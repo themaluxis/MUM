@@ -79,6 +79,9 @@ def add_server_setup(plugin_id):
             db.session.rollback()
             current_app.logger.error(f"Error adding media server during setup: {e}")
             flash(f'Error adding server: {str(e)}', 'danger')
+    else:
+        if request.method == 'POST':
+            current_app.logger.warning(f"Form validation failed. Errors: {form.errors}")
 
     return render_template('setup/add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
 

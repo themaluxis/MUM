@@ -310,6 +310,61 @@ def mass_update_user_libraries(user_ids: list[int], new_library_ids: list, admin
             raise Exception(f"Mass Update: DB commit failed: {e}")
     return processed_count, error_count
 
+def mass_update_user_libraries_by_server(user_ids: list[int], updates_by_server: dict, admin_id: int = None):
+    from app.models_media_services import UserMediaAccess
+
+    processed_count = 0
+    error_count = 0
+    
+    users_to_update = User.query.filter(User.id.in_(user_ids)).all()
+    user_map = {user.id: user for user in users_to_update}
+
+    for server_id, new_library_ids in updates_by_server.items():
+        server = MediaServiceManager.get_server_by_id(server_id)
+        if not server:
+            current_app.logger.error(f"Mass Update: Could not find server with ID {server_id}. Skipping.")
+            error_count += len(user_ids) # Or be more specific if you can map users to this server
+            continue
+
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service:
+            current_app.logger.error(f"Mass Update: Could not create service for server {server.name}. Skipping.")
+            error_count += len(user_ids)
+            continue
+
+        # Find which of the selected users have access to this server
+        access_records = UserMediaAccess.query.filter(UserMediaAccess.server_id == server_id, UserMediaAccess.user_id.in_(user_ids)).all()
+        
+        for access in access_records:
+            user = user_map.get(access.user_id)
+            if not user:
+                continue
+
+            try:
+                # This is a simplified update. The service method might need to be more generic.
+                if hasattr(service, 'update_user_access'):
+                    service.update_user_access(user.plex_user_id, new_library_ids) # Assumes plex_user_id is the key
+                
+                # Update the UserMediaAccess record
+                access.allowed_library_ids = new_library_ids
+                user.updated_at = datetime.utcnow()
+                processed_count += 1
+            except Exception as e:
+                current_app.logger.error(f"Mass Update Error for user {user.plex_username} on server {server.name}: {e}")
+                error_count += 1
+
+    if processed_count > 0 or error_count > 0:
+        try:
+            db.session.commit()
+            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Mass library update by server complete. Processed {processed_count} user-server relations with {error_count} errors.", admin_id=admin_id)
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Mass Update by Server: DB commit error: {e}")
+            raise
+
+    return processed_count, error_count
+
+
 def mass_update_bot_whitelist(user_ids: list[int], should_whitelist: bool, admin_id: int = None):
     users_to_update = User.query.filter(User.id.in_(user_ids)).all()
     updated_count = 0

@@ -53,18 +53,21 @@ class MediaServerForm(FlaskForm):
         from app.services.media_service_factory import MediaServiceFactory
         from app.models_plugins import Plugin
         
-        # Get available service types from plugins
+        # Get available service types from all discovered plugins, not just enabled ones
         available_services = []
-        plugins = Plugin.query.filter_by(is_enabled=True).all()
+        plugins = Plugin.query.all() # Changed from filter_by(is_enabled=True)
         
+        from app.services.plugin_manager import plugin_manager
         for plugin in plugins:
             try:
-                service_class = MediaServiceFactory.get_service_class(plugin.name)
-                if service_class:
-                    display_name = getattr(service_class, 'DISPLAY_NAME', plugin.name.title())
-                    available_services.append((plugin.name, display_name))
+                # Use the plugin manager to get the display name
+                plugin_info = plugin_manager.get_plugin_info(plugin.plugin_id)
+                if plugin_info:
+                    display_name = plugin_info.get('name', plugin.plugin_id.title())
+                    available_services.append((plugin.plugin_id, display_name))
             except Exception:
-                # Skip plugins that can't be loaded
+                # Fallback for any issues
+                available_services.append((plugin.plugin_id, plugin.plugin_id.title()))
                 continue
         
         # Sort by display name
@@ -209,6 +212,7 @@ class UserEditForm(FlaskForm): # As updated for whitelist fields
 
 class MassUserEditForm(FlaskForm): # As updated
     action = SelectField('Action', choices=[
+        ('update_libraries', 'Update Libraries'),
         ('extend_access', 'Extend Access by Days'),
         ('set_expiration', 'Set Expiration Date'),
         ('clear_expiration', 'Clear Expiration (Never Expire)'),
@@ -218,6 +222,7 @@ class MassUserEditForm(FlaskForm): # As updated
         ('unwhitelist_purge', 'Remove Purge Whitelist'),
         ('delete_users', 'Delete Users')
     ], validators=[DataRequired()])
+    libraries = SelectMultipleField('Libraries', coerce=str, validators=[Optional()])
     days_to_extend = IntegerField('Days to Extend', validators=[Optional(), NumberRange(min=1)])
     new_expiration_date = DateField('New Expiration Date', validators=[Optional(), date_not_in_past], format='%Y-%m-%d')
     confirm_delete = BooleanField('Confirm Deletion (for "Delete Users")', validators=[Optional()])

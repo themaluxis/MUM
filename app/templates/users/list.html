@@ -199,14 +199,12 @@
                 {{ mass_edit_form.action(class="select select-bordered", id="mass_edit_action_select") }}
             </div>
             <div id="mass_edit_libraries_section" class="form-control mb-4 hidden">
-                <label class="label"><span class="label-text">Set Access to Libraries...</span></label>
-                <div class="max-h-60 overflow-y-auto p-2 border border-base-300 rounded-md flex flex-col">
-                    {% for value, label in mass_edit_form.libraries.choices %}
-                    <label class="label cursor-pointer justify-start mb-1">
-                        <input type="checkbox" name="libraries" value="{{ value }}" class="checkbox checkbox-primary mr-2">
-                        <span class="label-text">{{ label }}</span>
-                    </label>
-                    {% endfor %}
+                <div id="mass_edit_libraries_content">
+                    <!-- Dynamic content will be loaded here -->
+                    <div class="text-center">
+                        <span class="loading loading-spinner"></span>
+                        <p>Loading libraries...</p>
+                    </div>
                 </div>
             </div>
             <div id="mass_edit_delete_confirmation_section" class="form-control mb-4 hidden">
@@ -417,8 +415,15 @@
                 if(deleteConfirmSection) deleteConfirmSection.classList.add('hidden');
                 const submitBtn = document.getElementById('mass_edit_submit_button');
                 if(submitBtn) submitBtn.disabled = (this.value === '');
+
                 if (this.value === 'update_libraries' && librariesSection) {
                     librariesSection.classList.remove('hidden');
+                    const userIds = Array.from(selectedUserIds).join(',');
+                    // Correctly trigger the HTMX request with proper options
+                    htmx.ajax('GET', `{{ url_for('users.mass_edit_libraries_form') }}?user_ids=${userIds}`, {
+                        target: '#mass_edit_libraries_content',
+                        swap: 'innerHTML'
+                    });
                 } else if (this.value === 'delete_users' && deleteConfirmSection) {
                     deleteConfirmSection.classList.remove('hidden');
                     if (submitBtn && confirmDeleteCheckbox) {

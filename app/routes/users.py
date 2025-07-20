@@ -135,10 +135,7 @@ def list_users():
         lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
         user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
 
-    mass_edit_form = MassUserEditForm()
-    mass_edit_form.libraries.choices = sorted(available_libraries.items(), key=lambda item: item[1].lower())
-    if mass_edit_form.libraries.data is None:
-        mass_edit_form.libraries.data = []  
+    mass_edit_form = MassUserEditForm()  
 
     default_inactive_days = 90
     default_exclude_sharers = True
@@ -417,6 +414,39 @@ def delete_user(user_id):
         response.headers['HX-Trigger'] = json.dumps(toast)
         return response
 
+@bp.route('/mass_edit_libraries_form')
+@login_required
+def mass_edit_libraries_form():
+    user_ids_str = request.args.get('user_ids', '')
+    if not user_ids_str:
+        return '<div class="alert alert-error">No users selected.</div>'
+    
+    user_ids = [int(uid) for uid in user_ids_str.split(',') if uid.isdigit()]
+    
+    # Group users by server
+    from app.models_media_services import UserMediaAccess, MediaServer
+    access_records = db.session.query(UserMediaAccess, User, MediaServer).join(User, UserMediaAccess.user_id == User.id).join(MediaServer, UserMediaAccess.server_id == MediaServer.id).filter(UserMediaAccess.user_id.in_(user_ids)).all()
+
+    servers_data = {}
+    for access, user, server in access_records:
+        if server.id not in servers_data:
+            service = MediaServiceFactory.create_service_from_db(server)
+            libraries = service.get_libraries() if service else []
+            servers_data[server.id] = {
+                'server_name': server.name,
+                'service_type': server.service_type.value,
+                'users': [],
+                'libraries': libraries,
+                'current_library_ids': set() # To store common libraries
+            }
+        servers_data[server.id]['users'].append(user)
+        if not servers_data[server.id]['current_library_ids']:
+            servers_data[server.id]['current_library_ids'].update(access.allowed_library_ids or [])
+        else:
+            servers_data[server.id]['current_library_ids'].intersection_update(access.allowed_library_ids or [])
+
+    return render_template('users/partials/_mass_edit_libraries.html', servers_data=servers_data)
+
 @bp.route('/mass_edit', methods=['POST'])
 @login_required
 @setup_required
@@ -455,9 +485,17 @@ def mass_edit_users():
         action = form.action.data
         try:
             if action == 'update_libraries':
-                new_library_ids = form.libraries.data or []
-                processed_count, error_count = user_service.mass_update_user_libraries(user_ids, new_library_ids, admin_id=current_user.id)
-                toast_message = f"Mass library update: {processed_count} processed, {error_count} errors."
+                # The new logic will parse libraries per server
+                updates_by_server = {}
+                for key, value in request.form.items():
+                    if key.startswith('libraries_server_'):
+                        server_id = int(key.split('_')[-1])
+                        if server_id not in updates_by_server:
+                            updates_by_server[server_id] = []
+                        updates_by_server[server_id] = request.form.getlist(key)
+
+                processed_count, error_count = user_service.mass_update_user_libraries_by_server(user_ids, updates_by_server, admin_id=current_user.id)
+                toast_message = f"Mass library update: {processed_count} users updated, {error_count} errors."
                 toast_category = "success" if error_count == 0 else "warning"
             elif action == 'delete_users':
                 if not form.confirm_delete.data:

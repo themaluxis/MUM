@@ -1,0 +1,28 @@
+<div id="mass_edit_libraries_content">
+    {% if not servers_data %}
+        <div class="alert alert-warning">Could not find server information for the selected users.</div>
+    {% else %}
+        {% for server_id, data in servers_data.items() %}
+            <div class="mb-6 p-4 border border-base-300 rounded-lg">
+                <h4 class="font-bold text-md mb-2 border-b border-base-300 pb-2">
+                    <i class="fa-solid fa-server mr-2"></i>{{ data.server_name }} <span class="badge badge-ghost">{{ data.service_type }}</span>
+                </h4>
+                <p class="text-xs text-base-content/70 mb-2">
+                    Applies to users: {{ data.users|map(attribute='plex_username')|join(', ') }}
+                </p>
+                <div class="max-h-48 overflow-y-auto p-2 border border-base-300 rounded-md flex flex-col">
+                    {% for library in data.libraries %}
+                        <label class="label cursor-pointer justify-start mb-1">
+                            <input type="checkbox" name="libraries_server_{{ server_id }}" value="{{ library.id }}" 
+                                   class="checkbox checkbox-primary mr-2"
+                                   {% if library.id in data.current_library_ids %}checked{% endif %}>
+                            <span class="label-text">{{ library.name }}</span>
+                        </label>
+                    {% else %}
+                        <span class="text-sm italic text-base-content/70">No libraries found for this server.</span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
