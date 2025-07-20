@@ -80,6 +80,14 @@ class PluginManager:
     
     def initialize_core_plugins(self):
         """Initialize core plugins in the database"""
+        try:
+            # Check if plugins table exists by attempting a simple query
+            Plugin.query.first()
+        except Exception as e:
+            # If plugins table doesn't exist yet (during migrations), skip initialization
+            current_app.logger.warning(f"Plugins table not available during initialization: {e}")
+            return
+            
         for plugin_id, plugin_info in self._core_plugins.items():
             existing = Plugin.query.filter_by(plugin_id=plugin_id).first()
             

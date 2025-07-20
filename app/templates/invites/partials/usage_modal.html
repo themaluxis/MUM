@@ -22,7 +22,7 @@
         <tbody>
             {% for usage in usages %}
             <tr class="hover">
-                <td title="{{ usage.used_at | format_datetime_human }}">
+                <td title="{{ usage.used_at | format_datetime_user }}">
                     {{ usage.used_at | time_ago }}
                 </td>
                 <td>

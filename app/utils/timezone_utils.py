@@ -63,3 +63,56 @@ def format_datetime_human(dt: Optional[datetime], include_time: bool = True) -> 
         return format_datetime(local_dt, "%Y-%m-%d %I:%M %p", show_timezone=True)
     else:
         return format_datetime(local_dt, "%Y-%m-%d", show_timezone=False)
+
+def get_all_timezones():
+    """Get a list of all available timezone names."""
+    return pytz.all_timezones
+
+def format_datetime_user(dt: Optional[datetime], include_time: bool = True) -> str:
+    """Format datetime based on the current user's timezone preference."""
+    if dt is None:
+        return "N/A"
+
+    from flask_login import current_user
+    from app.models import UserPreferences
+
+    if not current_user.is_authenticated:
+        return format_datetime(dt)
+
+    prefs = UserPreferences.get_timezone_preference(current_user.id)
+    preference = prefs.get('preference', 'local')
+    local_timezone_str = prefs.get('local_timezone')
+    time_format = prefs.get('time_format', '12')
+
+    if include_time:
+        if time_format == '24':
+            format_str = '%Y-%m-%d %H:%M:%S'
+        else:
+            format_str = '%Y-%m-%d %I:%M:%S %p'
+    else:
+        format_str = '%Y-%m-%d'
+
+    if preference == 'utc':
+        # Ensure datetime is in UTC for display
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        utc_dt = dt.astimezone(timezone.utc)
+        return f"{utc_dt.strftime(format_str)} UTC"
+    
+    if local_timezone_str:
+        try:
+            local_tz = pytz.timezone(local_timezone_str)
+            # Ensure datetime has timezone info before conversion
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            local_dt = dt.astimezone(local_tz)
+            if include_time:
+                return local_dt.strftime(f'{format_str} %Z')
+            return local_dt.strftime(format_str)
+        except pytz.UnknownTimeZoneError:
+            # Fallback to app timezone if user's timezone is invalid
+            return format_datetime(dt)
+    
+    # Fallback to app timezone
+    return format_datetime(dt)
+

@@ -328,3 +328,47 @@ class StreamHistory(db.Model):
 
     def __repr__(self):
         return f'<StreamHistory {self.id} by {self.user.plex_username}>'
+
+class UserPreferences(db.Model):
+    __tablename__ = 'user_preferences'
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('admin_accounts.id'), unique=True, nullable=False)
+    
+    # This field will store the user's choice: 'local' or 'utc'
+    timezone_preference = db.Column(db.String(10), default='local', nullable=False)
+    
+    # This field will store the browser-detected timezone name (e.g., 'America/New_York')
+    local_timezone = db.Column(db.String(100), nullable=True)
+    
+    # This field will store the user's time format preference: '12' or '24'
+    time_format = db.Column(db.String(2), default='12', nullable=False)
+    
+    def __repr__(self):
+        return f'<UserPreferences for Admin {self.admin_id}>'
+    
+    @staticmethod
+    def get_timezone_preference(admin_id):
+        prefs = UserPreferences.query.filter_by(admin_id=admin_id).first()
+        if prefs:
+            return {
+                "preference": prefs.timezone_preference,
+                "local_timezone": prefs.local_timezone,
+                "time_format": prefs.time_format
+            }
+        return {"preference": "local", "local_timezone": None, "time_format": "12"}
+    
+    @staticmethod
+    def set_timezone_preference(admin_id, preference, local_timezone=None, time_format=None):
+        prefs = UserPreferences.query.filter_by(admin_id=admin_id).first()
+        if not prefs:
+            prefs = UserPreferences(admin_id=admin_id)
+            db.session.add(prefs)
+        
+        prefs.timezone_preference = preference
+        if preference == 'local' and local_timezone:
+            prefs.local_timezone = local_timezone
+        if time_format:
+            prefs.time_format = time_format
+        
+        db.session.commit()
+        return prefs

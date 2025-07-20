@@ -17,9 +17,9 @@
             <tbody>
                 {% for log in logs.items %}
                 <tr class="hover">
-                    <td class="whitespace-nowrap" title="{{ log.timestamp | format_datetime_human }}">
+                    <td class="whitespace-nowrap" title="{{ log.timestamp | format_datetime_user }}">
                         {{ log.timestamp | time_ago }}
-                        <div class="text-xs opacity-60 lg:hidden">{{ log.timestamp | format_datetime_human(include_time=False) }}</div>
+                        <div class="text-xs opacity-60 lg:hidden">{{ log.timestamp | format_datetime_user(include_time=False) }}</div>
                     </td>
                     <td>
                         <span class="badge badge-sm badge-outline inline-block whitespace-nowrap badge-{{ log.event_type.name | lower | replace('_', '-') }}">{{ log.event_type.name | title | replace('_', ' ') }}</span>

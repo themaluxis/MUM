@@ -8,6 +8,7 @@ from wtforms.widgets import ListWidget, CheckboxInput # <--- ADDED THIS IMPORT
 import urllib.parse 
 from flask_login import current_user
 from datetime import date
+from app.utils.timezone_utils import get_all_timezones
 
 def date_not_in_past(form, field):
     if field.data and field.data < date.today():
@@ -431,181 +432,6 @@ class PluginSettingsForm(FlaskForm):
     
     submit = SubmitField('Create Invite')
 
-class InviteEditForm(FlaskForm):
-    # Note: custom_path is intentionally omitted as it should not be editable.
-    expires_in_days = IntegerField('Expiration', validators=[Optional(), NumberRange(min=0)], default=0)
-    clear_expiry = BooleanField('Clear Expiration (Set to Never Expire)', default=False)
-    
-    number_of_uses = IntegerField('Number of Uses', validators=[Optional(), NumberRange(min=0)], default=0)
-    clear_max_uses = BooleanField('Clear Max Uses (Set to Unlimited)', default=False)
-    
-    membership_duration_days = IntegerField('Membership Duration (days)', validators=[Optional(), NumberRange(min=1)], default=None)
-    clear_membership_duration = BooleanField('Clear Membership Duration (Set to Permanent)', default=False)
-    
-    libraries = SelectMultipleField('Grant Access to Libraries', coerce=str, validators=[Optional()])
-    allow_downloads = BooleanField('Enable Downloads (Allow Sync)', default=False)
-    invite_to_plex_home = BooleanField('Invite to Plex Home', default=False)
-    allow_live_tv = BooleanField('Allow Live TV Access', default=False)
-    
-    override_force_discord_auth = BooleanField("Override 'Make Discord Login Mandatory'")
-    override_force_guild_membership = BooleanField("Override 'Require Discord Server Membership'")
-    grant_purge_whitelist = BooleanField('Whitelist user from Inactivity Purge')
-    grant_bot_whitelist = BooleanField('Whitelist user from Discord Bot Actions')
-    submit = SubmitField('Save Changes')
-
-class PurgeUsersForm(FlaskForm):
-    inactive_days = IntegerField(
-        'Days of Inactivity', 
-        validators=[DataRequired(), NumberRange(min=1)], 
-        default=30,
-        description="Users inactive for this many days will be purged."
-    )
-    exclude_sharers = BooleanField('Exclude users who share back their servers', default=True)
-    submit = SubmitField('Preview Purge')
-
-class SetPasswordForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
-    password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
-    confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('password', message='Passwords must match.')])
-    submit_set_password = SubmitField('Set Username & Password')
-
-    def validate_username(self, field):
-        from app.models import AdminAccount
-        if AdminAccount.query.filter_by(username=field.data).first():
-            raise ValidationError('Username already exists. Choose a different one.')
-
-class ChangePasswordForm(FlaskForm):
-    current_password = PasswordField('Current Password', validators=[DataRequired()])
-    new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
-    confirm_new_password = PasswordField(
-        'Confirm New Password', 
-        validators=[DataRequired(), EqualTo('new_password', message='Passwords must match.')]
-    )
-    submit_change_password = SubmitField('Change Password')
-
-class AdminCreateForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
-    password = PasswordField('Temporary Password', validators=[DataRequired(), Length(min=8)])
-    confirm_password = PasswordField('Confirm Temporary Password', validators=[DataRequired(), EqualTo('password')])
-    submit = SubmitField('Create Admin')
-
-    def validate_username(self, field):
-        from app.models import AdminAccount
-        if AdminAccount.query.filter_by(username=field.data).first():
-            raise ValidationError('Username already exists. Choose a different one.')
-
-class AdminEditForm(FlaskForm):
-    username = StringField('Username', render_kw={'readonly': True})
-    roles = SelectMultipleField('Roles', coerce=int, validators=[Optional()])
-    is_discord_bot_whitelisted = BooleanField('Whitelist from Discord Bot Actions')
-    is_purge_whitelisted = BooleanField('Whitelist from Inactivity Purge')
-    
-    def __init__(self, *args, **kwargs):
-        super(AdminEditForm, self).__init__(*args, **kwargs)
-        from app.models import Role
-        self.roles.choices = [(role.id, role.name) for role in Role.query.all()]
-    
-    submit = SubmitField('Save Changes')
-
-class RoleCreateForm(FlaskForm):
-    name = StringField('Role Name', validators=[DataRequired(), Length(min=3, max=80)])
-    description = StringField('Description', validators=[Optional(), Length(max=255)])
-    color = StringField('Badge Color', default='#808080', validators=[
-        Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g., #FF5733)')
-    ])
-    icon = StringField('Badge Icon Classes', validators=[
-        Optional(), Length(max=100)
-    ], description='CSS classes for the badge icon (e.g., "fas fa-star")')
-    
-    # Permissions
-    can_manage_users = BooleanField('Can Manage Users')
-    can_manage_invites = BooleanField('Can Manage Invites') 
-    can_manage_settings = BooleanField('Can Manage Settings')
-    can_view_logs = BooleanField('Can View Logs')
-    
-    submit = SubmitField('Create Role')
-
-class RoleEditForm(FlaskForm):
-    name = StringField('Role Name', validators=[DataRequired(), Length(min=3, max=80)])
-    description = StringField('Description', validators=[Optional(), Length(max=255)])
-    color = StringField('Badge Color', default='#808080', validators=[
-        Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g., #FF5733)')
-    ])
-    icon = StringField('Badge Icon Classes', validators=[
-        Optional(), Length(max=100)
-    ], description='CSS classes for the badge icon (e.g., "fas fa-star")')
-    
-    # Permissions
-    can_manage_users = BooleanField('Can Manage Users')
-    can_manage_invites = BooleanField('Can Manage Invites') 
-    can_manage_settings = BooleanField('Can Manage Settings')
-    can_view_logs = BooleanField('Can View Logs')
-    
-    submit = SubmitField('Save Changes')
-
-class RoleMemberForm(FlaskForm):
-    # This is the corrected field definition
-    admins_to_add = SelectMultipleField(
-        'Add Admins to Role', 
-        coerce=int, 
-        validators=[Optional()],
-        widget=ListWidget(prefix_label=False), 
-        option_widget=CheckboxInput()
-    )
-    submit_add_members = SubmitField('Add to Role')
-
-class AdminResetPasswordForm(FlaskForm):
-    new_password = PasswordField(
-        'New Temporary Password', 
-        validators=[DataRequired(), Length(min=8)]
-    )
-    confirm_new_password = PasswordField(
-        'Confirm Temporary Password', 
-        validators=[DataRequired(), EqualTo('new_password', message='Passwords must match.')]
-    )
-    submit_reset_password = SubmitField('Set New Password')
-
-class PluginSettingsForm(FlaskForm):
-    enabled_plugins = SelectMultipleField('Enabled Plugins', coerce=str, validators=[Optional()])
-    submit = SubmitField('Save Changes', message="Letters, numbers, hyphens, underscores only.", description="e.g., 'friends' -> /invite/friends")
-    
-    expires_at = DateField('Expiration Date', validators=[Optional(), date_not_in_past], description="Invite is valid until the end of this day. Leave blank for no expiry.")
-    
-    number_of_uses = IntegerField('Number of Uses', validators=[Optional(), NumberRange(min=0)], default=0, description="0 for unlimited uses.")
-    libraries = SelectMultipleField('Grant Access to Libraries', coerce=str, validators=[Optional()], description="Default: all libraries.")
-    allow_downloads = BooleanField('Enable Downloads (Allow Sync)', default=False, description="Allow the invited user to download/sync content from shared libraries.")
-    invite_to_plex_home = BooleanField('Invite to Plex Home', default=False, description="Invite the user to your Plex Home. This allows them to switch between users.")
-    allow_live_tv = BooleanField('Allow Live TV Access', default=False, description="Grant access to Live TV and DVR.")
-    
-    membership_expires_at = DateField(
-        'Membership Expiration Date', 
-        validators=[Optional(), date_not_in_past],
-        description="User's access will expire at the end of this day. Leave blank for permanent access."
-    )
-    
-    override_force_discord_auth = BooleanField(
-        "Override 'Make Discord Login Mandatory'",
-        default=False, # The route will set the default based on global settings
-        description="Override the global setting for requiring Discord login for this specific invite."
-    )
-    override_force_guild_membership = BooleanField(
-        "Override 'Require Discord Server Membership'",
-        default=False, # The route will set the default based on global settings
-        description="Override the global setting for requiring server membership for this specific invite."
-    )
-    grant_purge_whitelist = BooleanField(
-        'Whitelist user from Inactivity Purge',
-        default=False,
-        description="The created user will be automatically whitelisted from inactivity purges."
-    )
-    grant_bot_whitelist = BooleanField(
-        'Whitelist user from Discord Bot Actions',
-        default=False,
-        description="The created user will be immune to automated Discord Bot actions."
-    )
-    
-    submit = SubmitField('Create Invite')
-
 class GeneralSettingsForm(FlaskForm): # As before
     app_name = StringField("Application Name", validators=[Optional(), Length(max=100)])
     app_base_url = StringField(
@@ -614,3 +440,21 @@ class GeneralSettingsForm(FlaskForm): # As before
         description="Full public URL where this application is accessible. Essential for generating correct invite and callback links."
     )
     submit = SubmitField('Save General Settings')
+
+    def __init__(self, *args, **kwargs):
+        super(GeneralSettingsForm, self).__init__(*args, **kwargs)
+
+class TimezonePreferenceForm(FlaskForm):
+    timezone_preference = SelectField(
+        'Display Time In',
+        choices=[('local', 'My Timezone'), ('utc', 'UTC')],
+        validators=[DataRequired()]
+    )
+    time_format = SelectField(
+        'Time Format',
+        choices=[('12', '12-hour (AM/PM)'), ('24', '24-hour')],
+        validators=[DataRequired()],
+        default='12'
+    )
+    local_timezone = HiddenField() # This will be populated by JavaScript
+    submit = SubmitField('Save Timezone Setting')

@@ -40,6 +40,12 @@
                 {% do query_params.update({'sort_by': next_sort_streamed}) %}
                 <th data-col="last_streamed"><a href="{{ url_for('users.list_users', **query_params) }}" hx-get="{{ url_for('users.list_users', **query_params) }}" hx-target="#user-list-container" hx-swap="innerHTML" hx-push-url="true" class="link link-hover">Last Streamed {% if sort_column == 'last_streamed' %}<i class="fa-solid fa-sort-{{ 'down' if sort_direction == 'desc' else 'up' }} ml-1"></i>{% endif %}</a></th>
                 
+                {% set next_sort_created_at = 'created_at_desc' if sort_column == 'created_at' and sort_direction == 'asc' else 'created_at_asc' %}
+                {% do query_params.update({'sort_by': next_sort_created_at}) %}
+                <th data-col="mum_added_date"><a href="{{ url_for('users.list_users', **query_params) }}" hx-get="{{ url_for('users.list_users', **query_params) }}" hx-target="#user-list-container" hx-swap="innerHTML" hx-push-url="true" class="link link-hover">MUM Added Date {% if sort_column == 'created_at' %}<i class="fa-solid fa-sort-{{ 'down' if sort_direction == 'desc' else 'up' }} ml-1"></i>{% endif %}</a></th>
+                
+                <th data-col="last_played">Last Played</th>
+                
                 <th class="text-center" data-col="actions">Actions</th>
             </tr>
         </thead>
@@ -66,16 +72,16 @@
                 </td>
                 <td data-col="email" class="text-sm truncate max-w-xs" title="{{ user.plex_email or 'No email' }}">{{ user.plex_email or 'N/A' }}</td>
                 <td data-col="plex_join_date" class="text-sm">
-                    {{ user.plex_join_date | format_datetime_human(include_time=False) if user.plex_join_date else 'N/A' }}
+                    {{ user.plex_join_date | format_datetime_user if user.plex_join_date else 'N/A' }}
                 </td>
                 <td data-col="last_known_ip" class="text-sm font-mono">
-                    {{ last_ips.get(user.id, 'N/A') }}
+                    {{ user.last_known_ip }}
                 </td>
                 <td data-col="total_plays" class="text-sm">
-                    {{ stream_stats.get(user.id, {}).get('play_count', 0) }}
+                    {{ user.total_plays }}
                 </td>
                 <td data-col="total_duration" class="text-sm">
-                    {{ stream_stats.get(user.id, {}).get('total_duration', 0) | format_duration }}
+                    {{ user.total_duration | format_duration }}
                 </td>
                 <td data-col="status">
                     {% if user.is_home_user %}<span class="badge badge-primary badge-sm whitespace-nowrap" title="Plex Home User"><i class="fa-solid fa-home"></i>Home</span>{% endif %}
@@ -119,17 +125,41 @@
                         <span class="opacity-60">No libraries specifically shared.</span>
                     {% endif %}
                 </td>
-                <td data-col="last_streamed" class="text-sm" title="{{ user.last_streamed_at | format_datetime_human if user.last_streamed_at else 'Never' }}">
-                    <div title="{{ user.last_streamed_at | format_datetime_human if user.last_streamed_at else 'Never streamed' }}">
-                        {{ user.last_streamed_at | time_ago if user.last_streamed_at else 'Never' }}
-                    </div>
-                    <div class="text-xs opacity-50" title="Added {{ user.created_at | format_datetime_human if user.created_at else 'N/A' }}">
-                        Added: {{ user.created_at | time_ago if user.created_at else 'N/A' }}
+                <td data-col="last_streamed" class="text-sm" title="{{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}">
+                    <div title="{{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never streamed' }}">
+                        {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}
                     </div>
                     {% if user.access_expires_at %}
-                        <div class="text-xs text-warning mt-0.5" title="Access expires on {{ user.access_expires_at | format_datetime_human }}">
-                            <i class="fa-solid fa-hourglass-end fa-fw"></i> Expires: {{ user.access_expires_at | time_ago }}
+                        <div class="text-xs text-warning mt-0.5" title="Access expires on {{ user.access_expires_at | format_datetime_user }}">
+                            <i class="fa-solid fa-hourglass-end fa-fw"></i> Expires: {{ user.access_expires_at | format_datetime_user }}
                         </div>
+                    {% endif %}
+                </td>
+                <td data-col="mum_added_date" class="text-sm" title="{{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}">
+                    {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}
+                </td>
+                <td data-col="last_played" class="text-sm">
+                    {% set last_played = user_last_played.get(user.id) %}
+                    {% if last_played %}
+                        {% if last_played.rating_key %}
+                        <div class="relative group">
+                            <span class="cursor-help hover:text-primary">{{ last_played.media_title or 'Unknown Title' }}</span>
+                            <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-[9999] pointer-events-none">
+                                <div class="bg-base-100 border rounded-lg shadow-lg p-2 w-64">
+                                    <img src="{{ url_for('api.plex_image_proxy', path=('/library/metadata/' + last_played.rating_key + '/thumb')) }}" 
+                                         alt="{{ last_played.media_title }}" 
+                                         class="w-full h-auto rounded"
+                                         onerror="this.parentElement.parentElement.style.display='none'">
+                                    <div class="text-center text-sm font-semibold mt-2">{{ last_played.media_title }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <span>{{ last_played.media_title or 'Unknown Title' }}</span>
+                        {% endif %}
+                        <div class="text-xs opacity-60">{{ last_played.started_at | format_datetime_user if last_played.started_at else 'N/A' }}</div>
+                    {% else %}
+                        Never
                     {% endif %}
                 </td>
                 <td class="text-center" data-col="actions">

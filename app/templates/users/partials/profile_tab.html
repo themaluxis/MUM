@@ -1,7 +1,7 @@
 <!-- File: app/templates/users/_profile_tab.html -->
-{# Expects 'stream_stats' and 'user' in context #}
+{# Expects 'user' in context, with 'stream_stats' attached to it #}
 
-{% if stream_stats %}
+{% if user.stream_stats %}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
     
     {# --- START MODIFICATION --- #}
@@ -12,8 +12,16 @@
         <div class="space-y-2 text-sm p-4 bg-base-200 rounded-lg shadow-md">
            <p><strong>Plex Email:</strong> {{ user.plex_email or 'N/A' }}</p>
            <p><strong>Plex User ID:</strong> {{ user.plex_user_id or 'N/A' }}</p>
-           <p><strong>Account Added:</strong> {{ user.created_at | format_datetime_human }}</p>
+           <p><strong>Plex Join Date:</strong> {{ user.plex_join_date | format_datetime_user(include_time=False) if user.plex_join_date else 'N/A' }}</p>
+           <p><strong>Last Known IP:</strong> <span class="font-mono">{{ user.last_known_ip }}</span></p>
+           <p><strong>Account Added:</strong> {{ user.created_at | format_datetime_user }}</p>
            <p><strong>Last Synced:</strong> {{ user.last_synced_with_plex | time_ago if user.last_synced_with_plex else 'Never' }}</p>
+           
+           <div class="divider my-2"></div>
+
+           <h4 class="font-semibold pt-1">Lifetime Stats</h4>
+           <p><strong>Total Plays:</strong> {{ user.total_plays }}</p>
+           <p><strong>Total Watchtime:</strong> {{ user.total_duration | format_duration }}</p>
            
            <div class="divider my-2"></div>
            
@@ -40,9 +48,9 @@
                     <div class="card-body p-4">
                         <h4 class="card-title text-sm font-normal text-base-content/70">Last 24 hours</h4>
                         <div class="flex items-end space-x-2 mt-1">
-                            <span class="text-3xl font-bold text-primary">{{ stream_stats.global.plays_24h }}</span>
+                            <span class="text-3xl font-bold text-primary">{{ user.stream_stats.global.plays_24h }}</span>
                             <span class="pb-1 text-base-content/80">plays</span>
-                            <p class="text-sm font-medium">{{ stream_stats.global.duration_24h }}</p>
+                            <p class="text-sm font-medium">{{ user.stream_stats.global.duration_24h }}</p>
                         </div>
                     </div>
                 </div>
@@ -51,9 +59,9 @@
                     <div class="card-body p-4">
                         <h4 class="card-title text-sm font-normal text-base-content/70">Last 7 days</h4>
                         <div class="flex items-end space-x-2 mt-1">
-                            <span class="text-3xl font-bold text-primary">{{ stream_stats.global.plays_7d }}</span>
+                            <span class="text-3xl font-bold text-primary">{{ user.stream_stats.global.plays_7d }}</span>
                             <span class="pb-1 text-base-content/80">plays</span>
-                            <p class="text-sm font-medium">{{ stream_stats.global.duration_7d }}</p>
+                            <p class="text-sm font-medium">{{ user.stream_stats.global.duration_7d }}</p>
                         </div>
                     </div>
                 </div>
@@ -62,9 +70,9 @@
                     <div class="card-body p-4">
                         <h4 class="card-title text-sm font-normal text-base-content/70">Last 30 days</h4>
                         <div class="flex items-end space-x-2 mt-1">
-                            <span class="text-3xl font-bold text-primary">{{ stream_stats.global.plays_30d }}</span>
+                            <span class="text-3xl font-bold text-primary">{{ user.stream_stats.global.plays_30d }}</span>
                             <span class="pb-1 text-base-content/80">plays</span>
-                            <p class="text-sm font-medium">{{ stream_stats.global.duration_30d }}</p>
+                            <p class="text-sm font-medium">{{ user.stream_stats.global.duration_30d }}</p>
                         </div>
                     </div>
                 </div>
@@ -73,9 +81,9 @@
                     <div class="card-body p-4">
                         <h4 class="card-title text-sm font-normal text-base-content/70">All Time</h4>
                         <div class="flex items-end space-x-2 mt-1">
-                            <span class="text-3xl font-bold text-primary">{{ stream_stats.global.all_time_plays }}</span>
+                            <span class="text-3xl font-bold text-primary">{{ user.stream_stats.global.all_time_plays }}</span>
                             <span class="pb-1 text-base-content/80">plays</span>
-                            <p class="text-sm font-medium">{{ stream_stats.global.all_time_duration }}</p>
+                            <p class="text-sm font-medium">{{ user.stream_stats.global.all_time_duration }}</p>
                         </div>
                     </div>
                 </div>
@@ -87,7 +95,7 @@
         <div>
             <h3 class="text-xl font-bold mb-4">Player Stats</h3>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {% for player in stream_stats.players %}
+                {% for player in user.stream_stats.players %}
                 <div class="card bg-base-200 shadow-md text-center items-center">
                     <div class="card-body p-4">
                         {# Player icon #}
@@ -95,7 +103,7 @@
                             {% if 'xbox' in player.name.lower() %}
                                 <div class="w-10 h-10 mx-auto bg-green-600 rounded-lg flex items-center justify-center">
                                     <i class="fab fa-xbox text-white text-lg"></i>
-                                </div>
+                                 </div>
                             {% elif 'apple' in player.name.lower() or 'tv' in player.name.lower() %}
                                 <div class="w-10 h-10 mx-auto bg-gray-600 rounded-lg flex items-center justify-center">
                                     <i class="fab fa-apple text-white text-lg"></i>

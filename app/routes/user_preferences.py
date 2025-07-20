@@ -1,2 +1,23 @@
-# This file is deprecated and will be removed in a future update.
-# The functionality has been moved to app/routes/users.py
+
+from flask import Blueprint, render_template, redirect, url_for, flash
+from flask_login import login_required, current_user
+from app.forms import TimezonePreferenceForm
+from app.models import UserPreferences
+
+user_preferences_bp = Blueprint('user_preferences', __name__)
+
+@user_preferences_bp.route('/settings/timezone', methods=['POST'])
+@login_required
+def set_timezone():
+    form = TimezonePreferenceForm()
+    if form.validate_on_submit():
+        UserPreferences.set_timezone_preference(
+            admin_id=current_user.id,
+            preference=form.timezone_preference.data,
+            local_timezone=form.local_timezone.data,
+            time_format=form.time_format.data
+        )
+        flash('Timezone preference saved.', 'success')
+    else:
+        flash('Could not save timezone preference.', 'error')
+    return redirect(url_for('dashboard.settings_general'))

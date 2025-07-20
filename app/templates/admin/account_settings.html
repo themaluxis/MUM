@@ -132,8 +132,27 @@
                 </div>
             </div>
             {% endif %}
+
+            <div class="mt-8">
+                {% include 'admin/partials/timezone_form.html' %}
+            </div>
         </div>
         
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const timezoneForm = document.getElementById('timezoneForm');
+        if (timezoneForm) {
+            const localTimezoneInput = timezoneForm.querySelector('input[name="local_timezone"]');
+            if (localTimezoneInput) {
+                localTimezoneInput.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            }
+        }
+    });
+</script>
 {% endblock %}

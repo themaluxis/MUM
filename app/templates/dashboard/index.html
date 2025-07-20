@@ -72,7 +72,7 @@
                     <tbody>
                         {% for activity in recent_activities %}
                         <tr>
-                            <td class="hidden sm:table-cell" title="{{ activity.timestamp | format_datetime_human }}">
+                            <td class="hidden sm:table-cell" title="{{ activity.timestamp | format_datetime_user }}">
                                 {{ activity.timestamp | time_ago }}
                             </td>
                             <td>

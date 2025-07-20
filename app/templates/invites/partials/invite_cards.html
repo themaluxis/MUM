@@ -18,8 +18,8 @@
             </div>
 
             <div class="text-xs space-y-1 mb-3">
-                <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Created: {{ invite.created_at | time_ago if invite.created_at else 'N/A' }}</p>
-                <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-error' if invite.is_expired else 'text-success' }}"></i> Expires: {{ invite.expires_at | time_ago if invite.expires_at else 'Never' }}</p>
+                <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Created: {{ invite.created_at | format_datetime_user if invite.created_at else 'N/A' }}</p>
+                <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-error' if invite.is_expired else 'text-success' }}"></i> Expires: {{ invite.expires_at | format_datetime_user if invite.expires_at else 'Never' }}</p>
                 <p><i class="fa-solid fa-users-line fa-fw mr-1 text-info"></i> Uses: {{ invite.current_uses }} / {{ invite.max_uses or '∞' }}</p>
                 <p><i class="fa-solid fa-circle-question text-violet-600"></i> Status: 
                     {% if not invite.is_active %} <span class="badge badge-error badge-xs">Deactivated</span>

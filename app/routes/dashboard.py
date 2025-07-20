@@ -5,9 +5,9 @@ from flask import (
 )
 from flask_login import login_required, current_user, logout_user 
 import secrets
-from app.models import User, Invite, HistoryLog, Setting, EventType, SettingValueType, AdminAccount, Role 
+from app.models import User, Invite, HistoryLog, Setting, EventType, SettingValueType, AdminAccount, Role, UserPreferences 
 from app.forms import (
-    GeneralSettingsForm, DiscordConfigForm, SetPasswordForm, ChangePasswordForm, AdminCreateForm, AdminEditForm, RoleEditForm, RoleCreateForm, RoleMemberForm, AdminResetPasswordForm, PluginSettingsForm
+    GeneralSettingsForm, DiscordConfigForm, SetPasswordForm, ChangePasswordForm, AdminCreateForm, AdminEditForm, RoleEditForm, RoleCreateForm, RoleMemberForm, AdminResetPasswordForm, PluginSettingsForm, TimezonePreferenceForm
     # If you create an AdvancedSettingsForm, import it here too.
 )
 from app.extensions import db, scheduler # For db.func.now() if used, or db specific types
@@ -192,7 +192,18 @@ def settings_general():
 def settings_account():
     set_password_form = SetPasswordForm()
     change_password_form = ChangePasswordForm()
-    
+    timezone_form = TimezonePreferenceForm()
+
+    if 'submit_timezone' in request.form and timezone_form.validate_on_submit():
+        UserPreferences.set_timezone_preference(
+            admin_id=current_user.id,
+            preference=timezone_form.timezone_preference.data,
+            local_timezone=timezone_form.local_timezone.data,
+            time_format=timezone_form.time_format.data
+        )
+        flash('Timezone preference saved.', 'success')
+        return redirect(url_for('dashboard.settings_account'))
+
     # --- Handle "Change Password" Form Submission ---
     if 'submit_change_password' in request.form and change_password_form.validate_on_submit():
         admin = AdminAccount.query.get(current_user.id)
@@ -218,11 +229,18 @@ def settings_account():
         flash('Username and password have been set successfully!', 'success')
         return redirect(url_for('dashboard.settings_account'))
 
+    if request.method == 'GET':
+        prefs = UserPreferences.get_timezone_preference(current_user.id)
+        timezone_form.timezone_preference.data = prefs.get('preference')
+        timezone_form.local_timezone.data = prefs.get('local_timezone')
+        timezone_form.time_format.data = prefs.get('time_format', '12')
+
     return render_template(
         'admin/account_settings.html', #<-- Render the new standalone template
         title="My Account",
         set_password_form=set_password_form,
         change_password_form=change_password_form,
+        timezone_form=timezone_form
     )
 
 

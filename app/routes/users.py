@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, current_app, session, mak
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
 from app.models import User, Setting, EventType, AdminAccount, StreamHistory
-from app.models_media_services import ServiceType
+from app.models_media_services import ServiceType, MediaStreamHistory
 from app.models_media_services import ServiceType
 from app.forms import UserEditForm, MassUserEditForm
 from app.extensions import db
@@ -132,6 +132,13 @@ def list_users():
     # Fetch additional data for the current page
     stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
     last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
+
+    # Attach the additional data directly to each user object
+    for user in users_on_page:
+        stats = stream_stats.get(user.id, {})
+        user.total_plays = stats.get('play_count', 0)
+        user.total_duration = stats.get('total_duration', 0)
+        user.last_known_ip = last_ips.get(user.id, 'N/A')
     
     # Get library access info for each user, and sort it
     user_library_access = {}
@@ -175,6 +182,31 @@ def list_users():
             "name": f"{server.name} ({server.service_type.value.capitalize()})"
         })
 
+    # Get last played content for each user
+    user_last_played = {}
+    user_ids_on_page = [user.id for user in users_pagination.items]
+    if user_ids_on_page:
+        # Get the most recent stream for each user from StreamHistory table
+        from sqlalchemy import desc
+        last_streams = db.session.query(StreamHistory).filter(
+            StreamHistory.user_id.in_(user_ids_on_page)
+        ).order_by(StreamHistory.user_id, desc(StreamHistory.started_at)).all()
+        
+        # Group by user_id and take the first (most recent) for each user
+        seen_users = set()
+        for stream in last_streams:
+            if stream.user_id not in seen_users:
+                user_last_played[stream.user_id] = {
+                    'media_title': stream.media_title,
+                    'media_type': stream.media_type,
+                    'grandparent_title': stream.grandparent_title,
+                    'parent_title': stream.parent_title,
+                    'started_at': stream.started_at,
+                    'rating_key': stream.rating_key,
+                    'server_id': None  # StreamHistory doesn't have server_id
+                }
+                seen_users.add(stream.user_id)
+
     template_context = {
         'title': "Managed Users",
         'users': users_pagination,
@@ -182,6 +214,7 @@ def list_users():
         'stream_stats': stream_stats,
         'last_ips': last_ips,
         'user_library_access': user_library_access,
+        'user_last_played': user_last_played,
         'user_sorted_libraries': user_sorted_libraries,
         'current_view': view_mode,
         'available_libraries': available_libraries,
@@ -610,7 +643,6 @@ def mass_edit_users():
     # Get library access info for each user
     user_library_access = {}
     from app.models_media_services import UserMediaAccess
-    user_ids_on_page = [user.id for user in users_pagination.items]
     access_records = UserMediaAccess.query.filter(UserMediaAccess.user_id.in_(user_ids_on_page)).all()
     for access in access_records:
         if access.user_id not in user_library_access:

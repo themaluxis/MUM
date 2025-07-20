@@ -27,7 +27,7 @@
                         <a href="{{ invite.get_full_url(g.app_base_url) }}" target="_blank" class="btn btn-xs btn-ghost p-1" title="Open link in new tab">
                             <i class="fa-solid fa-external-link-alt fa-xs"></i>
                         </a>
-                        <div class="text-xs opacity-60">Created: {{ invite.created_at | time_ago }}</div>
+                        <div class="text-xs opacity-60">Created: {{ invite.created_at | format_datetime_user }}</div>
                     </td>
                     <td class="text-xs">
                         {% set granted_ids = invite.grant_library_ids or [] %}
@@ -44,9 +44,9 @@
                         {% endif %}
                     </td>
                     <td class="text-sm">{{ invite.current_uses }} / {{ invite.max_uses or '∞' }}</td>
-                    <td class="text-sm" title="{{ invite.expires_at | format_datetime_human if invite.expires_at else 'Never expires' }}">
-                        {{ invite.expires_at | time_ago if invite.expires_at else 'Never' }}
-                        {% if invite.expires_at and not invite.is_expired %}<div class="text-xs opacity-60">({{ invite.expires_at | format_datetime_human(include_time=False) }})</div>{% endif %}
+                    <td class="text-sm" title="{{ invite.expires_at | format_datetime_user if invite.expires_at else 'Never expires' }}">
+                        {{ invite.expires_at | format_datetime_user if invite.expires_at else 'Never' }}
+                        {% if invite.expires_at and not invite.is_expired %}<div class="text-xs opacity-60">({{ invite.expires_at | format_datetime_user }})</div>{% endif %}
                     </td>
                     <td>
                         {% if not invite.is_active %} <span class="badge badge-error">Deactivated</span>

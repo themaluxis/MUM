@@ -1,7 +1,8 @@
 # File: app/services/task_service.py
 from flask import current_app
 from app.extensions import scheduler 
-from app.models import Setting, EventType, User, StreamHistory  # User model is now needed
+from app.models import Setting, EventType, User, StreamHistory
+from app.models_media_services import ServiceType
 from app.utils.helpers import log_event
 from . import user_service # user_service is needed for deleting users
 from app.services.media_service_manager import MediaServiceManager
@@ -22,132 +23,70 @@ def monitor_plex_sessions_task():
     """
     global _active_stream_sessions
     with scheduler.app.app_context():
-        current_app.logger.debug("Task_Service: Running stateful monitor_plex_sessions_task...")
-        if not Setting.get('PLEX_URL') or not Setting.get('PLEX_TOKEN'):
+        current_app.logger.info("--- Running Plex Session Monitor Task ---")
+        
+        # Correctly check for any active Plex server from the database
+        plex_servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX, active_only=True)
+        if not plex_servers:
+            current_app.logger.warning("No active Plex servers configured in the database. Skipping task.")
             return
 
-        media_service_manager = MediaServiceManager()
         try:
-            active_plex_sessions = media_service_manager.get_active_sessions()
+            # This already gets sessions from all active servers
+            active_plex_sessions = MediaServiceManager.get_all_active_sessions()
             now_utc = datetime.now(timezone.utc)
-            
-            # Create a dictionary of current sessions for easy lookup and to get the full session object
+            current_app.logger.info(f"Found {len(active_plex_sessions)} active sessions across all servers.")
+
             current_sessions_dict = {session.sessionKey: session for session in active_plex_sessions if hasattr(session, 'sessionKey')}
             current_plex_session_keys = set(current_sessions_dict.keys())
             
-            # DEBUG: Log session tracking info
-            current_app.logger.debug(f"MONITOR_DEBUG: Current Plex sessions: {list(current_plex_session_keys)}")
-            current_app.logger.debug(f"MONITOR_DEBUG: Tracked active sessions: {list(_active_stream_sessions.keys())}")
-            current_app.logger.debug(f"MONITOR_DEBUG: Session key types - Plex: {[type(k) for k in current_plex_session_keys]}, Tracked: {[type(k) for k in _active_stream_sessions.keys()]}")
+            current_app.logger.debug(f"Current Plex session keys: {list(current_plex_session_keys)}")
+            current_app.logger.debug(f"Previously tracked session keys: {list(_active_stream_sessions.keys())}")
 
             # Step 1: Check for stopped streams
             stopped_session_keys = set(_active_stream_sessions.keys()) - current_plex_session_keys
-            for session_key in stopped_session_keys:
-                stream_history_id = _active_stream_sessions.pop(session_key, None)
-                if stream_history_id:
-                    history_record = db.session.get(StreamHistory, stream_history_id)
-                    if history_record and not history_record.stopped_at:
-                        # The final known progress IS the actual playback duration.
-                        final_duration = history_record.view_offset_at_end_seconds
-                        history_record.duration_seconds = final_duration if final_duration and final_duration > 0 else 0
-                        
-                        history_record.stopped_at = now_utc
-                        current_app.logger.info(f"Stream STOPPED: Session {session_key}. Final playback duration: {history_record.duration_seconds}s.")
+            if stopped_session_keys:
+                current_app.logger.info(f"Found {len(stopped_session_keys)} stopped sessions: {list(stopped_session_keys)}")
+                for session_key in stopped_session_keys:
+                    stream_history_id = _active_stream_sessions.pop(session_key, None)
+                    if stream_history_id:
+                        history_record = db.session.get(StreamHistory, stream_history_id)
+                        if history_record and not history_record.stopped_at:
+                            final_duration = history_record.view_offset_at_end_seconds
+                            history_record.duration_seconds = final_duration if final_duration and final_duration > 0 else 0
+                            history_record.stopped_at = now_utc
+                            current_app.logger.info(f"Marked session {session_key} (DB ID: {stream_history_id}) as stopped. Final duration: {history_record.duration_seconds}s.")
+                        else:
+                            current_app.logger.warning(f"Could not find or already stopped history record for DB ID {stream_history_id}")
             
             # Step 2: Check for new and ongoing streams
+            if not current_sessions_dict:
+                current_app.logger.info("No new or ongoing sessions to process.")
+            else:
+                current_app.logger.info(f"Processing {len(current_sessions_dict)} new or ongoing sessions...")
+
             for session_key, session in current_sessions_dict.items():
-                mum_user = None
+                user_id_from_session = None
                 if hasattr(session, 'user') and session.user and hasattr(session.user, 'id'):
-                    mum_user = User.query.filter_by(plex_user_id=session.user.id).first()
+                    user_id_from_session = session.user.id
+                elif hasattr(session, 'userId'):
+                    user_id_from_session = session.userId
+
+                if not user_id_from_session:
+                    current_app.logger.warning(f"Session {session_key} is missing a user ID. Skipping.")
+                    continue
+
+                mum_user = User.query.filter_by(plex_user_id=user_id_from_session).first()
                 
-                if not mum_user: 
-                    continue 
+                if not mum_user:
+                    current_app.logger.warning(f"Could not find MUM user for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
+                    continue
+                
+                current_app.logger.debug(f"Processing session {session_key} for user '{mum_user.plex_username}' (MUM ID: {mum_user.id})")
 
-                # Enhanced 4K Transcode Enforcement Logic
-                transcode_session = getattr(session, 'transcodeSession', None)
-                if transcode_session and not mum_user.allow_4k_transcode:
-                    video_decision = getattr(transcode_session, 'videoDecision', 'copy').lower()
-                    if video_decision == 'transcode':
-                        
-                        # Enhanced 4K detection using the same logic as streaming_sessions_partial
-                        is_4k_source = False
-                        
-                        # Get media elements to find original source
-                        original_media = None
-                        if hasattr(session, 'media') and isinstance(session.media, list):
-                            for media in session.media:
-                                if hasattr(media, '_data') and media._data is not None:
-                                    if media._data.get('selected') != '1':
-                                        original_media = media
-                                        break
-                            
-                            # If no non-selected media found, use first media as fallback
-                            if original_media is None and session.media:
-                                original_media = session.media[0]
-                        
-                        # Check for 4K in original media
-                        if original_media:
-                            # Method 1: Check videoResolution attribute
-                            if hasattr(original_media, 'videoResolution') and original_media.videoResolution:
-                                vid_res = original_media.videoResolution.lower()
-                                if vid_res == "4k":
-                                    is_4k_source = True
-                                    current_app.logger.debug(f"4K detected via videoResolution: {original_media.videoResolution}")
-                            
-                            # Method 2: Check height
-                            elif hasattr(original_media, 'height') and original_media.height:
-                                height = int(original_media.height)
-                                if height >= 2160:
-                                    is_4k_source = True
-                                    current_app.logger.debug(f"4K detected via height: {height}p")
-                            
-                            # Method 3: Check video streams in parts
-                            elif hasattr(original_media, 'parts') and original_media.parts:
-                                part = original_media.parts[0]
-                                for stream in getattr(part, 'streams', []):
-                                    if getattr(stream, 'streamType', 0) == 1:  # Video stream
-                                        # Check displayTitle for 4K
-                                        if hasattr(stream, 'displayTitle') and stream.displayTitle:
-                                            display_title = stream.displayTitle.upper()
-                                            if "4K" in display_title:
-                                                is_4k_source = True
-                                                current_app.logger.debug(f"4K detected via displayTitle: {stream.displayTitle}")
-                                                break
-                                        
-                                        # Check height
-                                        elif hasattr(stream, 'height') and stream.height:
-                                            height = int(stream.height)
-                                            if height >= 2160:
-                                                is_4k_source = True
-                                                current_app.logger.debug(f"4K detected via stream height: {height}p")
-                                                break
-                        
-                        # Legacy fallback method (for compatibility)
-                        if not is_4k_source:
-                            media_item = session.media[0] if hasattr(session, 'media') and session.media else None
-                            if media_item and hasattr(media_item, 'parts') and media_item.parts:
-                                video_stream = next((s for s in media_item.parts[0].streams if getattr(s, 'streamType', 0) == 1), None)
-                                if video_stream and hasattr(video_stream, 'height') and video_stream.height >= 2000:
-                                    is_4k_source = True
-                                    current_app.logger.debug(f"4K detected via legacy method: {video_stream.height}p")
-                        
-                        if is_4k_source:
-                            current_app.logger.warning(f"RULE ENFORCED: Terminating 4K transcode for user '{mum_user.plex_username}' (Session: {session_key}).")
-                            termination_message = "4K to non-4K transcoding is not permitted on this server."
-                            try:
-                                plex_service.terminate_plex_session(session_key, termination_message)
-                                log_event(EventType.PLEX_SESSION_DETECTED,
-                                          f"Terminated 4K transcode session for user '{mum_user.plex_username}'.",
-                                          user_id=mum_user.id,
-                                          details={'reason': termination_message})
-                                _active_stream_sessions.pop(session_key, None)
-                                continue 
-                            except Exception as e_term:
-                                current_app.logger.error(f"Failed to terminate 4K transcode for session {session_key}: {e_term}")
-
-                # If the session is new, create the history record AND add it to our tracker.
+                # If the session is new, create the history record
                 if session_key not in _active_stream_sessions:
-                    current_app.logger.debug(f"MONITOR_DEBUG: Creating NEW session record for session_key: {session_key} (type: {type(session_key)})")
+                    current_app.logger.info(f"New session detected: {session_key}. Creating history record.")
                     
                     media_duration_ms = getattr(session, 'duration', 0)
                     media_duration_s = int(media_duration_ms / 1000) if media_duration_ms else 0
@@ -157,11 +96,11 @@ def monitor_plex_sessions_task():
                         session_key=str(session_key),
                         rating_key=str(getattr(session, 'ratingKey', None)),
                         started_at=now_utc,
-                        platform=getattr(session.player, 'platform', 'N/A'),
-                        product=getattr(session.player, 'product', 'N/A'),
-                        player=getattr(session.player, 'title', 'N/A'),
-                        ip_address=getattr(session.player, 'address', 'N/A'),
-                        is_lan=getattr(session.player, 'local', False),
+                        platform=getattr(session.player, 'platform', 'N/A') if hasattr(session, 'player') else 'N/A',
+                        product=getattr(session.player, 'product', 'N/A') if hasattr(session, 'player') else 'N/A',
+                        player=getattr(session.player, 'title', 'N/A') if hasattr(session, 'player') else 'N/A',
+                        ip_address=getattr(session.player, 'address', 'N/A') if hasattr(session, 'player') else 'N/A',
+                        is_lan=getattr(session.player, 'local', False) if hasattr(session, 'player') else False,
                         media_title=getattr(session, 'title', "Unknown"),
                         media_type=getattr(session, 'type', "Unknown"),
                         grandparent_title=getattr(session, 'grandparentTitle', None),
@@ -170,34 +109,34 @@ def monitor_plex_sessions_task():
                         view_offset_at_end_seconds=int(getattr(session, 'viewOffset', 0) / 1000)
                     )
                     db.session.add(new_history_record)
-                    db.session.flush()
+                    db.session.flush() # Flush to get the ID
                     _active_stream_sessions[session_key] = new_history_record.id
-                    current_app.logger.info(f"Stream STARTED: Session {session_key} for user {mum_user.id}. Recorded with DB ID {new_history_record.id}.")
+                    current_app.logger.info(f"Successfully created StreamHistory record (ID: {new_history_record.id}) for session {session_key}.")
                 
-                # If the session is ongoing, find its record and just update the progress
+                # If the session is ongoing, update its progress
                 else:
-                    current_app.logger.debug(f"MONITOR_DEBUG: Updating EXISTING session {session_key}")
                     history_record_id = _active_stream_sessions.get(session_key)
                     if history_record_id:
                         history_record = db.session.get(StreamHistory, history_record_id)
                         if history_record:
                             current_offset_s = int(getattr(session, 'viewOffset', 0) / 1000)
                             history_record.view_offset_at_end_seconds = current_offset_s
-                            current_app.logger.debug(f"Stream ONGOING: Session {session_key}. Updated progress to {current_offset_s}s.")
+                            current_app.logger.debug(f"Updated progress for ongoing session {session_key} to {current_offset_s}s.")
                         else:
-                            current_app.logger.warning(f"MONITOR_DEBUG: Could not find StreamHistory record with ID {history_record_id} for session {session_key}")
+                            current_app.logger.warning(f"Could not find existing StreamHistory record with ID {history_record_id} for ongoing session {session_key}.")
                     else:
-                        current_app.logger.warning(f"MONITOR_DEBUG: Session {session_key} in _active_stream_sessions but no record ID found")
+                        current_app.logger.error(f"CRITICAL: Session {session_key} was in tracked keys but had no DB ID!")
 
-                # Always update the user's main 'last_streamed_at' field
+                # Update the user's main 'last_streamed_at' field
                 user_service.update_user_last_streamed(mum_user.plex_user_id, now_utc)
 
             # Commit all changes for this cycle
             db.session.commit()
+            current_app.logger.info("--- Plex Session Monitor Task Finished ---")
             
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f"Task_Service: Error during monitor_plex_sessions_task: {e}", exc_info=True)
+            current_app.logger.error(f"Fatal error in monitor_plex_sessions_task: {e}", exc_info=True)
 
 def check_user_access_expirations_task():
     """

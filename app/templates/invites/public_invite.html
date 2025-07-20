@@ -110,7 +110,7 @@
 
                     <div class="text-xs text-base-content/60 mt-6 space-y-1 text-left">
                         <h4 class="font-semibold text-base-content/70 mb-1.5">Invite Details:</h4>
-                        <p><i class="fa-regular fa-clock fa-fw w-4"></i> Link Expires: {{ invite.expires_at | format_datetime_human if invite.expires_at else "Never" }}</p>
+                        <p><i class="fa-regular fa-clock fa-fw w-4"></i> Link Expires: {{ invite.expires_at | format_datetime_user if invite.expires_at else "Never" }}</p>
                         <p><i class="fa-solid fa-users fa-fw w-4"></i> Link Uses Left: {{ (invite.max_uses - invite.current_uses) if invite.max_uses is not none else "Unlimited" }}</p>
                         {% if invite.membership_duration_days %}
                              <p class="text-accent"><i class="fa-solid fa-user-clock fa-fw w-4"></i> Membership Duration: {{ invite.membership_duration_days }} day{{'s' if invite.membership_duration_days != 1 else ''}} after acceptance.</p>

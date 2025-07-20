@@ -151,32 +151,32 @@ def view_user(user_id):
         # Remove the old access_expires_in_days logic since we're now using DateField
         # The form will automatically populate access_expires_at from the user object via obj=user
 
-    stream_history_pagination = None
-    stream_stats = None
-    active_session_keys = []
+    stream_stats = user_service.get_user_stream_stats(user_id)
+    last_ip_map = user_service.get_bulk_last_known_ips([user_id])
+    last_ip = last_ip_map.get(user_id)
+    user.stream_stats = stream_stats
+    user.total_plays = stream_stats.get('global', {}).get('all_time_plays', 0)
+    user.total_duration = stream_stats.get('global', {}).get('all_time_duration_seconds', 0)
+    user.last_known_ip = last_ip if last_ip else 'N/A'
     
+    stream_history_pagination = None
     if tab == 'history':
         page = request.args.get('page', 1, type=int)
-        stream_history_pagination = StreamHistory.query.filter_by(user_id=user.id).order_by(StreamHistory.started_at.desc()).paginate(page=page, per_page=15, error_out=False)
-        
-        # Get current active session keys for this user's history
-        try:
-            media_service_manager = MediaServiceManager()
-            active_sessions = media_service_manager.get_active_sessions()
-            active_session_keys = [str(session.sessionKey) for session in active_sessions if hasattr(session, 'sessionKey')]
-            current_app.logger.debug(f"Active session keys for history display: {active_session_keys}")
-        except Exception as e:
-            current_app.logger.warning(f"Could not fetch active sessions for history display: {e}")
-            active_session_keys = []
+        # The session monitor now handles logging active streams directly to the DB.
+        # We can just query the table and order by started_at to see the latest,
+        # which will include any active streams (where stopped_at is NULL).
+        stream_history_pagination = StreamHistory.query.filter_by(user_id=user.id)\
+            .order_by(StreamHistory.started_at.desc())\
+            .paginate(page=page, per_page=15, error_out=False)
             
-    elif tab == 'profile':
-        stream_stats = user_service.get_user_stream_stats(user_id)
+    # No need for the elif, stream_stats are now always available on the user object
+    # elif tab == 'profile':
+    #     stream_stats = user_service.get_user_stream_stats(user_id)
 
     if request.headers.get('HX-Request') and tab == 'history':
         return render_template('users/partials/history_tab_content.html', 
                              user=user, 
-                             history_logs=stream_history_pagination,
-                             active_session_keys=active_session_keys)
+                             history_logs=stream_history_pagination)
         
     return render_template(
         'users/profile.html',
@@ -184,7 +184,6 @@ def view_user(user_id):
         user=user,
         form=form,
         history_logs=stream_history_pagination,
-        active_session_keys=active_session_keys,
         active_tab=tab,
         is_admin=AdminAccount.query.filter_by(plex_uuid=user.plex_uuid).first() is not None if user.plex_uuid else False,
         stream_stats=stream_stats,
