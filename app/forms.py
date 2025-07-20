@@ -186,11 +186,18 @@ class UserEditForm(FlaskForm): # As updated for whitelist fields
     plex_username = StringField('Plex Username', render_kw={'readonly': True})
     plex_email = StringField('Plex Email', render_kw={'readonly': True})
     is_home_user = BooleanField('Plex Home User', render_kw={'disabled': True})
-    libraries = SelectMultipleField('Grant Access to Libraries', coerce=str, validators=[Optional()])
+    libraries = SelectMultipleField(
+        'Grant Access to Libraries', 
+        coerce=str, 
+        validators=[Optional()],
+        widget=ListWidget(prefix_label=False), 
+        option_widget=CheckboxInput()
+    )
     access_expiration = DateField('Access Expiration Date', validators=[Optional(), date_not_in_past], format='%Y-%m-%d')
     membership_duration_days = IntegerField('Membership Duration (days)', validators=[Optional(), NumberRange(min=1)], default=None)
     is_discord_bot_whitelisted = BooleanField('Whitelist from Discord Bot Actions')
     is_purge_whitelisted = BooleanField('Whitelist from Inactivity Purge')
+    notes = TextAreaField('User Notes', validators=[Optional(), Length(max=1000)])
     
     # Clear checkboxes for nullable fields
     clear_access_expiration = BooleanField(

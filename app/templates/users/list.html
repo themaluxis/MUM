@@ -17,6 +17,10 @@
             </button>
             <span id="sync-noop-target"></span>
 
+            <button class="btn btn-ghost" onclick="user_settings_modal.showModal()">
+                <i class="fa-solid fa-cog"></i>
+            </button>
+
             <div id="column-selector-container" class="dropdown dropdown-end hidden">
                 <label tabindex="0" class="btn btn-ghost" title="Select columns">
                     <i class="fa-solid fa-table-columns mr-1"></i> Columns
@@ -253,10 +257,55 @@
         </div>
     </div>
 </dialog>
+<dialog id="user_settings_modal" class="modal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg">User Display Settings</h3>
+    <div class="py-4">
+        <div class="form-control">
+            <label class="label cursor-pointer">
+                <span class="label-text">Show User Notes on Cards</span>
+                <input type="checkbox" id="show_user_notes_toggle" class="toggle toggle-primary" />
+            </label>
+        </div>
+    </div>
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn">Close</button>
+      </form>
+    </div>
+  </div>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
+<script>
+    // User Notes Toggle Logic
+    const showUserNotesToggle = document.getElementById('show_user_notes_toggle');
+
+    function applyShowNotesPreference() {
+        const showNotes = localStorage.getItem('showUserNotes') === 'true';
+        showUserNotesToggle.checked = showNotes;
+        document.querySelectorAll('.user-notes-container').forEach(container => {
+            container.style.display = showNotes ? '' : 'none';
+        });
+    }
+
+    showUserNotesToggle.addEventListener('change', function() {
+        localStorage.setItem('showUserNotes', this.checked);
+        applyShowNotesPreference();
+    });
+
+    // Apply preference on initial load
+    document.addEventListener('DOMContentLoaded', applyShowNotesPreference);
+    
+    // Re-apply after HTMX swaps content
+    htmx.on('htmx:afterSwap', function(event) {
+        if (event.target.id === 'user-list-container') {
+            applyShowNotesPreference();
+        }
+    });
+</script>
 <script>
     const TABLE_COLUMNS = {
         email: 'Email',

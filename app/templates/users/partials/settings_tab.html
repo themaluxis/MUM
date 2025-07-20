@@ -1,4 +1,4 @@
-<!-- File: app/templates/users/_settings_tab.html -->
+<!-- File: app/templates/users/partials/settings_tab.html -->
 {# Expects 'form' and 'user' in context #}
 <form method="POST"
       id="editUserForm"
@@ -8,31 +8,8 @@
       
     <div class="space-y-6">
         <div>
-            <h3 class="text-lg font-semibold border-b border-base-100 pb-2">Stream Permissions</h3>
-            <div class="pt-4 space-y-4">
-                <div class="tooltip tooltip-top w-full cursor-not-allowed" 
-                     data-tip="This setting can't be changed here due to a Plex API limitation. Please update 'Allow Sync' directly in Plex for now.">
-                    
-                    {# THE FIX: Added 'pointer-events-none' to this inner div. #}
-                    <div class="form-control w-full opacity-50 pointer-events-none">
-                        <label class="label cursor-not-allowed justify-start">
-                            {# The 'disabled' attribute is still correctly applied here #}
-                            {{ form.allow_downloads(class="toggle toggle-primary mr-3", disabled=True) }}
-                            <span class="label-text font-medium">{{ form.allow_downloads.label.text }}</span>
-                        </label>
-                        <p class="text-xs text-base-content/60 pl-16">{{ form.allow_downloads.description }}</p>
-                    </div>
-                </div>
-                <div class="form-control w-full mb-4">
-                    <label class="label cursor-pointer justify-start">
-                        {{ form.allow_4k_transcode(class="toggle toggle-primary mr-3") }}
-                        <span class="label-text font-medium">{{ form.allow_4k_transcode.label.text }}</span>
-                    </label>
-                    <p class="text-xs text-base-content/60 pl-16">{{ form.allow_4k_transcode.description }}</p>
-                </div>
-            </div>
-            <h3 class="text-lg font-semibold border-b border-base-100 pb-2">Notes & Whitelists</h3>
-            <div class="pt-4 space-y-4">
+            <div class="divider text-xs">Notes & Whitelists</div>
+            <div class="space-y-4">
                 <div class="form-control w-full">
                     {{ form.notes.label(class="label font-medium") }}
                     {{ form.notes(class="textarea textarea-bordered h-24 w-full" + ("textarea-error" if form.notes.errors else ""), placeholder="Add any notes about this user...") }}
@@ -54,17 +31,40 @@
                     <p class="text-xs text-base-content/60 pl-16">{{ form.is_purge_whitelisted.description }}</p>
                 </div>
             </div>
+            <div class="divider text-xs">Stream Permissions</div>
+            <div class="space-y-4">
+                <div class="tooltip tooltip-top w-full cursor-not-allowed" 
+                     data-tip="This setting can't be changed here due to a Plex API limitation. Please update 'Allow Sync' directly in Plex for now.">
+                    
+                    {# THE FIX: Added 'pointer-events-none' to this inner div. #}
+                    <div class="form-control w-full opacity-50 pointer-events-none">
+                        <label class="label cursor-not-allowed justify-start">
+                            {# The 'disabled' attribute is still correctly applied here #}
+                            {{ form.allow_downloads(class="toggle toggle-primary mr-3", disabled=True) }}
+                            <span class="label-text font-medium">{{ form.allow_downloads.label.text }}</span>
+                        </label>
+                        <p class="text-xs text-base-content/60 pl-16">{{ form.allow_downloads.description }}</p>
+                    </div>
+                </div>
+                <div class="form-control w-full mb-4">
+                    <label class="label cursor-pointer justify-start">
+                        {{ form.allow_4k_transcode(class="toggle toggle-primary mr-3") }}
+                        <span class="label-text font-medium">{{ form.allow_4k_transcode.label.text }}</span>
+                    </label>
+                    <p class="text-xs text-base-content/60 pl-16">{{ form.allow_4k_transcode.description }}</p>
+                </div>
+            </div>
         </div>
         
         <div>
-            <h3 class="text-lg font-semibold border-b border-base-100 pb-2">Access Duration</h3>
-             <div class="pt-4 space-y-4">
+            <div class="divider text-xs">Access Duration</div>
+             <div class="space-y-4">
                 <div class="form-control w-full max-w-sm">
-                    {{ form.access_expires_at.label(class="label font-medium whitespace-normal") }}
+                    {{ form.access_expiration.label(class="label font-medium whitespace-normal") }}
                     {# The input type is now 'date' which browsers render as a calendar picker #}
-                    {{ form.access_expires_at(id="user_edit_access_expires_at_input", class="input input-bordered " + ("input-error" if form.access_expires_at.errors else "")) }}
-                    <label class="label whitespace-normal"><span class="label-text-alt">{{ form.access_expires_at.description }}</span></label>
-                    {% if form.access_expires_at.errors %}<p class="text-error text-xs mt-1">{{ form.access_expires_at.errors[0] }}</p>{% endif %}
+                    {{ form.access_expiration(id="user_edit_access_expiration_input", class="input input-bordered " + ("input-error" if form.access_expiration.errors else "")) }}
+                    <label class="label whitespace-normal"><span class="label-text-alt">{{ form.access_expiration.description }}</span></label>
+                    {% if form.access_expiration.errors %}<p class="text-error text-xs mt-1">{{ form.access_expiration.errors[0] }}</p>{% endif %}
                 </div>
                 <div class="form-control w-full">
                     <label class="label cursor-pointer justify-start whitespace-normal">
@@ -76,8 +76,8 @@
         </div>
 
         <div>
-             <h3 class="text-lg font-semibold border-b border-base-100 pb-2">Library Access</h3>
-             <div class="pt-4">
+             <div class="divider text-xs">Library Access</div>
+             <div>
                 <div class="form-control w-full">
                     <div class="flex justify-end mb-2">
                         <span class="label-text-alt">
@@ -104,7 +104,7 @@
 </form>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+(function () {
     const selectAllButton = document.getElementById('select_all_libraries');
     const deselectAllButton = document.getElementById('deselect_all_libraries');
     // Important: scope the checkbox query to the form to avoid conflicts if other forms exist
@@ -115,16 +115,16 @@ document.addEventListener('DOMContentLoaded', function () {
     if (selectAllButton) { selectAllButton.addEventListener('click', function() { libraryCheckboxes.forEach(checkbox => checkbox.checked = true); }); }
     if (deselectAllButton) { deselectAllButton.addEventListener('click', function() { libraryCheckboxes.forEach(checkbox => checkbox.checked = false); }); }
 
-    const dateInput = document.getElementById('user_edit_access_expires_at_input');
+    const dateInput = document.getElementById('user_edit_access_expiration_input');
     const clearCheckbox = document.getElementById('user_edit_clear_access_expiration_checkbox');
 
     function syncExpiryFields() {
-        if (!daysInput || !clearCheckbox) return;
+        if (!dateInput || !clearCheckbox) return;
         if (clearCheckbox.checked) {
-            daysInput.disabled = true;
-            daysInput.value = '';
+            dateInput.disabled = true;
+            dateInput.value = '';
         } else {
-            daysInput.disabled = false;
+            dateInput.disabled = false;
         }
     }
 
@@ -134,5 +134,5 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Run once on load to set initial state
     syncExpiryFields();
-});
+})();
 </script>

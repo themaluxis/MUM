@@ -42,6 +42,11 @@
                 {% endif %}
             </div>
 
+            <div class="user-notes-container" style="display: none;">
+                <p class="text-xs font-semibold mb-1">Notes:</p>
+                <p class="text-xs text-base-content/70 mb-3">{{ user.notes or 'No notes for this user.' }}</p>
+            </div>
+
             <div class="mb-3">
                 <p class="text-xs font-semibold mb-1 inline">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.id, [])|length }}</span>):</p>
                 {% if user_sorted_libraries.get(user.id) %}
