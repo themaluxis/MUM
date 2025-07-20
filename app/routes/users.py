@@ -1,5 +1,5 @@
 # File: app/routes/users.py
-from flask import Blueprint, render_template, request, current_app, session, make_response 
+from flask import Blueprint, render_template, request, current_app, session, make_response, redirect, url_for 
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
 from app.models import User, Setting, EventType, AdminAccount, StreamHistory
@@ -22,8 +22,28 @@ bp = Blueprint('users', __name__)
 @login_required
 @setup_required
 def list_users():
+    current_app.logger.debug(f"--- Entering list_users ---")
+    current_app.logger.debug(f"Request args: {request.args}")
+    current_app.logger.debug(f"Is HTMX request: {request.headers.get('HX-Request')}")
+    current_app.logger.debug(f"current_user.id: {current_user.id}")
+    current_app.logger.debug(f"Saved preferred view: '{current_user.preferred_user_list_view}'")
+
+    # If it's a direct browser load and 'view' is missing from the URL
+    if 'view' not in request.args and not request.headers.get('HX-Request'):
+        # Get the preferred view, default to 'cards' if not set
+        preferred_view = current_user.preferred_user_list_view or 'cards'
+        current_app.logger.debug(f"Redirecting: 'view' not in args. Using preferred_view: '{preferred_view}'")
+        
+        # Preserve other query params and redirect
+        args = request.args.to_dict()
+        args['view'] = preferred_view
+        return redirect(url_for('users.list_users', **args))
+
+    # For all other cases (redirected request or HTMX), determine view_mode from args
+    view_mode = request.args.get('view', 'cards')
+    current_app.logger.debug(f"Final view_mode for rendering: '{view_mode}'")
+
     page = request.args.get('page', 1, type=int)
-    view_mode = request.args.get('view', Setting.get('DEFAULT_USER_VIEW', 'cards'))
    
     session_per_page_key = 'users_list_per_page'
     default_per_page_config = current_app.config.get('DEFAULT_USERS_PER_PAGE', 12)
@@ -180,6 +200,30 @@ def list_users():
         return render_template('users/partials/user_list_content.html', **template_context)
 
     return render_template('users/list.html', **template_context)
+
+@bp.route('/save_view_preference', methods=['POST'])
+@login_required
+def save_view_preference():
+    view_mode = request.form.get('view_mode')
+    current_app.logger.debug(f"--- save_view_preference ---")
+    current_app.logger.debug(f"Received view_mode: '{view_mode}'")
+    current_app.logger.debug(f"current_user.id: {current_user.id}")
+    current_app.logger.debug(f"View preference BEFORE save: '{current_user.preferred_user_list_view}'")
+    
+    if view_mode in ['cards', 'table']:
+        try:
+            user_to_update = AdminAccount.query.get(current_user.id)
+            user_to_update.preferred_user_list_view = view_mode
+            db.session.commit()
+            current_app.logger.debug(f"View preference AFTER save: '{user_to_update.preferred_user_list_view}'")
+            return '', 204
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error saving view preference: {e}", exc_info=True)
+            return 'Error saving preference', 500
+            
+    current_app.logger.warning(f"Invalid view_mode '{view_mode}' received.")
+    return 'Invalid view mode', 400
 
 @bp.route('/sync', methods=['POST'])
 @login_required

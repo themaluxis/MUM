@@ -267,11 +267,19 @@
                 <input type="checkbox" id="show_user_notes_toggle" class="toggle toggle-primary" />
             </label>
         </div>
+        <div class="form-control w-full max-w-xs">
+            <label class="label">
+                <span class="label-text">Preferred Default View</span>
+            </label>
+            <select id="preferred_view_select" class="select select-bordered">
+                <option value="cards">Cards</option>
+                <option value="table">Table</option>
+            </select>
+        </div>
     </div>
     <div class="modal-action">
-      <form method="dialog">
-        <button class="btn">Close</button>
-      </form>
+      <button type="button" class="btn btn-ghost" onclick="user_settings_modal.close()">Cancel</button>
+      <button id="save_user_settings_btn" class="btn btn-primary">Save</button>
     </div>
   </div>
 </dialog>
@@ -280,29 +288,77 @@
 {% block scripts %}
 {{ super() }}
 <script>
-    // User Notes Toggle Logic
+    // User Display Settings Logic
+    const userSettingsModal = document.getElementById('user_settings_modal');
     const showUserNotesToggle = document.getElementById('show_user_notes_toggle');
+    const preferredViewSelect = document.getElementById('preferred_view_select');
+    const saveSettingsBtn = document.getElementById('save_user_settings_btn');
+    const openSettingsBtn = document.querySelector('button[onclick="user_settings_modal.showModal()"]');
 
+    // This function applies the "Show Notes" preference to the user cards on the page.
     function applyShowNotesPreference() {
         const showNotes = localStorage.getItem('showUserNotes') === 'true';
-        showUserNotesToggle.checked = showNotes;
         document.querySelectorAll('.user-notes-container').forEach(container => {
             container.style.display = showNotes ? '' : 'none';
         });
     }
 
-    showUserNotesToggle.addEventListener('change', function() {
-        localStorage.setItem('showUserNotes', this.checked);
+    // This function is called when the modal is opened. It sets the
+    // inputs inside the modal to reflect the currently saved settings.
+    function loadSettingsIntoModal() {
+        const showNotes = localStorage.getItem('showUserNotes') === 'true';
+        showUserNotesToggle.checked = showNotes;
+
+        const preferredView = localStorage.getItem('userListView') || 'cards';
+        preferredViewSelect.value = preferredView;
+    }
+
+    // When the settings cog is clicked, load the current settings into the modal before showing it.
+    if (openSettingsBtn) {
+        openSettingsBtn.addEventListener('click', loadSettingsIntoModal);
+    }
+
+    // When the "Save" button is clicked...
+    saveSettingsBtn.addEventListener('click', function() {
+        // 1. Get the chosen values from the modal inputs.
+        const showNotes = showUserNotesToggle.checked;
+        const preferredView = preferredViewSelect.value;
+
+        // 2. Save them to localStorage for immediate UI updates.
+        localStorage.setItem('showUserNotes', showNotes);
+        localStorage.setItem('userListView', preferredView);
+
+        // 3. Visually apply the notes preference right away.
         applyShowNotesPreference();
+
+        // 4. Send the preferred view to the backend to save in the database.
+        htmx.ajax('POST', '/users/save_view_preference', {
+            values: { view_mode: preferredView },
+            swap: 'none'
+        }).then(() => {
+            // SUCCESS: The request completed successfully (e.g., status 204).
+            userSettingsModal.close();
+            htmx.trigger(document.body, 'showToastEvent', { message: 'Settings saved successfully!', category: 'success' });
+            
+            // If the view preference was changed, the user can see the result by navigating to the new view manually.
+            // No automatic reload is needed.
+            if (preferredView !== '{{ current_view }}') {
+                // Optional: could trigger a soft refresh of the content area if desired,
+                // but for now, we will just let the user navigate.
+            }
+        }).catch((error) => {
+            // ERROR: The request failed (e.g., status 4xx, 5xx, or network error).
+            console.error("Failed to save settings:", error);
+            userSettingsModal.close();
+            htmx.trigger(document.body, 'showToastEvent', { message: 'Failed to save settings.', category: 'error' });
+        });
     });
 
-    // Apply preference on initial load
+    // On initial page load, apply the "Show Notes" preference.
     document.addEventListener('DOMContentLoaded', applyShowNotesPreference);
     
-    // Re-apply after ANY HTMX swap on the page to catch OOB swaps
-    htmx.on('htmx:afterSwap', function(event) {
-        applyShowNotesPreference();
-    });
+    // After any HTMX content swap, re-apply the "Show Notes" preference.
+    htmx.on('htmx:afterSwap', applyShowNotesPreference);
 </script>
 <script>
     const TABLE_COLUMNS = {

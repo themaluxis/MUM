@@ -135,6 +135,7 @@ class AdminAccount(db.Model, UserMixin): # ... (no changes needed for bot featur
     discord_email = db.Column(db.String(255), nullable=True)
     discord_email_verified = db.Column(db.Boolean, nullable=True)
     force_password_change = db.Column(db.Boolean, default=False, nullable=False)
+    preferred_user_list_view = db.Column(db.String(10), default='cards', nullable=False)
     roles = db.relationship('Role', secondary=admin_roles, lazy='subquery',
                             backref=db.backref('admins', lazy=True))
     def has_permission(self, permission_name):
