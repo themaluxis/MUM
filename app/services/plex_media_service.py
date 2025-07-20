@@ -7,6 +7,7 @@ from plexapi.exceptions import Unauthorized, NotFound, BadRequest
 import requests
 import xml.etree.ElementTree as ET
 import xmltodict
+from flask import current_app
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
 from app.models import Setting, EventType
@@ -408,27 +409,56 @@ class PlexMediaService(BaseMediaService):
 
     def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
         """Get GeoIP information for a given IP address using Plex's API."""
+        current_app.logger.debug(f"GeoIP lookup requested for IP: {ip_address}")
+        
         if not ip_address or ip_address in ['127.0.0.1', 'localhost']:
-            return {"status": "local", "message": "This is a local address."}
+            current_app.logger.debug(f"Local IP detected: {ip_address}")
+            return {"error": "This is a local address - no GeoIP data available"}
 
         if not self.api_key:
-            self.log_error("Plex API key is missing, cannot perform GeoIP lookup.")
-            return {"status": "error", "message": "Plex API key is not configured."}
+            current_app.logger.error("Plex API key is missing, cannot perform GeoIP lookup.")
+            return {"error": "Plex API key is not configured"}
 
         try:
             headers = {'X-Plex-Token': self.api_key}
             url = f"https://plex.tv/api/v2/geoip?ip_address={ip_address}"
+            current_app.logger.debug(f"Making GeoIP request to: {url}")
+            current_app.logger.debug(f"Request headers: {headers}")
+            
             response = requests.get(url, headers=headers, timeout=10)
+            current_app.logger.debug(f"Response status code: {response.status_code}")
+            current_app.logger.debug(f"Response content: {response.content}")
+            current_app.logger.debug(f"Response headers: {response.headers}")
+            
             response.raise_for_status()
             
-            # Parse the XML response
-            parsed_data = xmltodict.parse(response.content)
-            # The root element is 'Response', let's return its content
-            return parsed_data.get('Response', {})
+            # Parse the XML response using built-in ElementTree
+            current_app.logger.debug("Attempting to parse XML response")
+            root = ET.fromstring(response.content)
+            current_app.logger.debug(f"XML root tag: {root.tag}")
+            
+            # Extract data from XML attributes (not child elements)
+            geoip_data = dict(root.attrib)
+            current_app.logger.debug(f"XML attributes: {root.attrib}")
+            
+            # Split coordinates into separate latitude and longitude fields
+            if 'coordinates' in geoip_data:
+                coords = geoip_data['coordinates'].split(', ')
+                if len(coords) == 2:
+                    geoip_data['latitude'] = coords[0].strip()
+                    geoip_data['longitude'] = coords[1].strip()
+                    current_app.logger.debug(f"Split coordinates: lat={geoip_data['latitude']}, lon={geoip_data['longitude']}")
+            
+            current_app.logger.debug(f"Final GeoIP data: {geoip_data}")
+            return geoip_data
             
         except requests.exceptions.RequestException as e:
-            self.log_error(f"Failed to get GeoIP info from Plex API for {ip_address}: {e}")
-            return {"status": "error", "message": str(e)}
+            current_app.logger.error(f"Failed to get GeoIP info from Plex API for {ip_address}: {e}")
+            return {"error": f"Network error: {str(e)}"}
+        except ET.ParseError as e:
+            current_app.logger.error(f"Failed to parse XML response from Plex API: {e}")
+            current_app.logger.error(f"Raw response content: {response.content}")
+            return {"error": "Invalid response format from Plex API"}
         except Exception as e:
-            self.log_error(f"An unexpected error occurred during GeoIP lookup: {e}", exc_info=True)
-            return {"status": "error", "message": "An unexpected error occurred."}
+            current_app.logger.error(f"An unexpected error occurred during GeoIP lookup: {e}", exc_info=True)
+            return {"error": "An unexpected error occurred"}
