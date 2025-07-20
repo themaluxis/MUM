@@ -2,13 +2,13 @@ version: '3.8' # Specifies the Docker Compose file format version
 
 services:
   mum: # Service name (Multimedia User Manager)
-    container_name: mum_test
+    container_name: mum
     build:
       context: . # The build context is the current directory
       dockerfile: Dockerfile # Specifies the Dockerfile to use
     restart: unless-stopped # Restart policy
     ports:
-      - "5698:5000" # Maps port 5699 on the host to port 5000 in the container
+      - "5699:5000" # Maps port 5699 on the host to port 5000 in the container
                     # Gunicorn will run on port 5000 inside the container
     volumes:
       # Mounts the ./MUM directory on the host to /app/instance in the container.
@@ -25,7 +25,7 @@ services:
 
       # DEBUG: For fine-grained information, typically of interest only when diagnosing problems.
       # INFO: For general operational information (startup, successful operations, etc.).
-      - FLASK_LOG_LEVEL=DEBUG
+      - FLASK_LOG_LEVEL=INFO
 
       # Add any other environment variables your app might need at runtime
       # For example, if you decide to pass some secrets or configurations this way:
