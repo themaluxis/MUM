@@ -160,7 +160,7 @@
 
     <div id="mass-edit-container" class="mb-4 hidden">
         <div class="flex items-center space-x-2">
-            <button type="button" class="btn btn-accent" onclick="mass_edit_modal.showModal()">
+            <button type="button" class="btn btn-accent" id="mass-edit-open-button">
                 <i class="fa-solid fa-pen-to-square mr-2"></i> Mass Edit (<span id="selected-users-count" class="contents">0</span> selected)
             </button>
             <button type="button" class="btn btn-secondary" id="select_all_visible_button" title="Select all users currently visible">Select All</button>
@@ -409,32 +409,44 @@
             });
         }
 
-        if (massEditActionSelect) {
-            massEditActionSelect.addEventListener('change', function () {
-                if(librariesSection) librariesSection.classList.add('hidden'); 
-                if(deleteConfirmSection) deleteConfirmSection.classList.add('hidden');
-                const submitBtn = document.getElementById('mass_edit_submit_button');
-                if(submitBtn) submitBtn.disabled = (this.value === '');
+        const massEditOpenButton = document.getElementById('mass-edit-open-button');
+        const massEditModal = document.getElementById('mass_edit_modal');
 
-                if (this.value === 'update_libraries' && librariesSection) {
-                    librariesSection.classList.remove('hidden');
-                    const userIds = Array.from(selectedUserIds).join(',');
-                    // Correctly trigger the HTMX request with proper options
-                    htmx.ajax('GET', `{{ url_for('users.mass_edit_libraries_form') }}?user_ids=${userIds}`, {
-                        target: '#mass_edit_libraries_content',
-                        swap: 'innerHTML'
-                    });
-                } else if (this.value === 'delete_users' && deleteConfirmSection) {
-                    deleteConfirmSection.classList.remove('hidden');
-                    if (submitBtn && confirmDeleteCheckbox) {
-                        submitBtn.disabled = !confirmDeleteCheckbox.checked;
-                    }
+        function syncMassEditActionState() {
+            if (!massEditActionSelect) return;
+            const action = massEditActionSelect.value;
+            
+            if(librariesSection) librariesSection.classList.add('hidden');
+            if(deleteConfirmSection) deleteConfirmSection.classList.add('hidden');
+            
+            const submitBtn = document.getElementById('mass_edit_submit_button');
+            if(submitBtn) submitBtn.disabled = (action === '');
+
+            if (action === 'update_libraries' && librariesSection) {
+                librariesSection.classList.remove('hidden');
+                const userIds = Array.from(selectedUserIds).join(',');
+                htmx.ajax('GET', `{{ url_for('users.mass_edit_libraries_form') }}?user_ids=${userIds}`, {
+                    target: '#mass_edit_libraries_content',
+                    swap: 'innerHTML'
+                });
+            } else if (action === 'delete_users' && deleteConfirmSection) {
+                deleteConfirmSection.classList.remove('hidden');
+                if (submitBtn && confirmDeleteCheckbox) {
+                    submitBtn.disabled = !confirmDeleteCheckbox.checked;
                 }
-            });
-            if (massEditActionSelect.value === '') {
-                const submitBtn = document.getElementById('mass_edit_submit_button');
-                if(submitBtn) submitBtn.disabled = true;
             }
+        }
+
+        if (massEditOpenButton && massEditModal) {
+            massEditOpenButton.addEventListener('click', function() {
+                massEditModal.showModal();
+                syncMassEditActionState();
+            });
+        }
+
+        if (massEditActionSelect) {
+            massEditActionSelect.addEventListener('change', syncMassEditActionState);
+            syncMassEditActionState(); // Set initial state
         }
 
         if (confirmDeleteCheckbox) {

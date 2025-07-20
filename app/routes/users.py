@@ -423,29 +423,34 @@ def mass_edit_libraries_form():
     
     user_ids = [int(uid) for uid in user_ids_str.split(',') if uid.isdigit()]
     
-    # Group users by server
     from app.models_media_services import UserMediaAccess, MediaServer
     access_records = db.session.query(UserMediaAccess, User, MediaServer).join(User, UserMediaAccess.user_id == User.id).join(MediaServer, UserMediaAccess.server_id == MediaServer.id).filter(UserMediaAccess.user_id.in_(user_ids)).all()
 
-    servers_data = {}
+    services_data = {}
     for access, user, server in access_records:
-        if server.id not in servers_data:
+        service_type_key = server.service_type.value
+        if service_type_key not in services_data:
+            services_data[service_type_key] = {
+                'service_name': server.service_type.name.capitalize(),
+                'servers': {}
+            }
+        
+        if server.id not in services_data[service_type_key]['servers']:
             service = MediaServiceFactory.create_service_from_db(server)
             libraries = service.get_libraries() if service else []
-            servers_data[server.id] = {
+            services_data[service_type_key]['servers'][server.id] = {
                 'server_name': server.name,
-                'service_type': server.service_type.value,
                 'users': [],
                 'libraries': libraries,
-                'current_library_ids': set() # To store common libraries
+                'current_library_ids': set(access.allowed_library_ids or [])
             }
-        servers_data[server.id]['users'].append(user)
-        if not servers_data[server.id]['current_library_ids']:
-            servers_data[server.id]['current_library_ids'].update(access.allowed_library_ids or [])
-        else:
-            servers_data[server.id]['current_library_ids'].intersection_update(access.allowed_library_ids or [])
+        
+        services_data[service_type_key]['servers'][server.id]['users'].append(user)
+        # Intersect library IDs for users on the same server
+        current_ids = services_data[service_type_key]['servers'][server.id]['current_library_ids']
+        current_ids.intersection_update(access.allowed_library_ids or [])
 
-    return render_template('users/partials/_mass_edit_libraries.html', servers_data=servers_data)
+    return render_template('users/partials/_mass_edit_libraries.html', services_data=services_data)
 
 @bp.route('/mass_edit', methods=['POST'])
 @login_required
