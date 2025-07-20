@@ -1,0 +1,387 @@
+{# File: app/templates/invites/_create_invite_modal_form_content.html #}
+{# Expects 'form', 'available_libraries', 'global_force_sso', 'global_require_guild' #}
+
+<div id="create-invite-form-fields-wrapper">
+    {{ form.hidden_tag() }}
+
+    {# --- Basic, Always-Visible Options --- #}
+    <div class="form-control mb-3">
+        {{ form.custom_path.label(class="label text-base-content font-bold mb-1") }} <div class="badge badge-xs badge-outline badge-warning mb-1">Optional</div>
+        {{ form.custom_path(class="input input-bordered w-full " + ("input-error" if form.custom_path.errors else ""), placeholder="e.g., 'besties' or 'vip_access'") }}
+        {% if form.custom_path.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.custom_path.errors[0] }}</span>{% else %}<span class="label-text-alt text-xs block">{{ form.custom_path.description }}</span>{% endif %}
+    </div>
+
+    <div class="form-control mb-4">
+        {{ form.expires_at.label(class="label inline-block font-bold mb-1") }}
+        {{ form.expires_at(class="input input-bordered w-full " + ("input-error" if form.expires_at.errors else ""), type="date") }}
+        {% if form.expires_at.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.expires_at.errors[0] }}</span>{% else %}<span class="label-text-alt text-xs block">{{ form.expires_at.description }}</span>{% endif %}
+    </div>
+
+    {# Server Selection #}
+    <div class="divider text-xs">Select Server & Grant Access</div>
+    <div class="form-control mb-4 space-y-2">
+        <input type="hidden" name="server_id" id="selected_server_id">
+        {% for group, servers in all_servers | groupby('service_type') %}
+            <details class="collapse collapse-arrow bg-base-200/50 border border-base-300 rounded-md server-group-details">
+                <summary class="collapse-title text-lg font-medium flex items-center">
+                    {% if group.value == 'plex' %}
+                        <svg class="w-6 h-6 inline-block text-primary bottom-0.5 relative" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="#000000" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
+                    {% endif %}
+                    {{ group.name.capitalize() }}
+                </summary>
+                <div class="collapse-content">
+                    <div class="grid grid-cols-1 gap-4">
+                        {% for server in servers %}
+                            <div class="card bg-base-100 shadow-xl cursor-pointer server-card border-2 border-transparent relative" data-server-id="{{ server.id }}">
+                                <div class="absolute top-2 right-2 checkmark-icon hidden">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div class="card-body p-4">
+                                    <h2 class="card-title text-base">{{ server.name }}</h2>
+                                    
+                                    <div class="server-options-content hidden mt-4 space-y-4">
+                                        {# Library Access #}
+                                        <div class="form-control">
+                                            <label class="label">
+                                                <span class="label-text">{{ form.libraries.label.text }}</span>
+                                                <span class="label-text-alt">
+                                                    <button type="button" class="btn btn-xs btn-ghost select-all-libs">All</button> |
+                                                    <button type="button" class="btn btn-xs btn-ghost deselect-all-libs">None</button>
+                                                </span>
+                                            </label>
+                                            <div class="max-h-40 overflow-y-auto p-2 border border-base-300 rounded-md bg-base-100/30 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                                {% for value, label in form.libraries.choices %}
+                                                    <label class="label cursor-pointer justify-start py-1">
+                                                        <input type="checkbox" name="{{ form.libraries.name }}" value="{{ value }}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" {% if form.libraries.data and value in form.libraries.data %}checked{% endif %}>
+                                                        <span class="label-text" title="{{ label }}">{{ label | truncate(30, True) }}</span>
+                                                    </label>
+                                                {% endfor %}
+                                            </div>
+                                            {% if form.libraries.errors %}<span class="label-text-alt text-error mt-1">{{ form.libraries.errors[0] }}</span>{% endif %}
+                                        </div>
+                                        
+                                        {# Allow Downloads #}
+                                        <div class="form-control">
+                                            <label class="label cursor-pointer justify-start">
+                                                {{ form.allow_downloads(class="toggle toggle-accent mr-3") }}
+                                                <span class="label-text font-medium">{{ form.allow_downloads.label.text }}</span>
+                                            </label>
+                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_downloads.description }}</p>
+                                        </div>
+
+                                        {# Plex-specific options #}
+                                        {% if server.service_type.value == 'plex' %}
+                                        <div class="form-control">
+                                            <label class="label cursor-pointer justify-start">
+                                                {{ form.invite_to_plex_home(class="toggle toggle-primary mr-3") }}
+                                                <span class="label-text font-medium">{{ form.invite_to_plex_home.label.text }}</span>
+                                            </label>
+                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.invite_to_plex_home.description }}</p>
+                                        </div>
+                                        <div class="form-control">
+                                            <label class="label cursor-pointer justify-start">
+                                                {{ form.allow_live_tv(class="toggle toggle-secondary mr-3") }}
+                                                <span class="label-text font-medium">{{ form.allow_live_tv.label.text }}</span>
+                                            </label>
+                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_live_tv.description }}</p>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </details>
+        {% endfor %}
+    </div>
+
+    {# --- NEW: Advanced Options Collapsible Section --- #}
+    <details class="collapse collapse-arrow bg-base-100/50 border border-base-300 rounded-md">
+        <summary class="collapse-title text-md font-medium">
+            Advanced Options
+        </summary>
+        <div class="collapse-content space-y-4">
+            
+            {# Number of Uses #}
+            <div class="form-control">
+                {{ form.number_of_uses.label(class="label") }}
+                {{ form.number_of_uses(class="input input-bordered " + ("input-error" if form.number_of_uses.errors else ""), type="number", min="0") }}
+                {% if form.number_of_uses.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.number_of_uses.errors[0] }}</span>{% else %}<span class="label-text-alt text-xs block">{{ form.number_of_uses.description }}</span>{% endif %}
+            </div>
+
+            {# Membership Duration #}
+            <div class="form-control">
+                {{ form.membership_expires_at.label(class="label") }}
+                {{ form.membership_expires_at(class="input input-bordered " + ("input-error" if form.membership_expires_at.errors else ""), type="date") }} 
+                {% if form.membership_expires_at.errors %}<label class="label py-0 mt-1"><span class="label-text-alt text-error whitespace-normal">{{ form.membership_expires_at.errors[0] }}</span></label>{% endif %}
+                <label class="label pt-1"><span class="label-text-alt whitespace-normal text-xs">{{ form.membership_expires_at.description }}</span></label>
+            </div>
+            
+            {# Discord Overrides #}
+            <div class="divider text-xs">Discord Overrides</div>
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.override_force_discord_auth(class="toggle toggle-info mr-3", id="modal_override_sso") }}
+                    <span class="label-text font-medium">{{ form.override_force_discord_auth.label.text }}</span>
+                </label>
+                <p class="text-xs text-base-content/60 mt-0.5 pl-14">The global setting is <strong>{{ "ON" if global_force_sso else "OFF" }}</strong>. Toggle to override for this invite.</p>
+            </div>
+            
+            {% if global_require_guild %}
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.override_force_guild_membership(class="toggle toggle-warning mr-3", id="modal_override_guild") }}
+                    <span class="label-text font-medium">{{ form.override_force_guild_membership.label.text }}</span>
+                </label>
+                <p class="text-xs text-base-content/60 mt-0.5 pl-14">The global setting is <strong>ON</strong>. Toggle to disable for this invite.</p>
+            </div>
+            {% endif %}
+
+            <div class="divider text-xs">Whitelist Grants</div>
+            
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.grant_purge_whitelist(class="toggle toggle-accent mr-3") }}
+                    <span class="label-text font-medium">{{ form.grant_purge_whitelist.label.text }}</span>
+                </label>
+                <p class="text-xs text-base-content/60 mt-0.5 pl-14">{{ form.grant_purge_whitelist.description }}</p>
+            </div>
+            
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.grant_bot_whitelist(class="toggle toggle-info mr-3") }}
+                    <span class="label-text font-medium">{{ form.grant_bot_whitelist.label.text }}</span>
+                </label>
+                <p class="text-xs text-base-content/60 mt-0.5 pl-14">{{ form.grant_bot_whitelist.description }}</p>
+            </div>
+
+        </div>
+    </details>
+    {# --- END Advanced Options --- #}
+
+    {# Server Selection #}
+    <div class="divider text-xs">Select Server & Grant Access</div>
+    <div class="form-control mb-4 space-y-2">
+        <input type="hidden" name="server_id" id="selected_server_id">
+        {% for group, servers in all_servers | groupby('service_type') %}
+            <details class="collapse collapse-arrow bg-base-200/50 border border-base-300 rounded-md server-group-details">
+                <summary class="collapse-title text-lg font-medium flex items-center">
+                    {% if group.value == 'plex' %}
+                        <svg class="w-6 h-6 inline-block text-primary bottom-0.5 relative" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="#000000" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
+                    {% endif %}
+                    {{ group.name.capitalize() }}
+                </summary>
+                <div class="collapse-content">
+                    <div class="grid grid-cols-1 gap-4">
+                        {% for server in servers %}
+                            <div class="card bg-base-100 shadow-xl cursor-pointer server-card border-2 border-transparent relative" data-server-id="{{ server.id }}">
+                                <div class="absolute top-2 right-2 checkmark-icon hidden">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div class="card-body p-4">
+                                    <h2 class="card-title text-base">{{ server.name }}</h2>
+                                    
+                                    <div class="server-options-content hidden mt-4 space-y-4">
+                                        {# Library Access #}
+                                        <div class="form-control">
+                                            <label class="label">
+                                                <span class="label-text">{{ form.libraries.label.text }}</span>
+                                                <span class="label-text-alt">
+                                                    <button type="button" class="btn btn-xs btn-ghost select-all-libs">All</button> |
+                                                    <button type="button" class="btn btn-xs btn-ghost deselect-all-libs">None</button>
+                                                </span>
+                                            </label>
+                                            <div class="max-h-40 overflow-y-auto p-2 border border-base-300 rounded-md bg-base-100/30 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                                {% for value, label in form.libraries.choices %}
+                                                    <label class="label cursor-pointer justify-start py-1">
+                                                        <input type="checkbox" name="{{ form.libraries.name }}" value="{{ value }}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" {% if form.libraries.data and value in form.libraries.data %}checked{% endif %}>
+                                                        <span class="label-text" title="{{ label }}">{{ label | truncate(30, True) }}</span>
+                                                    </label>
+                                                {% endfor %}
+                                            </div>
+                                            {% if form.libraries.errors %}<span class="label-text-alt text-error mt-1">{{ form.libraries.errors[0] }}</span>{% endif %}
+                                        </div>
+                                        
+                                        {# Allow Downloads #}
+                                        <div class="form-control">
+                                            <label class="label cursor-pointer justify-start">
+                                                {{ form.allow_downloads(class="toggle toggle-accent mr-3") }}
+                                                <span class="label-text font-medium">{{ form.allow_downloads.label.text }}</span>
+                                            </label>
+                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_downloads.description }}</p>
+                                        </div>
+
+                                        {# Plex-specific options #}
+                                        {% if server.service_type.value == 'plex' %}
+                                        <div class="form-control">
+                                            <label class="label cursor-pointer justify-start">
+                                                {{ form.invite_to_plex_home(class="toggle toggle-primary mr-3") }}
+                                                <span class="label-text font-medium">{{ form.invite_to_plex_home.label.text }}</span>
+                                            </label>
+                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.invite_to_plex_home.description }}</p>
+                                        </div>
+                                        <div class="form-control">
+                                            <label class="label cursor-pointer justify-start">
+                                                {{ form.allow_live_tv(class="toggle toggle-secondary mr-3") }}
+                                                <span class="label-text font-medium">{{ form.allow_live_tv.label.text }}</span>
+                                            </label>
+                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_live_tv.description }}</p>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </details>
+        {% endfor %}
+    </div>
+
+    {# Submit actions are unchanged #}
+    <div class="modal-action mt-6">
+        <button type="button" class="btn btn-ghost" onclick="const modal = document.getElementById('create_invite_modal'); if(modal) modal.close();">Cancel</button>
+        {{ form.submit(class="btn btn-primary") }}
+        <span id="create_invite_loader_span" class="htmx-indicator loading loading-spinner loading-md"></span>
+    </div>
+
+</div>
+<script>
+    (function() { 
+        const currentForm = document.currentScript.closest('form') || document.getElementById('createInviteForm');
+        if (!currentForm) {
+            return;
+        }
+
+        // Set all library checkboxes to checked by default
+        const allLibraryCheckboxes = currentForm.querySelectorAll('.library-checkbox');
+        allLibraryCheckboxes.forEach(cb => cb.checked = true);
+
+        const overrideSsoToggle = currentForm.querySelector('#modal_override_sso');
+        const overrideGuildToggle = currentForm.querySelector('#modal_override_guild');
+
+        function handleSsoDependency() {
+            if (!overrideSsoToggle || !overrideGuildToggle) {
+                return;
+            }
+            
+            if (overrideSsoToggle.checked) {
+                overrideGuildToggle.disabled = false;
+            } else {
+                overrideGuildToggle.disabled = true;
+                overrideGuildToggle.checked = false;
+            }
+        }
+        
+        if (overrideSsoToggle) {
+            overrideSsoToggle.addEventListener('change', handleSsoDependency);
+            handleSsoDependency();
+        }
+
+        const linkExpiresInDaysInput = currentForm.querySelector('#expires_in_days_input');
+        const calculatedLinkExpiryDateSpan = currentForm.querySelector('#calculated_link_expiry_date');
+        
+        function updateCalculatedLinkExpiry() {
+            if (!linkExpiresInDaysInput || !calculatedLinkExpiryDateSpan) return;
+            const days = parseInt(linkExpiresInDaysInput.value);
+            if (!isNaN(days) && days > 0) {
+                const today = new Date();
+                const expiryDate = new Date(new Date().setDate(today.getDate() + days));
+                calculatedLinkExpiryDateSpan.textContent = expiryDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+            } else if (linkExpiresInDaysInput.value === '0' || linkExpiresInDaysInput.value === '') {
+                calculatedLinkExpiryDateSpan.textContent = 'Never';
+            } else {
+                 calculatedLinkExpiryDateSpan.textContent = 'Invalid';
+            }
+        }
+        if (linkExpiresInDaysInput) {
+            linkExpiresInDaysInput.addEventListener('input', updateCalculatedLinkExpiry);
+            updateCalculatedLinkExpiry(); 
+        }
+
+        const membershipDurationInput = currentForm.querySelector('#membership_duration_days_input');
+        const calculatedMembershipExpiryDateSpan = currentForm.querySelector('#calculated_membership_expiry_date');
+
+        function updateCalculatedMembershipExpiry() {
+            if (!membershipDurationInput || !calculatedMembershipExpiryDateSpan) return;
+            const inputValue = membershipDurationInput.value;
+            const days = parseInt(inputValue);
+
+            if (!isNaN(days) && days > 0) {
+                const today = new Date();
+                const expiryDate = new Date(new Date().setDate(today.getDate() + days));
+                calculatedMembershipExpiryDateSpan.textContent = expiryDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+            } else if (inputValue === '') {
+                calculatedMembershipExpiryDateSpan.textContent = 'Permanent (if blank)';
+            } else { 
+                calculatedMembershipExpiryDateSpan.textContent = 'Invalid / Permanent';
+            }
+        }
+        if (membershipDurationInput) {
+            membershipDurationInput.addEventListener('input', updateCalculatedMembershipExpiry);
+            setTimeout(updateCalculatedMembershipExpiry, 0);
+        }
+
+        // Server selection and dynamic options
+        const serverCards = document.querySelectorAll('.server-card');
+        const selectedServerIdInput = document.getElementById('selected_server_id');
+        const serverGroups = document.querySelectorAll('.server-group-details');
+
+        serverCards.forEach(card => {
+            const optionsContent = card.querySelector('.server-options-content');
+            const checkmarkIcon = card.querySelector('.checkmark-icon');
+            const selectAllBtn = card.querySelector('.select-all-libs');
+            const deselectAllBtn = card.querySelector('.deselect-all-libs');
+            const libCheckboxes = card.querySelectorAll('.library-checkbox');
+
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.server-options-content') || e.target.closest('summary')) {
+                    return;
+                }
+
+                const isSelected = card.classList.contains('border-primary');
+                const parentDetails = card.closest('.server-group-details');
+
+                // Hide all server options, reset borders, and hide checkmarks
+                serverCards.forEach(c => {
+                    c.classList.remove('border-primary');
+                    c.classList.add('border-transparent');
+                    c.querySelector('.server-options-content').classList.add('hidden');
+                    c.querySelector('.checkmark-icon').classList.add('hidden');
+                });
+
+                // Close all collapsible sections
+                serverGroups.forEach(group => {
+                    if (group !== parentDetails || isSelected) {
+                         group.removeAttribute('open');
+                    }
+                });
+
+                if (!isSelected) {
+                    card.classList.remove('border-transparent');
+                    card.classList.add('border-primary');
+                    optionsContent.classList.remove('hidden');
+                    checkmarkIcon.classList.remove('hidden');
+                    selectedServerIdInput.value = card.dataset.serverId;
+                    if (parentDetails) {
+                        parentDetails.setAttribute('open', '');
+                    }
+                } else {
+                    selectedServerIdInput.value = '';
+                }
+            });
+
+            if(selectAllBtn) selectAllBtn.addEventListener('click', () => libCheckboxes.forEach(cb => cb.checked = true));
+            if(deselectAllBtn) deselectAllBtn.addEventListener('click', () => libCheckboxes.forEach(cb => cb.checked = false));
+        });
+
+        if (serverCards.length > 0) {
+            serverCards[0].click();
+        }
+    })();
+</script>

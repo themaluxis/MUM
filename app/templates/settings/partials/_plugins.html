@@ -1,0 +1,232 @@
+<!-- File: app/templates/settings/partials/_plugins.html -->
+<div class="flex justify-between items-center mb-6">
+    <div class="text-lg font-semibold">Plugins</div>
+    <div class="flex gap-2">
+        <button onclick="reloadPlugins()" class="btn btn-outline btn-sm">
+            <i class="fas fa-sync mr-2"></i>Reload Plugins
+        </button>
+        <a href="{{ url_for('plugins.install_plugin') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus mr-2"></i>Install Plugin
+        </a>
+    </div>
+</div>
+
+<!-- Core Plugins -->
+<div class="mb-8">
+    <h2 class="text-xl font-semibold mb-4">Core Services</h2>
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {% for plugin in available_plugins %}
+        {% if plugin.plugin_type.value == 'core' %}
+    <div class="card bg-base-200 hover:bg-base-300 transition-colors">
+        <div class="card-body p-4">
+            <div class="flex items-start">
+                <div class="flex-1">
+                    <div class="flex items-center mb-1">
+                        <h3 class="font-semibold text-lg mr-3">{{ plugin.name }}</h3>
+                        {% if plugin.is_enabled %}
+                            <span class="badge badge-success badge-sm">Enabled</span>
+                        {% else %}
+                            <span class="badge badge-ghost badge-sm">Disabled</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm mt-1 text-base-content/60">{{ plugin.description }}</p>
+                    
+                    {% if plugin.supported_features %}
+                    <div class="mt-3">
+                        <div class="text-xs mb-1">Features:</div>
+                        <div class="flex flex-wrap gap-1">
+                            {% for feature in plugin.supported_features[:4] %}
+                            <span class="badge badge-outline badge-xs">
+                                {{ feature.replace('_', ' ').title() }}
+                            </span>
+                            {% endfor %}
+                            {% if plugin.supported_features|length > 4 %}
+                            <span class="badge badge-outline badge-xs">
+                                +{{ plugin.supported_features|length - 4 }} more
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-2 text-xs text-gray-500">
+                        <i class="fas fa-code-branch mr-1"></i>
+                        Version {{ plugin.version }}
+                    </div>
+                    
+                    {% if plugin.servers_count > 0 %}
+                    <div class="text-xs text-blue-600 mt-2">
+                        <i class="fas fa-server mr-1"></i>
+                        {{ plugin.servers_count }} server(s) using this plugin
+                    </div>
+                    {% endif %}
+                    
+                    {% if plugin.last_error %}
+                    <div class="alert alert-error alert-sm mt-2">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span class="text-xs">{{ plugin.last_error[:50] }}...</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-actions justify-end mt-4">
+                <button onclick="showPluginInfo('{{ plugin.plugin_id }}')" 
+                        class="btn btn-ghost btn-sm">
+                    <i class="fas fa-info mr-1"></i>Info
+                </button>
+                {% if plugin.is_enabled %}
+                <form method="POST" action="{{ url_for('plugins.disable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-warning btn-sm">
+                        <i class="fas fa-power-off mr-1"></i>Disable
+                    </button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" 
+                            class="btn btn-success btn-sm"
+                            {% if plugin.servers_count == 0 %}disabled title="No servers configured for this plugin. Configure a server first."{% endif %}>
+                        <i class="fas fa-power-off mr-1"></i>Enable
+                        <!-- Debug: plugin_id={{ plugin.plugin_id }}, servers_count={{ plugin.servers_count }} -->
+                    </button>
+                </form>
+                {% endif %}
+                <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=plugin.plugin_id) }}" class="btn btn-primary btn-sm">
+                    Configure
+                </a>
+            </div>
+        </div>
+    </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Community Plugins -->
+{% set community_plugins = available_plugins | selectattr('plugin_type.value', 'in', ['community', 'custom']) | list %}
+{% if community_plugins %}
+<div class="mb-8">
+    <h2 class="text-xl font-semibold mb-4">Community Plugins</h2>
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {% for plugin in community_plugins %}
+        <div class="card bg-base-200 hover:bg-base-300 transition-colors">
+            <div class="card-body p-4">
+                <div class="flex items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center mb-1">
+                            <h3 class="font-semibold text-lg mr-3">{{ plugin.name }}</h3>
+                            {% if plugin.is_enabled %}
+                                <span class="badge badge-success badge-sm">Enabled</span>
+                            {% else %}
+                                <span class="badge badge-ghost badge-sm">Disabled</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-sm text-gray-600 mt-1">{{ plugin.description }}</p>
+                        
+                        {% if plugin.supported_features %}
+                        <div class="mt-3">
+                            <div class="text-xs text-gray-500 mb-1">Features:</div>
+                            <div class="flex flex-wrap gap-1">
+                                {% for feature in plugin.supported_features[:4] %}
+                                <span class="badge badge-outline badge-xs">
+                                    {{ feature.replace('_', ' ').title() }}
+                                </span>
+                                {% endfor %}
+                                {% if plugin.supported_features|length > 4 %}
+                                <span class="badge badge-outline badge-xs">
+                                    +{{ plugin.supported_features|length - 4 }} more
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="space-y-1 text-xs text-gray-500 mt-2">
+                            {% if plugin.author %}
+                            <div class="flex items-center">
+                                <i class="fas fa-user mr-2"></i>
+                                <span>{{ plugin.author }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="flex items-center">
+                                <i class="fas fa-code-branch mr-1"></i>
+                                <span>Version {{ plugin.version }}</span>
+                            </div>
+                            {% if plugin.license %}
+                            <div class="flex items-center">
+                                <i class="fas fa-balance-scale mr-2"></i>
+                                <span>{{ plugin.license }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if plugin.servers_count > 0 %}
+                        <div class="text-xs text-blue-600 mt-2">
+                            <i class="fas fa-server mr-1"></i>
+                            {{ plugin.servers_count }} server(s) using this plugin
+                        </div>
+                        {% endif %}
+                        
+                        {% if plugin.last_error %}
+                        <div class="alert alert-error alert-sm mt-2">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span class="text-xs">{{ plugin.last_error[:50] }}...</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-actions justify-end mt-4">
+                    <button onclick="showPluginInfo('{{ plugin.plugin_id }}')" 
+                            class="btn btn-ghost btn-sm">
+                        <i class="fas fa-info mr-1"></i>Info
+                    </button>
+                    {% if plugin.is_enabled %}
+                    <form method="POST" action="{{ url_for('plugins.disable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-warning btn-sm">
+                            <i class="fas fa-power-off mr-1"></i>Disable
+                        </button>
+                    </form>
+                    {% else %}
+                    <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" 
+                                class="btn btn-success btn-sm"
+                                {% if plugin.servers_count == 0 %}disabled title="No servers configured for this plugin. Configure a server first."{% endif %}>
+                            <i class="fas fa-power-off mr-1"></i>Enable
+                            <!-- Debug: plugin_id={{ plugin.plugin_id }}, servers_count={{ plugin.servers_count }} -->
+                        </button>
+                    </form>
+                    {% endif %}
+                    <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=plugin.plugin_id) }}" class="btn btn-primary btn-sm">
+                        Configure
+                    </a>
+                    <form method="POST" action="{{ url_for('plugins.uninstall_plugin', plugin_id=plugin.plugin_id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" 
+                                class="btn btn-error btn-sm"
+                                onclick="return confirm('Are you sure you want to uninstall this plugin? This action cannot be undone.')"
+                                {% if not plugin.can_be_disabled() %}disabled title="Cannot uninstall - has active servers"{% endif %}>
+                            <i class="fas fa-trash mr-1"></i>Uninstall
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Empty State -->
+{% if not available_plugins %}
+<div class="text-center py-12">
+    <i class="fas fa-puzzle-piece text-6xl text-gray-300 mb-4"></i>
+    <h3 class="text-xl font-semibold text-gray-600 mb-2">No Plugins Available</h3>
+    <p class="text-gray-500 mb-6">Install plugins to extend MUM's functionality.</p>
+    <a href="{{ url_for('plugins.install_plugin') }}" class="btn btn-primary">
+        <i class="fas fa-plus mr-2"></i>Install Your First Plugin
+    </a>
+</div>
+{% endif %}

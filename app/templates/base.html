@@ -1,0 +1,132 @@
+<!-- File: app/templates/base.html -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}{{ g.app_name or "Multimedia User Manager" }}{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
+    {% block head_extra %}{% endblock %}
+</head>
+
+<body class="bg-base-100 text-base-content">
+
+    {# --- Determine Outer Layout Wrapper --- #}
+    {% if current_user and current_user.is_authenticated and g.setup_complete %}
+    {# Logged-in and setup complete: Use drawer layout #}
+    <div class="drawer">
+        <input id="main-sidebar-drawer-toggle" type="checkbox" class="drawer-toggle" />
+        <div class="drawer-content flex flex-col min-h-screen">
+            {% include 'components/navigation/main_navbar.html' %}
+            {# Main content rendering call is below, outside this direct if/else for wrappers #}
+            {% else %}
+            {# Non-logged-in or setup state: Simpler flex layout #}
+            <div class="flex flex-col min-h-screen">
+                {% if g.setup_complete == False and request.endpoint and request.endpoint.startswith('setup.') %}
+                {% include 'components/navigation/setup_navbar.html' %}
+                {% else %}
+                {% include 'components/navigation/public_navbar.html' %}
+                {% endif %}
+                {# Main content rendering call is below, outside this direct if/else for wrappers #}
+                {% endif %}
+
+                <!-- Main Content Area - This is where the single content block will be, common to both layouts -->
+                <main class="flex-grow container mx-auto px-4 py-8">
+                    {% include 'components/alerts/flash_messages.html' %}
+
+                    {% block content %}
+                    <!-- Default content if child template doesn't override -->
+                    <p class="text-center text-lg text-base-content/70 py-10">
+                        Default content from base.html. Child template should override this.
+                    </p>
+                    {% endblock content %}
+                </main>
+
+                <footer class="footer footer-center p-4 bg-base-300 text-base-content no-print mt-auto">
+                    <div>
+                        <p>© {{ current_year }} {{ g.app_name or "Multimedia User Manager" }}.</p>
+                    </div>
+                </footer>
+
+                {# Close conditional wrapper divs correctly #}
+                {% if current_user and current_user.is_authenticated and g.setup_complete %}
+            </div> {# Closes drawer-content #}
+            <div id="sidebar" class="drawer-side z-40">
+                <label for="main-sidebar-drawer-toggle" aria-label="close sidebar" class="drawer-overlay"></label>
+                <ul class="menu p-4 w-60 sm:w-80 min-h-full bg-base-200 text-base-content">
+
+                    {# Add conditional 'active' class to each link #}
+                    <li><a href="{{ url_for('dashboard.index') }}" class="{{ 'active menu-active' if request.endpoint == 'dashboard.index' else '' }}"><i class="fa-solid fa-chart-line fa-fw mr-2"></i> Dashboard</a></li>
+                    <li><a href="{{ url_for('users.list_users') }}" class="{{ 'active menu-active' if request.endpoint and request.endpoint.startswith('users.') else '' }}"><i class="fa-solid fa-users fa-fw mr-2"></i> Users</a></li>
+                    <li><a href="{{ url_for('invites.list_invites') }}" class="{{ 'active menu-active' if request.endpoint and request.endpoint.startswith('invites.') else '' }}"><i class="fa-solid fa-ticket fa-fw mr-2"></i> Invites</a></li>
+                    <li><a href="{{ url_for('dashboard.libraries') }}" class="{{ 'active menu-active' if request.endpoint == 'dashboard.libraries' else '' }}"><i class="fa-solid fa-layer-group fa-fw mr-2"></i> Libraries</a></li>
+                    <li><a href="{{ url_for('dashboard.streaming_sessions') }}" class="{{ 'active menu-active' if request.endpoint == 'dashboard.streaming_sessions' else '' }}"><i class="fa-solid fa-tower-broadcast fa-fw mr-2"></i> Streaming</a></li>
+                    
+                    {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') or current_user.has_permission('manage_discord_settings') or current_user.has_permission('manage_advanced_settings') or current_user.has_permission('view_admins_tab')  %}
+                    {% set settings_is_active = request.endpoint and request.endpoint.startswith('dashboard.settings_') %}
+                    <li>
+                        <details {% if settings_is_active %}open{% endif %}>
+                            <summary class="{{ 'active' if settings_is_active else '' }}">
+                                <i class="fa-solid fa-cog fa-fw mr-2"></i> Settings
+                            </summary>
+                            <ul class="ml-4">
+                                {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
+                                <li><a href="{{ url_for('dashboard.settings_general') }}" class="{{ 'active menu-active' if request.endpoint == 'dashboard.settings_general' else '' }}"><i class="fa-solid fa-sliders fa-fw"></i> General</a></li>
+                                {% endif %}
+                                {% if current_user.id == 1 or current_user.has_permission('view_admins_tab') %}
+                                    {% set admin_area_active = request.endpoint and (request.endpoint.startswith('dashboard.settings_admin') or request.endpoint.startswith('dashboard.settings_role')) %}
+                                    <li>
+                                        <details {% if admin_area_active %}open{% endif %}>
+                                            <summary class="{{ 'active' if admin_area_active else '' }}">
+                                                <i class="fa-solid fa-user-shield fa-fw mr-2"></i> Manage Admins
+                                            </summary>
+                                            <ul class="ml-4">
+                                                {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
+                                                <li><a href="{{ url_for('dashboard.settings_admins') }}" class="{{ 'active menu-active' if request.endpoint and request.endpoint.startswith('dashboard.settings_admin') else '' }}"><i class="fa-solid fa-shield-halved mr-2"></i> Admins</a></li>
+                                                {% endif %}
+                                                {% if current_user.id == 1 or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
+                                                <li><a href="{{ url_for('dashboard.settings_roles') }}" class="{{ 'active menu-active' if request.endpoint and request.endpoint.startswith('dashboard.settings_role') else '' }}"><i class="fa-solid fa-shield mr-2"></i> Roles</a></li>
+                                                {% endif %}
+                                            </ul>
+                                        </details>
+                                    </li>
+                                {% endif %}
+                                {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
+                                <li><a href="{{ url_for('dashboard.settings_discord') }}" class="{{ 'active menu-active' if request.endpoint == 'dashboard.settings_discord' else '' }}"><i class="fa-brands fa-discord fa-fw"></i> Discord</a></li>
+                                {% endif %}
+                                {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
+                                <li><a href="{{ url_for('dashboard.settings_logs') }}" class="{{ 'active menu-active' if request.endpoint == 'dashboard.settings_logs' else '' }}"><i class="fa-solid fa-timeline fa-fw"></i> Logs</a></li>
+                                {% endif %}
+                                {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
+                                <li><a href="{{ url_for('dashboard.settings_advanced') }}" class="{{ 'active menu-active' if request.endpoint == 'dashboard.settings_advanced' else '' }}"><i class="fa-solid fa-gears fa-fw"></i> Advanced</a></li>
+                                {% endif %}
+                            </ul>
+                        </details>
+                    </li>
+                    {% endif %}
+                    <div class="divider"></div>
+                    <li><a href="{{ url_for('auth.logout') }}"><i class="fa-solid fa-arrow-right-from-bracket fa-fw mr-2"></i> Logout</a></li>
+                </ul>
+            </div>
+        </div> {# Closes drawer #}
+        {% else %}
+    </div> {# Closes simple flex-col div for non-logged-in state #}
+    {% endif %}
+
+    {% block modals %}{% endblock modals %}
+
+    <div id="toast-container" class="toast toast-bottom toast-center sm:toast-end z-1100 space-y-2"></div>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js"
+        integrity="sha512-2kIcAizYXhIn8TzUvqzEDZNuDZ+aW7yE/+f1HJHXFjQcGNfv1kqzJSTBRBSlOgp6B/KZsz1K0a3ZTqP9dnxioQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

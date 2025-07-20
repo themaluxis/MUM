@@ -1,0 +1,213 @@
+{# File: app/templates/invites/partials/edit_invite_modal.html #}
+{# Expects form, invite, grouped_servers, invite_server, global_require_guild #}
+
+<h3 class="font-bold text-lg mb-4">
+    <i class="fa-solid fa-edit mr-2"></i>Edit Invite
+</h3>
+<p class="text-sm text-base-content/80 mb-4 -mt-2">
+    Path:
+    <a href="{{ invite.get_full_url(g.app_base_url) }}" target="_blank" class="link link-hover font-mono text-xs">
+        {{ invite.custom_path or invite.token }}
+    </a> (Path is not editable)
+</p>
+
+<form id="editInviteForm-{{ invite.id }}"
+      hx-post="{{ url_for('invites.update_invite', invite_id=invite.id) }}"
+      hx-target="#edit_invite_modal_content_div"
+      hx-swap="innerHTML"
+      hx-on::after-request="if(event.detail.successful && event.detail.xhr.status !== 422) { document.getElementById('edit_invite_modal').close(); }"
+      hx-indicator="#edit_invite_loader_span">
+
+    {{ form.hidden_tag() }}
+
+    {# --- Basic, Always-Visible Options --- #}
+    <div class="form-control mb-3">
+        <label class="label text-base-content font-bold mb-1">Invite Code String</label>
+        <input type="text" value="{{ invite.custom_path or 'N/A' }}" class="input input-bordered w-full" disabled>
+        <span class="label-text-alt text-xs block mt-1">The custom path cannot be changed after creation.</span>
+    </div>
+
+    <div class="form-control mb-4">
+        {{ form.expires_in_days.label(class="label inline-block font-bold mb-1") }} <div class="badge badge-xs badge-outline badge-warning mb-1">In Days</div>
+        <div class="join w-full">
+            {{ form.expires_in_days(class="input input-bordered join-item w-full " + ("input-error" if form.expires_in_days.errors else ""), type="number", min="0", id="edit_expires_in_days") }}
+            <label class="btn btn-warning join-item" title="Set expiry to never">
+                {{ form.clear_expiry(class="checkbox checkbox-xs mr-2", id="edit_clear_expiry") }} Clear
+            </label>
+        </div>
+        {% if form.expires_in_days.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.expires_in_days.errors[0] }}</span>{% endif %}
+    </div>
+
+    {# Server Selection & Options (Display Only) #}
+    <div class="divider text-xs">Server & Access Options</div>
+    <p class="text-xs text-base-content/70 -mt-2 mb-3">Server selection cannot be changed after an invite is created.</p>
+    
+    <div class="form-control mb-4 space-y-2">
+        {% if invite_server %}
+            <details class="collapse collapse-arrow bg-base-200/50 border border-base-300 rounded-md" open>
+                <summary class="collapse-title text-lg font-medium flex items-center">
+                    {% if invite_server.service_type.value == 'plex' %}
+                        <svg class="w-6 h-6 inline-block text-primary bottom-0.5 relative" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="#000000" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
+                    {% endif %}
+                    {{ invite_server.service_type.name.capitalize() }}
+                </summary>
+                <div class="collapse-content">
+                    <div class="card bg-base-100 shadow-xl border-2 border-primary mt-2">
+                        <div class="card-body p-4">
+                            <h2 class="card-title text-base">{{ invite_server.name }}</h2>
+                            <div class="mt-4 space-y-4">
+                                {# Library Access #}
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text">{{ form.libraries.label.text }}</span>
+                                        <span class="label-text-alt">
+                                            <button type="button" class="btn btn-xs btn-ghost select-all-libs">All</button> |
+                                            <button type="button" class="btn btn-xs btn-ghost deselect-all-libs">None</button>
+                                        </span>
+                                    </label>
+                                    <div class="max-h-40 overflow-y-auto p-2 border border-base-300 rounded-md bg-base-100/30 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                        {% for value, label in form.libraries.choices %}
+                                            <label class="label cursor-pointer justify-start py-1">
+                                                <input type="checkbox" name="{{ form.libraries.name }}" value="{{ value }}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" {% if form.libraries.data and value in form.libraries.data %}checked{% endif %}>
+                                                <span class="label-text" title="{{ label }}">{{ label | truncate(30, True) }}</span>
+                                            </label>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                
+                                {# Allow Downloads #}
+                                <div class="form-control">
+                                    <label class="label cursor-pointer justify-start">
+                                        {{ form.allow_downloads(class="toggle toggle-accent mr-3") }}
+                                        <span class="label-text font-medium">{{ form.allow_downloads.label.text }}</span>
+                                    </label>
+                                </div>
+
+                                {# Plex-specific options #}
+                                {% if invite_server.service_type.value == 'plex' %}
+                                <div class="form-control">
+                                    <label class="label cursor-pointer justify-start">
+                                        {{ form.invite_to_plex_home(class="toggle toggle-primary mr-3") }}
+                                        <span class="label-text font-medium">{{ form.invite_to_plex_home.label.text }}</span>
+                                    </label>
+                                </div>
+                                <div class="form-control">
+                                    <label class="label cursor-pointer justify-start">
+                                        {{ form.allow_live_tv(class="toggle toggle-secondary mr-3") }}
+                                        <span class="label-text font-medium">{{ form.allow_live_tv.label.text }}</span>
+                                    </label>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        {% else %}
+            <div class="alert alert-warning">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <span>The server associated with this invite no longer exists. Some options may not be available.</span>
+            </div>
+        {% endif %}
+    </div>
+
+    {# --- Advanced Options --- #}
+    <details class="collapse collapse-arrow bg-base-100/50 border border-base-300 rounded-md">
+        <summary class="collapse-title text-md font-medium">Advanced Options</summary>
+        <div class="collapse-content space-y-4 pt-4">
+            <div class="form-control">
+                {{ form.number_of_uses.label(class="label font-bold") }}
+                <div class="join w-full">
+                    {{ form.number_of_uses(class="input input-bordered join-item w-full " + ("input-error" if form.number_of_uses.errors else ""), type="number", min="0", id="edit_number_of_uses") }}
+                    <label class="btn btn-warning join-item" title="Set to unlimited uses">
+                        {{ form.clear_max_uses(class="checkbox checkbox-xs mr-2", id="edit_clear_max_uses") }} Clear
+                    </label>
+                </div>
+                {% if form.number_of_uses.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.number_of_uses.errors[0] }}</span>{% endif %}
+            </div>
+
+            <div class="form-control">
+                {{ form.membership_duration_days.label(class="label font-bold") }}
+                <div class="join w-full">
+                    {{ form.membership_duration_days(class="input input-bordered join-item w-full " + ("input-error" if form.membership_duration_days.errors else ""), type="number", min="1", id="edit_membership_duration_days") }}
+                    <label class="btn btn-warning join-item" title="Set to permanent membership">
+                        {{ form.clear_membership_duration(class="checkbox checkbox-xs mr-2", id="edit_clear_membership_duration") }} Clear
+                    </label>
+                </div>
+                {% if form.membership_duration_days.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.membership_duration_days.errors[0] }}</span>{% endif %}
+            </div>
+
+            <div class="divider text-xs">Discord Overrides</div>
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.override_force_discord_auth(class="toggle toggle-info mr-3", id="edit_modal_override_sso") }}
+                    <span class="label-text font-medium">{{ form.override_force_discord_auth.label.text }}</span>
+                </label>
+            </div>
+            {% if global_require_guild %}
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.override_force_guild_membership(class="toggle toggle-warning mr-3", id="edit_modal_override_guild") }}
+                    <span class="label-text font-medium">{{ form.override_force_guild_membership.label.text }}</span>
+                </label>
+            </div>
+            {% endif %}
+
+            <div class="divider text-xs">Whitelist Grants</div>
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.grant_purge_whitelist(class="toggle toggle-accent mr-3") }}
+                    <span class="label-text font-medium">{{ form.grant_purge_whitelist.label.text }}</span>
+                </label>
+            </div>
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.grant_bot_whitelist(class="toggle toggle-info mr-3") }}
+                    <span class="label-text font-medium">{{ form.grant_bot_whitelist.label.text }}</span>
+                </label>
+            </div>
+        </div>
+    </details>
+
+    <div class="modal-action mt-6">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('edit_invite_modal').close()">Cancel</button>
+        {{ form.submit(class="btn btn-primary") }}
+        <span id="edit_invite_loader_span" class="htmx-indicator loading loading-spinner loading-md"></span>
+    </div>
+</form>
+
+<script>
+(function() {
+    const form = document.getElementById('editInviteForm-{{ invite.id }}');
+    if (!form) return;
+
+    // Checkbox-input disabling logic
+    const fieldsToDisable = [
+        { cbId: 'edit_clear_expiry', inputId: 'edit_expires_in_days' },
+        { cbId: 'edit_clear_max_uses', inputId: 'edit_number_of_uses' },
+        { cbId: 'edit_clear_membership_duration', inputId: 'edit_membership_duration_days' }
+    ];
+    fieldsToDisable.forEach(field => {
+        const checkbox = form.querySelector('#' + field.cbId);
+        const input = form.querySelector('#' + field.inputId);
+        if (checkbox && input) {
+            const sync = () => { 
+                input.disabled = checkbox.checked; 
+                if (checkbox.checked) {
+                    input.value = ''; 
+                }
+            };
+            checkbox.addEventListener('change', sync);
+            sync(); // Initial sync on load
+        }
+    });
+
+    // Library selection logic
+    const selectAllBtn = form.querySelector('.select-all-libs');
+    const deselectAllBtn = form.querySelector('.deselect-all-libs');
+    const libCheckboxes = form.querySelectorAll('.library-checkbox');
+    if(selectAllBtn) selectAllBtn.addEventListener('click', (e) => { e.preventDefault(); libCheckboxes.forEach(cb => cb.checked = true); });
+    if(deselectAllBtn) deselectAllBtn.addEventListener('click', (e) => { e.preventDefault(); libCheckboxes.forEach(cb => cb.checked = false); });
+
+})();
+</script>

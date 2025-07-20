@@ -1,0 +1,72 @@
+{# File: app/templates/dashboard/partials/multi_service_status.html #}
+{# Expects 'server_status' (dict) in context #}
+
+{% if not server_status %}
+    {# Case where no servers are configured at all #}
+    <div class="flex flex-row gap-3 items-center">
+        <div class="self-start p-3 rounded-md bg-base-300 text-base-content/60"><i class="fa-solid fa-server fa-2x"></i></div>
+        <div class="flex flex-col">
+            <h2 class="card-title text-base-content/70 text-sm font-normal mb-px">Media Server Status</h2>
+            <p class="text-sm text-warning">No media servers configured.</p>
+        </div>
+    </div>
+    <div class="card-actions justify-end mt-4">
+        <a href="{{ url_for('dashboard.settings_plugins') }}" class="btn btn-xs btn-primary">
+            <i class="fa-solid fa-sliders mr-1"></i> Configure a Server
+        </a>
+    </div>
+
+{% elif server_status.multi_server %}
+    {# Case for multiple servers #}
+    <div class="flex flex-row gap-3 items-center">
+        <div class="self-start p-3 rounded-md {{ 'bg-error/20 text-error' if server_status.offline_count > 0 else 'bg-success/20 text-success' }}"><i class="fa-solid fa-network-wired fa-2x"></i></div>
+        <div class="flex flex-col">
+            <h2 class="card-title text-base-content/70 text-sm font-normal mb-px">Media Server Status</h2>
+            <div class="flex items-center gap-x-4 text-sm">
+                <strong class="text-success">Online: {{ server_status.online_count }}</strong>
+                {% if server_status.offline_count > 0 %}
+                <strong class="text-error">Offline: {{ server_status.offline_count }}</strong>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="card-actions justify-end mt-4">
+        <button class="btn btn-xs btn-outline btn-ghost" onclick="all_servers_status_modal.showModal()">
+            <i class="fa-solid fa-eye mr-1"></i> View All
+        </button>
+    </div>
+
+{% else %}
+    {# Case for a single server #}
+    <div class="flex flex-row gap-3 items-center">
+        <div class="self-start p-3 rounded-md {{ 'bg-success/20 text-success' if server_status.online else 'bg-error/20 text-error' }}"><i class="fa-solid fa-server fa-2x"></i></div>
+        <div class="flex flex-col">
+            <h2 class="card-title text-base-content/70 text-sm font-normal mb-px">{{ server_status.name | default('Server Status') }}</h2>
+            {% if server_status.online %}
+                <p class="text-sm"><strong class="text-success">Online</strong> - {{ server_status.friendly_name | default('Unknown Server') }}</p>
+                <p class="text-xs text-base-content/70">Version: {{ server_status.version | default('N/A') }}</p>
+            {% else %}
+                <p class="text-sm"><strong class="text-error">Offline</strong></p>
+                <p class="text-xs text-base-content/70" title="{{ server_status.error_message | default('Could not connect.') }}">
+                    {{ server_status.error_message | default('Could not connect to server.') | truncate(100, True) }}
+                </p>
+            {% endif %}
+            <p class="text-xs text-base-content/70">
+                Last Check: {{ server_status.last_check_time | time_ago if server_status.last_check_time else 'N/A' }}
+            </p>
+        </div>
+    </div>
+    <div class="card-actions justify-end mt-4">
+        <a href="{{ url_for('media_servers.edit_server', server_id=server_status.server_id) }}" class="btn btn-xs btn-outline btn-ghost">
+            <i class="fa-solid fa-sliders mr-1"></i> Configure
+        </a>
+        <button class="btn btn-xs btn-outline btn-ghost"
+                hx-post="{{ url_for('api.check_server_status', server_id=server_status.server_id) }}"
+                hx-target="#server_status_card_content"
+                hx-swap="innerHTML"
+                hx-indicator="#server_status_loader_refresh">
+            <span id="server_status_loader_refresh" class="htmx-indicator loading loading-spinner loading-xs"></span>
+            <i class="fa-solid fa-sync mr-1 htmx-indicator-hide"></i> Refresh
+        </button>
+    </div>
+{% endif %}

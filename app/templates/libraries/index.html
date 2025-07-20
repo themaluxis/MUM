@@ -1,0 +1,51 @@
+<!-- File: app/templates/libraries/index.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ super() }} - Libraries{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-2">
+    <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">All Libraries</h1>
+        {# You could add a 'Refresh Libraries' button here later #}
+    </div>
+
+    <div class="card bg-base-200 shadow-xl">
+        <div class="card-body">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Library Name</th>
+                            <th>Server</th>
+                            <th>Library Type</th>
+                            <th>Total Items</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lib in libraries %}
+                        <tr class="hover">
+                            <td class="font-semibold">{{ lib.name }}</td>
+                            <td>
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-semibold">{{ lib.server_name }}</span>
+                                    <span class="badge badge-ghost badge-sm">{{ lib.service_type }}</span>
+                                </div>
+                            </td>
+                            <td>{{ lib.type }}</td>
+                            <td>{{ lib.item_count }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center py-8">
+                                <p class="text-lg">No libraries found on any connected servers.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{# File: app/templates/users/_sync_results_modal_content.html #}
+{# Expects added_users, updated_users, removed_users, error_count, error_messages #}
+
+<div class="modal-box max-w-2xl">
+    <form method="dialog">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" type="button" 
+              onclick="document.getElementById('sync_results_modal').close()">✕</button>
+    </form>
+    <h3 class="font-bold text-lg"><i class="fa-solid fa-list-check mr-2"></i>Sync Results</h3>
+
+    {% if sync_result.errors > 0 %}
+        <div class="alert alert-error shadow-lg my-4">
+            <div>
+                <i class="fa-solid fa-circle-xmark fa-lg mr-2"></i>
+                <span>
+                    Encountered {{ sync_result.errors }} error(s) during sync.
+                    {% if sync_result.error_messages %}
+                        <ul class="list-disc list-inside text-xs mt-1">
+                            {% for msg in sync_result.error_messages[:3] %} {# Show first 3 errors #}
+                                <li>{{ msg | truncate(150) }}</li>
+                            {% endfor %}
+                            {% if sync_result.error_messages|length > 3 %}
+                                <li>... and {{ sync_result.error_messages|length - 3 }} more. Check server logs.</li>
+                            {% endif %}
+                        </ul>
+                    {% else %}
+                         Check server logs for details.
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if sync_result.added == 0 and sync_result.updated == 0 and sync_result.errors == 0 %}
+        <p class="py-4 text-success"><i class="fa-solid fa-check-circle mr-2"></i>Sync complete. No changes were made to user data.</p>
+    {% else %}
+        <p class="py-2 text-sm">Review the changes made during the media server synchronization:</p>
+        <div class="max-h-[60vh] overflow-y-auto space-y-3">
+            {% if sync_result.added > 0 %}
+            <div class="collapse collapse-arrow bg-base-100 rounded-md shadow">
+                <input type="checkbox" checked /> 
+                <div class="collapse-title text-md font-medium text-success">
+                    <i class="fa-solid fa-user-plus mr-2"></i>Added Users ({{ sync_result.added }})
+                </div>
+                <div class="collapse-content">
+                    <p class="text-xs">{{ sync_result.added }} new users were added from media servers.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if sync_result.updated > 0 %}
+            <div class="collapse collapse-arrow bg-base-100 rounded-md shadow">
+                <input type="checkbox" checked /> 
+                <div class="collapse-title text-md font-medium text-info">
+                    <i class="fa-solid fa-user-pen mr-2"></i>Updated Users ({{ sync_result.updated }})
+                </div>
+                <div class="collapse-content">
+                    {% if sync_result.updated_details %}
+                        <ul class="list-none text-xs pl-2 space-y-1">
+                            {% for detail in sync_result.updated_details %}
+                                <li>
+                                    <strong>{{ detail.username }}</strong>
+                                    <ul class="list-disc list-inside pl-3 text-base-content/80">
+                                        {% for change in detail.changes %}
+                                            <li>{{ change }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-xs">{{ sync_result.updated }} existing users were updated with new information.</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="modal-action mt-6">
+      <button type="button" class="btn btn-primary" onclick="document.getElementById('sync_results_modal').close()">Close</button>
+    </div>
+</div>

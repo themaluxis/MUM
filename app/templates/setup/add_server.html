@@ -1,0 +1,150 @@
+{% extends "layouts/setup.html" %}
+
+{% block title %}Add Media Server - {{ g.app_name }} Setup{% endblock %}
+
+{% block setup_content %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title text-2xl mb-4">
+            Configure {{ form.service_type.data.title() }} Server
+        </h2>
+        <form method="POST" action="{{ url_for('media_servers.add_server_setup', plugin_id=form.service_type.data) }}">
+            {{ form.hidden_tag() }}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            
+            {% if form.service_type.data %}
+            <input type="hidden" name="service_type" value="{{ form.service_type.data }}">
+            {% endif %}
+
+            <div class="form-control w-full mb-4">
+                {{ form.name.label(class="label") }}
+                {{ form.name(class="input input-bordered w-full") }}
+                {% if form.name.errors %}
+                    <div class="label"><span class="label-text-alt text-error">{{ form.name.errors[0] }}</span></div>
+                {% endif %}
+            </div>
+
+            <div class="form-control w-full mb-4">
+                {{ form.url.label(class="label") }}
+                {{ form.url(class="input input-bordered w-full", placeholder="http://192.168.1.10:8096") }}
+                {% if form.url.errors %}
+                    <div class="label"><span class="label-text-alt text-error">{{ form.url.errors[0] }}</span></div>
+                {% endif %}
+            </div>
+
+            <div id="apiKeyField" class="form-control w-full mb-4">
+                {{ form.api_key.label(class="label") }}
+                <span class="label-text-alt text-xs mb-1" id="apiKeyHelp">Required for this service.</span>
+                {{ form.api_key(class="input input-bordered w-full") }}
+                {% if form.api_key.errors %}
+                    <div class="label"><span class="label-text-alt text-error">{{ form.api_key.errors[0] }}</span></div>
+                {% endif %}
+            </div>
+
+            <div id="credentialsFields" class="hidden">
+                <div class="form-control w-full mb-4">
+                    {{ form.username.label(class="label") }}
+                    {{ form.username(class="input input-bordered w-full") }}
+                </div>
+                <div class="form-control w-full mb-4">
+                    {{ form.password.label(class="label") }}
+                    {{ form.password(class="input input-bordered w-full") }}
+                </div>
+            </div>
+
+            <div class="form-control mb-6">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.is_active(class="checkbox checkbox-primary mr-3") }}
+                    <span class="label-text">{{ form.is_active.label.text }}</span>
+                </label>
+            </div>
+
+            <div class="card-actions justify-between items-center mt-6">
+                <a href="{{ url_for('plugins.setup_plugins') }}" class="btn btn-ghost">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to Services
+                </a>
+                <div class="flex gap-2">
+                    <button type="button" id="test-connection-btn" class="btn btn-outline">Test Connection</button>
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Your existing JS for updating form fields and testing connection can go here.
+// Ensure the test connection fetch URL is correct.
+document.addEventListener('DOMContentLoaded', function() {
+    function updateFormFields() {
+        const serviceType = '{{ form.service_type.data }}';
+        const apiKeyField = document.getElementById('apiKeyField');
+        const credentialsFields = document.getElementById('credentialsFields');
+        const apiKeyHelp = document.getElementById('apiKeyHelp');
+        const apiKeyInput = document.getElementById('api_key');
+        
+        const apiKeyServices = ['plex', 'emby', 'jellyfin', 'kavita', 'audiobookshelf', 'komga'];
+        const credentialServices = ['romm'];
+        
+        if (apiKeyServices.includes(serviceType)) {
+            apiKeyField.classList.remove('hidden');
+            credentialsFields.classList.add('hidden');
+            apiKeyInput.required = true;
+        } else if (credentialServices.includes(serviceType)) {
+            apiKeyField.classList.add('hidden');
+            credentialsFields.classList.remove('hidden');
+            apiKeyInput.required = false;
+        }
+    }
+
+    function testConnection(event) {
+        const form = document.querySelector('form');
+        const formData = new FormData(form);
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        
+        btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Testing...';
+        btn.disabled = true;
+        
+        const serverConfig = {
+            name: formData.get('name'),
+            service_type: formData.get('service_type'),
+            url: formData.get('url'),
+            api_key: formData.get('api_key'),
+            username: formData.get('username'),
+            password: formData.get('password')
+        };
+        
+        fetch("{{ url_for('media_servers.test_new_server_connection') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': formData.get('csrf_token')
+            },
+            body: JSON.stringify(serverConfig)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                htmx.trigger('body', 'showToastEvent', { message: 'Connection successful: ' + data.message, category: 'success' });
+            } else {
+                htmx.trigger('body', 'showToastEvent', { message: 'Connection failed: ' + data.message, category: 'danger' });
+            }
+        })
+        .catch(error => {
+            htmx.trigger('body', 'showToastEvent', { message: 'Error: ' + error.message, category: 'danger' });
+        })
+        .finally(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    }
+
+    updateFormFields();
+    document.getElementById('test-connection-btn').addEventListener('click', testConnection);
+});
+</script>
+{% endblock %}

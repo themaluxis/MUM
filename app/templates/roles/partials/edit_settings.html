@@ -1,0 +1,26 @@
+<!-- File: app/templates/roles/_roles_edit_settings.html -->
+
+
+    <div class="flex items-center mb-4">
+        <a href="{{ url_for('dashboard.settings_roles') }}" class="btn btn-sm btn-ghost"><i class="fa-solid fa-arrow-left mr-2"></i> Back to Role List</a>
+    </div>
+
+    <h2 class="text-xl font-semibold my-4">Edit Role: <span class="font-bold text-primary">{{ role.name }}</span></h2>
+
+    <div class="overflow-x-auto ">
+    <div role="tablist" class="tabs tabs-border whitespace-nowrap flex-nowrap">
+        <a role="tab" href="{{ url_for('dashboard.edit_role', role_id=role.id, tab='display') }}" class="tab {{ 'tab-active' if active_role_tab == 'display' else '' }}">Display</a>
+        <a role="tab" href="{{ url_for('dashboard.edit_role', role_id=role.id, tab='permissions') }}" class="tab {{ 'tab-active' if active_role_tab == 'permissions' else '' }}">Permissions</a>
+        <a role="tab" href="{{ url_for('dashboard.edit_role', role_id=role.id, tab='members') }}" class="tab {{ 'tab-active' if active_role_tab == 'members' else '' }}">Manage Members ({{ role.admins|length }})</a>
+    </div>
+    </div>
+
+    <div class="bg-base-100 p-6 rounded-b-box rounded-tr-box">
+        {% if active_role_tab == 'display' %}
+            {% include 'roles/_display_tab.html' %}
+        {% elif active_role_tab == 'permissions' %}
+            {% include 'roles/_permissions_tab.html' %}
+        {% elif active_role_tab == 'members' %}
+            {% include 'roles/_members_tab.html' %}
+        {% endif %}
+    </div>

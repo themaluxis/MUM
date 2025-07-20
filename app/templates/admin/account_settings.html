@@ -1,0 +1,139 @@
+<!-- File: app/templates/admin/account_settings.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ super() }} - My Account{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-2 max-w-5xl">
+    <div class="flex items-center mb-6">
+        <h1 class="text-3xl font-bold">My Account</h1>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+        {# --- COLUMN 1: Your Profile (Left) --- #}
+        <div class="md:col-span-1">
+            <div class="card bg-base-200 shadow-xl sticky top-24">
+                <div class="card-body items-center text-center">
+                    {# Main Admin Avatar #}
+                    <div class="avatar mb-4">
+                        <div class="w-32 rounded-full ring ring-primary ring-offset-base-100 ring-offset-4">
+                            {% if current_user.plex_thumb %}
+                                <img src="{{ current_user.plex_thumb }}" alt="{{ current_user.username or current_user.plex_username }} avatar" />
+                            {% else %}
+                                <div class="avatar placeholder">
+                                    <div class="bg-primary text-primary-content rounded-full w-32 !flex items-center justify-center">
+                                        <span class="text-6xl font-bold">{{ (current_user.username or current_user.plex_username)[0]|upper if (current_user.username or current_user.plex_username) else 'A' }}</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <h2 class="card-title text-2xl">{{ current_user.plex_username or current_user.username }}</h2>
+                    <p class="text-base-content/70 text-sm mb-4">{{ current_user.email or 'No email on file' }}</p>
+                    {% if not current_user.plex_uuid %}
+                    <div class="w-full mb-4">
+                        {# This is a POST form to be consistent with the other SSO buttons #}
+                        <form method="POST" action="{{ url_for('auth.plex_sso_login_admin') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                             <button type="submit" class="btn btn-primary btn-sm btn-block bg-[#e5a00d] hover:bg-[#c4880b] border-[#e5a00d] hover:border-[#c4880b] text-black">
+                                <i class="fa-brands fa-plex fa-lg mr-2"></i> Link Plex Account
+                            </button>
+                        </form>
+                         <p class="text-xs text-base-content/60 mt-1">Link your Plex account to enable signing in with Plex.</p>
+                    </div>
+                    {% endif %}
+
+                    {# Discord Details (if linked) #}
+                    {% if current_user.discord_user_id %}
+                    <div class="divider text-xs">Linked Discord</div>
+                    <div class="flex items-center space-x-3 py-2">
+                        <div class="avatar">
+                            <div class="w-12 rounded-full">
+                                <img src="https://cdn.discordapp.com/avatars/{{ current_user.discord_user_id }}/{{ current_user.discord_avatar_hash }}.png?size=128" alt="Discord Avatar">
+                            </div>
+                        </div>
+                        <div class="text-left">
+                             <p class="font-semibold">{{ current_user.discord_username }}</p>
+                             <p class="text-xs text-base-content/70">ID: {{ current_user.discord_user_id }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# --- COLUMN 2: Account Settings Forms (Right) --- #}
+        <div class="md:col-span-2">
+            <!-- File: app/templates/account/_forms.html -->
+            {# Expects set_password_form and change_password_form in context #}
+
+            {# --- Set Initial Credentials Form --- #}
+            {% if current_user.is_plex_sso_only %}
+            <div class="card bg-base-200 shadow-xl">
+                <div class="card-body">
+                    <h3 class="card-title text-warning"><i class="fa-solid fa-key mr-2"></i> Set Local Credentials</h3>
+                    <p class="text-sm mb-4">Your account is currently "Plex SSO Only". Set a local username and password here to use as a fallback login method.</p>
+                    
+                    <form method="POST" action="{{ url_for('dashboard.settings_account') }}">
+                        {{ set_password_form.hidden_tag() }}
+                        <div class="space-y-4 max-w-md">
+                            <div class="form-control">
+                                {{ set_password_form.username.label(class="label block") }}
+                                {{ set_password_form.username(class="input input-bordered " + ("input-error" if set_password_form.username.errors else "")) }}
+                                {% if set_password_form.username.errors %}<p class="text-error text-xs mt-1">{{ set_password_form.username.errors[0] }}</p>{% endif %}
+                            </div>
+                            <div class="form-control">
+                                {{ set_password_form.password.label(class="label block") }}
+                                {{ set_password_form.password(class="input input-bordered " + ("input-error" if set_password_form.password.errors else "")) }}
+                                 {% if set_password_form.password.errors %}<p class="text-error text-xs mt-1">{{ set_password_form.password.errors[0] }}</p>{% endif %}
+                            </div>
+                            <div class="form-control">
+                                {{ set_password_form.confirm_password.label(class="label block") }}
+                                {{ set_password_form.confirm_password(class="input input-bordered " + ("input-error" if set_password_form.confirm_password.errors else "")) }}
+                                {% if set_password_form.confirm_password.errors %}<p class="text-error text-xs mt-1">{{ set_password_form.confirm_password.errors[0] }}</p>{% endif %}
+                            </div>
+                            <div class="card-actions justify-end mt-2">
+                                {{ set_password_form.submit_set_password(class="btn btn-warning") }}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            {# --- Change Password Form --- #}
+            {% if not current_user.is_plex_sso_only %}
+            <div class="card bg-base-200 shadow-xl">
+                <div class="card-body">
+                    <h3 class="card-title"><i class="fa-solid fa-lock mr-2"></i> Change Password</h3>
+                    <form method="POST" action="{{ url_for('dashboard.settings_account') }}">
+                        {{ change_password_form.hidden_tag() }}
+                        <div class="space-y-4 max-w-md">
+                             <div class="form-control">
+                                {{ change_password_form.current_password.label(class="label block") }}
+                                {{ change_password_form.current_password(class="input input-bordered") }}
+                            </div>
+                             <div class="form-control">
+                                {{ change_password_form.new_password.label(class="label block") }}
+                                {{ change_password_form.new_password(class="input input-bordered " + ("input-error" if change_password_form.new_password.errors else "")) }}
+                                {% if change_password_form.new_password.errors %}<p class="text-error text-xs mt-1">{{ change_password_form.new_password.errors[0] }}</p>{% endif %}
+                            </div>
+                             <div class="form-control">
+                                {{ change_password_form.confirm_new_password.label(class="label block") }}
+                                {{ change_password_form.confirm_new_password(class="input input-bordered " + ("input-error" if change_password_form.confirm_new_password.errors else "")) }}
+                                 {% if change_password_form.confirm_new_password.errors %}<p class="text-error text-xs mt-1">{{ change_password_form.confirm_new_password.errors[0] }}</p>{% endif %}
+                            </div>
+                            <div class="card-actions justify-end mt-2">
+                                {{ change_password_form.submit_change_password(class="btn btn-primary") }}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+    </div>
+</div>
+{% endblock %}

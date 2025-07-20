@@ -1,0 +1,142 @@
+{% extends "layouts/setup.html" %}
+
+{% block title %}Select Services - {{ g.app_name }}{% endblock %}
+
+{% block setup_content %}
+<div class="card bg-base-100 shadow-xl max-w-4xl mx-auto">
+    <div class="card-body">
+        <h2 class="card-title text-2xl mb-6">
+            <i class="fas fa-puzzle-piece mr-3"></i>
+            Select Media Services
+        </h2>
+        
+        <div class="mb-6">
+            <p class="text-gray-600">
+                Choose which media services you want to use with MUM. You can enable additional services later from the admin panel.
+            </p>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+            {% for plugin in plugins %}
+            <div class="card bg-base-200 hover:bg-base-300 transition-colors">
+                <div class="card-body p-4">
+                    <div class="flex items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-1">
+                                <h3 class="font-semibold text-lg mr-3">{{ plugin.name }}</h3>
+                                {% if plugin.servers_count > 0 %}
+                                    <span class="badge badge-success badge-sm">Configured</span>
+                                {% else %}
+                                    <span class="badge badge-ghost badge-sm">Not Configured</span>
+                                {% endif %}
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">{{ plugin.description }}</p>
+                            
+                            {% if plugin.supported_features %}
+                            <div class="mt-3">
+                                <div class="text-xs text-gray-500 mb-1">Features:</div>
+                                <div class="flex flex-wrap gap-1">
+                                    {% for feature in plugin.supported_features[:4] %}
+                                    <span class="badge badge-outline badge-xs">
+                                        {{ feature.replace('_', ' ').title() }}
+                                    </span>
+                                    {% endfor %}
+                                    {% if plugin.supported_features|length > 4 %}
+                                    <span class="badge badge-outline badge-xs">
+                                        +{{ plugin.supported_features|length - 4 }} more
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mt-2 text-xs text-gray-500">
+                                <i class="fas fa-code-branch mr-1"></i>
+                                Version {{ plugin.version }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-actions justify-end mt-4">
+                        <a href="{{ url_for('media_servers.setup_list_servers', plugin_id=plugin.plugin_id) }}" 
+                           class="btn btn-primary btn-sm">
+                            Configure
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+            <!-- Service Descriptions -->
+            <div class="collapse collapse-arrow bg-base-200 mb-6">
+                <input type="checkbox" /> 
+                <div class="collapse-title text-lg font-medium">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    Service Information
+                </div>
+                <div class="collapse-content"> 
+                    <div class="space-y-4 text-sm">
+                        <div>
+                            <strong>Plex Media Server:</strong> Full-featured media server with user management, sharing, transcoding, and mobile apps. Recommended for most users.
+                        </div>
+                        <div>
+                            <strong>Emby/Jellyfin:</strong> Open-source media servers with similar features to Plex. Good alternatives with more customization options.
+                        </div>
+                        <div>
+                            <strong>Kavita:</strong> Specialized server for comics, manga, and digital books. Perfect for comic book collections.
+                        </div>
+                        <div>
+                            <strong>AudiobookShelf:</strong> Dedicated audiobook and podcast server with chapter support and progress tracking.
+                        </div>
+                        <div>
+                            <strong>Komga:</strong> Comic and manga server with advanced metadata management and reading features.
+                        </div>
+                        <div>
+                            <strong>RomM:</strong> Retro gaming ROM management server for organizing and playing classic games.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Requirements Notice -->
+            <div class="alert alert-info mb-6">
+                <i class="fas fa-lightbulb"></i>
+                <div>
+                    <h4 class="font-semibold">Setup Requirements</h4>
+                    <p class="text-sm mt-1">
+                        After setup, you'll need to configure each selected service with its server URL and authentication details. 
+                        Make sure your media servers are running and accessible.
+                    </p>
+                </div>
+            </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-between items-center">
+            <a href="{{ url_for('setup.account_setup') }}" class="btn btn-ghost">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back
+            </a>
+            
+            <div class="flex gap-2">
+                <button onclick="refreshPluginStatus()" class="btn btn-outline btn-sm">
+                    <i class="fas fa-sync-alt mr-1"></i>
+                    Refresh Status
+                </button>
+                <a href="{{ url_for('setup.discord_config') }}" class="btn btn-primary">
+                    Continue
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshPluginStatus() {
+    // Simple page reload to refresh the plugin status
+    // The servers_count should be updated by the SQLAlchemy event listeners
+    window.location.reload();
+}
+</script>
+
+{% endblock %}

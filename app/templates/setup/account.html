@@ -1,0 +1,92 @@
+<!-- File: app/templates/setup/account_setup.html -->
+{% extends "layouts/setup.html" %}
+
+{% set setup_step_title = "Admin Account Setup" %}
+{% set setup_page_title = "Create Administrator Account" %}
+{% set setup_page_subtitle = "Choose how you'll log in to manage this application." %}
+{% set current_step_id = 'account' %} {# For stepper highlighting #}
+
+{% block setup_content %}
+<div class="space-y-8">
+    <!-- Username/Password Section -->
+    <div class="card bg-base-200 shadow-lg">
+        <div class="card-body">
+            <h3 class="card-title text-lg mb-4">
+                <i class="fa-solid fa-user-shield mr-2"></i>
+                Create Admin Account (Required)
+            </h3>
+            <form method="POST" action="{{ url_for('setup.account_setup') }}" id="usernamePasswordForm">
+                {{ form.hidden_tag() }}
+                <input type="hidden" name="login_method" value="username_password">
+                
+                <div class="form-control w-full mb-4">
+                    {{ form.username.label(class="label required") }}
+                    {{ form.username(class="input input-bordered " + ("input-error" if form.username.errors else ""), placeholder="Enter a username", required=true) }}
+                    {% if form.username.errors %}
+                        {% for error in form.username.errors %}
+                            <label class="label">
+                                <span class="label-text-alt text-error">{{ error }}</span>
+                            </label>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                <div class="form-control w-full mb-4">
+                    {{ form.password.label(class="label required") }}
+                    {{ form.password(class="input input-bordered " + ("input-error" if form.password.errors else ""), placeholder="Enter a strong password", required=true) }}
+                    {% if form.password.errors %}
+                        {% for error in form.password.errors %}
+                            <label class="label">
+                                <span class="label-text-alt text-error">{{ error }}</span>
+                            </label>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                <div class="form-control w-full mb-6">
+                    {{ form.confirm_password.label(class="label required") }}
+                    {{ form.confirm_password(class="input input-bordered " + ("input-error" if form.confirm_password.errors else ""), placeholder="Confirm your password", required=true) }}
+                    {% if form.confirm_password.errors %}
+                        {% for error in form.confirm_password.errors %}
+                            <label class="label">
+                                <span class="label-text-alt text-error">{{ error }}</span>
+                            </label>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                <button type="submit" name="submit_type" value="username_password" class="btn btn-primary w-full">
+                    <i class="fa-solid fa-user-plus mr-2"></i> Create Admin Account
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="divider">OR</div>
+
+    <!-- Plex SSO Section -->
+    <div class="card bg-base-200 shadow-lg">
+        <div class="card-body">
+            <h3 class="card-title text-lg mb-4">
+                <i class="fa-brands fa-plex mr-2"></i>
+                Link Plex Account (Optional)
+            </h3>
+            <p class="text-sm text-base-content/70 mb-4">
+                If you have a Plex account, you can optionally link it for easier login. This is not required and you can always add it later.
+            </p>
+            <a href="{{ url_for('setup.account_setup', submit_type='plex_sso') }}" class="btn btn-outline btn-warning w-full">
+                <i class="fa-brands fa-plex fa-lg mr-2"></i> Link Plex Account
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if error_message %}
+<div role="alert" class="alert alert-error mt-6">
+    <i class="fa-solid fa-circle-xmark fa-fw text-xl mr-3"></i>
+    <span>{{ error_message }}</span>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,214 @@
+<!-- File: app/templates/users/_users_table.html -->
+{# Expects 'users', 'available_libraries', 'sort_column', 'sort_direction' #}
+<div class="overflow-x-auto bg-base-200 shadow-lg rounded-lg">
+    <table class="table table-zebra w-full table-sm md:table-md">
+        <thead>
+            <tr>
+                <th class="w-10 text-center">
+                    <label title="Select all visible">
+                        <input type="checkbox" class="checkbox checkbox-primary checkbox-xs sm:checkbox-sm" id="select_all_users_table" />
+                    </label>
+                </th>
+
+                {% set query_params = request.args.to_dict() %}
+                
+                {% set next_sort_user = 'username_desc' if sort_column == 'username' and sort_direction == 'asc' else 'username_asc' %}
+                {% do query_params.update({'sort_by': next_sort_user}) %}
+                <th data-col="user"><a href="{{ url_for('users.list_users', **query_params) }}" hx-get="{{ url_for('users.list_users', **query_params) }}" hx-target="#user-list-container" hx-swap="innerHTML" hx-push-url="true" class="link link-hover">User {% if sort_column == 'username' %}<i class="fa-solid fa-sort-{{ 'down' if sort_direction == 'desc' else 'up' }} ml-1"></i>{% endif %}</a></th>
+                
+                <th data-col="email">Email</th>
+
+                {% set next_sort_join_date = 'plex_join_date_desc' if sort_column == 'plex_join_date' and sort_direction == 'asc' else 'plex_join_date_asc' %}
+                {% do query_params.update({'sort_by': next_sort_join_date}) %}
+                <th data-col="plex_join_date"><a href="{{ url_for('users.list_users', **query_params) }}" hx-get="{{ url_for('users.list_users', **query_params) }}" hx-target="#user-list-container" hx-swap="innerHTML" hx-push-url="true" class="link link-hover">Plex Join Date {% if sort_column == 'plex_join_date' %}<i class="fa-solid fa-sort-{{ 'down' if sort_direction == 'desc' else 'up' }} ml-1"></i>{% endif %}</a></th>
+
+                <th data-col="last_known_ip">Last Known IP</th>
+
+                {% set next_sort_plays = 'total_plays_desc' if sort_column == 'total_plays' and sort_direction == 'asc' else 'total_plays_asc' %}
+                {% do query_params.update({'sort_by': next_sort_plays}) %}
+                <th data-col="total_plays"><a href="{{ url_for('users.list_users', **query_params) }}" hx-get="{{ url_for('users.list_users', **query_params) }}" hx-target="#user-list-container" hx-swap="innerHTML" hx-push-url="true" class="link link-hover">Total Plays {% if sort_column == 'total_plays' %}<i class="fa-solid fa-sort-{{ 'down' if sort_direction == 'desc' else 'up' }} ml-1"></i>{% endif %}</a></th>
+                
+                {% set next_sort_duration = 'total_duration_desc' if sort_column == 'total_duration' and sort_direction == 'asc' else 'total_duration_asc' %}
+                {% do query_params.update({'sort_by': next_sort_duration}) %}
+                <th data-col="total_duration"><a href="{{ url_for('users.list_users', **query_params) }}" hx-get="{{ url_for('users.list_users', **query_params) }}" hx-target="#user-list-container" hx-swap="innerHTML" hx-push-url="true" class="link link-hover">Total Duration {% if sort_column == 'total_duration' %}<i class="fa-solid fa-sort-{{ 'down' if sort_direction == 'desc' else 'up' }} ml-1"></i>{% endif %}</a></th>
+                
+                <th data-col="status">Status</th>
+                
+                <th data-col="libraries">Libraries</th>
+                
+                {% set next_sort_streamed = 'last_streamed_desc' if sort_column == 'last_streamed' and sort_direction == 'asc' else 'last_streamed_asc' %}
+                {% do query_params.update({'sort_by': next_sort_streamed}) %}
+                <th data-col="last_streamed"><a href="{{ url_for('users.list_users', **query_params) }}" hx-get="{{ url_for('users.list_users', **query_params) }}" hx-target="#user-list-container" hx-swap="innerHTML" hx-push-url="true" class="link link-hover">Last Streamed {% if sort_column == 'last_streamed' %}<i class="fa-solid fa-sort-{{ 'down' if sort_direction == 'desc' else 'up' }} ml-1"></i>{% endif %}</a></th>
+                
+                <th class="text-center" data-col="actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users.items %}
+            <tr id="user-row-{{ user.id }}" class="hover:bg-base-300">
+                <td class="text-center">
+                    <input type="checkbox" class="checkbox checkbox-primary checkbox-xs sm:checkbox-sm user-select-checkbox" data-user-id="{{ user.id }}">
+                </td>
+                <td data-col="user">
+                    <div class="flex items-center space-x-3">
+                        <div class="avatar"><div class="mask mask-squircle w-10 h-10"><img src="{{ user.get_avatar(url_for('static', filename='img/default_avatar.png')) }}" alt="{{ user.plex_username }} avatar" onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}';"/></div></div>
+                        <div>
+                            {% if current_user.has_permission('view_user') %}
+                            <a href="{{ url_for('user.view_user', user_id=user.id, view='table', page=users.page, per_page=current_per_page) }}" title="User Profile" class="text-primary link link-hover">
+                                <div class="font-bold truncate max-w-[150px] sm:max-w-xs" title="{{ user.plex_username }}">{{ user.plex_username }}</div>
+                            </a>
+                            {% else %}
+                                <div class="font-bold truncate max-w-[150px] sm:max-w-xs" title="{{ user.plex_username }}">{{ user.plex_username }}</div>
+                            {% endif %}
+                            <div class="text-xs opacity-50">ID: {{ user.plex_user_id or user.id }}</div>
+                        </div>
+                    </div>
+                </td>
+                <td data-col="email" class="text-sm truncate max-w-xs" title="{{ user.plex_email or 'No email' }}">{{ user.plex_email or 'N/A' }}</td>
+                <td data-col="plex_join_date" class="text-sm">
+                    {{ user.plex_join_date | format_datetime_human(include_time=False) if user.plex_join_date else 'N/A' }}
+                </td>
+                <td data-col="last_known_ip" class="text-sm font-mono">
+                    {{ last_ips.get(user.id, 'N/A') }}
+                </td>
+                <td data-col="total_plays" class="text-sm">
+                    {{ stream_stats.get(user.id, {}).get('play_count', 0) }}
+                </td>
+                <td data-col="total_duration" class="text-sm">
+                    {{ stream_stats.get(user.id, {}).get('total_duration', 0) | format_duration }}
+                </td>
+                <td data-col="status">
+                    {% if user.is_home_user %}<span class="badge badge-primary badge-sm whitespace-nowrap" title="Plex Home User"><i class="fa-solid fa-home"></i>Home</span>{% endif %}
+                    {% if user.shares_back %}<span class="badge badge-secondary badge-sm mt-1 whitespace-nowrap" title="Shares Libraries Back"><i class="fa-solid fa-server"></i>Shares Back</span>{% endif %}
+                    {% if user.discord_user_id %}<span class="badge badge-info badge-sm mt-1 whitespace-nowrap" title="Discord: {{ user.discord_username or 'Linked' }}"><i class="fa-brands fa-discord"></i>Discord</span>{% endif %}
+                    {% if user.is_purge_whitelisted %}
+                        <span class="badge badge-accent badge-sm mb-1 whitespace-nowrap" title="This user is immune to inactivity purges.">
+                            <i class="fa-solid fa-shield-halved"></i>Purge WL
+                        </span>
+                    {% endif %}
+                    {% if user.plex_uuid and user.plex_uuid in admins_by_uuid %}
+                        {# First, display a generic Admin badge #}
+                        <div class="badge badge-error badge-outline badge-sm" title="This user is an administrator"><i class="fa-solid fa-user-shield"></i>Admin</div>
+                        
+                        {# Then, loop through the roles for that admin and display colored badges #}
+                        {% set admin = admins_by_uuid[user.plex_uuid] %}
+                        {% for role in admin.roles %}
+                        <span class="badge badge-sm" style="background-color: {{ role.color or '#808080' }}; border-color: {{ role.color or '#808080' }}; color: {{ get_text_color_for_bg(role.color) }};" title="Role: {{ role.name }}">
+                            {% if role.icon %}<i class="{{ role.icon }}"></i>{% endif %}{{ role.name }}
+                        </span>
+                        {% endfor %}
+                    {% endif %}
+                </td>
+                <td data-col="libraries" class="text-xs" data-user-id-for-libs="{{ user.id }}">
+                    {% set sorted_libraries = user_sorted_libraries.get(user.id, []) %}
+                    {% if sorted_libraries %}
+                        <div id="libraries-{{ user.id }}" class="flex flex-col space-y-0.5">
+                        {% set initially_visible_count = 3 %}
+                        {% for lib_name in sorted_libraries[:initially_visible_count] %}
+                            <span class="badge badge-xs badge-outline whitespace-nowrap" title="{{ lib_name }}">
+                                {{ lib_name | truncate(25, True) }}
+                            </span>
+                        {% endfor %}
+                        {% if sorted_libraries|length > initially_visible_count %}
+                            <button id="more-libs-{{ user.id }}" onclick='showMoreTableLibraries({{ user.id }}, {{ sorted_libraries|tojson|safe }})' class="btn btn-xs btn-ghost text-accent p-0 mt-1">
+                                + {{ sorted_libraries|length - initially_visible_count }} more
+                            </button>
+                        {% endif %}
+                        </div>
+                    {% else %}
+                        <span class="opacity-60">No libraries specifically shared.</span>
+                    {% endif %}
+                </td>
+                <td data-col="last_streamed" class="text-sm" title="{{ user.last_streamed_at | format_datetime_human if user.last_streamed_at else 'Never' }}">
+                    <div title="{{ user.last_streamed_at | format_datetime_human if user.last_streamed_at else 'Never streamed' }}">
+                        {{ user.last_streamed_at | time_ago if user.last_streamed_at else 'Never' }}
+                    </div>
+                    <div class="text-xs opacity-50" title="Added {{ user.created_at | format_datetime_human if user.created_at else 'N/A' }}">
+                        Added: {{ user.created_at | time_ago if user.created_at else 'N/A' }}
+                    </div>
+                    {% if user.access_expires_at %}
+                        <div class="text-xs text-warning mt-0.5" title="Access expires on {{ user.access_expires_at | format_datetime_human }}">
+                            <i class="fa-solid fa-hourglass-end fa-fw"></i> Expires: {{ user.access_expires_at | time_ago }}
+                        </div>
+                    {% endif %}
+                </td>
+                <td class="text-center" data-col="actions">
+                    <div class="flex items-center justify-center space-x-1">
+                        {% if current_user.has_permission('view_user') %}
+                        <a href="{{ url_for('user.view_user', user_id=user.id, view='table', page=users.page, per_page=current_per_page) }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-eye"></i></a>
+                        {% endif %}
+                        {% if current_user.has_permission('edit_user') %}
+                        <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 card-action-button"
+                                title="Quick Edit Settings"
+                                hx-get="{{ url_for('users.get_quick_edit_form', user_id=user.id, view='table', page=users.page, per_page=current_per_page) }}"
+                                hx-target="#quick_edit_modal_content_div"
+                                hx-swap="innerHTML"
+                                onclick="quick_edit_user_modal.showModal()">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        {% endif %}
+                        {% if current_user.has_permission('delete_user') %}
+                        <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Remove User"
+                                hx-confirm="Are you sure you want to remove '{{ user.plex_username }}' from MUM and Plex Server?"
+                                hx-delete="{{ url_for('users.delete_user', user_id=user.id) }}"
+                                hx-target="#user-row-{{ user.id }}" hx-swap="outerHTML swap:0.5s" hx-indicator="this">
+                            <i class="fa-solid fa-trash-can htmx-indicator-hide"></i>
+                            <span class="htmx-indicator loading loading-spinner loading-xs"></span>
+                        </button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function showMoreTableLibraries(userId, libraryNames) {
+        const container = document.getElementById(`libraries-${userId}`);
+        const button = document.getElementById(`more-libs-${userId}`);
+        container.innerHTML = ''; // Clear existing badges
+        libraryNames.forEach(libName => {
+            const badge = document.createElement('span');
+            badge.className = 'badge badge-xs badge-outline whitespace-nowrap';
+            badge.title = libName;
+            badge.textContent = libName.length > 25 ? libName.substring(0, 25) + '...' : libName;
+            container.appendChild(badge);
+        });
+        if (button) {
+            button.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // This event listener ensures that the script runs only after the initial page load.
+        // For HTMX-loaded content, we need to handle events differently.
+    });
+
+    // This is a global listener. It's better to attach it once.
+    // It will catch events from content loaded by HTMX.
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        // Re-initialize "Select All" checkbox logic for the new content
+        const selectAllCheckbox = document.getElementById('select_all_users_table');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                document.querySelectorAll('.user-select-checkbox').forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                });
+                updateMassEditFormState(); 
+            });
+        }
+
+        // Re-initialize individual user selection checkboxes
+        document.querySelectorAll('.user-select-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (!this.checked) {
+                    if (selectAllCheckbox) selectAllCheckbox.checked = false;
+                }
+                updateMassEditFormState();
+            });
+        });
+    });
+</script>

@@ -1,0 +1,426 @@
+<!-- File: app/templates/settings/index.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ super() }} - {{ title or "Application Settings" }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-2">
+    <h1 class="text-3xl font-bold mb-8">{{ title or "Application Settings" }}</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-8">
+        
+        {# --- COLUMN 1: Desktop Sidebar Navigation --- #}
+        <div class="hidden md:block md:col-span-1">
+            <ul class="menu bg-base-200 rounded-box p-2 space-y-1 sticky top-24 w-full shadow-xl">
+                <li>
+                    <h2 class="menu-title"><span><i class="fa-solid fa-cog fa-fw mr-2"></i> Settings</span></h2>
+                    <ul>
+                        {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
+                        <li><a href="{{ url_for('dashboard.settings_general') }}" class="{{ 'active menu-active' if active_tab == 'general' else '' }}"><i class="fa-solid fa-sliders mr-2"></i> General</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('view_admins_tab') %}
+                        <h2 class="menu-title"><span><i class="fa-solid fa-user-shield fa-fw mr-2"></i> Manage Admins</span></h2>
+                        <ul>
+                            {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
+                                <li><a href="{{ url_for('dashboard.settings_admins') }}" class="{{ 'active menu-active' if active_tab in ['admins', 'admins_edit'] else '' }}"><i class="fa-solid fa-shield-halved mr-2"></i> Admins</a></li>
+                            {% endif %}
+                            {% if current_user.id == 1 or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
+                                <li><a href="{{ url_for('dashboard.settings_roles') }}" class="{{ 'active menu-active' if active_tab in ['roles', 'roles_edit'] else '' }}"><i class="fa-solid fa-shield mr-2"></i> Roles</a></li>
+                            {% endif %}
+                        </ul>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
+                        <li><a href="{{ url_for('dashboard.settings_discord') }}" class="{{ 'active menu-active' if active_tab == 'discord' else '' }}"><i class="fa-brands fa-discord mr-2"></i> Discord</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
+                        <li><a href="{{ url_for('dashboard.settings_plugins') }}" class="{{ 'active menu-active' if active_tab == 'plugins' else '' }}"><i class="fa-solid fa-puzzle-piece mr-2"></i> Plugins</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
+                        <li><a href="{{ url_for('dashboard.settings_logs') }}" class="{{ 'active menu-active' if active_tab == 'logs' else '' }}"><i class="fa-solid fa-timeline mr-2"></i> Logs</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
+                        <li><a href="{{ url_for('dashboard.settings_advanced') }}" class="{{ 'active menu-active' if active_tab == 'advanced' else '' }}"><i class="fa-solid fa-cogs mr-2"></i> Advanced</a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        
+        {# --- COLUMN 2: Main Content Area --- #}
+        <div class="md:col-span-5">
+            
+            {# --- Mobile Navigation Dropdown --- #}
+            <div class="form-control md:hidden mb-6">
+                <label class="label"><span class="label-text">Go to setting:</span></label>
+                <select class="select select-bordered" onchange="if (this.value) window.location.href=this.value;">
+                    {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
+                    <option value="{{ url_for('dashboard.settings_general') }}" {% if active_tab == 'general' %}selected{% endif %}>General</option>
+                    {% endif %}
+                    {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
+                    <option value="{{ url_for('dashboard.settings_admins') }}" {% if active_tab == 'admins' %}selected{% endif %}>Manage Admins</option>
+                    {% endif %}
+                    {% if current_user.id == 1 or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
+                    <option value="{{ url_for('dashboard.settings_roles') }}" {% if active_tab == 'roles' %}selected{% endif %}>Manage Roles</option>
+                    {% endif %}
+                    {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
+                    <option value="{{ url_for('dashboard.settings_discord') }}" {% if active_tab == 'discord' %}selected{% endif %}>Discord</option>
+                    {% endif %}
+                    {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
+                    <option value="{{ url_for('dashboard.settings_plugins') }}" {% if active_tab == 'plugins' %}selected{% endif %}>Plugins</option>
+                    {% endif %}
+                    {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
+                    <option value="{{ url_for('dashboard.settings_logs') }}" {% if active_tab == 'logs' %}selected{% endif %}>Logs</option>
+                    {% endif %}
+                    {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
+                    <option value="{{ url_for('dashboard.settings_advanced') }}" {% if active_tab == 'advanced' %}selected{% endif %}>Advanced</option>
+                    {% endif %}
+                </select>
+            </div>
+            
+            <div class="bg-base-200 shadow-xl rounded-lg p-6 sm:p-8">
+            {% block settings_content %}
+                {#
+                This block acts as the content switcher for the settings area.
+                The appropriate route passes the 'active_tab' variable,
+                and this block includes the corresponding partial template.
+                #}
+                {% if active_tab == 'account' %}
+                    {% include 'admin/account_settings.html' %}
+                    
+                {% elif active_tab == 'general' %}
+                    {% include 'settings/partials/general.html' %}
+                    
+                {% elif active_tab == 'discord' %}
+                    {% include 'settings/partials/discord.html' %}
+
+                {% elif active_tab == 'plugins' %}
+                    {% include 'settings/partials/_plugins.html' %}
+                {% elif active_tab == 'plugin_install' %}
+                    {% include 'settings/partials/_plugin_install.html' %}
+                {% elif active_tab == 'plugin_configure' %}
+                    {% include 'settings/partials/_plugin_configure.html' %}
+                {% elif active_tab == 'plugin_edit_server' %}
+                    {% include 'settings/partials/_plugin_edit_server.html' %}
+                {% elif active_tab == 'advanced' %}
+                    {% include 'settings/partials/advanced.html' %}
+                {% elif active_tab == 'admins' %}
+                    {% include 'settings/partials/admins.html' %}
+                {% elif active_tab == 'admins_edit' %}
+                    {% include 'admins/edit.html' %}
+                {% elif active_tab == 'roles' %}
+                    {% include 'settings/partials/roles.html' %}
+                {% elif active_tab == 'roles_edit' %}
+                    {% include 'roles/_roles_edit_settings.html' %}
+                {% elif active_tab == 'logs' %}
+                    {% include 'settings/partials/logs.html' %}
+                {% else %}
+                    <div class="text-center p-8">
+                        <i class="fa-solid fa-arrow-left fa-2x text-base-content/30 mb-4"></i>
+                        <p class="text-lg">Please select a category from the sidebar to begin.</p>
+                    </div>
+                {% endif %}
+            {% endblock settings_content %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<dialog id="create_admin_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+        <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" type="button" onclick="create_admin_modal.close()">✕</button></form>
+        <h3 class="font-bold text-lg mb-4">Create New Admin</h3>
+        <div id="create_admin_modal_content_div">
+             <!-- HTMX will load form content here -->
+             <div class="text-center p-8"><span class="loading loading-lg loading-spinner"></span></div>
+        </div>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block modals %}
+    {{ super() }}
+    {% if active_tab == 'logs' %}
+        <dialog id="clear_logs_modal" class="modal modal-bottom sm:modal-middle">
+          <div class="modal-box max-w-lg">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" type="button" onclick="clear_logs_modal.close()">✕</button>
+            </form>
+            <h3 class="font-bold text-lg text-error"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Confirm Clear Logs</h3>
+            <p class="py-4 text-sm">This action is irreversible. Select which event types to clear, or clear all.</p>
+            <form id="confirmClearLogsForm" 
+                  hx-post="{{ url_for('dashboard.clear_logs_route') }}"
+                  hx-indicator="#clear-logs-loader"
+                  hx-on::after-request="if(event.detail.successful) { clear_logs_modal.close(); }"> 
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="form-control mb-4">
+                      <label class="label cursor-pointer justify-start">
+                          <input type="checkbox" name="clear_all_types" value="true" class="checkbox checkbox-error mr-2" id="clear_all_history_types_checkbox" checked onchange="toggleEventTypeCheckboxesDisabled(this.checked)">
+                          <span class="label-text font-semibold">Clear ALL Event Types</span>
+                      </label>
+                  </div>
+                  <div id="specific_event_types_for_clear" class="max-h-60 overflow-y-auto border border-base-300 rounded p-2 space-y-1 mb-4 opacity-50">
+                      {% for type in event_types %}
+                      <label class="label cursor-pointer justify-start py-1">
+                          <input type="checkbox" name="event_types_to_clear[]" value="{{ type.name }}" class="checkbox checkbox-sm checkbox-secondary mr-2 event-type-clear-checkbox" checked disabled>
+                          <span class="label-text text-xs">{{ type.name | title | replace('_', ' ') }}</span>
+                      </label>
+                      {% endfor %}
+                  </div>
+                  <div class="modal-action mt-4">
+                      <button type="button" class="btn btn-ghost" onclick="clear_logs_modal.close()">Cancel</button>
+                      <button type="submit" class="btn btn-error">
+                          <span id="clear-logs-loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
+                          Confirm Clear
+                      </button>
+                  </div>
+            </form>
+          </div>
+        </dialog>
+    {% endif %}
+{% endblock modals %}
+
+{% block scripts %}
+{{ super() }}
+{# Scripts specific to settings pages, e.g., for Plex connection test or Discord admin link #}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        const targetId = event.detail.target.id;
+        if (targetId === 'plex_settings_connection_status_message') { // Assuming this ID
+            const statusElement = event.detail.target.querySelector('[data-connection-status]');
+            if (statusElement && plexSettingsConnTestedInput) {
+                plexSettingsConnTestedInput.value = (statusElement.dataset.connectionStatus === 'success') ? "true" : "false";
+                updatePlexSettingsSaveButtonState();
+            }
+        }
+        // Handle Discord Admin Link status update if done via HTMX
+        else if (targetId === 'discord_admin_link_status') { // Assuming this ID in _discord_settings.html
+            // Potentially update UI based on the new content of discord_admin_link_status
+            // e.g. change button text or visibility
+        }
+    });
+
+});
+
+// Clear Logs Modal Functions
+function toggleEventTypeCheckboxesDisabled(clearAllChecked) {
+    const specificTypesContainer = document.getElementById('specific_event_types_for_clear');
+    const eventTypeCheckboxes = document.querySelectorAll('.event-type-clear-checkbox');
+    
+    if (clearAllChecked) {
+        // Clear All is checked - disable and grey out individual checkboxes
+        specificTypesContainer.classList.add('opacity-50');
+        eventTypeCheckboxes.forEach(checkbox => {
+            checkbox.disabled = true;
+            checkbox.checked = true; // Check all when clearing all
+        });
+    } else {
+        // Clear All is unchecked - enable individual checkboxes
+        specificTypesContainer.classList.remove('opacity-50');
+        eventTypeCheckboxes.forEach(checkbox => {
+            checkbox.disabled = false;
+            checkbox.checked = false; // Uncheck all when allowing selection
+        });
+    }
+}
+
+// Plugin Info Modal Functions (for plugins tab)
+function showPluginInfo(pluginId) {
+    fetch(`/admin/plugins/${pluginId}/info`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('pluginInfoTitle').textContent = data.name || 'Unknown Plugin';
+            document.getElementById('pluginInfoContent').innerHTML = `
+                <div class="space-y-3">
+                    <div>
+                        <strong>Description:</strong> ${data.description || 'No description available'}
+                    </div>
+                    
+                    <div>
+                        <strong>Version:</strong> ${data.version || 'Unknown'}
+                    </div>
+                    
+                    <div>
+                        <strong>Type:</strong> ${data.plugin_type || 'Unknown'}
+                    </div>
+                    
+                    <div>
+                        <strong>Status:</strong> 
+                        <span class="badge badge-${data.is_enabled ? 'success' : 'neutral'} badge-sm">
+                            ${data.is_enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                    </div>
+                    
+                    ${data.servers_count > 0 ? `
+                    <div>
+                        <strong>Servers:</strong> ${data.servers_count} server(s) using this plugin
+                    </div>
+                    ` : ''}
+                    
+                    ${data.supported_features && data.supported_features.length > 0 ? `
+                    <div>
+                        <strong>Features:</strong>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            ${data.supported_features.map(feature => 
+                                `<span class="badge badge-outline badge-xs">${feature.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    ${data.author ? `
+                    <div>
+                        <strong>Author:</strong> ${data.author}
+                    </div>
+                    ` : ''}
+                    
+                    ${data.license ? `
+                    <div>
+                        <strong>License:</strong> ${data.license}
+                    </div>
+                    ` : ''}
+                    
+                    ${data.homepage ? `
+                    <div>
+                        <strong>Homepage:</strong> 
+                        <a href="${data.homepage}" target="_blank" class="link">${data.homepage}</a>
+                    </div>
+                    ` : ''}
+                    
+                    ${data.last_error ? `
+                    <div class="alert alert-error">
+                        <strong>Last Error:</strong> ${data.last_error}
+                    </div>
+                    ` : ''}
+                    
+                    ${data.installed_at ? `
+                    <div class="text-xs text-gray-500">
+                        Installed: ${new Date(data.installed_at).toLocaleString()}
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            document.getElementById('pluginInfoModal').classList.add('modal-open');
+        })
+        .catch(error => {
+            console.error('Error loading plugin info:', error);
+            // You could add a toast notification here if you have one
+        });
+}
+
+function closePluginInfoModal() {
+    document.getElementById('pluginInfoModal').classList.remove('modal-open');
+}
+
+// Check if at least one plugin is enabled
+function hasEnabledPlugins() {
+    const enabledBadges = document.querySelectorAll('.badge-success');
+    return enabledBadges.length > 0;
+}
+
+// Prevent navigation away from plugins page if no plugins are enabled
+function checkPluginRequirement() {
+    if (window.location.pathname.includes('/settings/plugins') && !hasEnabledPlugins()) {
+        return 'You must have at least one plugin enabled before leaving this page. Please enable a plugin or configure servers for an existing plugin.';
+    }
+}
+
+// Add event listeners when on plugins page
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.location.pathname.includes('/settings/plugins')) {
+        // Prevent page unload if no plugins enabled
+        window.addEventListener('beforeunload', function(e) {
+            const message = checkPluginRequirement();
+            if (message) {
+                e.preventDefault();
+                e.returnValue = message;
+                return message;
+            }
+        });
+        
+        // Intercept navigation clicks
+        document.addEventListener('click', function(e) {
+            const link = e.target.closest('a');
+            if (link && link.href && !link.href.includes('/settings/plugins')) {
+                const message = checkPluginRequirement();
+                if (message) {
+                    e.preventDefault();
+                    alert(message);
+                    return false;
+                }
+            }
+        });
+        
+        // Intercept form submissions that would navigate away
+        document.addEventListener('submit', function(e) {
+            const form = e.target;
+            if (form && form.action && !form.action.includes('/settings/plugins') && !form.action.includes('/plugins/')) {
+                const message = checkPluginRequirement();
+                if (message) {
+                    e.preventDefault();
+                    alert(message);
+                    return false;
+                }
+            }
+        });
+    }
+});
+
+// Reload plugins function (for plugins tab)
+function reloadPlugins() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Reloading...';
+    btn.disabled = true;
+    
+    fetch('/admin/api/plugins/reload')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                if (typeof showToast === 'function') {
+                    showToast('Plugins reloaded successfully', 'success');
+                } else {
+                    alert('Plugins reloaded successfully');
+                }
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                // Show error message
+                if (typeof showToast === 'function') {
+                    showToast('Failed to reload plugins: ' + data.message, 'error');
+                } else {
+                    alert('Failed to reload plugins: ' + data.message);
+                }
+            }
+        })
+        .catch(error => {
+            // Show error message
+            if (typeof showToast === 'function') {
+                showToast('Error reloading plugins: ' + error.message, 'error');
+            } else {
+                alert('Error reloading plugins: ' + error.message);
+            }
+        })
+        .finally(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+}
+</script>
+
+<!-- Plugin Info Modal -->
+<div id="pluginInfoModal" class="modal">
+    <div class="modal-box">
+        <h3 id="pluginInfoTitle" class="font-bold text-lg mb-4">Plugin Information</h3>
+        <div id="pluginInfoContent">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+        <div class="modal-action">
+            <button class="btn" onclick="closePluginInfoModal()">Close</button>
+        </div>
+    </div>
+    <div class="modal-backdrop" onclick="closePluginInfoModal()"></div>
+</div>
+
+{% endblock %}

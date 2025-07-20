@@ -1,0 +1,51 @@
+{% extends "layouts/setup.html" %}
+
+{% block title %}App Configuration - {{ g.app_name }} Setup{% endblock %}
+
+{% block setup_content %}
+<div class="card bg-base-100 shadow-xl max-w-2xl mx-auto">
+    <div class="card-body">
+        <h2 class="card-title text-2xl mb-4">
+            <i class="fas fa-cogs mr-3"></i>
+            App Configuration
+        </h2>
+        <form method="POST" action="{{ url_for('setup.app_config') }}">
+            {{ form.hidden_tag() }}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            <div class="form-control w-full mb-4">
+                {{ form.app_name.label(class="label") }}
+                {{ form.app_name(class="input input-bordered w-full") }}
+                {% if form.app_name.errors %}
+                    <div class="label"><span class="label-text-alt text-error">{{ form.app_name.errors[0] }}</span></div>
+                {% endif %}
+            </div>
+
+            <div class="form-control w-full mb-4">
+                {{ form.app_base_url.label(class="label") }}
+                {{ form.app_base_url(class="input input-bordered w-full", placeholder="https://plex.example.com") }}
+                {% if form.app_base_url.errors %}
+                    <div class="label"><span class="label-text-alt text-error">{{ form.app_base_url.errors[0] }}</span></div>
+                {% endif %}
+            </div>
+            
+            <div class="alert alert-info mt-6 mb-6">
+                <div>
+                    <i class="fa-solid fa-circle-info fa-lg mr-2"></i>
+                    <span>
+                        The <strong>Application Base URL</strong> must be the full, publicly accessible URL for this application.
+                        If you use a reverse proxy, this should be the final public address.
+                    </span>
+                </div>
+            </div>
+
+            <div class="card-actions justify-between items-center mt-6">
+                <a href="{{ url_for('plugins.setup_plugins') }}" class="btn btn-ghost">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </a>
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

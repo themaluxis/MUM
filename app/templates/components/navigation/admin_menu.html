@@ -1,0 +1,76 @@
+<!-- Admin Menu Items for Multi-Service Support -->
+<li>
+    <details>
+        <summary>
+            <i class="fas fa-server"></i>
+            Media Servers
+        </summary>
+        <ul>
+            <li><a href="{{ url_for('media_servers.list_servers') }}">
+                <i class="fas fa-list"></i>All Servers
+            </a></li>
+            <li><a href="{{ url_for('media_servers.add_server') }}">
+                <i class="fas fa-plus"></i>Add Server
+            </a></li>
+        </ul>
+    </details>
+</li>
+
+<li>
+    <details>
+        <summary>
+            <i class="fas fa-users"></i>
+            User Management
+        </summary>
+        <ul>
+            <li><a href="{{ url_for('users.list_users') }}">
+                <i class="fas fa-list"></i>All Users
+            </a></li>
+            <li><button onclick="syncAllUsers()" class="w-full text-left">
+                <i class="fas fa-sync"></i>Sync Users
+            </button></li>
+        </ul>
+    </details>
+</li>
+
+<li>
+    <details>
+        <summary>
+            <i class="fas fa-envelope"></i>
+            Invitations
+        </summary>
+        <ul>
+            <li><a href="{{ url_for('invites.list_invites') }}">
+                <i class="fas fa-list"></i>All Invites
+            </a></li>
+            <li><a href="{{ url_for('invites.create_invite') }}">
+                <i class="fas fa-plus"></i>Create Invite
+            </a></li>
+        </ul>
+    </details>
+</li>
+
+<script>
+function syncAllUsers() {
+    if (confirm('Sync users from all media servers? This may take a moment.')) {
+        fetch('/users/sync', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('User sync completed successfully!');
+                location.reload();
+            } else {
+                alert('Sync failed: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error during sync: ' + error.message);
+        });
+    }
+}
+</script>

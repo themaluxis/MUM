@@ -1,0 +1,47 @@
+{# File: app/templates/components/modals/all_servers_status_modal.html #}
+{# Expects 'server_status' (dict with 'all_statuses' list) in context #}
+<dialog id="all_servers_status_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-2xl">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="font-bold text-lg mb-4">All Server Statuses</h3>
+        <div class="space-y-4">
+            {% if server_status and server_status.all_statuses %}
+                {% for status in server_status.all_statuses %}
+                <div class="p-3 border border-base-300 rounded-lg">
+                    <div class="flex flex-row gap-3 items-center">
+                        <div class="self-start p-2 rounded-md {{ 'bg-success/20 text-success' if status.online else 'bg-error/20 text-error' }}">
+                            <i class="fa-solid fa-server fa-lg"></i>
+                        </div>
+                        <div class="flex-grow">
+                            <h4 class="font-semibold">{{ status.name }}</h4>
+                            {% if status.online %}
+                                <p class="text-sm"><strong class="text-success">Online</strong> - {{ status.friendly_name | default('Unknown Server') }}</p>
+                                <p class="text-xs text-base-content/70">Version: {{ status.version | default('N/A') }}</p>
+                            {% else %}
+                                <p class="text-sm"><strong class="text-error">Offline</strong></p>
+                                <p class="text-xs text-base-content/70" title="{{ status.error_message | default('Could not connect.') }}">
+                                    {{ status.error_message | default('Could not connect.') | truncate(100, True) }}
+                                </p>
+                            {% endif %}
+                        </div>
+                        <div class="flex-none">
+                             <a href="{{ url_for('media_servers.edit_server', server_id=status.server_id) }}" class="btn btn-xs btn-outline btn-ghost">
+                                <i class="fa-solid fa-sliders"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>No server statuses to display.</p>
+            {% endif %}
+        </div>
+        <div class="modal-action mt-6">
+            <form method="dialog">
+                <button class="btn">Close</button>
+            </form>
+        </div>
+    </div>
+</dialog>

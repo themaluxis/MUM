@@ -1,0 +1,94 @@
+{% extends "layouts/setup.html" %}
+
+{% block title %}Configure {{ plugin.name }} Servers - {{ g.app_name }}{% endblock %}
+
+{% block setup_content %}
+<div class="card bg-base-100 shadow-xl max-w-4xl mx-auto">
+    <div class="card-body">
+        <h2 class="card-title text-2xl mb-4">
+            <i class="fas fa-server mr-3"></i>
+            Configure {{ plugin.name }} Servers
+        </h2>
+
+        <div class="flex justify-between items-center mb-6">
+            <p class="text-gray-600">
+                Add one or more servers for {{ plugin.name }}.
+            </p>
+            <a href="{{ url_for('media_servers.add_server_setup', plugin_id=plugin.plugin_id) }}" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i>Add Server
+            </a>
+        </div>
+
+        {% if servers %}
+        <div class="grid gap-6 md:grid-cols-1 lg:grid-cols-2 mb-8">
+            {% for server in servers %}
+            <div class="card bg-base-200">
+                <div class="card-body p-4">
+                    <div class="flex items-start justify-between">
+                        <h3 class="font-semibold text-lg">{{ server.name }}</h3>
+                        <div class="badge badge-{{ 'success' if server.is_active else 'error' }} badge-sm">
+                            {{ 'Active' if server.is_active else 'Inactive' }}
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 truncate">{{ server.url }}</p>
+                    <div class="card-actions justify-end mt-2">
+                        <a href="{{ url_for('media_servers.setup_edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" class="btn btn-ghost btn-xs">Edit</a>
+                        <button onclick="deleteServer({{ server.id }}, '{{ server.name }}')" class="btn btn-ghost btn-xs text-red-500">Delete</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-10 bg-base-200 rounded-lg">
+            <i class="fas fa-server text-5xl text-gray-400 mb-4"></i>
+            <h3 class="text-lg font-semibold text-gray-600">No {{ plugin.name }} Servers Yet</h3>
+            <p class="text-gray-500 mt-1">Click "Add Server" to configure your first one.</p>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div class="flex justify-between items-center mt-8">
+            <a href="{{ url_for('plugins.setup_plugins') }}" class="btn btn-ghost">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Services
+            </a>
+            <a href="{{ url_for('setup.discord_config') }}" class="btn btn-primary">
+                Continue
+                <i class="fas fa-arrow-right ml-2"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div id="deleteModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Confirm Deletion</h3>
+        <p class="py-4">Are you sure you want to delete the server "<span id="serverName"></span>"? This action cannot be undone.</p>
+        <div class="modal-action">
+            <form id="deleteForm" method="post" action="">
+                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                 <input type="hidden" name="return_to" value="setup_plugin_config">
+                 <input type="hidden" name="plugin_id" value="{{ plugin.plugin_id }}">
+                <button type="button" class="btn" onclick="closeDeleteModal()">Cancel</button>
+                <button type="submit" class="btn btn-error">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteServer(serverId, serverName) {
+    document.getElementById('serverName').textContent = serverName;
+    // The action URL needs to be set dynamically
+    const form = document.getElementById('deleteForm');
+    form.action = `/admin/servers/${serverId}/delete`;
+    document.getElementById('deleteModal').classList.add('modal-open');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('modal-open');
+}
+</script>
+{% endblock %}

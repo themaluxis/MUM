@@ -1,0 +1,136 @@
+<!-- File: app/templates/settings/partials/_plugin_edit_server.html -->
+<div class="mb-6">
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li><a href="{{ url_for('dashboard.settings_plugins') }}">Plugins</a></li>
+            <li><a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=plugin.plugin_id) }}">{{ plugin.name }}</a></li>
+            <li>Edit {{ server.name }}</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title text-2xl mb-4">Edit {{ server.name }}</h2>
+        
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-control w-full mb-4">
+                {{ form.name.label(class="label") }}
+                {{ form.name(class="input input-bordered w-full") }}
+                {% if form.name.errors %}
+                    <div class="label">
+                        <span class="label-text-alt text-error">{{ form.name.errors[0] }}</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="form-control w-full mb-4">
+                {{ form.service_type.label(class="label") }}
+                {{ form.service_type(class="select select-bordered w-full", disabled=true) }}
+                <div class="label">
+                    <span class="label-text-alt">Service type cannot be changed after creation</span>
+                </div>
+            </div>
+
+            <div class="form-control w-full mb-4">
+                {{ form.url.label(class="label") }}
+                {{ form.url(class="input input-bordered w-full") }}
+                {% if form.url.errors %}
+                    <div class="label">
+                        <span class="label-text-alt text-error">{{ form.url.errors[0] }}</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="form-control w-full mb-4">
+                {{ form.api_key.label(class="label") }}
+                {{ form.api_key(class="input input-bordered w-full", placeholder="Leave blank to keep current") }}
+                {% if form.api_key.errors %}
+                    <div class="label">
+                        <span class="label-text-alt text-error">{{ form.api_key.errors[0] }}</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="form-control w-full mb-4">
+                {{ form.username.label(class="label") }}
+                {{ form.username(class="input input-bordered w-full") }}
+                {% if form.username.errors %}
+                    <div class="label">
+                        <span class="label-text-alt text-error">{{ form.username.errors[0] }}</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="form-control w-full mb-4">
+                {{ form.password.label(class="label") }}
+                {{ form.password(class="input input-bordered w-full", placeholder="Leave blank to keep current") }}
+                {% if form.password.errors %}
+                    <div class="label">
+                        <span class="label-text-alt text-error">{{ form.password.errors[0] }}</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="form-control mb-6">
+                <label class="label cursor-pointer justify-start">
+                    {{ form.is_active(class="checkbox checkbox-primary mr-3") }}
+                    <span class="label-text">{{ form.is_active.label.text }}</span>
+                </label>
+            </div>
+
+            <div class="card-actions justify-end">
+                <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=plugin.plugin_id) }}" class="btn btn-ghost">Cancel</a>
+                <button type="button" onclick="testConnection()" class="btn btn-outline">Test Connection</button>
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function testConnection() {
+    const form = document.querySelector('form');
+    const formData = new FormData(form);
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing...';
+    btn.disabled = true;
+    
+    // Test the current server
+    fetch(`/admin/api/servers/{{ server.id }}/test`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Connection successful: ' + data.message, 'success');
+        } else {
+            showToast('Connection failed: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error testing connection: ' + error.message, 'error');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} fixed top-4 right-4 w-auto z-50`;
+    toast.innerHTML = `
+        <div>
+            <span>${message}</span>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+</script>

@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Add Media Server - {{ g.app_name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-2">
+    <h1 class="text-3xl font-bold mb-8">Add Media Server</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-8">
+        
+        {# --- COLUMN 1: Desktop Sidebar Navigation --- #}
+        <div class="hidden md:block md:col-span-1">
+            <ul class="menu bg-base-200 rounded-box p-2 space-y-1 sticky top-24 w-full shadow-xl">
+                <li>
+                    <h2 class="menu-title"><span><i class="fa-solid fa-cog fa-fw mr-2"></i> Settings</span></h2>
+                    <ul>
+                        {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
+                        <li><a href="{{ url_for('dashboard.settings_general') }}"><i class="fa-solid fa-sliders mr-2"></i> General</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('view_admins_tab') %}
+                        <h2 class="menu-title"><span><i class="fa-solid fa-user-shield fa-fw mr-2"></i> Manage Admins</span></h2>
+                        <ul>
+                            {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
+                                <li><a href="{{ url_for('dashboard.settings_admins') }}"><i class="fa-solid fa-shield-halved mr-2"></i> Admins</a></li>
+                            {% endif %}
+                            {% if current_user.id == 1 or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
+                                <li><a href="{{ url_for('dashboard.settings_roles') }}"><i class="fa-solid fa-shield mr-2"></i> Roles</a></li>
+                            {% endif %}
+                        </ul>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('manage_plex_settings') %}
+                        <li><a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id='plex') }}"><i class="fa-solid fa-network-wired mr-2"></i> Plex</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
+                        <li><a href="{{ url_for('dashboard.settings_discord') }}"><i class="fa-brands fa-discord mr-2"></i> Discord</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
+                        <li><a href="{{ url_for('dashboard.settings_plugins') }}" class="active menu-active"><i class="fa-solid fa-puzzle-piece mr-2"></i> Plugins</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
+                        <li><a href="{{ url_for('dashboard.settings_logs') }}"><i class="fa-solid fa-timeline mr-2"></i> Logs</a></li>
+                        {% endif %}
+                        {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
+                        <li><a href="{{ url_for('dashboard.settings_advanced') }}"><i class="fa-solid fa-cogs mr-2"></i> Advanced</a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        {# --- COLUMN 2-6: Main Content --- #}
+        <div class="md:col-span-5">
+            <div class="mb-6">
+                <div class="breadcrumbs text-sm">
+                    <ul>
+                        <li><a href="{{ url_for('dashboard.settings_plugins') }}">Plugins</a></li>
+                        {% if request.args.get('service_type') %}
+                        <li><a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=request.args.get('service_type')) }}">{{ request.args.get('service_type').title() }}</a></li>
+                        {% endif %}
+                        <li>Add Server</li>
+                    </ul>
+                </div>
+            </div>
+
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('media_servers.add_server', return_to=return_to) }}" onsubmit="console.log('Form submitted'); return true;">
+                {{ form.hidden_tag() }}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="form-control w-full mb-4">
+                    {{ form.name.label(class="label") }}
+                    {{ form.name(class="input input-bordered w-full") }}
+                    {% if form.name.errors %}
+                        <div class="label">
+                            <span class="label-text-alt text-error">{{ form.name.errors[0] }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-control w-full mb-4 {% if form.service_type.data %}hidden{% endif %}">
+                    {{ form.service_type.label(class="label") }}
+                    {{ form.service_type(class="select select-bordered w-full", onchange="updateFormFields()") }}
+                    {% if form.service_type.errors %}
+                        <div class="label">
+                            <span class="label-text-alt text-error">{{ form.service_type.errors[0] }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if form.service_type.data %}
+                <input type="hidden" name="service_type" value="{{ form.service_type.data }}">
+                {% endif %}
+
+                <div class="form-control w-full mb-4">
+                    {{ form.url.label(class="label") }}
+                    {{ form.url(class="input input-bordered w-full", placeholder="https://your-server.com:32400") }}
+                    {% if form.url.errors %}
+                        <div class="label">
+                            <span class="label-text-alt text-error">{{ form.url.errors[0] }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div id="apiKeyField" class="form-control w-full mb-4">
+                    {{ form.api_key.label(class="label") }}
+                    <span class="label-text-alt" id="apiKeyHelp">Required for most services</span>
+                    {{ form.api_key(class="input input-bordered w-full") }}
+                    {% if form.api_key.errors %}
+                        <div class="label">
+                            <span class="label-text-alt text-error">{{ form.api_key.errors[0] }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div id="credentialsFields" class="hidden">
+                    <div class="form-control w-full mb-4">
+                        {{ form.username.label(class="label") }}
+                        {{ form.username(class="input input-bordered w-full") }}
+                        {% if form.username.errors %}
+                            <div class="label">
+                                <span class="label-text-alt text-error">{{ form.username.errors[0] }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-control w-full mb-4">
+                        {{ form.password.label(class="label") }}
+                        {{ form.password(class="input input-bordered w-full") }}
+                        {% if form.password.errors %}
+                            <div class="label">
+                                <span class="label-text-alt text-error">{{ form.password.errors[0] }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-control mb-6">
+                    <label class="label cursor-pointer justify-start">
+                        {{ form.is_active(class="checkbox checkbox-primary mr-3") }}
+                        <span class="label-text">{{ form.is_active.label.text }}</span>
+                    </label>
+                </div>
+
+                <div class="card-actions justify-end">
+                    {% if request.args.get('service_type') %}
+                    <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=request.args.get('service_type')) }}" class="btn btn-ghost">Cancel</a>
+                    {% else %}
+                    <a href="{{ url_for('dashboard.settings_plugins') }}" class="btn btn-ghost">Cancel</a>
+                    {% endif %}
+                    <button type="button" onclick="testConnection(event)" class="btn btn-outline">Test Connection</button>
+                    {{ form.submit(class="btn btn-primary", onclick="console.log('Save button clicked')") }}
+                </div>
+            </form>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateFormFields() {
+    const serviceTypeSelect = document.getElementById('service_type');
+    const serviceType = serviceTypeSelect ? serviceTypeSelect.value : '{{ form.service_type.data }}';
+    const apiKeyField = document.getElementById('apiKeyField');
+    const credentialsFields = document.getElementById('credentialsFields');
+    const apiKeyHelp = document.getElementById('apiKeyHelp');
+    const apiKeyInput = document.getElementById('api_key');
+    
+    // Services that use API keys vs username/password
+    const apiKeyServices = ['plex', 'emby', 'jellyfin', 'kavita', 'audiobookshelf', 'komga'];
+    const credentialServices = ['romm'];
+    
+    if (apiKeyServices.includes(serviceType)) {
+        apiKeyField.classList.remove('hidden');
+        credentialsFields.classList.add('hidden');
+        apiKeyInput.required = true;
+        
+        // Update help text based on service
+        const helpTexts = {
+            'plex': 'Get your Plex token from Settings > Account > Privacy & Online Media Sources',
+            'emby': 'Generate an API key in Emby Dashboard > Advanced > API Keys',
+            'jellyfin': 'Generate an API key in Jellyfin Dashboard > Advanced > API Keys',
+            'kavita': 'Generate an API key in Kavita Admin Dashboard > Settings > Users',
+            'audiobookshelf': 'Generate an API key in AudiobookShelf Settings > Users & Sessions',
+            'komga': 'Generate an API key in Komga Settings > Users'
+        };
+        apiKeyHelp.textContent = helpTexts[serviceType] || 'Required for this service';
+        
+    } else if (credentialServices.includes(serviceType)) {
+        apiKeyField.classList.add('hidden');
+        credentialsFields.classList.remove('hidden');
+        apiKeyInput.required = false;
+    } else {
+        // Default to API key
+        apiKeyField.classList.remove('hidden');
+        credentialsFields.classList.add('hidden');
+        apiKeyInput.required = false;
+        apiKeyHelp.textContent = 'Required for most services';
+    }
+}
+
+function testConnection(event) {
+    const form = document.querySelector('form');
+    const formData = new FormData(form);
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing...';
+    btn.disabled = true;
+    
+    // Create a temporary server config for testing
+    const serverConfig = {
+        name: formData.get('name'),
+        service_type: formData.get('service_type'),
+        url: formData.get('url'),
+        api_key: formData.get('api_key'),
+        username: formData.get('username'),
+        password: formData.get('password')
+    };
+    
+    fetch("{{ url_for('media_servers.test_new_server_connection') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': formData.get('csrf_token')
+        },
+        body: JSON.stringify(serverConfig)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showToast('Connection successful: ' + data.message, 'success');
+        } else {
+            showToast('Connection failed: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error testing connection: ' + error.message, 'error');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function showToast(message, type) {
+    // A simple toast implementation. In a real app, you'd use a more robust library.
+    const toastContainer = document.body; // Or a specific container
+    const toast = document.createElement('div');
+    const alertType = type === 'success' ? 'alert-success' : 'alert-error';
+    
+    toast.className = `alert ${alertType} shadow-lg fixed top-5 right-5 w-auto max-w-xs z-50`;
+    toast.innerHTML = `
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+// Initialize form fields on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateFormFields();
+});
+</script>
+{% endblock %}
