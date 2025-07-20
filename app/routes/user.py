@@ -49,9 +49,9 @@ def view_user(user_id):
                 if user.access_expires_at is not None:
                     user.access_expires_at = None
                     access_expiration_changed = True
-            elif form.access_expires_at.data:
+            elif form.access_expiration.data:
                 # WTForms gives a date object. Combine with max time to set expiry to end of day.
-                new_expiry_datetime = datetime.combine(form.access_expires_at.data, datetime.max.time())
+                new_expiry_datetime = datetime.combine(form.access_expiration.data, datetime.max.time())
                 # Only update if the date is actually different
                 if user.access_expires_at is None or user.access_expires_at.date() != new_expiry_datetime.date():
                     user.access_expires_at = new_expiry_datetime
@@ -91,6 +91,35 @@ def view_user(user_id):
                 form_after_save.libraries.choices = list(available_libraries.items())
                 form_after_save.libraries.data = list(user.allowed_library_ids or [])
 
+                # OOB-SWAP LOGIC
+                # 1. Render the updated form for the modal (the primary target)
+                modal_html = render_template('users/partials/settings_tab.html', form=form_after_save, user=user)
+
+                # 2. Render the updated user card for the OOB swap
+                # We need the same context that the main user list uses for a card
+                from app.models_media_services import UserMediaAccess
+                user_library_access = UserMediaAccess.query.filter_by(user_id=user.id).first()
+                user_sorted_libraries = {}
+                if user_library_access:
+                    lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in user_library_access.allowed_library_ids]
+                    user_sorted_libraries[user.id] = sorted(lib_names, key=str.lower)
+                
+                admins_by_uuid = {admin.plex_uuid: admin for admin in AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()}
+
+                card_html = render_template(
+                    'users/partials/_single_user_card.html',
+                    user=user,
+                    user_sorted_libraries=user_sorted_libraries,
+                    admins_by_uuid=admins_by_uuid,
+                    current_user=current_user 
+                )
+                
+                # 3. Add the oob-swap attribute to the card's root div
+                card_html_oob = card_html.replace(f'id="user-card-{user.id}"', f'id="user-card-{user.id}" hx-swap-oob="true"')
+
+                # 4. Combine the modal and card HTML for the response
+                final_html = modal_html + card_html_oob
+
                 # Create the toast message payload
                 toast_payload = {
                     "showToastEvent": {
@@ -99,11 +128,8 @@ def view_user(user_id):
                     }
                 }
                 
-                # Render the form partial again to get the updated HTML for the swap
-                updated_form_html = render_template('users/partials/settings_tab.html', form=form_after_save, user=user)
-                
                 # Create the response and add the HX-Trigger header
-                response = make_response(updated_form_html)
+                response = make_response(final_html)
                 response.headers['HX-Trigger'] = json.dumps(toast_payload)
                 return response
             else:

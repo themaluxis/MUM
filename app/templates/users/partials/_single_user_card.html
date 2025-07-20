@@ -1,0 +1,100 @@
+{# File: app/templates/users/partials/_single_user_card.html #}
+{# Expects 'user' object and other context variables like 'user_sorted_libraries', 'admins_by_uuid' etc. #}
+<div id="user-card-{{ user.id }}" class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow duration-200 ease-in-out relative group user-card-clickable" data-user-id-for-card="{{ user.id }}">
+    <!-- User Selection Checkbox -->
+    <input type="checkbox" id="user-checkbox-{{ user.id }}" class="checkbox checkbox-primary absolute top-2 right-2 z-10 user-select-checkbox hidden group-hover:block focus:block checked:block" data-user-id="{{ user.id }}" title="Select user">
+    
+    <div class="card-body p-4">
+        <div class="flex flex-row items-center mb-3">
+            <div class="avatar mr-3">
+                <div class="w-10 rounded-full">
+                    <img src="{{ user.get_avatar(url_for('static', filename='img/default_avatar.png')) }}" alt="{{ user.plex_username }} avatar" onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}'; this.classList.add('object-scale-down');" />
+                </div>
+            </div>
+            <h2 class="card-title text-lg truncate" title="{{ user.plex_username }}">
+                {{ user.plex_username }}
+            </h2>
+        </div>
+        
+        <div class="text-xs space-y-1 mb-3">
+            <p class="text-xs text-base-content/70 truncate" title="{{ user.plex_email or 'No email' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.plex_email or 'No email available' }}</p>
+            <div class="tooltip tooltip-top" data-tip="The date {{ user.plex_username }} was added to MUM">
+                <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | time_ago if user.created_at else 'N/A' }}</p>
+            </div>
+            <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | time_ago if user.last_streamed_at else 'Never' }}</p>
+            {% if user.plex_join_date %}
+            <div class="tooltip tooltip-top" data-tip="The date {{ user.plex_username }} joined your Plex server">
+                <p><i class="fa-solid fa-server fa-fw mr-1 text-info"></i> Plex Join Date: {{ user.plex_join_date | format_datetime_human(include_time=False) }}</p>
+            </div>
+            {% endif %}
+            {% if user.access_expires_at %}
+                <p class="text-warning">
+                    <i class="fa-solid fa-hourglass-end fa-fw mr-1"></i> 
+                    Access Expires: {{ user.access_expires_at | time_ago }} 
+                    <span class="text-base-content">{{ user.access_expires_at | format_datetime_human(include_time=False) }}</span>
+                </p>
+            {% endif %}
+        </div>
+
+        <div class="user-notes-container" style="display: none;">
+            <p class="text-xs font-semibold mb-1">Notes:</p>
+            <p class="text-xs text-base-content/70 mb-3">{{ user.notes or 'No notes for this user.' }}</p>
+        </div>
+
+        <div class="mb-3">
+            <p class="text-xs font-semibold mb-1 inline">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.id, [])|length }}</span>):</p>
+            {% if user_sorted_libraries.get(user.id) %}
+                {% for lib_name in user_sorted_libraries.get(user.id, []) %}
+                    <span class="badge badge-sm badge-outline mr-1 mb-1" title="{{ lib_name }}">{{ lib_name }}</span>
+                {% endfor %}
+            {% else %}
+                <span class="text-xs text-base-content/60">No libraries specifically shared.</span>
+            {% endif %}
+        </div>
+
+        <div class="flex flex-wrap gap-1 mb-3">
+            {% if user.is_home_user %}<div class="badge badge-primary badge-sm" title="Plex Home User"><i class="fa-solid fa-home"></i>Home</div>{% endif %}
+            {% if user.shares_back %}<div class="badge badge-secondary badge-sm" title="Shares Libraries Back"><i class="fa-solid fa-server"></i>Shares Back</div>{% endif %}
+            {% if user.discord_user_id %}<div class="badge badge-info badge-sm" title="Discord: {{ user.discord_username or 'Linked' }}"><i class="fa-brands fa-discord"></i>Linked</div>{% endif %}
+            {% if user.is_purge_whitelisted %}<div class="badge badge-accent badge-sm" title="This user is immune to inactivity purges."><i class="fa-solid fa-shield-halved"></i>Purge Whitelisted</div>{% endif %}
+            {% if user.plex_uuid and user.plex_uuid in admins_by_uuid %}
+                <div class="badge badge-error badge-outline badge-sm" title="This user is an administrator"><i class="fa-solid fa-user-shield"></i>Admin</div>
+                {% set admin = admins_by_uuid[user.plex_uuid] %}
+                {% for role in admin.roles %}
+                <span class="badge badge-sm" style="background-color: {{ role.color or '#808080' }}; border-color: {{ role.color or '#808080' }}; color: {{ get_text_color_for_bg(role.color) }};" title="Role: {{ role.name }}">
+                    {% if role.icon %}<i class="{{ role.icon }}"></i>{% endif %}{{ role.name }}
+                </span>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">
+            {% if current_user.has_permission('view_user') %}
+            <a href="{{ url_for('user.view_user', user_id=user.id) }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                <i class="fa-solid fa-eye"></i>
+            </a>
+            {% endif %}
+            {% if current_user.has_permission('edit_user') %}
+            <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 card-action-button"
+                    title="Quick Edit Settings"
+                    hx-get="{{ url_for('users.get_quick_edit_form', user_id=user.id) }}"
+                    hx-target="#quick_edit_modal_content_div"
+                    hx-swap="innerHTML"
+                    onclick="quick_edit_user_modal.showModal()">
+                <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            {% endif %}
+            {% if current_user.has_permission('delete_user') %}
+            <button class="btn btn-xs btn-ghost text-error hover:bg-error/10 card-action-button" title="Remove User"
+                    hx-confirm="Are you sure you want to remove '{{ user.plex_username }}' from MUM and Plex Server?"
+                    hx-delete="{{ url_for('users.delete_user', user_id=user.id) }}"
+                    hx-target="closest .card" 
+                    hx-swap="outerHTML swap:0.5s"
+                    hx-indicator="this">
+                <i class="fa-solid fa-trash-can htmx-indicator-hide"></i>
+                <span class="htmx-indicator loading loading-spinner loading-xs"></span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>

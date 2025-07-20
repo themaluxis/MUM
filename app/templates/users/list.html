@@ -299,11 +299,9 @@
     // Apply preference on initial load
     document.addEventListener('DOMContentLoaded', applyShowNotesPreference);
     
-    // Re-apply after HTMX swaps content
+    // Re-apply after ANY HTMX swap on the page to catch OOB swaps
     htmx.on('htmx:afterSwap', function(event) {
-        if (event.target.id === 'user-list-container') {
-            applyShowNotesPreference();
-        }
+        applyShowNotesPreference();
     });
 </script>
 <script>
