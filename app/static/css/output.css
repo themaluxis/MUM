@@ -5190,6 +5190,16 @@
       margin-top: calc(var(--spacing) * 0);
     }
   }
+  .sm\:mr-2 {
+    @media (width >= 40rem) {
+      margin-right: calc(var(--spacing) * 2);
+    }
+  }
+  .sm\:mb-0 {
+    @media (width >= 40rem) {
+      margin-bottom: calc(var(--spacing) * 0);
+    }
+  }
   .sm\:hidden {
     @media (width >= 40rem) {
       display: none;

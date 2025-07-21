@@ -755,6 +755,7 @@ def streaming_sessions_partial():
     
     active_sessions_data = []
     sessions_by_server = {}  # For categorized view
+    sessions_by_service = {}  # For service view
     summary_stats = {
         "total_streams": 0,
         "direct_play_count": 0,
@@ -1053,7 +1054,7 @@ def streaming_sessions_partial():
                 }
                 active_sessions_data.append(session_details)
 
-                # For categorized view, group by server
+                # For categorized and service views, group sessions
                 if view_mode == 'categorized':
                     # Get the actual server name from the session data
                     server_name = getattr(raw_session, 'server_name', None)
@@ -1092,14 +1093,48 @@ def streaming_sessions_partial():
                     sessions_by_server[server_name]['sessions'].append(session_details)
                     sessions_by_server[server_name]['stats']['total_streams'] += 1
 
+                # For service view, group by service type
+                elif view_mode == 'service':
+                    # Determine service type from session
+                    if is_plex_session:
+                        service_name = "Plex"
+                        service_type = "plex"
+                    elif is_jellyfin_session:
+                        service_name = "Jellyfin"
+                        service_type = "jellyfin"
+                    else:
+                        service_name = "Unknown Service"
+                        service_type = "unknown"
+                    
+                    if service_name not in sessions_by_service:
+                        sessions_by_service[service_name] = {
+                            'sessions': [],
+                            'service_type': service_type,
+                            'stats': {
+                                "total_streams": 0,
+                                "direct_play_count": 0,
+                                "transcode_count": 0,
+                                "total_bandwidth_mbps": 0.0,
+                                "lan_bandwidth_mbps": 0.0,
+                                "wan_bandwidth_mbps": 0.0
+                            }
+                        }
+                    
+                    sessions_by_service[service_name]['sessions'].append(session_details)
+                    sessions_by_service[service_name]['stats']['total_streams'] += 1
+
                 if is_transcoding:
                     summary_stats["transcode_count"] += 1
                     if view_mode == 'categorized' and server_name in sessions_by_server:
                         sessions_by_server[server_name]['stats']['transcode_count'] += 1
+                    elif view_mode == 'service' and service_name in sessions_by_service:
+                        sessions_by_service[service_name]['stats']['transcode_count'] += 1
                 else:
                     summary_stats["direct_play_count"] += 1
                     if view_mode == 'categorized' and server_name in sessions_by_server:
                         sessions_by_server[server_name]['stats']['direct_play_count'] += 1
+                    elif view_mode == 'service' and service_name in sessions_by_service:
+                        sessions_by_service[service_name]['stats']['direct_play_count'] += 1
                 
                 # Bandwidth Calculation (moved to be unconditional)
                 if is_plex_session:
@@ -1120,6 +1155,14 @@ def streaming_sessions_partial():
                         sessions_by_server[server_name]['stats']['lan_bandwidth_mbps'] += bitrate_mbps
                     else:
                         sessions_by_server[server_name]['stats']['wan_bandwidth_mbps'] += bitrate_mbps
+                
+                # Update service-specific stats for service view
+                elif view_mode == 'service' and service_name in sessions_by_service:
+                    sessions_by_service[service_name]['stats']['total_bandwidth_mbps'] += bitrate_mbps
+                    if is_lan:
+                        sessions_by_service[service_name]['stats']['lan_bandwidth_mbps'] += bitrate_mbps
+                    else:
+                        sessions_by_service[service_name]['stats']['wan_bandwidth_mbps'] += bitrate_mbps
 
         # Round bandwidth values
         summary_stats["total_bandwidth_mbps"] = round(summary_stats["total_bandwidth_mbps"], 1)
@@ -1132,6 +1175,13 @@ def streaming_sessions_partial():
                 server_data['stats']['total_bandwidth_mbps'] = round(server_data['stats']['total_bandwidth_mbps'], 1)
                 server_data['stats']['lan_bandwidth_mbps'] = round(server_data['stats']['lan_bandwidth_mbps'], 1)
                 server_data['stats']['wan_bandwidth_mbps'] = round(server_data['stats']['wan_bandwidth_mbps'], 1)
+        
+        # Round service-specific bandwidth values
+        elif view_mode == 'service':
+            for service_data in sessions_by_service.values():
+                service_data['stats']['total_bandwidth_mbps'] = round(service_data['stats']['total_bandwidth_mbps'], 1)
+                service_data['stats']['lan_bandwidth_mbps'] = round(service_data['stats']['lan_bandwidth_mbps'], 1)
+                service_data['stats']['wan_bandwidth_mbps'] = round(service_data['stats']['wan_bandwidth_mbps'], 1)
 
     except Exception as e:
         current_app.logger.error(f"STREAMING_DEBUG: Error during streaming_sessions_partial: {e}", exc_info=True)
@@ -1139,6 +1189,10 @@ def streaming_sessions_partial():
     if view_mode == 'categorized':
         return render_template('dashboard/partials/streaming_sessions_categorized.html', 
                                sessions_by_server=sessions_by_server, 
+                               summary_stats=summary_stats)
+    elif view_mode == 'service':
+        return render_template('dashboard/partials/streaming_sessions_categorized_by_service.html', 
+                               sessions_by_service=sessions_by_service, 
                                summary_stats=summary_stats)
     else:
         return render_template('dashboard/partials/streaming_sessions.html', 

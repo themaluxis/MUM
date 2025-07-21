@@ -1,5 +1,5 @@
-{# File: app/templates/dashboard/partials/streaming_sessions_categorized.html #}
-{# Expects 'sessions_by_server' (dict) AND 'summary_stats' (dict) in context #}
+{# File: app/templates/dashboard/partials/streaming_sessions_categorized_by_service.html #}
+{# Expects 'sessions_by_service' (dict) AND 'summary_stats' (dict) in context #}
 
 {# --- Overall Summary Statistics Line --- #}
 {% if summary_stats %}
@@ -16,32 +16,37 @@
 {% endif %}
 {# --- End Overall Summary Statistics Line --- #}
 
-{% if sessions_by_server and sessions_by_server|length > 0 %}
-    {% for server_name, server_data in sessions_by_server.items() %}
+{% if sessions_by_service and sessions_by_service|length > 0 %}
+    {% for service_name, service_data in sessions_by_service.items() %}
         <div class="mb-6">
-            {# Server Header with Stats #}
+            {# Service Header with Stats #}
             <div class="flex flex-col sm:flex-row sm:items-center mb-3">
                 <h3 class="text-lg font-semibold flex items-center mb-1 sm:mb-0 sm:mr-2">
-                    <i class="fa-solid fa-server mr-2 text-primary"></i>
-                    {{ server_name }}
-                    {% if server_data.actual_server_name and server_data.actual_server_name != server_name %}
-                        <div class="badge badge-outline badge-sm ml-2">{{ server_data.actual_server_name }}</div>
+                    {% if service_data.service_type == 'plex' %}
+                        <i class="fa-solid fa-play mr-2 text-primary"></i>
+                    {% elif service_data.service_type == 'jellyfin' %}
+                        <i class="fa-solid fa-film mr-2 text-primary"></i>
+                    {% elif service_data.service_type == 'emby' %}
+                        <i class="fa-solid fa-video mr-2 text-primary"></i>
+                    {% else %}
+                        <i class="fa-solid fa-cogs mr-2 text-primary"></i>
                     {% endif %}
+                    {{ service_name }}
                 </h3>
                 <div class="text-sm text-base-content/70">
                     <i class="fa-solid fa-chart-line fa-fw mr-1"></i>
-                    <strong>Activity:</strong> {{ server_data.stats.total_streams }} stream{{ 's' if server_data.stats.total_streams != 1 else '' }}
-                    {% if server_data.stats.total_streams > 0 %}
-                        ({{ server_data.stats.direct_play_count }} direct play, {{ server_data.stats.transcode_count }} transcode)
-                        | {{ server_data.stats.total_bandwidth_mbps }} Mbps
-                        (LAN: {{ server_data.stats.lan_bandwidth_mbps }}, WAN: {{ server_data.stats.wan_bandwidth_mbps }})
+                    <strong>Activity:</strong> {{ service_data.stats.total_streams }} stream{{ 's' if service_data.stats.total_streams != 1 else '' }}
+                    {% if service_data.stats.total_streams > 0 %}
+                        ({{ service_data.stats.direct_play_count }} direct play, {{ service_data.stats.transcode_count }} transcode)
+                        | {{ service_data.stats.total_bandwidth_mbps }} Mbps
+                        (LAN: {{ service_data.stats.lan_bandwidth_mbps }}, WAN: {{ service_data.stats.wan_bandwidth_mbps }})
                     {% endif %}
                 </div>
             </div>
 
-            {# Server Sessions Grid #}
+            {# Service Sessions Grid #}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 pl-4 border-l-2 border-primary/30">
-                {% for session in server_data.sessions %}
+                {% for session in service_data.sessions %}
                 <div class="card bg-base-200 shadow-lg w-full max-w-md relative group" tabindex="0">
                     <div class="absolute top-2 right-2 z-10 flex space-x-1
                                 opacity-0 pointer-events-none 
@@ -152,6 +157,6 @@
     <div class="text-center py-10">
         <i class="fa-solid fa-play-circle fa-3x text-base-content/30 mb-4"></i>
         <h3 class="text-lg font-semibold text-base-content/70 mb-2">No Active Streams</h3>
-        <p class="text-base-content/50">There are currently no active streaming sessions across any servers.</p>
+        <p class="text-base-content/50">There are currently no active streaming sessions across any services.</p>
     </div>
 {% endif %}
