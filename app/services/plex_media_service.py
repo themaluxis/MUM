@@ -1,6 +1,7 @@
 # File: app/services/plex_media_service.py
 import json
 from typing import List, Dict, Any, Optional, Tuple
+from datetime import datetime
 from plexapi.server import PlexServer
 from plexapi.myplex import MyPlexAccount
 from plexapi.exceptions import Unauthorized, NotFound, BadRequest
@@ -190,6 +191,25 @@ class PlexMediaService(BaseMediaService):
                 user_share_details = detailed_shares_by_userid.get(plex_user_id_int)
                 accepted_at_val = user_share_details.get('acceptedAt') if user_share_details else None
 
+                # Store raw XML data for debugging
+                import json
+                raw_user_data = {
+                    'plex_user_obj_attrs': {
+                        'id': getattr(plex_user_obj, 'id', None),
+                        'username': getattr(plex_user_obj, 'username', None),
+                        'title': getattr(plex_user_obj, 'title', None),
+                        'email': getattr(plex_user_obj, 'email', None),
+                        'thumb': getattr(plex_user_obj, 'thumb', None),
+                        'home': getattr(plex_user_obj, 'home', None),
+                        'friend': getattr(plex_user_obj, 'friend', None),
+                        'servers': [getattr(s, '__dict__', str(s)) for s in getattr(plex_user_obj, 'servers', [])],
+                        'all_attrs': {attr: getattr(plex_user_obj, attr, None) for attr in dir(plex_user_obj) if not attr.startswith('_')}
+                    },
+                    'share_details': user_share_details,
+                    'users_sharing_back_ids': list(users_sharing_back_ids),
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+
                 user_data_basic = {
                     'id': str(plex_user_id_int),
                     'uuid': plex_user_uuid_str,
@@ -200,6 +220,7 @@ class PlexMediaService(BaseMediaService):
                     'shares_back': plex_user_id_int in users_sharing_back_ids,
                     'library_ids': [],
                     'accepted_at': accepted_at_val,
+                    'raw_data': json.dumps(raw_user_data, default=str, indent=2)
                 }
 
                 user_share_details = detailed_shares_by_userid.get(plex_user_id_int)

@@ -23,8 +23,8 @@
             </div>
             <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
             {% if user.plex_join_date %}
-            <div class="tooltip tooltip-top" data-tip="The date {{ user.plex_username }} joined your Plex server">
-                <p><i class="fa-solid fa-server fa-fw mr-1 text-info"></i> Plex Join Date: {{ user.plex_join_date | format_datetime_user }}</p>
+            <div class="tooltip tooltip-top" data-tip="Full join date: {{ user.plex_join_date | format_datetime_user }} - When {{ user.plex_username }} joined your Plex server">
+                <p><i class="fa-solid fa-server fa-fw mr-1 text-info"></i> Plex Join Date: {{ user.plex_join_date | format_datetime_user(include_time=False) }}</p>
             </div>
             {% endif %}
             {% if user.access_expires_at %}
@@ -69,6 +69,14 @@
         </div>
 
         <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">
+            <button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" 
+                    title="Show Raw Plex Data"
+                    hx-get="{{ url_for('users.get_user_debug_info', user_id=user.id) }}"
+                    hx-target="#user_debug_modal_content"
+                    hx-swap="innerHTML"
+                    onclick="user_debug_modal.showModal()">
+                <i class="fa-solid fa-info"></i>
+            </button>
             {% if current_user.has_permission('view_user') %}
             <a href="{{ url_for('user.view_user', user_id=user.id) }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
                 <i class="fa-solid fa-eye"></i>

@@ -243,12 +243,40 @@ class MediaServiceManager:
                 user.plex_uuid = user_data.get('uuid')
                 user.plex_thumb_url = user_data.get('thumb')
                 user.is_home_user = user_data.get('is_home_user', False)
+                user.raw_plex_data = user_data.get('raw_data')  # Store raw data for new users
+                
+                # Parse and set plex_join_date from acceptedAt timestamp
+                accepted_at_str = user_data.get('accepted_at')
+                if accepted_at_str and str(accepted_at_str).isdigit():
+                    try:
+                        from datetime import timezone
+                        plex_join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
+                        user.plex_join_date = plex_join_date_dt.replace(tzinfo=None)
+                        current_app.logger.debug(f"Set plex_join_date for new user {username}: {user.plex_join_date}")
+                    except (ValueError, TypeError) as e:
+                        current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {username}: {e}")
             
             db.session.add(user)
             db.session.flush()  # Get the ID
         else:
             # Update existing user
             user.shares_back = user_data.get('shares_back', False)
+            # Update raw Plex data if this is a Plex server and raw data is available
+            if server.service_type == ServiceType.PLEX and user_data.get('raw_data'):
+                user.raw_plex_data = user_data.get('raw_data')
+                
+                # Update plex_join_date if we have acceptedAt data
+                accepted_at_str = user_data.get('accepted_at')
+                if accepted_at_str and str(accepted_at_str).isdigit():
+                    try:
+                        from datetime import timezone
+                        plex_join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
+                        new_join_date = plex_join_date_dt.replace(tzinfo=None)
+                        if user.plex_join_date != new_join_date:
+                            user.plex_join_date = new_join_date
+                            current_app.logger.debug(f"Updated plex_join_date for user {user.get_display_name()}: {user.plex_join_date}")
+                    except (ValueError, TypeError) as e:
+                        current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {user.get_display_name()}: {e}")
 
         return user
     

@@ -354,13 +354,20 @@ def sync_all_users():
                 current_app.logger.warning(f"Found user '{plex_username_from_sync}' by username, but ID/UUID did not match. Updating existing record (ID: {mum_user.id}).")
 
         new_library_ids = list(plex_user_data.get('allowed_library_ids_on_server', []))
-        accepted_at_str = plex_user_data.get('acceptedAt')
+        # Try both keys since the Plex service might use either
+        accepted_at_str = plex_user_data.get('acceptedAt') or plex_user_data.get('accepted_at')
+        current_app.logger.debug(f"User sync - {plex_user_data.get('username', 'Unknown')}: acceptedAt raw value = {accepted_at_str}")
+        current_app.logger.debug(f"User sync - {plex_user_data.get('username', 'Unknown')}: Full plex_user_data keys = {list(plex_user_data.keys())}")
         plex_join_date_dt = None
         if accepted_at_str and accepted_at_str.isdigit():
             try:
                 plex_join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
-            except (ValueError, TypeError):
+                current_app.logger.debug(f"User sync - {plex_user_data.get('username', 'Unknown')}: parsed plex_join_date = {plex_join_date_dt}")
+            except (ValueError, TypeError) as e:
+                current_app.logger.warning(f"User sync - {plex_user_data.get('username', 'Unknown')}: Failed to parse acceptedAt '{accepted_at_str}': {e}")
                 plex_join_date_dt = None
+        else:
+            current_app.logger.debug(f"User sync - {plex_user_data.get('username', 'Unknown')}: acceptedAt is not a valid digit string: '{accepted_at_str}'")
         
         if mum_user:
             changes = []
@@ -368,8 +375,16 @@ def sync_all_users():
             if mum_user.plex_uuid != plex_uuid_from_sync: changes.append("Plex UUID updated"); mum_user.plex_uuid = plex_uuid_from_sync
             if mum_user.plex_username != plex_username_from_sync: changes.append(f"Username changed"); mum_user.plex_username = plex_username_from_sync
             if set(mum_user.allowed_library_ids or []) != set(new_library_ids): changes.append("Libraries updated"); mum_user.allowed_library_ids = new_library_ids
+            # Update raw Plex data if available
+            if plex_user_data.get('raw_data'): 
+                changes.append("Raw data updated"); mum_user.raw_plex_data = plex_user_data.get('raw_data')
             if plex_join_date_dt and (mum_user.plex_join_date is None or mum_user.plex_join_date != plex_join_date_dt.replace(tzinfo=None)):
+                current_app.logger.debug(f"User sync - {mum_user.plex_username}: Updating plex_join_date from {mum_user.plex_join_date} to {plex_join_date_dt.replace(tzinfo=None)}")
                 changes.append("Plex join date updated"); mum_user.plex_join_date = plex_join_date_dt.replace(tzinfo=None)
+            elif plex_join_date_dt:
+                current_app.logger.debug(f"User sync - {mum_user.plex_username}: plex_join_date already up to date: {mum_user.plex_join_date}")
+            else:
+                current_app.logger.debug(f"User sync - {mum_user.plex_username}: No valid plex_join_date to set")
 
             if changes:
                 mum_user.last_synced_with_plex = datetime.utcnow(); mum_user.updated_at = datetime.utcnow()
@@ -382,7 +397,8 @@ def sync_all_users():
                     allowed_library_ids=new_library_ids, is_home_user=plex_user_data.get('is_home_user', False),
                     shares_back=plex_user_data.get('shares_back', False), is_plex_friend=plex_user_data.get('is_friend', False),
                     plex_join_date=plex_join_date_dt.replace(tzinfo=None) if plex_join_date_dt else None,
-                    last_synced_with_plex=datetime.utcnow()
+                    last_synced_with_plex=datetime.utcnow(),
+                    raw_plex_data=plex_user_data.get('raw_data')  # Store raw data for new users
                 )
                 db.session.add(new_user)
                 added_users_details.append({'username': plex_username_from_sync, 'plex_id': plex_id})
@@ -640,6 +656,9 @@ def mass_edit_users():
     users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
     users_count = query.count()
     
+    # Extract user IDs from pagination results
+    user_ids_on_page = [user.id for user in users_pagination.items]
+    
     # Get library access info for each user
     user_library_access = {}
     from app.models_media_services import UserMediaAccess
@@ -649,17 +668,40 @@ def mass_edit_users():
             user_library_access[access.user_id] = []
         user_library_access[access.user_id].extend(access.allowed_library_ids)
 
+    # Get additional required context data for the template
+    admin_accounts = AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()
+    admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts}
+    
+    # Get stream stats and other data
+    user_ids_on_page = [user.id for user in users_pagination.items]
+    stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
+    last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
+    
+    # Get sorted libraries
+    user_sorted_libraries = {}
+    for user_id, lib_ids in user_library_access.items():
+        lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
+        user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
+    
     response_html = render_template('users/partials/user_list_content.html',
                                     users=users_pagination,
                                     users_count=users_count,
                                     user_library_access=user_library_access,
+                                    user_sorted_libraries=user_sorted_libraries,
                                     available_libraries=available_libraries,
                                     current_view=view_mode,
-                                    current_per_page=items_per_page)
+                                    current_per_page=items_per_page,
+                                    stream_stats=stream_stats,
+                                    last_ips=last_ips,
+                                    admins_by_uuid=admins_by_uuid)
     
     response = make_response(response_html)
     toast_payload = {"showToastEvent": {"message": toast_message, "category": toast_category}}
     response.headers['HX-Trigger-After-Swap'] = json.dumps(toast_payload)
+    
+    # Debug logging to help troubleshoot toast issues
+    current_app.logger.debug(f"Mass edit complete. Toast message: '{toast_message}', category: '{toast_category}'")
+    current_app.logger.debug(f"HX-Trigger-After-Swap header: {response.headers.get('HX-Trigger-After-Swap')}")
     
     return response
 
@@ -743,6 +785,26 @@ def preview_purge_inactive_users():
         current_app.logger.error(f"User_Routes.py - preview_purge_inactive_users(): Error generating purge preview: {e}", exc_info=True)
         return render_template('partials/_alert_message.html', message=f"An unexpected error occurred generating purge preview: {e}", category='error'), 500
     
+@bp.route('/debug_info/<int:user_id>')
+@login_required
+def get_user_debug_info(user_id):
+    """Get raw Plex data for a user for debugging purposes - ONLY uses stored data, NO API calls"""
+    user = User.query.get_or_404(user_id)
+    
+    try:
+        # Log whether we have stored data or not
+        if user.raw_plex_data:
+            current_app.logger.info(f"Using stored raw data for user {user.plex_username} - NO API call made")
+        else:
+            current_app.logger.warning(f"No stored raw data for user {user.plex_username} - user needs to sync")
+        
+        # Render the template with the user data
+        return render_template('users/partials/user_debug_info_modal.html', user=user)
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting debug info for user {user_id}: {e}", exc_info=True)
+        return f"<p class='text-error'>Error fetching user data: {str(e)}</p>"
+
 @bp.route('/quick_edit_form/<int:user_id>')
 @login_required
 @permission_required('edit_user')

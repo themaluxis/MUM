@@ -203,6 +203,9 @@ class User(db.Model):
     is_discord_bot_whitelisted = db.Column(db.Boolean, default=False, nullable=False)
     is_purge_whitelisted = db.Column(db.Boolean, default=False, nullable=False)
     
+    # Raw data storage
+    raw_plex_data = db.Column(db.Text, nullable=True)  # Store raw XML/JSON data from Plex API
+    
     # Invite relationship
     used_invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True)
     invite = db.relationship('Invite', back_populates='redeemed_users')
