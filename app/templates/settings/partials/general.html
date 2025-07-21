@@ -28,6 +28,18 @@
             {% endif %}
         </div>
 
+        <div class="form-control w-full max-w-md">
+            {{ form.app_local_url.label(class="label") }}
+            {{ form.app_local_url(class="input input-bordered " + ("input-error" if form.app_local_url.errors else ""), placeholder="http://192.168.1.100:5000") }}
+            {% if form.app_local_url.errors %}
+                {% for error in form.app_local_url.errors %}
+                <label class="label"><span class="label-text-alt text-error">{{ error }}</span></label>
+                {% endfor %}
+            {% else %}
+                 <label class="label"><span class="label-text-alt whitespace-normal">{{ form.app_local_url.description }}</span></label>
+            {% endif %}
+        </div>
+
         <div class="form-control mt-8">
             {{ form.submit(class="btn btn-primary") }}
         </div>

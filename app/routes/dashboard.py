@@ -172,6 +172,16 @@ def settings_general():
         # This route now ONLY handles general app settings.
         Setting.set('APP_NAME', form.app_name.data, SettingValueType.STRING, "Application Name")
         Setting.set('APP_BASE_URL', form.app_base_url.data.rstrip('/'), SettingValueType.STRING, "Application Base URL")
+        app_local_url = form.app_local_url.data.rstrip('/') if form.app_local_url.data else None
+        Setting.set('APP_LOCAL_URL', app_local_url or '', SettingValueType.STRING, "Application Local URL")
+        
+        # Update app config
+        current_app.config['APP_NAME'] = form.app_name.data
+        current_app.config['APP_BASE_URL'] = form.app_base_url.data.rstrip('/')
+        current_app.config['APP_LOCAL_URL'] = app_local_url
+        if hasattr(g, 'app_name'): g.app_name = form.app_name.data
+        if hasattr(g, 'app_base_url'): g.app_base_url = form.app_base_url.data.rstrip('/')
+        if hasattr(g, 'app_local_url'): g.app_local_url = app_local_url
         
         log_event(EventType.SETTING_CHANGE, "General application settings updated.", admin_id=current_user.id)
         flash('General settings saved successfully.', 'success')
@@ -179,6 +189,7 @@ def settings_general():
     elif request.method == 'GET':
         form.app_name.data = Setting.get('APP_NAME')
         form.app_base_url.data = Setting.get('APP_BASE_URL')
+        form.app_local_url.data = Setting.get('APP_LOCAL_URL')
     return render_template(
         'settings/index.html',
         title="General Settings", 

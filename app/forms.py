@@ -440,6 +440,11 @@ class GeneralSettingsForm(FlaskForm): # As before
         validators=[DataRequired(message="This URL is required."), URL(message="Invalid URL. Must be full public URL (e.g., https://mum.example.com).")],
         description="Full public URL where this application is accessible. Essential for generating correct invite and callback links."
     )
+    app_local_url = StringField(
+        'Local Application URL', 
+        validators=[Optional(), URL(message="Invalid URL. Must be full local URL (e.g., http://192.168.1.100:5000).")], 
+        description="Local URL for internal network access (optional)."
+    )
     submit = SubmitField('Save General Settings')
 
     def __init__(self, *args, **kwargs):
