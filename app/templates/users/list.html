@@ -579,6 +579,23 @@
             const modal = document.getElementById('sync_results_modal');
             if (modal) modal.showModal();
         });
+
+        // Add click-outside-to-close functionality for modals
+        function addClickOutsideToClose(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    // Check if the click was on the modal backdrop (not on the modal content)
+                    if (e.target === modal) {
+                        modal.close();
+                    }
+                });
+            }
+        }
+
+        // Apply click-outside-to-close to both modals
+        addClickOutsideToClose('mass_edit_modal');
+        addClickOutsideToClose('quick_edit_user_modal');
     });
 </script>
 {% endblock %}
