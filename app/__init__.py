@@ -256,7 +256,11 @@ def create_app(config_name=None):
                 admin_account_present = AdminAccount.query.first() is not None if admin_table_exists else False
                 app_config_done = bool(g.app_base_url)
                 
-                # Check if at least one plugin is enabled AND has configured servers (new modular approach)
+                # Setup is complete if admin account exists and basic app config is done
+                # Plugin configuration is handled separately and doesn't affect setup completion
+                g.setup_complete = admin_account_present and app_config_done
+                
+                # Check if at least one plugin is enabled (separate from setup completion)
                 plugins_configured = False
                 try:
                     from app.models_plugins import Plugin, PluginStatus
@@ -270,7 +274,6 @@ def create_app(config_name=None):
                     current_app.logger.warning(f"Could not check plugin status: {e}")
                     plugins_configured = False
                 
-                g.setup_complete = admin_account_present and plugins_configured and app_config_done
                 current_app.logger.debug(f"Init.py - before_request_tasks(): Setup status: admin={admin_account_present}, plugins={plugins_configured}, app={app_config_done} -> Overall setup_complete={g.setup_complete}")
             else: 
                 g.setup_complete = False
@@ -303,6 +306,7 @@ def create_app(config_name=None):
             'plugins.uninstall_plugin'
         ]
         
+        # --- Setup redirection logic (only when setup is incomplete) ---
         if not g.setup_complete and \
            request.endpoint and \
            not any(request.endpoint.startswith(prefix) or request.endpoint == prefix.rstrip('.') 
@@ -323,50 +327,54 @@ def create_app(config_name=None):
                     if request.endpoint != 'setup.account_setup' and request.endpoint != 'setup.plex_sso_callback_setup_admin':
                         current_app.logger.info(f"Init.py - before_request_tasks(): Redirecting to account_setup (no admin).")
                         return redirect(url_for('setup.account_setup'))
-                else:
-                    # Check if plugins are enabled (new modular approach)
-                    plugins_configured = False
-                    try:
-                        from app.models_plugins import Plugin, PluginStatus
-                        # Ensure any pending database changes are committed and refresh the session
-                        db.session.commit()
-                        db.session.close()  # Close current session to ensure fresh data
-                        enabled_plugins = Plugin.query.filter(Plugin.status == PluginStatus.ENABLED).all()
-                        plugins_configured = len(enabled_plugins) > 0
-                        current_app.logger.debug(f"Init.py - before_request_tasks(): Found {len(enabled_plugins)} enabled plugins, plugins_configured={plugins_configured}")
-                        if enabled_plugins:
-                            for p in enabled_plugins:
-                                current_app.logger.debug(f"Init.py - before_request_tasks(): Plugin {p.plugin_id} is enabled with {p.servers_count} servers")
-                    except Exception as e:
-                        current_app.logger.error(f"Init.py - before_request_tasks(): Error checking plugins configuration: {e}")
-                        plugins_configured = False
-                    
-                    if not plugins_configured:
-                        # When no plugins are enabled, only allow access to plugin management endpoints
-                        # and essential auth/static endpoints
-                        allowed_endpoints = [
-                            'dashboard.settings_plugins', 'plugins.enable_plugin', 'plugins.disable_plugin',
-                            'plugins.reload_plugins', 'plugins.install_plugin', 'plugins.uninstall_plugin',
-                            'auth.app_login', 'auth.logout', 'static', 'api.health'
-                        ]
-                        
-                        # Block ALL routes except the explicitly allowed ones when no plugins are configured
-                        # This prevents bypassing the lockdown via any route (users, invites, dashboard, etc.)
-                        should_redirect = (not request.endpoint or request.endpoint not in allowed_endpoints)
-                        
-                        current_app.logger.debug(f"Init.py - before_request_tasks(): Endpoint '{request.endpoint}', should_redirect={should_redirect}")
-                        
-                        if should_redirect:
-                            current_app.logger.info(f"Init.py - before_request_tasks(): No plugins enabled, blocking access to '{request.endpoint}', redirecting to plugins settings.")
-                            return redirect(url_for('dashboard.settings_plugins'))
-                    elif not (settings_table_exists_sr_redir and Setting.get('APP_BASE_URL')):
-                        if request.endpoint != 'setup.app_config':
-                            current_app.logger.info(f"Init.py - before_request_tasks(): Redirecting to app_config.")
-                            return redirect(url_for('setup.app_config'))
             except Exception as e_setup_redirect:
                 current_app.logger.error(f"Init.py - before_request_tasks(): DB error during setup redirection logic: {e_setup_redirect}", exc_info=True)
                 if request.endpoint != 'setup.account_setup':
                      pass # Avoid redirect loop if account_setup itself errors
+        
+        # --- Plugin validation logic (runs regardless of setup status) ---
+        # This ensures users can't access the app without at least one plugin enabled
+        try:
+            plugins_configured = False
+            try:
+                from app.models_plugins import Plugin, PluginStatus
+                # Check plugin configuration status for access control
+                # Ensure any pending database changes are committed and refresh the session
+                db.session.commit()
+                db.session.close()  # Close current session to ensure fresh data
+                enabled_plugins = Plugin.query.filter(Plugin.status == PluginStatus.ENABLED).all()
+                plugins_configured = len(enabled_plugins) > 0
+                current_app.logger.debug(f"Init.py - before_request_tasks(): Found {len(enabled_plugins)} enabled plugins, plugins_configured={plugins_configured}")
+                if enabled_plugins:
+                    for p in enabled_plugins:
+                        current_app.logger.debug(f"Init.py - before_request_tasks(): Plugin {p.plugin_id} is enabled with {p.servers_count} servers")
+            except Exception as e:
+                current_app.logger.error(f"Init.py - before_request_tasks(): Error checking plugins configuration: {e}")
+                plugins_configured = False
+            
+            if not plugins_configured:
+                # When no plugins are enabled, only allow access to plugin management endpoints
+                # and essential auth/static endpoints
+                allowed_endpoints = [
+                    'dashboard.settings_plugins', 'plugins.enable_plugin', 'plugins.disable_plugin',
+                    'plugins.reload_plugins', 'plugins.install_plugin', 'plugins.uninstall_plugin',
+                    'auth.app_login', 'auth.logout', 'static', 'api.health',
+                    # Add media server management endpoints to allow adding servers
+                    'media_servers.add_server', 'media_servers.list_servers', 'media_servers.edit_server',
+                    'dashboard.settings_plugin_configure', 'dashboard.settings_plugin_edit_server'
+                ]
+                
+                # Block ALL routes except the explicitly allowed ones when no plugins are configured
+                # This prevents bypassing the lockdown via any route (users, invites, dashboard, etc.)
+                should_redirect = (not request.endpoint or request.endpoint not in allowed_endpoints)
+                
+                current_app.logger.debug(f"Init.py - before_request_tasks(): Endpoint '{request.endpoint}', should_redirect={should_redirect}")
+                
+                if should_redirect:
+                    current_app.logger.info(f"Init.py - before_request_tasks(): No plugins enabled, blocking access to '{request.endpoint}', redirecting to plugins settings.")
+                    return redirect(url_for('dashboard.settings_plugins'))
+        except Exception as e_plugin_check:
+            current_app.logger.error(f"Init.py - before_request_tasks(): DB error during plugin validation: {e_plugin_check}", exc_info=True)
 
 
     # Register blueprints

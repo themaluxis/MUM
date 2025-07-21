@@ -50,18 +50,9 @@ def app_login():
             db.session.commit()
             log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Admin '{admin.username}' logged in (password).")
             
-            # Check if setup is complete before redirecting
-            if not getattr(g, 'setup_complete', False):
-                # Find the next required setup step
-                from app.routes.setup import get_completed_steps
-                completed_steps = get_completed_steps()
-                if 'account' not in completed_steps:
-                    return redirect(url_for('setup.account_setup'))
-                if 'plugins' not in completed_steps:
-                    return redirect(url_for('setup.plugins'))
-                if 'app' not in completed_steps:
-                    return redirect(url_for('setup.app_config'))
-                return redirect(url_for('setup.discord_config'))
+            # REMOVED: No setup redirects after initial setup is complete
+            # Once an admin account exists and basic app config is done, 
+            # never redirect back to setup - handle plugin configuration in settings instead
 
             next_page = request.args.get('next')
             if not next_page or not is_safe_url(next_page):

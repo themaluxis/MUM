@@ -56,7 +56,7 @@ def setup_required(f):
         # We also check that we are not already on a setup page to avoid redirect loops.
         if request.endpoint and not request.endpoint.startswith('setup.'):
             flash("Application setup is not complete. Please follow the steps below.", "warning")
-            return redirect(url_for('setup.account_setup'))
+            return redirect(url_for('auth.app_login'))
         
         # If we are already on a setup page (like /setup/plex), allow it to run
         # so the user can complete the setup process.
