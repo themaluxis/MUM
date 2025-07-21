@@ -181,7 +181,11 @@ def list_users():
             current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
 
     for user_id, lib_ids in user_library_access.items():
-        lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
+        # Handle special case for Jellyfin users with '*' (all libraries access)
+        if lib_ids == ['*']:
+            lib_names = ['All Libraries']
+        else:
+            lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
         user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
 
     mass_edit_form = MassUserEditForm()  
@@ -716,7 +720,11 @@ def mass_edit_users():
     # Get sorted libraries
     user_sorted_libraries = {}
     for user_id, lib_ids in user_library_access.items():
-        lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
+        # Handle special case for Jellyfin users with '*' (all libraries access)
+        if lib_ids == ['*']:
+            lib_names = ['All Libraries']
+        else:
+            lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
         user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
     
     response_html = render_template('users/partials/user_list_content.html',
@@ -848,16 +856,16 @@ def get_quick_edit_form(user_id):
     user = User.query.get_or_404(user_id)
     form = UserEditForm(obj=user) # Pre-populate form with existing data
 
-    # Populate dynamic choices
-    media_service_manager = MediaServiceManager()
+    # Populate dynamic choices - only show libraries from servers this user has access to
+    from app.models_media_services import UserMediaAccess
+    user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
     
-    # Get libraries from all active servers, not just Plex
     available_libraries = {}
-    all_servers = media_service_manager.get_all_servers(active_only=True)
+    current_library_ids = []
     
-    for server in all_servers:
+    for access in user_access_records:
         try:
-            service = MediaServiceFactory.create_service_from_db(server)
+            service = MediaServiceFactory.create_service_from_db(access.server)
             if service:
                 server_libraries = service.get_libraries()
                 for lib in server_libraries:
@@ -866,18 +874,16 @@ def get_quick_edit_form(user_id):
                     if lib_id:
                         # Use just the library name since server name is now shown in a separate badge
                         available_libraries[str(lib_id)] = lib_name
+                
+                # Collect current library IDs from this server
+                current_library_ids.extend(access.allowed_library_ids or [])
         except Exception as e:
-            current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
+            current_app.logger.error(f"Error getting libraries from {access.server.name}: {e}")
+    
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
     
-    # Pre-populate the fields with the user's current settings
-    from app.models_media_services import UserMediaAccess
-    # Get access from the first server (this logic might need improvement for multi-server setups)
-    access = UserMediaAccess.query.filter_by(user_id=user.id).first()
-    if access:
-        form.libraries.data = list(access.allowed_library_ids or [])
-    else:
-        form.libraries.data = []
+    # Pre-populate the fields with the user's current settings from all their servers
+    form.libraries.data = list(set(current_library_ids))  # Remove duplicates
     form.allow_downloads.data = user.allow_downloads
     form.allow_4k_transcode.data = user.allow_4k_transcode
     form.is_discord_bot_whitelisted.data = user.is_discord_bot_whitelisted

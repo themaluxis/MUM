@@ -29,14 +29,24 @@ def view_user(user_id):
     # On GET, it's populated from the user object.
     form = UserEditForm(request.form if request.method == 'POST' else None, obj=user)
     
-    # Populate dynamic choices for the form, required for both GET and failed POST validation
-    media_service_manager = MediaServiceManager()
-    plex_server = media_service_manager.get_servers_by_type(ServiceType.PLEX, active_only=True)
-    if not plex_server:
-        available_libraries = {}
-    else:
-        plex_service = MediaServiceFactory.create_service_from_db(plex_server[0])
-        available_libraries = {lib['id']: lib['name'] for lib in plex_service.get_libraries()}
+    # Populate dynamic choices for the form - only show libraries from servers this user has access to
+    from app.models_media_services import UserMediaAccess
+    user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
+    
+    available_libraries = {}
+    for access in user_access_records:
+        try:
+            service = MediaServiceFactory.create_service_from_db(access.server)
+            if service:
+                server_libraries = service.get_libraries()
+                for lib in server_libraries:
+                    lib_id = lib.get('external_id') or lib.get('id')
+                    lib_name = lib.get('name', 'Unknown')
+                    if lib_id:
+                        available_libraries[str(lib_id)] = lib_name
+        except Exception as e:
+            current_app.logger.error(f"Error getting libraries from {access.server.name}: {e}")
+    
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
 
     # Handle form submission for the settings tab
@@ -101,7 +111,11 @@ def view_user(user_id):
                 user_library_access = UserMediaAccess.query.filter_by(user_id=user.id).first()
                 user_sorted_libraries = {}
                 if user_library_access:
-                    lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in user_library_access.allowed_library_ids]
+                    # Handle special case for Jellyfin users with '*' (all libraries access)
+                    if user_library_access.allowed_library_ids == ['*']:
+                        lib_names = ['All Libraries']
+                    else:
+                        lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in user_library_access.allowed_library_ids]
                     user_sorted_libraries[user.id] = sorted(lib_names, key=str.lower)
                 
                 admins_by_uuid = {admin.plex_uuid: admin for admin in AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()}

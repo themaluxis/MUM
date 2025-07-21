@@ -14,7 +14,7 @@
                                 <i class="fa-solid fa-server mr-2"></i>{{ data.server_name }}
                             </h4>
                             <p class="text-xs text-base-content/70 mb-2">
-                                Applies to users: {{ data.users|map(attribute='plex_username')|join(', ') }}
+                                Applies to users: {% for user in data.users %}{{ user.get_display_name() }}{% if not loop.last %}, {% endif %}{% endfor %}
                             </p>
                             <div class="max-h-48 overflow-y-auto p-2 border border-base-300 rounded-md grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                                 {% for library in data.libraries %}
