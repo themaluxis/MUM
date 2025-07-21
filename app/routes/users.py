@@ -144,16 +144,21 @@ def list_users():
     user_library_access = {}
     user_sorted_libraries = {}
     user_service_types = {}  # Track which services each user belongs to
+    user_server_names = {}  # Track which server names each user belongs to
     from app.models_media_services import UserMediaAccess
     access_records = UserMediaAccess.query.filter(UserMediaAccess.user_id.in_(user_ids_on_page)).all()
     for access in access_records:
         if access.user_id not in user_library_access:
             user_library_access[access.user_id] = []
             user_service_types[access.user_id] = []
+            user_server_names[access.user_id] = []
         user_library_access[access.user_id].extend(access.allowed_library_ids)
         # Track which service types this user has access to
         if access.server.service_type not in user_service_types[access.user_id]:
             user_service_types[access.user_id].append(access.server.service_type)
+        # Track which server names this user has access to
+        if access.server.name not in user_server_names[access.user_id]:
+            user_server_names[access.user_id].append(access.server.name)
 
     media_service_manager = MediaServiceManager()
     
@@ -170,8 +175,8 @@ def list_users():
                     lib_id = lib.get('external_id') or lib.get('id')
                     lib_name = lib.get('name', 'Unknown')
                     if lib_id:
-                        # Prefix with server name to avoid conflicts between servers
-                        available_libraries[str(lib_id)] = f"{lib_name} ({server.name})"
+                        # Use just the library name since server name is now shown in a separate badge
+                        available_libraries[str(lib_id)] = lib_name
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
 
@@ -234,6 +239,7 @@ def list_users():
         'user_last_played': user_last_played,
         'user_sorted_libraries': user_sorted_libraries,
         'user_service_types': user_service_types,
+        'user_server_names': user_server_names,
         'current_view': view_mode,
         'available_libraries': available_libraries,
         'mass_edit_form': mass_edit_form,
@@ -597,8 +603,8 @@ def mass_edit_users():
                     lib_id = lib.get('external_id') or lib.get('id')
                     lib_name = lib.get('name', 'Unknown')
                     if lib_id:
-                        # Prefix with server name to avoid conflicts between servers
-                        available_libraries[str(lib_id)] = f"{lib_name} ({server.name})"
+                        # Use just the library name since server name is now shown in a separate badge
+                        available_libraries[str(lib_id)] = lib_name
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
@@ -858,8 +864,8 @@ def get_quick_edit_form(user_id):
                     lib_id = lib.get('external_id') or lib.get('id')
                     lib_name = lib.get('name', 'Unknown')
                     if lib_id:
-                        # Prefix with server name to avoid conflicts between servers
-                        available_libraries[str(lib_id)] = f"{lib_name} ({server.name})"
+                        # Use just the library name since server name is now shown in a separate badge
+                        available_libraries[str(lib_id)] = lib_name
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
