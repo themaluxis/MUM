@@ -1,6 +1,20 @@
 <!-- File: app/templates/settings/partials/_plugins.html -->
-<div class="flex justify-between items-center mb-6">
+<!-- Desktop Layout -->
+<div class="hidden md:flex justify-between items-center mb-6">
     <div class="text-lg font-semibold">Plugins</div>
+    <div class="flex gap-2">
+        <button onclick="reloadPlugins()" class="btn btn-outline btn-sm">
+            <i class="fas fa-sync mr-2"></i>Reload Plugins
+        </button>
+        <a href="{{ url_for('plugins.install_plugin') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus mr-2"></i>Install Plugin
+        </a>
+    </div>
+</div>
+
+<!-- Mobile Layout -->
+<div class="md:hidden mb-6">
+    <div class="text-lg font-semibold mb-3">Plugins</div>
     <div class="flex gap-2">
         <button onclick="reloadPlugins()" class="btn btn-outline btn-sm">
             <i class="fas fa-sync mr-2"></i>Reload Plugins

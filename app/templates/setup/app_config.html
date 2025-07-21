@@ -34,7 +34,12 @@
 
             <div class="form-control w-full mb-4">
                 {{ form.app_local_url.label(class="label") }}
-                {{ form.app_local_url(class="input input-bordered w-full", placeholder="http://192.168.1.100:5000") }}
+                <div class="join w-full">
+                    {{ form.app_local_url(class="input input-bordered join-item flex-1", placeholder="http://192.168.1.100:5000", id="app_local_url") }}
+                    <button type="button" id="auto-fill-local-url" class="btn btn-outline join-item">
+                        <i class="fas fa-magic mr-1"></i>Auto-fill
+                    </button>
+                </div>
                 {% if form.app_local_url.errors %}
                     <div class="label"><span class="label-text-alt text-error">{{ form.app_local_url.errors[0] }}</span></div>
                 {% endif %}
@@ -65,4 +70,106 @@
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const autoFillBtn = document.getElementById('auto-fill-local-url');
+    const localUrlInput = document.getElementById('app_local_url');
+    
+    // Auto-fill on page load if field is empty
+    if (!localUrlInput.value.trim()) {
+        autoFillLocalUrl();
+    }
+    
+    // Auto-fill when button is clicked
+    autoFillBtn.addEventListener('click', autoFillLocalUrl);
+    
+    function autoFillLocalUrl() {
+        // Get current port from window.location
+        const currentPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+        const currentProtocol = window.location.protocol;
+        
+        // Try to get local IP using WebRTC
+        getLocalIP().then(localIP => {
+            if (localIP) {
+                const localUrl = `${currentProtocol}//${localIP}:${currentPort}`;
+                localUrlInput.value = localUrl;
+                
+                // Show success feedback
+                const originalText = autoFillBtn.innerHTML;
+                autoFillBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Done';
+                autoFillBtn.classList.remove('btn-outline');
+                autoFillBtn.classList.add('btn-success');
+                
+                setTimeout(() => {
+                    autoFillBtn.innerHTML = originalText;
+                    autoFillBtn.classList.remove('btn-success');
+                    autoFillBtn.classList.add('btn-outline');
+                }, 2000);
+            } else {
+                // Fallback: use current hostname if it's not localhost
+                const currentHost = window.location.hostname;
+                if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+                    const localUrl = `${currentProtocol}//${currentHost}:${currentPort}`;
+                    localUrlInput.value = localUrl;
+                } else {
+                    // Show error if we can't determine local IP
+                    const originalText = autoFillBtn.innerHTML;
+                    autoFillBtn.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i>Unable to detect';
+                    autoFillBtn.classList.remove('btn-outline');
+                    autoFillBtn.classList.add('btn-warning');
+                    
+                    setTimeout(() => {
+                        autoFillBtn.innerHTML = originalText;
+                        autoFillBtn.classList.remove('btn-warning');
+                        autoFillBtn.classList.add('btn-outline');
+                    }, 3000);
+                }
+            }
+        });
+    }
+    
+    function getLocalIP() {
+        return new Promise((resolve) => {
+            // Create RTCPeerConnection to get local IP
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+            
+            let localIP = null;
+            
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    const candidate = event.candidate.candidate;
+                    const ipMatch = candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+                    
+                    if (ipMatch && ipMatch[1]) {
+                        const ip = ipMatch[1];
+                        // Filter out loopback and other non-local IPs
+                        if (!ip.startsWith('127.') && 
+                            !ip.startsWith('169.254.') && 
+                            (ip.startsWith('192.168.') || 
+                             ip.startsWith('10.') || 
+                             ip.startsWith('172.'))) {
+                            localIP = ip;
+                            pc.close();
+                            resolve(localIP);
+                        }
+                    }
+                }
+            };
+            
+            // Create a data channel to trigger ICE gathering
+            pc.createDataChannel('test');
+            pc.createOffer().then(offer => pc.setLocalDescription(offer));
+            
+            // Timeout after 3 seconds
+            setTimeout(() => {
+                pc.close();
+                resolve(localIP);
+            }, 3000);
+        });
+    }
+});
+</script>
 {% endblock %}
