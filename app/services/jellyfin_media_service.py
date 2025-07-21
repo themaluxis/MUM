@@ -453,38 +453,31 @@ class JellyfinMediaService(BaseMediaService):
     def get_active_sessions(self) -> List[Dict[str, Any]]:
         """Get active Jellyfin sessions"""
         try:
-            client = self._get_client()
+            # Use direct API call to Sessions endpoint (no parameters needed)
+            sessions = self._make_request('Sessions')
             
-            # Try to use official client methods if available
-            if hasattr(client, 'jellyfin') and hasattr(client.jellyfin, 'get_sessions'):
-                sessions = client.jellyfin.get_sessions()
-            else:
-                sessions = self._make_request('Sessions')
+            self.log_info(f"Retrieved {len(sessions)} total sessions from Jellyfin")
             
             result = []
             
             for session in sessions:
+                # Only include sessions that are actively playing something
                 if not session.get('NowPlayingItem'):
-                    continue  # Skip inactive sessions
+                    self.log_debug(f"Skipping inactive session: {session.get('Id', 'Unknown')}")
+                    continue
                 
                 now_playing = session.get('NowPlayingItem', {})
+                play_state = session.get('PlayState', {})
                 user_info = session.get('UserName', 'Unknown')
                 
-                result.append({
-                    'session_id': session.get('Id', ''),
-                    'user_id': session.get('UserId', ''),
-                    'username': user_info,
-                    'media_title': now_playing.get('Name', 'Unknown'),
-                    'media_type': now_playing.get('Type', 'unknown'),
-                    'player': session.get('Client', 'Unknown'),
-                    'platform': session.get('ApplicationVersion', ''),
-                    'state': 'playing' if session.get('PlayState', {}).get('IsPaused') == False else 'paused',
-                    'progress_percent': self._calculate_progress(session.get('PlayState', {}), now_playing),
-                    'ip_address': session.get('RemoteEndPoint', ''),
-                    'is_lan': session.get('IsLocal', False)
-                })
+                self.log_info(f"Processing active session for user '{user_info}' playing '{now_playing.get('Name', 'Unknown')}'")
+                
+                # Return the raw session data for compatibility with the streaming page
+                result.append(session)
             
+            self.log_info(f"Returning {len(result)} active sessions from Jellyfin")
             return result
+            
         except Exception as e:
             self.log_error(f"Error fetching active sessions: {e}")
             return []

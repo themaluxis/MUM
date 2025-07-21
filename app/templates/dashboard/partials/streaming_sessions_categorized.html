@@ -1,0 +1,154 @@
+{# File: app/templates/dashboard/partials/streaming_sessions_categorized.html #}
+{# Expects 'sessions_by_server' (dict) AND 'summary_stats' (dict) in context #}
+
+{# --- Overall Summary Statistics Line --- #}
+{% if summary_stats %}
+<div class="text-sm text-base-content/80 mb-4 pb-3 border-b border-base-300/40">
+    <i class="fa-solid fa-globe fa-fw mr-1"></i>
+    <strong>Overall Activity:</strong> {{ summary_stats.total_streams }} stream{{ 's' if summary_stats.total_streams != 1 else '' }}
+    {% if summary_stats.total_streams > 0 %}
+        ({{ summary_stats.direct_play_count }} direct play, {{ summary_stats.transcode_count }} transcode)
+        | Bandwidth: {{ summary_stats.total_bandwidth_mbps }} Mbps
+        (LAN: {{ summary_stats.lan_bandwidth_mbps }} Mbps, WAN: {{ summary_stats.wan_bandwidth_mbps }} Mbps)
+    {% endif %}
+    <i class="fa-solid fa-info-circle fa-xs ml-1 text-base-content/50" title="Bandwidth is an estimate based on current stream bitrates."></i>
+</div>
+{% endif %}
+{# --- End Overall Summary Statistics Line --- #}
+
+{% if sessions_by_server and sessions_by_server|length > 0 %}
+    {% for server_name, server_data in sessions_by_server.items() %}
+        <div class="mb-6">
+            {# Server Header with Stats #}
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <i class="fa-solid fa-server mr-2 text-primary"></i>
+                    {{ server_name }}
+                </h3>
+                <div class="text-sm text-base-content/70">
+                    <i class="fa-solid fa-chart-line fa-fw mr-1"></i>
+                    <strong>Activity:</strong> {{ server_data.stats.total_streams }} stream{{ 's' if server_data.stats.total_streams != 1 else '' }}
+                    {% if server_data.stats.total_streams > 0 %}
+                        ({{ server_data.stats.direct_play_count }} direct play, {{ server_data.stats.transcode_count }} transcode)
+                        | {{ server_data.stats.total_bandwidth_mbps }} Mbps
+                        (LAN: {{ server_data.stats.lan_bandwidth_mbps }}, WAN: {{ server_data.stats.wan_bandwidth_mbps }})
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Server Sessions Grid #}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 pl-4 border-l-2 border-primary/30">
+                {% for session in server_data.sessions %}
+                <div class="card bg-base-200 shadow-lg w-full max-w-md relative group" tabindex="0">
+                    <div class="absolute top-2 right-2 z-10 flex space-x-1
+                                opacity-0 pointer-events-none 
+                                transition-opacity duration-200 
+                                group-hover:opacity-100 group-hover:pointer-events-auto 
+                                group-focus:opacity-100 group-focus:pointer-events-auto">
+                        
+                        <button type="button" class="btn btn-xs btn-circle btn-info" 
+                                title="Show Raw Data"
+                                onclick="document.getElementById('rawDataModal-{{ session.session_key }}').showModal()">
+                            <i class="fa-solid fa-info"></i>
+                        </button>
+
+                        {% if current_user.has_permission('kill_stream') and session.session_key %}
+                        <button class="btn btn-xs btn-circle btn-error"
+                                title="Terminate Session"
+                                onclick='openTerminateSessionModal({{ session.session_key | tojson }}, {{ session.user | tojson }}, {{ session.media_title | tojson }})'>
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="card-body p-3">
+                        {# Main Flex Container: Poster | Details #}
+                        <div class="flex items-start space-x-3">
+                            {# Poster Column #}
+                            <div class="avatar flex-shrink-0">
+                                <div class="w-16 h-24 rounded">
+                                    {% if session.thumb_url %}
+                                        <img src="{{ session.thumb_url }}" alt="{{ session.media_title }} Poster" 
+                                             onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_media_thumb.png') }}';" 
+                                             class="object-cover w-full h-full"/>
+                                    {% else %}
+                                        <div class="w-full h-full bg-base-300 flex flex-col items-center justify-center text-xs text-base-content/50">
+                                           <i class="fa-regular fa-image fa-2x mb-1"></i> No Poster Available
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {# Details Column #}
+                            <div class="flex-1 min-w-0">
+                                {# Title and Year #}
+                                <h3 class="font-semibold text-sm leading-tight mb-1 line-clamp-2" title="{{ session.media_title }}">
+                                    {{ session.media_title }}
+                                    {% if session.year %}<span class="text-xs text-base-content/60">({{ session.year }})</span>{% endif %}
+                                </h3>
+
+                                {# User and Player Info #}
+                                <div class="text-xs text-base-content/70 mb-2 space-y-1">
+                                    <div class="flex items-center">
+                                        <i class="fa-solid fa-user fa-fw mr-1 text-info"></i>
+                                        <span class="truncate">{{ session.user }}</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i class="fa-solid fa-tv fa-fw mr-1 text-info"></i>
+                                        <span class="truncate">{{ session.player_title }}</span>
+                                    </div>
+                                </div>
+
+                                {# Progress Bar #}
+                                <div class="mb-2">
+                                    <div class="flex justify-between items-center text-xs mb-1">
+                                        <span class="text-base-content/60">{{ session.state }}</span>
+                                        <span class="text-base-content/60">{{ session.progress }}%</span>
+                                    </div>
+                                    <progress class="progress progress-primary w-full h-1" value="{{ session.progress }}" max="100"></progress>
+                                </div>
+
+                                {# Stream Quality Badge #}
+                                <div class="flex flex-wrap gap-1">
+                                    {% if session.is_transcode_calc %}
+                                        <div class="badge badge-warning badge-xs">Transcode</div>
+                                    {% else %}
+                                        <div class="badge badge-success badge-xs">Direct Play</div>
+                                    {% endif %}
+                                    <div class="badge badge-outline badge-xs">{{ session.quality_detail }}</div>
+                                    <div class="badge badge-outline badge-xs">{{ session.location_type_calc }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {# Raw Data Modal for this session #}
+                <dialog id="rawDataModal-{{ session.session_key }}" class="modal modal-bottom sm:modal-middle">
+                    <div class="modal-box max-w-4xl">
+                        <form method="dialog">
+                            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+                        </form>
+                        <h3 class="font-bold text-lg mb-4">Raw Session Data</h3>
+                        <div class="text-xs">
+                            <strong>User:</strong> {{ session.user }}<br>
+                            <strong>Media:</strong> {{ session.media_title }}<br>
+                            <strong>Player:</strong> {{ session.player_title }}<br>
+                            <strong>Session Key:</strong> {{ session.session_key }}
+                        </div>
+                        <div class="mockup-code mt-4 max-h-96 overflow-y-auto">
+                            <pre><code>{{ session.raw_data_json }}</code></pre>
+                        </div>
+                    </div>
+                </dialog>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="text-center py-10">
+        <i class="fa-solid fa-play-circle fa-3x text-base-content/30 mb-4"></i>
+        <h3 class="text-lg font-semibold text-base-content/70 mb-2">No Active Streams</h3>
+        <p class="text-base-content/50">There are currently no active streaming sessions across any servers.</p>
+    </div>
+{% endif %}

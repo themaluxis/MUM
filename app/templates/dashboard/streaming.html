@@ -23,6 +23,20 @@
             <span id="streaming-auto-refresh-loader" class="htmx-indicator loading loading-spinner loading-sm text-primary ml-2"></span>
         </div>
         <div class="flex items-center space-x-2 mt-4 sm:mt-0">
+            <div class="dropdown dropdown-end">
+                <label tabindex="0" class="btn btn-ghost btn-sm" title="Change view">
+                    <i class="fa-solid fa-eye mr-1"></i> View <i class="fa-solid fa-chevron-down fa-xs ml-1"></i>
+                </label>
+                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-300 rounded-box w-40">
+                    <li><a href="javascript:void(0)" onclick="setStreamingView('merged'); return false;" class="streaming-view-option font-bold bg-base-100/50" data-view="merged">
+                        <i class="fa-solid fa-layer-group fa-fw mr-2"></i> Merged
+                    </a></li>
+                    <li><a href="javascript:void(0)" onclick="setStreamingView('categorized'); return false;" class="streaming-view-option" data-view="categorized">
+                        <i class="fa-solid fa-server fa-fw mr-2"></i> Categorized
+                    </a></li>
+                </ul>
+            </div>
+            
             {# Countdown Timer Div #}
             <div id="countdown-timer-container" class="relative w-10 h-10" title="Time until next auto-refresh">
                 <svg class="w-full h-full" viewBox="0 0 100 100">
@@ -41,7 +55,7 @@
             </div>
 
             <button class="btn btn-secondary btn-sm"
-                    hx-get="{{ url_for('dashboard.streaming_sessions_partial') }}"
+                    hx-get="{{ url_for('dashboard.streaming_sessions_partial') }}?view=merged"
                     hx-target="#streaming-sessions-container"
                     hx-swap="innerHTML"
                     hx-indicator="#streaming-manual-refresh-loader"
@@ -53,7 +67,7 @@
     </div>
 
     <div id="streaming-sessions-container" 
-         hx-get="{{ url_for('dashboard.streaming_sessions_partial') }}" 
+         hx-get="{{ url_for('dashboard.streaming_sessions_partial') }}?view=merged" 
          hx-trigger="load, every {{ streaming_refresh_interval | default(15) }}s"
          hx-swap="innerHTML"
          hx-indicator="#streaming-auto-refresh-loader">
@@ -252,6 +266,44 @@ document.addEventListener('DOMContentLoaded', function () {
             // No need to call resetAndStartCountdown() here as afterSettle will handle it
         });
     }
+
 });
+
+// Streaming view management (moved outside DOMContentLoaded to be globally accessible)
+let currentStreamingView = 'merged';
+
+function setStreamingView(view) {
+    currentStreamingView = view;
+    
+    // Update the dropdown to show current selection
+    document.querySelectorAll('.streaming-view-option').forEach(option => {
+        const optionView = option.getAttribute('data-view');
+        if (optionView === view) {
+            option.classList.add('font-bold', 'bg-base-100/50');
+        } else {
+            option.classList.remove('font-bold', 'bg-base-100/50');
+        }
+    });
+
+    // Update the streaming content with the new view
+    const streamingContainer = document.getElementById('streaming-sessions-container');
+    if (streamingContainer) {
+        htmx.ajax('GET', `{{ url_for('dashboard.streaming_sessions_partial') }}?view=${view}`, {
+            target: '#streaming-sessions-container',
+            swap: 'innerHTML'
+        });
+    }
+
+    // Update the manual refresh button URL
+    const manualRefreshButton = document.getElementById('manual-refresh-button');
+    if (manualRefreshButton) {
+        manualRefreshButton.setAttribute('hx-get', `{{ url_for('dashboard.streaming_sessions_partial') }}?view=${view}`);
+    }
+
+    // Update the auto-refresh URL
+    if (streamingContainer) {
+        streamingContainer.setAttribute('hx-get', `{{ url_for('dashboard.streaming_sessions_partial') }}?view=${view}`);
+    }
+}
 </script>
 {% endblock %}

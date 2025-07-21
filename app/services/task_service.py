@@ -13,9 +13,9 @@ _active_stream_sessions = {}
 
 # --- Scheduled Tasks ---
 
-def monitor_plex_sessions_task():
+def monitor_media_sessions_task():
     """
-    Statefully monitors Plex sessions, with corrected session tracking and duration calculation.
+    Statefully monitors media sessions from all services (Plex, Jellyfin, etc.), with corrected session tracking and duration calculation.
     - Creates a new StreamHistory record when a new session starts.
     - Continuously updates the view offset (progress) on the SAME record for an ongoing session.
     - Correctly calculates final playback duration from the last known viewOffset when the session stops.
@@ -23,28 +23,35 @@ def monitor_plex_sessions_task():
     """
     global _active_stream_sessions
     with scheduler.app.app_context():
-        current_app.logger.info("--- Running Plex Session Monitor Task ---")
+        current_app.logger.info("--- Running Media Session Monitor Task ---")
         
-        # Correctly check for any active Plex server from the database
-        plex_servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX, active_only=True)
-        if not plex_servers:
-            current_app.logger.warning("No active Plex servers configured in the database. Skipping task.")
+        # Check for any active media servers from the database
+        all_servers = MediaServiceManager.get_all_servers(active_only=True)
+        if not all_servers:
+            current_app.logger.warning("No active media servers configured in the database. Skipping task.")
             return
 
         try:
-            # This already gets sessions from all active servers
-            active_plex_sessions = MediaServiceManager.get_all_active_sessions()
+            # This gets sessions from all active servers (Plex, Jellyfin, etc.)
+            active_sessions = MediaServiceManager.get_all_active_sessions()
             now_utc = datetime.now(timezone.utc)
-            current_app.logger.info(f"Found {len(active_plex_sessions)} active sessions across all servers.")
+            current_app.logger.info(f"Found {len(active_sessions)} active sessions across all servers.")
 
-            current_sessions_dict = {session.sessionKey: session for session in active_plex_sessions if hasattr(session, 'sessionKey')}
-            current_plex_session_keys = set(current_sessions_dict.keys())
+            # Handle both Plex and Jellyfin session formats
+            current_sessions_dict = {}
+            for session in active_sessions:
+                # Plex sessions have sessionKey, Jellyfin sessions have Id
+                session_key = getattr(session, 'sessionKey', None) or getattr(session, 'Id', None) or session.get('Id', None) if isinstance(session, dict) else None
+                if session_key:
+                    current_sessions_dict[session_key] = session
             
-            current_app.logger.debug(f"Current Plex session keys: {list(current_plex_session_keys)}")
+            current_session_keys = set(current_sessions_dict.keys())
+            
+            current_app.logger.debug(f"Current session keys: {list(current_session_keys)}")
             current_app.logger.debug(f"Previously tracked session keys: {list(_active_stream_sessions.keys())}")
 
             # Step 1: Check for stopped streams
-            stopped_session_keys = set(_active_stream_sessions.keys()) - current_plex_session_keys
+            stopped_session_keys = set(_active_stream_sessions.keys()) - current_session_keys
             if stopped_session_keys:
                 current_app.logger.info(f"Found {len(stopped_session_keys)} stopped sessions: {list(stopped_session_keys)}")
                 for session_key in stopped_session_keys:
@@ -72,14 +79,29 @@ def monitor_plex_sessions_task():
                 elif hasattr(session, 'userId'):
                     user_id_from_session = session.userId
 
-                if not user_id_from_session:
+                # Handle different session formats for user lookup
+                mum_user = None
+                if hasattr(session, 'user') and session.user and hasattr(session.user, 'id'):
+                    # Plex session - look up by plex_user_id
+                    mum_user = User.query.filter_by(plex_user_id=user_id_from_session).first()
+                    if not mum_user:
+                        current_app.logger.warning(f"Could not find MUM user for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
+                        continue
+                elif isinstance(session, dict) and session.get('UserId'):
+                    # Jellyfin session - look up by primary_username
+                    jellyfin_username = session.get('UserName')
+                    if jellyfin_username:
+                        mum_user = User.query.filter_by(primary_username=jellyfin_username).first()
+                        if mum_user:
+                            current_app.logger.debug(f"Found MUM user ID {mum_user.id} for Jellyfin user '{jellyfin_username}'")
+                        else:
+                            current_app.logger.warning(f"No MUM user found for Jellyfin username '{jellyfin_username}'. Skipping session.")
+                            continue
+                    else:
+                        current_app.logger.warning(f"Jellyfin session {session_key} is missing UserName. Skipping.")
+                        continue
+                else:
                     current_app.logger.warning(f"Session {session_key} is missing a user ID. Skipping.")
-                    continue
-
-                mum_user = User.query.filter_by(plex_user_id=user_id_from_session).first()
-                
-                if not mum_user:
-                    current_app.logger.warning(f"Could not find MUM user for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
                     continue
                 
                 current_app.logger.debug(f"Processing session {session_key} for user '{mum_user.plex_username}' (MUM ID: {mum_user.id})")
@@ -296,15 +318,15 @@ def schedule_all_tasks():
         session_interval_seconds = 60
         current_app.logger.warning(f"Invalid SESSION_MONITORING_INTERVAL_SECONDS. Defaulting to {session_interval_seconds}s.")
 
-    # 1. Plex Session Monitoring
+    # 1. Media Session Monitoring (Plex, Jellyfin, etc.)
     if _schedule_job_if_not_exists_or_reschedule(
-        job_id='monitor_plex_sessions',
-        func=monitor_plex_sessions_task,
+        job_id='monitor_media_sessions',
+        func=monitor_media_sessions_task,
         trigger_type='interval',
         seconds=session_interval_seconds,
         next_run_time=datetime.now(timezone.utc) + timedelta(seconds=10) # Start shortly after app start
     ):
-        log_event(EventType.APP_STARTUP, f"Plex session monitoring task (re)scheduled (Interval: {session_interval_seconds}s).")
+        log_event(EventType.APP_STARTUP, f"Media session monitoring task (re)scheduled (Interval: {session_interval_seconds}s).")
 
     # 2. User Access Expiration Check - NOW USES SAME INTERVAL AS SESSION MONITORING
     if _schedule_job_if_not_exists_or_reschedule(

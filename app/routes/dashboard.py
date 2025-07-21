@@ -751,7 +751,10 @@ def streaming_sessions():
 @setup_required
 @permission_required('view_streaming')
 def streaming_sessions_partial():
+    view_mode = request.args.get('view', 'merged')
+    
     active_sessions_data = []
+    sessions_by_server = {}  # For categorized view
     summary_stats = {
         "total_streams": 0,
         "direct_play_count": 0,
@@ -783,33 +786,103 @@ def streaming_sessions_partial():
         if raw_sessions_from_all_services:
             summary_stats["total_streams"] = len(raw_sessions_from_all_services)
             
-            plex_user_ids_in_session_for_query = {int(rs.user.id) for rs in raw_sessions_from_all_services if hasattr(rs, 'user') and rs.user and hasattr(rs.user, 'id')}
+            # Collect user IDs from both Plex and Jellyfin sessions
+            user_ids_in_session_for_query = set()
+            for rs in raw_sessions_from_all_services:
+                # Plex sessions have rs.user.id, Jellyfin sessions have UserId
+                if hasattr(rs, 'user') and rs.user and hasattr(rs.user, 'id'):
+                    user_ids_in_session_for_query.add(int(rs.user.id))
+                elif isinstance(rs, dict) and rs.get('UserId'):
+                    # For Jellyfin, we need to find the user by jellyfin user ID
+                    pass  # We'll handle this differently below
             
-            mum_users_map_by_plex_id = {u.plex_user_id: u for u in User.query.filter(User.plex_user_id.in_(list(plex_user_ids_in_session_for_query)))} if plex_user_ids_in_session_for_query else {}
+            mum_users_map_by_plex_id = {u.plex_user_id: u for u in User.query.filter(User.plex_user_id.in_(list(user_ids_in_session_for_query)))} if user_ids_in_session_for_query else {}
+            
+            # Also get users by primary_username for Jellyfin sessions
+            jellyfin_usernames = set()
+            for rs in raw_sessions_from_all_services:
+                if isinstance(rs, dict) and rs.get('UserName'):
+                    jellyfin_usernames.add(rs.get('UserName'))
+            
+            mum_users_map_by_username = {u.primary_username: u for u in User.query.filter(User.primary_username.in_(list(jellyfin_usernames)))} if jellyfin_usernames else {}
 
-            for raw_plex_session in raw_sessions_from_all_services:
-                user_name = getattr(raw_plex_session.user, 'title', 'Unknown User')
-                player = raw_plex_session.player
-                player_title = getattr(player, 'title', 'Unknown Player')
-                player_platform = getattr(player, 'platform', '')
-                product = getattr(player, 'product', 'N/A')
-                media_title = getattr(raw_plex_session, 'title', "Unknown Title")
-                media_type = getattr(raw_plex_session, 'type', 'unknown').capitalize()
-                year = getattr(raw_plex_session, 'year', None)
-                library_name = getattr(raw_plex_session, 'librarySectionTitle', getattr(raw_plex_session, 'server_name', "N/A"))
-                progress = (raw_plex_session.viewOffset / raw_plex_session.duration) * 100 if raw_plex_session.duration else 0
-                thumb_path = raw_plex_session.thumb
-                if media_type == 'Episode' and hasattr(raw_plex_session, 'grandparentThumb'):
-                    thumb_path = raw_plex_session.grandparentThumb
-                thumb_url = url_for('api.plex_image_proxy', path=thumb_path.lstrip('/')) if thumb_path else None
-                transcode_session = raw_plex_session.transcodeSession
-                is_transcoding = transcode_session is not None
+            for raw_session in raw_sessions_from_all_services:
+                # Determine if this is a Plex or Jellyfin session
+                is_plex_session = hasattr(raw_session, 'user') and hasattr(raw_session, 'sessionKey')
+                is_jellyfin_session = isinstance(raw_session, dict) and 'UserId' in raw_session
                 
-                location_ip = getattr(player, 'address', 'N/A')
-                is_lan = getattr(player, 'local', False)
-                location_lan_wan = "LAN" if is_lan else "WAN"
-                mum_user = mum_users_map_by_plex_id.get(int(raw_plex_session.user.id))
-                mum_user_id = mum_user.id if mum_user else None
+                if is_plex_session:
+                    # Handle Plex session format
+                    user_name = getattr(raw_session.user, 'title', 'Unknown User')
+                    player = raw_session.player
+                    player_title = getattr(player, 'title', 'Unknown Player')
+                    player_platform = getattr(player, 'platform', '')
+                    product = getattr(player, 'product', 'N/A')
+                    media_title = getattr(raw_session, 'title', "Unknown Title")
+                    media_type = getattr(raw_session, 'type', 'unknown').capitalize()
+                    year = getattr(raw_session, 'year', None)
+                    library_name = getattr(raw_session, 'librarySectionTitle', "N/A")
+                    progress = (raw_session.viewOffset / raw_session.duration) * 100 if raw_session.duration else 0
+                    thumb_path = raw_session.thumb
+                    if media_type == 'Episode' and hasattr(raw_session, 'grandparentThumb'):
+                        thumb_path = raw_session.grandparentThumb
+                    thumb_url = url_for('api.plex_image_proxy', path=thumb_path.lstrip('/')) if thumb_path else None
+                    transcode_session = raw_session.transcodeSession
+                    is_transcoding = transcode_session is not None
+                    
+                    location_ip = getattr(player, 'address', 'N/A')
+                    is_lan = getattr(player, 'local', False)
+                    location_lan_wan = "LAN" if is_lan else "WAN"
+                    mum_user = mum_users_map_by_plex_id.get(int(raw_session.user.id))
+                    mum_user_id = mum_user.id if mum_user else None
+                    session_key = raw_session.sessionKey
+                    
+                elif is_jellyfin_session:
+                    # Handle Jellyfin session format
+                    user_name = raw_session.get('UserName', 'Unknown User')
+                    now_playing = raw_session.get('NowPlayingItem', {})
+                    play_state = raw_session.get('PlayState', {})
+                    
+                    player_title = raw_session.get('DeviceName', 'Unknown Device')
+                    player_platform = raw_session.get('Client', '')
+                    product = raw_session.get('ApplicationVersion', 'N/A')
+                    media_title = now_playing.get('Name', "Unknown Title")
+                    media_type = now_playing.get('Type', 'unknown').capitalize()
+                    year = now_playing.get('ProductionYear', None)
+                    library_name = "Library"  # Generic library name for Jellyfin
+                    
+                    # Calculate progress for Jellyfin
+                    position_ticks = play_state.get('PositionTicks', 0)
+                    runtime_ticks = now_playing.get('RunTimeTicks', 0)
+                    progress = (position_ticks / runtime_ticks) * 100 if runtime_ticks else 0
+                    
+                    # Handle Jellyfin thumbnails
+                    thumb_url = None
+                    item_id = now_playing.get('Id')
+                    if item_id:
+                        # For episodes, prefer series poster; for movies, use primary image
+                        if media_type == 'Episode' and now_playing.get('SeriesId'):
+                            thumb_url = url_for('api.jellyfin_image_proxy', item_id=now_playing.get('SeriesId'), image_type='Primary')
+                            current_app.logger.info(f"Generated Jellyfin episode thumbnail URL: {thumb_url}")
+                        else:
+                            thumb_url = url_for('api.jellyfin_image_proxy', item_id=item_id, image_type='Primary')
+                            current_app.logger.info(f"Generated Jellyfin movie thumbnail URL: {thumb_url} for item_id: {item_id}")
+                    
+                    is_transcoding = play_state.get('PlayMethod') == 'Transcode'
+                    
+                    location_ip = raw_session.get('RemoteEndPoint', 'N/A')
+                    is_lan = not raw_session.get('IsLocal', True)  # Jellyfin logic might be inverted
+                    location_lan_wan = "LAN" if is_lan else "WAN"
+                    
+                    # Find MUM user by username for Jellyfin
+                    mum_user = mum_users_map_by_username.get(user_name)
+                    mum_user_id = mum_user.id if mum_user else None
+                    session_key = raw_session.get('Id', '')
+                    
+                else:
+                    # Skip unknown session formats
+                    current_app.logger.warning(f"Unknown session format: {type(raw_session)}")
+                    continue
 
                 # Initialize details
                 quality_detail = ""
@@ -819,27 +892,29 @@ def streaming_sessions_partial():
                 subtitle_detail = "None"
                 container_detail = ""
                 
-                # Find original and transcoded media parts and streams
-                original_media = next((m for m in raw_plex_session.media if not m.selected), raw_plex_session.media[0])
-                original_media_part = original_media.parts[0]
-                original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
-                original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
+                # Handle session details based on service type
+                if is_plex_session:
+                    # Find original and transcoded media parts and streams for Plex
+                    original_media = next((m for m in raw_session.media if not m.selected), raw_session.media[0])
+                    original_media_part = original_media.parts[0]
+                    original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
+                    original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
 
-                # Determine stream type
-                if is_transcoding:
-                    # For transcodes, the session data is for the *output* stream.
-                    # We need to fetch the original item to get the source quality.
-                    try:
-                        full_media_item = raw_plex_session._server.fetchItem(raw_plex_session.ratingKey)
-                        original_media_part = full_media_item.media[0].parts[0]
-                        original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
-                        original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
-                    except Exception as e:
-                        current_app.logger.error(f"Could not fetch full media item for transcode session: {e}")
-                        # Fallback to the potentially inaccurate session data
-                        original_media_part = next((p for m in raw_plex_session.media for p in m.parts if not p.selected), raw_plex_session.media[0].parts[0])
-                        original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
-                        original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
+                    # Determine stream type for Plex
+                    if is_transcoding:
+                        # For transcodes, the session data is for the *output* stream.
+                        # We need to fetch the original item to get the source quality.
+                        try:
+                            full_media_item = raw_session._server.fetchItem(raw_session.ratingKey)
+                            original_media_part = full_media_item.media[0].parts[0]
+                            original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
+                            original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
+                        except Exception as e:
+                            current_app.logger.error(f"Could not fetch full media item for transcode session: {e}")
+                            # Fallback to the potentially inaccurate session data
+                            original_media_part = next((p for m in raw_session.media for p in m.parts if not p.selected), raw_session.media[0].parts[0])
+                            original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
+                            original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
 
                     speed = f"(Speed: {transcode_session.speed:.1f})" if transcode_session.speed is not None else ""
                     status = "Throttled" if transcode_session.throttled else ""
@@ -869,7 +944,7 @@ def streaming_sessions_partial():
                         audio_detail = f"Transcode ({original_audio_display} \u2192 {transcoded_audio_display})"
 
                     # Subtitle
-                    selected_subtitle_stream = next((s for m in raw_plex_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
+                    selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
                     if transcode_session.subtitleDecision == "transcode":
                         if selected_subtitle_stream:
                             lang = selected_subtitle_stream.language or "Unknown"
@@ -897,16 +972,17 @@ def streaming_sessions_partial():
                             subtitle_detail = "Direct Stream (Unknown)"
 
                     # Quality
-                    transcoded_media = next((m for m in raw_plex_session.media if m.selected), None)
+                    transcoded_media = next((m for m in raw_session.media if m.selected), None)
                     quality_res = get_standard_resolution(getattr(transcoded_media, 'height', transcode_session.height))
                     if transcoded_media:
                         quality_detail = f"{quality_res} ({transcoded_media.bitrate / 1000:.1f} Mbps)"
                     else:
                         quality_detail = f"{quality_res} (Bitrate N/A)"
 
-                else: # Direct Play or Direct Stream
+                elif is_plex_session and not is_transcoding:
+                    # Plex Direct Play
                     stream_details = "Direct Play"
-                    if any(p.decision == 'transcode' for m in raw_plex_session.media for p in m.parts):
+                    if any(p.decision == 'transcode' for m in raw_session.media for p in m.parts):
                         stream_details = "Direct Stream"
 
                     original_res = get_standard_resolution(original_video_stream.height) if original_video_stream else "Unknown"
@@ -914,46 +990,109 @@ def streaming_sessions_partial():
                     video_detail = f"Direct Play ({original_video_stream.codec.upper()} {original_res})" if original_video_stream else "Direct Play (Unknown Video)"
                     audio_detail = f"Direct Play ({original_audio_stream.displayTitle})" if original_audio_stream else "Direct Play (Unknown Audio)"
                     
-                    selected_subtitle_stream = next((s for m in raw_plex_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
+                    selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
                     if selected_subtitle_stream:
                         subtitle_detail = f"Direct Play ({selected_subtitle_stream.displayTitle})"
 
                     quality_detail = f"Original ({original_media.bitrate / 1000:.1f} Mbps)"
 
+                else:
+                    # Jellyfin session handling (simplified)
+                    if is_transcoding:
+                        stream_details = "Transcode"
+                        container_detail = "Converting"
+                        video_detail = "Transcode"
+                        audio_detail = "Transcode"
+                        quality_detail = "Transcoding"
+                    else:
+                        stream_details = "Direct Play"
+                        container_detail = now_playing.get('Container', 'Unknown').upper()
+                        video_detail = "Direct Play"
+                        audio_detail = "Direct Play"
+                        quality_detail = "Direct Play"
+
                 # Prepare raw data for modal
                 raw_session_dict = {}
-                if hasattr(raw_plex_session, '_data') and raw_plex_session._data is not None:
-                    raw_xml_string = ET.tostring(raw_plex_session._data, encoding='unicode')
-                    raw_session_dict = xmltodict.parse(raw_xml_string)
+                if is_plex_session:
+                    if hasattr(raw_session, '_data') and raw_session._data is not None:
+                        raw_xml_string = ET.tostring(raw_session._data, encoding='unicode')
+                        raw_session_dict = xmltodict.parse(raw_xml_string)
+                elif is_jellyfin_session:
+                    raw_session_dict = raw_session  # Jellyfin sessions are already dict format
                 
                 raw_json_string = json.dumps(raw_session_dict, indent=2)
+
+                # Get additional details based on session type
+                if is_plex_session:
+                    grandparent_title = getattr(raw_session, 'grandparentTitle', None)
+                    parent_title = getattr(raw_session, 'parentTitle', None)
+                    player_state = getattr(raw_session.player, 'state', 'N/A').capitalize()
+                    bitrate_calc = raw_session.media[0].bitrate if raw_session.media else 0
+                else:
+                    grandparent_title = now_playing.get('SeriesName', None)
+                    parent_title = now_playing.get('SeasonName', None)
+                    player_state = 'Playing' if not play_state.get('IsPaused', False) else 'Paused'
+                    bitrate_calc = 0  # Jellyfin bitrate calculation would need more work
 
                 session_details = {
                     'user': user_name, 'mum_user_id': mum_user_id, 'player_title': player_title,
                     'player_platform': player_platform, 'product': product, 'media_title': media_title,
-                    'grandparent_title': getattr(raw_plex_session, 'grandparentTitle', None),
-                    'parent_title': getattr(raw_plex_session, 'parentTitle', None), 'media_type': media_type,
-                    'library_name': library_name, 'year': year, 'state': getattr(player, 'state', 'N/A').capitalize(),
-                    'progress': round(progress, 1), 'thumb_url': thumb_url, 'session_key': raw_plex_session.sessionKey,
+                    'grandparent_title': grandparent_title,
+                    'parent_title': parent_title, 'media_type': media_type,
+                    'library_name': library_name, 'year': year, 'state': player_state,
+                    'progress': round(progress, 1), 'thumb_url': thumb_url, 'session_key': session_key,
                     'quality_detail': quality_detail, 'stream_detail': stream_details,
                     'container_detail': container_detail,
                     'video_detail': video_detail, 'audio_detail': audio_detail, 'subtitle_detail': subtitle_detail,
                     'location_detail': f"{location_lan_wan}: {location_ip}", 'is_public_ip': not is_lan,
                     'location_ip': location_ip, 'bandwidth_detail': f"Streaming via {location_lan_wan}",
-                    'bitrate_calc': raw_plex_session.media[0].bitrate, 'location_type_calc': location_lan_wan,
+                    'bitrate_calc': bitrate_calc, 'location_type_calc': location_lan_wan,
                     'is_transcode_calc': is_transcoding,
                     'raw_data_json': raw_json_string,
                     'raw_data_json_lines': raw_json_string.splitlines()
                 }
                 active_sessions_data.append(session_details)
 
+                # For categorized view, group by server
+                if view_mode == 'categorized':
+                    # Get the actual server name from the session data
+                    server_name = getattr(raw_session, 'server_name', None)
+                    if not server_name:
+                        # Fallback to service type if server_name not available
+                        if is_plex_session:
+                            server_name = "Plex Server"
+                        else:
+                            server_name = "Jellyfin Server"
+                    if server_name not in sessions_by_server:
+                        sessions_by_server[server_name] = {
+                            'sessions': [],
+                            'stats': {
+                                "total_streams": 0,
+                                "direct_play_count": 0,
+                                "transcode_count": 0,
+                                "total_bandwidth_mbps": 0.0,
+                                "lan_bandwidth_mbps": 0.0,
+                                "wan_bandwidth_mbps": 0.0
+                            }
+                        }
+                    
+                    sessions_by_server[server_name]['sessions'].append(session_details)
+                    sessions_by_server[server_name]['stats']['total_streams'] += 1
+
                 if is_transcoding:
                     summary_stats["transcode_count"] += 1
+                    if view_mode == 'categorized' and server_name in sessions_by_server:
+                        sessions_by_server[server_name]['stats']['transcode_count'] += 1
                 else:
                     summary_stats["direct_play_count"] += 1
+                    if view_mode == 'categorized' and server_name in sessions_by_server:
+                        sessions_by_server[server_name]['stats']['direct_play_count'] += 1
                 
                 # Bandwidth Calculation (moved to be unconditional)
-                bitrate_kbps = getattr(raw_plex_session.session, 'bandwidth', 0)
+                if is_plex_session:
+                    bitrate_kbps = getattr(raw_session.session, 'bandwidth', 0)
+                else:
+                    bitrate_kbps = 0  # Jellyfin bandwidth calculation would need different approach
                 bitrate_mbps = (bitrate_kbps or 0) / 1000
                 summary_stats["total_bandwidth_mbps"] += bitrate_mbps
                 if is_lan:
@@ -961,16 +1100,37 @@ def streaming_sessions_partial():
                 else:
                     summary_stats["wan_bandwidth_mbps"] += bitrate_mbps
 
-                summary_stats["total_bandwidth_mbps"] = round(summary_stats["total_bandwidth_mbps"], 1)
-                summary_stats["lan_bandwidth_mbps"] = round(summary_stats["lan_bandwidth_mbps"], 1)
-                summary_stats["wan_bandwidth_mbps"] = round(summary_stats["wan_bandwidth_mbps"], 1)
+                # Update server-specific stats for categorized view
+                if view_mode == 'categorized' and server_name in sessions_by_server:
+                    sessions_by_server[server_name]['stats']['total_bandwidth_mbps'] += bitrate_mbps
+                    if is_lan:
+                        sessions_by_server[server_name]['stats']['lan_bandwidth_mbps'] += bitrate_mbps
+                    else:
+                        sessions_by_server[server_name]['stats']['wan_bandwidth_mbps'] += bitrate_mbps
+
+        # Round bandwidth values
+        summary_stats["total_bandwidth_mbps"] = round(summary_stats["total_bandwidth_mbps"], 1)
+        summary_stats["lan_bandwidth_mbps"] = round(summary_stats["lan_bandwidth_mbps"], 1)
+        summary_stats["wan_bandwidth_mbps"] = round(summary_stats["wan_bandwidth_mbps"], 1)
+
+        # Round server-specific bandwidth values
+        if view_mode == 'categorized':
+            for server_data in sessions_by_server.values():
+                server_data['stats']['total_bandwidth_mbps'] = round(server_data['stats']['total_bandwidth_mbps'], 1)
+                server_data['stats']['lan_bandwidth_mbps'] = round(server_data['stats']['lan_bandwidth_mbps'], 1)
+                server_data['stats']['wan_bandwidth_mbps'] = round(server_data['stats']['wan_bandwidth_mbps'], 1)
 
     except Exception as e:
         current_app.logger.error(f"STREAMING_DEBUG: Error during streaming_sessions_partial: {e}", exc_info=True)
-            
-    return render_template('dashboard/partials/streaming_sessions.html', 
-                           sessions=active_sessions_data, 
-                           summary_stats=summary_stats)
+    
+    if view_mode == 'categorized':
+        return render_template('dashboard/partials/streaming_sessions_categorized.html', 
+                               sessions_by_server=sessions_by_server, 
+                               summary_stats=summary_stats)
+    else:
+        return render_template('dashboard/partials/streaming_sessions.html', 
+                               sessions=active_sessions_data, 
+                               summary_stats=summary_stats)
 
 @bp.route('/settings/admins')
 @login_required

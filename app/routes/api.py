@@ -98,6 +98,68 @@ def plex_image_proxy():
         current_app.logger.error(f"API plex_image_proxy: Unexpected error for path {image_path_on_plex}: {e}", exc_info=True)
         abort(500)
 
+
+@bp.route('/jellyfin_image_proxy')
+@login_required
+def jellyfin_image_proxy():
+    item_id = request.args.get('item_id')
+    image_type = request.args.get('image_type', 'Primary')
+    
+    current_app.logger.info(f"API jellyfin_image_proxy: Received request for item_id='{item_id}', image_type='{image_type}'")
+    
+    if not item_id:
+        current_app.logger.warning("API jellyfin_image_proxy: 'item_id' parameter is missing.")
+        return "Missing item_id parameter", 400
+
+    try:
+        from app.services.media_service_manager import MediaServiceManager
+        from app.models_media_services import ServiceType
+        
+        media_service_manager = MediaServiceManager()
+        jellyfin_servers = media_service_manager.get_servers_by_type(ServiceType.JELLYFIN, active_only=True)
+        
+        if not jellyfin_servers:
+            current_app.logger.error("API jellyfin_image_proxy: No Jellyfin servers found.")
+            return "No Jellyfin servers available", 404
+
+        jellyfin_server = jellyfin_servers[0]  # Use first available server
+        current_app.logger.info(f"API jellyfin_image_proxy: Using Jellyfin server: {jellyfin_server.name} at {jellyfin_server.url}")
+        
+        jellyfin_service = MediaServiceFactory.create_service_from_db(jellyfin_server)
+        
+        if not jellyfin_service:
+            current_app.logger.error("API jellyfin_image_proxy: Could not get Jellyfin instance to proxy image.")
+            return "Could not connect to Jellyfin", 500
+
+        # Construct Jellyfin image URL
+        jellyfin_image_url = f"{jellyfin_server.url.rstrip('/')}/Items/{item_id}/Images/{image_type}"
+        
+        current_app.logger.info(f"API jellyfin_image_proxy: Fetching image from Jellyfin URL: {jellyfin_image_url}")
+
+        # Make request with authentication headers
+        headers = {
+            'X-Emby-Token': jellyfin_server.api_key,
+        }
+        current_app.logger.info(f"API jellyfin_image_proxy: Using API key: {jellyfin_server.api_key[:8]}...")
+        
+        import requests
+        img_response = requests.get(jellyfin_image_url, headers=headers, stream=True, timeout=10)
+        img_response.raise_for_status()
+
+        content_type = img_response.headers.get('Content-Type', 'image/jpeg')
+        
+        return Response(img_response.content, content_type=content_type)
+
+    except requests.exceptions.HTTPError as e_http:
+        current_app.logger.error(f"API jellyfin_image_proxy: HTTPError ({e_http.response.status_code}) fetching from Jellyfin: {e_http} for item {item_id}")
+        return f"HTTP error fetching image: {e_http.response.status_code}", e_http.response.status_code
+    except requests.exceptions.RequestException as e_req:
+        current_app.logger.error(f"API jellyfin_image_proxy: RequestException fetching from Jellyfin: {e_req} for item {item_id}")
+        return "Network error fetching image", 500
+    except Exception as e:
+        current_app.logger.error(f"API jellyfin_image_proxy: Unexpected error for item {item_id}: {e}", exc_info=True)
+        return "Error fetching image", 500
+
 @bp.route('/terminate_plex_session', methods=['POST'])
 @login_required
 @csrf.exempt # Or ensure your JS sends CSRF token for POST via HTMX
