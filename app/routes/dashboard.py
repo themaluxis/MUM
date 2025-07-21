@@ -1057,6 +1057,18 @@ def streaming_sessions_partial():
                 if view_mode == 'categorized':
                     # Get the actual server name from the session data
                     server_name = getattr(raw_session, 'server_name', None)
+                    
+                    # Get the actual server name from the server itself (not the custom name)
+                    actual_server_name = None
+                    if is_plex_session:
+                        # For Plex, try to get the server name from the session
+                        actual_server_name = getattr(raw_session, 'machineIdentifier', None)
+                        if hasattr(raw_session, '_server') and hasattr(raw_session._server, 'friendlyName'):
+                            actual_server_name = raw_session._server.friendlyName
+                    else:
+                        # For Jellyfin, get the server name from the session data
+                        actual_server_name = raw_session.get('ServerName', None)
+                    
                     if not server_name:
                         # Fallback to service type if server_name not available
                         if is_plex_session:
@@ -1066,6 +1078,7 @@ def streaming_sessions_partial():
                     if server_name not in sessions_by_server:
                         sessions_by_server[server_name] = {
                             'sessions': [],
+                            'actual_server_name': actual_server_name,
                             'stats': {
                                 "total_streams": 0,
                                 "direct_play_count": 0,

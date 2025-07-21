@@ -20,10 +20,13 @@
     {% for server_name, server_data in sessions_by_server.items() %}
         <div class="mb-6">
             {# Server Header with Stats #}
-            <div class="flex items-center justify-between mb-3">
-                <h3 class="text-lg font-semibold flex items-center">
+            <div class="flex items-center mb-3">
+                <h3 class="text-lg font-semibold flex items-center mr-2">
                     <i class="fa-solid fa-server mr-2 text-primary"></i>
                     {{ server_name }}
+                    {% if server_data.actual_server_name and server_data.actual_server_name != server_name %}
+                        <div class="badge badge-outline badge-sm ml-2">{{ server_data.actual_server_name }}</div>
+                    {% endif %}
                 </h3>
                 <div class="text-sm text-base-content/70">
                     <i class="fa-solid fa-chart-line fa-fw mr-1"></i>
