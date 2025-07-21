@@ -272,3 +272,14 @@ def format_duration(total_seconds):
         parts.append(f"{minutes}m")
         
     return " ".join(parts[:3]) # Show at most 3 parts (e.g., d, h, m)
+
+def format_json(json_string):
+    """Format a JSON string with proper indentation for display"""
+    try:
+        import json
+        # Parse the JSON string and format it with indentation
+        parsed = json.loads(json_string)
+        return json.dumps(parsed, indent=2, ensure_ascii=False)
+    except (json.JSONDecodeError, TypeError):
+        # If it's not valid JSON, return as-is
+        return json_string

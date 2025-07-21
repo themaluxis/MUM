@@ -143,20 +143,37 @@ def list_users():
     # Get library access info for each user, and sort it
     user_library_access = {}
     user_sorted_libraries = {}
+    user_service_types = {}  # Track which services each user belongs to
     from app.models_media_services import UserMediaAccess
     access_records = UserMediaAccess.query.filter(UserMediaAccess.user_id.in_(user_ids_on_page)).all()
     for access in access_records:
         if access.user_id not in user_library_access:
             user_library_access[access.user_id] = []
+            user_service_types[access.user_id] = []
         user_library_access[access.user_id].extend(access.allowed_library_ids)
+        # Track which service types this user has access to
+        if access.server.service_type not in user_service_types[access.user_id]:
+            user_service_types[access.user_id].append(access.server.service_type)
 
     media_service_manager = MediaServiceManager()
-    plex_servers = media_service_manager.get_servers_by_type(ServiceType.PLEX, active_only=True)
-    if not plex_servers:
-        available_libraries = {}
-    else:
-        plex_service = MediaServiceFactory.create_service_from_db(plex_servers[0])
-        available_libraries = {lib['id']: lib['name'] for lib in plex_service.get_libraries()}
+    
+    # Get libraries from all active servers, not just Plex
+    available_libraries = {}
+    all_servers = media_service_manager.get_all_servers(active_only=True)
+    
+    for server in all_servers:
+        try:
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service:
+                server_libraries = service.get_libraries()
+                for lib in server_libraries:
+                    lib_id = lib.get('external_id') or lib.get('id')
+                    lib_name = lib.get('name', 'Unknown')
+                    if lib_id:
+                        # Prefix with server name to avoid conflicts between servers
+                        available_libraries[str(lib_id)] = f"{lib_name} ({server.name})"
+        except Exception as e:
+            current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
 
     for user_id, lib_ids in user_library_access.items():
         lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
@@ -216,6 +233,7 @@ def list_users():
         'user_library_access': user_library_access,
         'user_last_played': user_last_played,
         'user_sorted_libraries': user_sorted_libraries,
+        'user_service_types': user_service_types,
         'current_view': view_mode,
         'available_libraries': available_libraries,
         'mass_edit_form': mass_edit_form,
@@ -565,12 +583,24 @@ def mass_edit_users():
     
     # We still must populate the dynamic choices for the libraries field
     media_service_manager = MediaServiceManager()
-    plex_servers = media_service_manager.get_servers_by_type(ServiceType.PLEX, active_only=True)
-    if not plex_servers:
-        available_libraries = {}
-    else:
-        plex_service = MediaServiceFactory.create_service_from_db(plex_servers[0])
-        available_libraries = {lib['id']: lib['name'] for lib in plex_service.get_libraries()}
+    
+    # Get libraries from all active servers, not just Plex
+    available_libraries = {}
+    all_servers = media_service_manager.get_all_servers(active_only=True)
+    
+    for server in all_servers:
+        try:
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service:
+                server_libraries = service.get_libraries()
+                for lib in server_libraries:
+                    lib_id = lib.get('external_id') or lib.get('id')
+                    lib_name = lib.get('name', 'Unknown')
+                    if lib_id:
+                        # Prefix with server name to avoid conflicts between servers
+                        available_libraries[str(lib_id)] = f"{lib_name} ({server.name})"
+        except Exception as e:
+            current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
 
     # Manual validation for user_ids, then form validation for the rest
@@ -814,17 +844,30 @@ def get_quick_edit_form(user_id):
 
     # Populate dynamic choices
     media_service_manager = MediaServiceManager()
-    plex_servers = media_service_manager.get_servers_by_type(ServiceType.PLEX, active_only=True)
-    if not plex_servers:
-        available_libraries = {}
-    else:
-        plex_service = MediaServiceFactory.create_service_from_db(plex_servers[0])
-        available_libraries = {lib['id']: lib['name'] for lib in plex_service.get_libraries()}
+    
+    # Get libraries from all active servers, not just Plex
+    available_libraries = {}
+    all_servers = media_service_manager.get_all_servers(active_only=True)
+    
+    for server in all_servers:
+        try:
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service:
+                server_libraries = service.get_libraries()
+                for lib in server_libraries:
+                    lib_id = lib.get('external_id') or lib.get('id')
+                    lib_name = lib.get('name', 'Unknown')
+                    if lib_id:
+                        # Prefix with server name to avoid conflicts between servers
+                        available_libraries[str(lib_id)] = f"{lib_name} ({server.name})"
+        except Exception as e:
+            current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
     
     # Pre-populate the fields with the user's current settings
     from app.models_media_services import UserMediaAccess
-    access = UserMediaAccess.query.filter_by(user_id=user.id, server_id=plex_servers[0].id).first()
+    # Get access from the first server (this logic might need improvement for multi-server setups)
+    access = UserMediaAccess.query.filter_by(user_id=user.id).first()
     if access:
         form.libraries.data = list(access.allowed_library_ids or [])
     else:

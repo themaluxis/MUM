@@ -35,7 +35,13 @@
                             <div class="flex items-center space-x-3">
                                 <div class="avatar">
                                     <div class="mask mask-squircle w-10 h-10">
-                                        <img src="{{ admin.plex_thumb or url_for('static', filename='img/default_avatar.png') }}" alt="{{ admin.plex_username }} avatar" />
+                                        {% if admin.plex_thumb %}
+                                            <img src="{{ admin.plex_thumb }}" alt="{{ admin.plex_username }} avatar" />
+                                        {% else %}
+                                            <div class="bg-primary text-primary-content w-10 h-10 flex items-center justify-center">
+                                                <span class="text-sm font-bold">{{ (admin.username or admin.plex_username)[0]|upper if (admin.username or admin.plex_username) else 'A' }}</span>
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <div>

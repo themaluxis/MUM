@@ -1,6 +1,30 @@
 {# File: app/templates/users/partials/_single_user_card.html #}
 {# Expects 'user' object and other context variables like 'user_sorted_libraries', 'admins_by_uuid' etc. #}
-<div id="user-card-{{ user.id }}" class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow duration-200 ease-in-out relative group user-card-clickable" data-user-id-for-card="{{ user.id }}">
+{# Determine service-specific background tint #}
+{% set service_types = user_service_types.get(user.id, []) %}
+{% set primary_service = service_types[0] if service_types else none %}
+{% if primary_service %}
+    {% if primary_service.value == 'plex' %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-yellow-500/10" %}
+    {% elif primary_service.value == 'jellyfin' %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-purple-500/10" %}
+    {% elif primary_service.value == 'emby' %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-green-500/10" %}
+    {% elif primary_service.value == 'kavita' %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-orange-500/10" %}
+    {% elif primary_service.value == 'audiobookshelf' %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-blue-500/10" %}
+    {% elif primary_service.value == 'komga' %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-red-500/10" %}
+    {% elif primary_service.value == 'romm' %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-indigo-500/10" %}
+    {% else %}
+        {% set card_bg_class = "bg-base-200" %}
+    {% endif %}
+{% else %}
+    {% set card_bg_class = "bg-base-200" %}
+{% endif %}
+<div id="user-card-{{ user.id }}" class="card {{ card_bg_class }} shadow-lg hover:shadow-xl transition-shadow duration-200 ease-in-out relative group user-card-clickable" data-user-id-for-card="{{ user.id }}">
     <!-- User Selection Checkbox -->
     <input type="checkbox" id="user-checkbox-{{ user.id }}" class="checkbox checkbox-primary absolute top-2 right-2 z-10 user-select-checkbox hidden group-hover:block focus:block checked:block" data-user-id="{{ user.id }}" title="Select user">
     
@@ -8,22 +32,53 @@
         <div class="flex flex-row items-center mb-3">
             <div class="avatar mr-3">
                 <div class="w-10 rounded-full">
-                    <img src="{{ user.get_avatar(url_for('static', filename='img/default_avatar.png')) }}" alt="{{ user.plex_username }} avatar" onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}'; this.classList.add('object-scale-down');" />
+                    <img src="{{ user.get_avatar(url_for('static', filename='img/default_avatar.png')) }}" alt="{{ user.get_display_name() }} avatar" onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}'; this.classList.add('object-scale-down');" />
                 </div>
             </div>
-            <h2 class="card-title text-lg truncate" title="{{ user.plex_username }}">
-                {{ user.plex_username }}
-            </h2>
+            <div class="flex flex-col">
+                <h2 class="card-title text-lg truncate" title="{{ user.get_display_name() }}">
+                    {{ user.get_display_name() }}
+                </h2>
+                {# Service type badge #}
+                {% if primary_service %}
+                    {% if primary_service.value == 'plex' %}
+                        {% set badge_class = "bg-yellow-500 text-yellow-900" %}
+                        {% set service_name = "Plex" %}
+                    {% elif primary_service.value == 'jellyfin' %}
+                        {% set badge_class = "bg-purple-500 text-purple-100" %}
+                        {% set service_name = "Jellyfin" %}
+                    {% elif primary_service.value == 'emby' %}
+                        {% set badge_class = "bg-green-500 text-green-100" %}
+                        {% set service_name = "Emby" %}
+                    {% elif primary_service.value == 'kavita' %}
+                        {% set badge_class = "bg-orange-500 text-orange-100" %}
+                        {% set service_name = "Kavita" %}
+                    {% elif primary_service.value == 'audiobookshelf' %}
+                        {% set badge_class = "bg-blue-500 text-blue-100" %}
+                        {% set service_name = "AudiobookShelf" %}
+                    {% elif primary_service.value == 'komga' %}
+                        {% set badge_class = "bg-red-500 text-red-100" %}
+                        {% set service_name = "Komga" %}
+                    {% elif primary_service.value == 'romm' %}
+                        {% set badge_class = "bg-indigo-500 text-indigo-100" %}
+                        {% set service_name = "RomM" %}
+                    {% else %}
+                        {% set badge_class = "bg-gray-500 text-gray-100" %}
+                        {% set service_name = primary_service.value|title %}
+                    {% endif %}
+                    <div class="badge badge-sm {{ badge_class }}">{{ service_name }}</div>
+                {% endif %}
+            </div>
         </div>
         
         <div class="text-xs space-y-1 mb-3">
             <p class="text-xs text-base-content/70 truncate" title="{{ user.plex_email or 'No email' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.plex_email or 'No email available' }}</p>
-            <div class="tooltip tooltip-top" data-tip="The date {{ user.plex_username }} was added to MUM">
+            <div class="tooltip tooltip-top" data-tip="The date {{ user.get_display_name() }} was added to MUM">
                 <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}</p>
             </div>
             <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
             {% if user.plex_join_date %}
-            <div class="tooltip tooltip-top" data-tip="Full join date: {{ user.plex_join_date | format_datetime_user }} - When {{ user.plex_username }} joined your Plex server">
+            <div class="tooltip tooltip-top" data-tip="Full join date: {{ user.plex_join_date | format_datetime_user }} - When {{ user.get_display_name() }} joined your Plex server">
                 <p><i class="fa-solid fa-server fa-fw mr-1 text-info"></i> Plex Join Date: {{ user.plex_join_date | format_datetime_user(include_time=False) }}</p>
             </div>
             {% endif %}
@@ -94,7 +149,7 @@
             {% endif %}
             {% if current_user.has_permission('delete_user') %}
             <button class="btn btn-xs btn-ghost text-error hover:bg-error/10 card-action-button" title="Remove User"
-                    hx-confirm="Are you sure you want to remove '{{ user.plex_username }}' from MUM and Plex Server?"
+                    hx-confirm="Are you sure you want to remove '{{ user.get_display_name() }}' from MUM and media servers?"
                     hx-delete="{{ url_for('users.delete_user', user_id=user.id) }}"
                     hx-target="closest .card" 
                     hx-swap="outerHTML swap:0.5s"

@@ -3,16 +3,8 @@
 
 <div class="space-y-4">
     {% if user.raw_plex_data %}
-        
-        <div class="stats shadow">
-            <div class="stat">
-                <div class="stat-title">UUID</div>
-                <div class="stat-value text-sm">{{ user.plex_uuid or 'N/A' }}</div>
-            </div>
-        </div>
-        
         <div class="mockup-code">
-            <pre><code>{{ user.raw_plex_data }}</code></pre>
+            <pre><code>{% if user.raw_plex_data.startswith('{') %}{{ user.raw_plex_data | format_json }}{% else %}{{ user.raw_plex_data }}{% endif %}</code></pre>
         </div>
     {% else %}
         <div class="alert alert-warning">
@@ -21,13 +13,6 @@
                 <strong>No Raw Data Available</strong><br>
                 This user doesn't have stored raw data yet.<br>
                 <em>Click "Sync Users" button to fetch and store the data.</em>
-            </div>
-        </div>
-        
-        <div class="stats shadow">
-            <div class="stat">
-                <div class="stat-title">UUID</div>
-                <div class="stat-value text-sm">{{ user.plex_uuid or 'N/A' }}</div>
             </div>
         </div>
     {% endif %}

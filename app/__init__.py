@@ -197,6 +197,7 @@ def create_app(config_name=None):
     app.jinja_env.filters['format_datetime_user'] = format_datetime_user
     app.jinja_env.globals['get_text_color_for_bg'] = helpers.get_text_color_for_bg
     app.jinja_env.filters['format_duration'] = helpers.format_duration
+    app.jinja_env.filters['format_json'] = helpers.format_json
     app.jinja_env.globals['EventType'] = EventType
 
     @app.context_processor

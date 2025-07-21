@@ -228,12 +228,26 @@ class MediaServiceManager:
         
         if not user:
             # Create new user
+            primary_username_value = username or email or f"user_{user_data.get('id', 'unknown')}"
+            current_app.logger.info(f"Creating new user with primary_username='{primary_username_value}', username='{username}', email='{email}'")
+            
             user = User(
-                primary_username=username or email or f"user_{user_data.get('id', 'unknown')}",
+                primary_username=primary_username_value,
                 primary_email=email,
                 avatar_url=user_data.get('thumb'),
                 shares_back=user_data.get('shares_back', False)
             )
+            
+            current_app.logger.info(f"Created user object: primary_username='{user.primary_username}', display_name='{user.get_display_name()}'")
+            
+            # Set service-specific fields based on server type
+            if server.service_type == ServiceType.JELLYFIN:
+                current_app.logger.info(f"Setting Jellyfin-specific fields for user '{username}'")
+                # Store raw Jellyfin data for debugging purposes
+                if user_data.get('raw_data'):
+                    import json
+                    user.raw_plex_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
+                    current_app.logger.info(f"Stored raw Jellyfin data for user '{username}'")
             
             # Set Plex-specific fields if this is a Plex server
             if server.service_type == ServiceType.PLEX:
@@ -258,10 +272,13 @@ class MediaServiceManager:
             
             db.session.add(user)
             db.session.flush()  # Get the ID
+            current_app.logger.info(f"User added to session and flushed: ID={user.id}, primary_username='{user.primary_username}', display_name='{user.get_display_name()}'")
+            current_app.logger.info(f"User object after flush: {user.__dict__}")
         else:
             # Update existing user
             user.shares_back = user_data.get('shares_back', False)
-            # Update raw Plex data if this is a Plex server and raw data is available
+            
+            # Update raw data based on server type
             if server.service_type == ServiceType.PLEX and user_data.get('raw_data'):
                 user.raw_plex_data = user_data.get('raw_data')
                 
@@ -277,6 +294,12 @@ class MediaServiceManager:
                             current_app.logger.debug(f"Updated plex_join_date for user {user.get_display_name()}: {user.plex_join_date}")
                     except (ValueError, TypeError) as e:
                         current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {user.get_display_name()}: {e}")
+            
+            elif server.service_type == ServiceType.JELLYFIN and user_data.get('raw_data'):
+                # Update raw Jellyfin data for existing users
+                import json
+                user.raw_plex_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
+                current_app.logger.info(f"Updated raw Jellyfin data for existing user '{user.get_display_name()}'")
 
         return user
     
