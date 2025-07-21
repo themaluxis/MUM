@@ -60,12 +60,12 @@
             </div>
 
             <div class="card-actions justify-between items-center mt-6">
-                <a href="{{ url_for('plugins.setup_plugins') }}" class="btn btn-ghost">
+                <a href="{{ url_for('setup.plugins') }}" class="btn btn-ghost">
                     <i class="fas fa-arrow-left mr-2"></i>Back to Services
                 </a>
                 <div class="flex gap-2">
                     <button type="button" id="test-connection-btn" class="btn btn-outline">Test Connection</button>
-                    {{ form.submit(class="btn btn-primary") }}
+                    {{ form.submit(class="btn btn-primary", id="submit-btn", disabled=true) }}
                 </div>
             </div>
         </form>
@@ -76,8 +76,10 @@
 {% block scripts %}
 {{ super() }}
 <script>
-// Your existing JS for updating form fields and testing connection can go here.
-// Ensure the test connection fetch URL is correct.
+// Connection test validation
+let connectionTested = false;
+let connectionSuccessful = false;
+
 document.addEventListener('DOMContentLoaded', function() {
     function updateFormFields() {
         const serviceType = '{{ form.service_type.data }}';
@@ -128,14 +130,31 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
+            connectionTested = true;
             if (data.success) {
+                connectionSuccessful = true;
                 htmx.trigger('body', 'showToastEvent', { message: 'Connection successful: ' + data.message, category: 'success' });
+                // Enable submit button
+                const submitBtn = document.getElementById('submit-btn');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('btn-disabled');
             } else {
+                connectionSuccessful = false;
                 htmx.trigger('body', 'showToastEvent', { message: 'Connection failed: ' + data.message, category: 'danger' });
+                // Keep submit button disabled
+                const submitBtn = document.getElementById('submit-btn');
+                submitBtn.disabled = true;
+                submitBtn.classList.add('btn-disabled');
             }
         })
         .catch(error => {
+            connectionTested = true;
+            connectionSuccessful = false;
             htmx.trigger('body', 'showToastEvent', { message: 'Error: ' + error.message, category: 'danger' });
+            // Keep submit button disabled
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('btn-disabled');
         })
         .finally(() => {
             btn.innerHTML = originalText;
@@ -143,8 +162,41 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Form submission validation
+    function validateForm(event) {
+        if (!connectionTested || !connectionSuccessful) {
+            event.preventDefault();
+            htmx.trigger('body', 'showToastEvent', { 
+                message: 'Please test the connection successfully before saving the server.', 
+                category: 'warning' 
+            });
+            return false;
+        }
+        return true;
+    }
+
+    // Reset connection status when form fields change
+    function resetConnectionStatus() {
+        connectionTested = false;
+        connectionSuccessful = false;
+        const submitBtn = document.getElementById('submit-btn');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('btn-disabled');
+    }
+
+    // Add event listeners to form fields to reset connection status
+    const formFields = ['name', 'url', 'api_key', 'username', 'password'];
+    formFields.forEach(fieldName => {
+        const field = document.querySelector(`[name="${fieldName}"]`);
+        if (field) {
+            field.addEventListener('input', resetConnectionStatus);
+            field.addEventListener('change', resetConnectionStatus);
+        }
+    });
+
     updateFormFields();
     document.getElementById('test-connection-btn').addEventListener('click', testConnection);
+    document.querySelector('form').addEventListener('submit', validateForm);
 });
 </script>
 {% endblock %}

@@ -28,11 +28,14 @@ def get_completed_steps():
     if admin_table_exists_steps and AdminAccount.query.first(): completed.add('account')
     if Setting.get('APP_BASE_URL'): completed.add('app')
     
-    # Check if plugins have been configured (have servers)
+    # Check if plugins have been configured (enabled AND have servers)
     from app.services.plugin_manager import plugin_manager
-    from app.models_plugins import Plugin
-    plugins_with_servers = Plugin.query.filter(Plugin.servers_count > 0).all()
-    if plugins_with_servers: completed.add('plugins')
+    from app.models_plugins import Plugin, PluginStatus
+    enabled_plugins_with_servers = Plugin.query.filter(
+        Plugin.status == PluginStatus.ENABLED,
+        Plugin.servers_count > 0
+    ).all()
+    if enabled_plugins_with_servers: completed.add('plugins')
     
     discord_enabled_setting_val = Setting.get('DISCORD_OAUTH_ENABLED') # Can be bool or string default
     if discord_enabled_setting_val is not None:
@@ -183,7 +186,7 @@ def account_setup():
                 try:
                     if AdminAccount.query.first(): # This will fail if table doesn't exist
                         flash('Admin account already exists. If you need to reset, consult documentation.', 'warning')
-                        return redirect(url_for('plugins.setup_plugins'))
+                        return redirect(url_for('setup.plugins'))
                 except Exception: # Table admin_accounts likely doesn't exist, proceed with creation
                     pass
 
@@ -195,8 +198,8 @@ def account_setup():
                     login_user(admin, remember=True) # Log in the newly created admin
                     log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Admin '{admin.username}' created and logged in (setup).", admin_id=admin.id) # Use admin.id
                     flash('Admin account created successfully.', 'success')
-                    current_app.logger.info(f"Account setup complete, redirecting to plugins setup: {url_for('plugins.setup_plugins')}")
-                    return redirect(url_for('plugins.setup_plugins'))
+                    current_app.logger.info(f"Account setup complete, redirecting to plugins setup: {url_for('setup.plugins')}")
+                    return redirect(url_for('setup.plugins'))
                 except Exception as e_db_commit:
                     db.session.rollback()
                     current_app.logger.error(f"DB error creating admin account: {e_db_commit}", exc_info=True)
@@ -256,14 +259,14 @@ def plex_sso_callback_setup_admin():
             if engine_conn_cb: engine_conn_cb.close()
         if admin_table_exists_cb and AdminAccount.query.first():
             flash('Admin account already exists.', 'warning'); existing_admin = AdminAccount.query.filter_by(plex_uuid=plex_account.uuid).first()
-            if existing_admin: login_user(existing_admin, remember=True); return redirect(url_for('plugins.setup_plugins'))
+            if existing_admin: login_user(existing_admin, remember=True); return redirect(url_for('setup.plugins'))
             else: flash("Admin account exists but doesn't match this Plex account.", "danger"); return redirect(url_for('setup.account_setup'))
         admin = AdminAccount(plex_uuid=plex_account.uuid, plex_username=plex_account.username, plex_thumb=plex_account.thumb, email=plex_account.email, is_plex_sso_only=True)
         db.session.add(admin); db.session.commit(); login_user(admin, remember=True)
         log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Admin '{admin.plex_username}' created (Plex SSO setup).")
         flash(f'Admin account for {admin.plex_username} created successfully using Plex.', 'success')
         session.pop('plex_pin_id_admin_setup', None); session.pop('plex_pin_code_admin_setup', None); session.pop('plex_headers_admin_setup', None)
-        return redirect(url_for('plugins.setup_plugins'))
+        return redirect(url_for('setup.plugins'))
     except PlexApiException as e_plex:
         flash(f'Plex API error: {str(e_plex)}', 'danger')
         current_app.logger.error(f"Plex SSO Callback (Setup): PlexApiException: {e_plex}", exc_info=True)
@@ -276,29 +279,37 @@ def plex_sso_callback_setup_admin():
 @bp.route('/app', methods=['GET', 'POST'])
 def app_config():
     # Check if plugins have been configured first (new flow)
-    if not 'plugins' in get_completed_steps(): return redirect(url_for('plugins.setup_plugins'))
+    if not 'plugins' in get_completed_steps(): return redirect(url_for('setup.plugins'))
     if 'app' in get_completed_steps() and request.method == 'GET': return redirect(url_for('setup.discord_config'))
     
     form = AppBaseUrlForm()
     if form.validate_on_submit():
         app_name = form.app_name.data
         app_base_url = form.app_base_url.data.rstrip('/')
+        app_local_url = form.app_local_url.data.rstrip('/') if form.app_local_url.data else None
         
         Setting.set('APP_NAME', app_name, SettingValueType.STRING, "Application Name")
-        Setting.set('APP_BASE_URL', app_base_url, SettingValueType.STRING, "Application Base URL")
+        Setting.set('APP_BASE_URL', app_base_url, SettingValueType.STRING, "Application Public URL")
+        Setting.set('APP_LOCAL_URL', app_local_url or '', SettingValueType.STRING, "Application Local URL")
         
         current_app.config['APP_NAME'] = app_name
         current_app.config['APP_BASE_URL'] = app_base_url
+        current_app.config['APP_LOCAL_URL'] = app_local_url
         if hasattr(g, 'app_name'): g.app_name = app_name
         if hasattr(g, 'app_base_url'): g.app_base_url = app_base_url
+        if hasattr(g, 'app_local_url'): g.app_local_url = app_local_url
         
-        log_event(EventType.SETTING_CHANGE, f"App settings updated: Name='{app_name}', URL='{app_base_url}'", admin_id=current_user.id)
+        log_message = f"App settings updated: Name='{app_name}', Public URL='{app_base_url}'"
+        if app_local_url:
+            log_message += f", Local URL='{app_local_url}'"
+        log_event(EventType.SETTING_CHANGE, log_message, admin_id=current_user.id)
         flash('Application settings saved.', 'success')
         return redirect(url_for('setup.discord_config'))
         
     elif request.method == 'GET':
         form.app_name.data = Setting.get('APP_NAME') or current_app.config.get('APP_NAME')
         form.app_base_url.data = Setting.get('APP_BASE_URL') or request.url_root.rstrip('/')
+        form.app_local_url.data = Setting.get('APP_LOCAL_URL')
         
     return render_template('setup/app_config.html', form=form, completed_steps=get_completed_steps(), current_step_id='app')
 
@@ -306,7 +317,7 @@ def app_config():
 @login_required
 def discord_config():
     if not 'app' in get_completed_steps(): return redirect(url_for('setup.app_config'))
-    if not 'plugins' in get_completed_steps(): return redirect(url_for('plugins.setup_plugins'))
+    if not 'plugins' in get_completed_steps(): return redirect(url_for('setup.plugins'))
     form = DiscordConfigForm()
     app_base_url = Setting.get('APP_BASE_URL')
     discord_invite_redirect_uri = url_for('invites.discord_oauth_callback', _external=True) if app_base_url else "Set App Base URL first"
@@ -362,3 +373,54 @@ def finish_setup():
     flash('Application setup complete!', 'success'); log_event(EventType.APP_STARTUP, "Setup completed.", admin_id=current_user.id)
     if hasattr(g, 'setup_complete'): g.setup_complete = True; current_app.config['SETUP_COMPLETE'] = True
     return redirect(url_for('dashboard.index'))
+
+@bp.route('/plugins')
+def plugins():
+    """Plugin selection during initial setup"""
+    # Initialize core plugins if not already done
+    from app.services.plugin_manager import plugin_manager
+    plugin_manager.initialize_core_plugins()
+    
+    # Manually refresh servers_count for all plugins to ensure accuracy
+    try:
+        from app.models_media_services import MediaServer, ServiceType
+        from app.models_plugins import Plugin
+        plugins = Plugin.query.all()
+        
+        for plugin in plugins:
+            try:
+                # Find the corresponding ServiceType enum value
+                service_type = None
+                for st in ServiceType:
+                    if st.value == plugin.plugin_id:
+                        service_type = st
+                        break
+                
+                if service_type:
+                    # Count actual servers
+                    actual_count = MediaServer.query.filter_by(service_type=service_type).count()
+                    if plugin.servers_count != actual_count:
+                        plugin.servers_count = actual_count
+                        db.session.add(plugin)
+                else:
+                    # For plugins without corresponding ServiceType, set to 0
+                    if plugin.servers_count != 0:
+                        plugin.servers_count = 0
+                        db.session.add(plugin)
+            except Exception as e:
+                current_app.logger.error(f"Error updating servers_count for plugin {plugin.plugin_id}: {e}")
+        
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.error(f"Error refreshing plugin servers count in setup: {e}")
+    
+    from app.models_plugins import PluginType
+    plugins = plugin_manager.get_available_plugins()
+    core_plugins = [p for p in plugins if p.plugin_type == PluginType.CORE]
+    
+    completed_steps = get_completed_steps()
+    
+    return render_template('setup/plugins.html', 
+                           plugins=core_plugins,
+                           completed_steps=completed_steps,
+                           current_step_id='plugins')

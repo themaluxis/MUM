@@ -23,24 +23,41 @@
 
             <div class="form-control w-full mb-4">
                 {{ form.app_base_url.label(class="label") }}
-                {{ form.app_base_url(class="input input-bordered w-full", placeholder="https://plex.example.com") }}
+                {{ form.app_base_url(class="input input-bordered w-full", placeholder="https://mum.example.com") }}
                 {% if form.app_base_url.errors %}
                     <div class="label"><span class="label-text-alt text-error">{{ form.app_base_url.errors[0] }}</span></div>
                 {% endif %}
+                <div class="label">
+                    <span class="label-text-alt text-xs">{{ form.app_base_url.description }}</span>
+                </div>
+            </div>
+
+            <div class="form-control w-full mb-4">
+                {{ form.app_local_url.label(class="label") }}
+                {{ form.app_local_url(class="input input-bordered w-full", placeholder="http://192.168.1.100:5000") }}
+                {% if form.app_local_url.errors %}
+                    <div class="label"><span class="label-text-alt text-error">{{ form.app_local_url.errors[0] }}</span></div>
+                {% endif %}
+                <div class="label">
+                    <span class="label-text-alt text-xs">{{ form.app_local_url.description }}</span>
+                </div>
             </div>
             
             <div class="alert alert-info mt-6 mb-6">
                 <div>
                     <i class="fa-solid fa-circle-info fa-lg mr-2"></i>
-                    <span>
-                        The <strong>Application Base URL</strong> must be the full, publicly accessible URL for this application.
-                        If you use a reverse proxy, this should be the final public address.
-                    </span>
+                    <div>
+                        <p class="font-semibold mb-2">URL Configuration:</p>
+                        <ul class="text-sm space-y-1">
+                            <li><strong>Public URL:</strong> Required for external access, OAuth callbacks, and invite links</li>
+                            <li><strong>Local URL:</strong> Optional for internal network access and faster local connections</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
 
             <div class="card-actions justify-between items-center mt-6">
-                <a href="{{ url_for('plugins.setup_plugins') }}" class="btn btn-ghost">
+                <a href="{{ url_for('setup.plugins') }}" class="btn btn-ghost">
                     <i class="fas fa-arrow-left mr-2"></i>Back
                 </a>
                 {{ form.submit(class="btn btn-primary") }}

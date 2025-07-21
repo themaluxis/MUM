@@ -349,8 +349,11 @@ def process_invite_form(invite_path_or_token):
                 if not pin_login:
                     raise Exception(f"Could not create Plex PIN: {error_msg}")
                 
-                pin_id = getattr(pin_login, 'id', getattr(pin_login, 'identifier', None))
-                session['plex_pin_id_invite_flow'] = pin_id
+                # Since MyPlexPinLogin doesn't expose an ID, use the PIN code as identifier
+                pin_code = pin_login.pin
+                current_app.logger.debug(f"PIN creation - using pin_code as identifier: {pin_code}")
+                
+                session['plex_pin_id_invite_flow'] = pin_code
                 session['plex_pin_code_invite_flow'] = pin_login.pin
                 # Store headers for callback recreation - only store serializable dict
                 try:
@@ -442,6 +445,12 @@ def plex_oauth_callback():
     pin_id_from_session = session.get('plex_pin_id_invite_flow')
     pin_headers = session.get('plex_headers_invite_flow', {})
     
+    # Debug logging to understand what's missing
+    current_app.logger.debug(f"Plex callback - invite_id from session: {invite_id}")
+    current_app.logger.debug(f"Plex callback - pin_code_from_session: {pin_id_from_session}")
+    current_app.logger.debug(f"Plex callback - pin_headers: {pin_headers}")
+    current_app.logger.debug(f"Plex callback - all session keys: {list(session.keys())}")
+    
     invite_path_or_token_for_redirect = "error_path" 
     if invite_id: 
         temp_invite_for_redirect = Invite.query.get(invite_id)
@@ -451,6 +460,7 @@ def plex_oauth_callback():
     fallback_redirect = url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token_for_redirect)
     
     if not invite_id or not pin_id_from_session:
+        current_app.logger.warning(f"Plex callback failed - invite_id: {invite_id}, pin_code: {pin_id_from_session}")
         flash('Plex login callback invalid. Try invite again.', 'danger')
         session.pop('plex_pin_id_invite_flow', None)
         session.pop('plex_pin_code_invite_flow', None)
@@ -467,12 +477,9 @@ def plex_oauth_callback():
         # Recreate pin login object for checking status
         from plexapi.myplex import MyPlexPinLogin
         pin_login = MyPlexPinLogin(headers=pin_headers, oauth=False)
-        # Restore PIN ID using safe attribute setting
-        if hasattr(pin_login, 'id'):
-            pin_login.id = pin_id_from_session
-        elif hasattr(pin_login, 'identifier'):
-            pin_login.identifier = pin_id_from_session
-        pin_login.pin = session.get('plex_pin_code_invite_flow')
+        # Set the PIN code (pin_id_from_session is actually the PIN code)
+        pin_login.pin = pin_id_from_session
+        current_app.logger.debug(f"Recreated pin_login with PIN: {pin_id_from_session}")
         
         # Use plexapi helper to check PIN status
         plex_auth_token, error_msg = check_plex_pin_status(pin_login)

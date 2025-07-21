@@ -6,6 +6,7 @@ from app.models_plugins import Plugin
 from app.forms import MediaServerForm
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
+from app.extensions import csrf
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
 from app.models import EventType
@@ -68,6 +69,18 @@ def add_server_setup(plugin_id):
             db.session.add(server)
             db.session.commit()
             
+            # Auto-enable the plugin when a server is configured during setup
+            try:
+                from app.services.plugin_manager import plugin_manager
+                plugin_enabled = plugin_manager.enable_plugin(plugin_id)
+                if plugin_enabled:
+                    current_app.logger.info(f"Auto-enabled plugin '{plugin_id}' after adding server during setup")
+                    flash(f'Plugin "{plugin_id}" has been automatically enabled!', 'info')
+                else:
+                    current_app.logger.warning(f"Failed to auto-enable plugin '{plugin_id}' after adding server during setup")
+            except Exception as e:
+                current_app.logger.error(f"Error auto-enabling plugin '{plugin_id}' during setup: {e}")
+            
             log_event(EventType.SETTING_CHANGE, f"Added new media server: {server.name}", admin_id=current_user.id)
             flash(f'Media server "{server.name}" added successfully!', 'success')
             
@@ -112,6 +125,17 @@ def add_server():
             server = MediaServer(name=form.name.data, service_type=ServiceType(form.service_type.data), url=form.url.data.rstrip('/'), api_key=form.api_key.data, username=form.username.data, password=form.password.data, is_active=form.is_active.data)
             db.session.add(server)
             db.session.commit()
+            
+            # Auto-enable the plugin when a server is configured (for non-setup flow too)
+            try:
+                from app.services.plugin_manager import plugin_manager
+                plugin_enabled = plugin_manager.enable_plugin(server.service_type.value)
+                if plugin_enabled:
+                    current_app.logger.info(f"Auto-enabled plugin '{server.service_type.value}' after adding server")
+                else:
+                    current_app.logger.warning(f"Failed to auto-enable plugin '{server.service_type.value}' after adding server")
+            except Exception as e:
+                current_app.logger.error(f"Error auto-enabling plugin '{server.service_type.value}': {e}")
             
             log_event(EventType.SETTING_CHANGE, f"Added new media server: {server.name}", admin_id=current_user.id)
             flash(f'Media server "{server.name}" added successfully!', 'success')
@@ -284,6 +308,7 @@ def delete_server(server_id):
     return redirect(url_for('media_servers.list_servers'))
 
 @bp.route('/api/servers/test_new', methods=['POST'])
+@csrf.exempt
 def test_new_server_connection():
     """Test connection for a new, unsaved server"""
     # Allow during setup, but require auth after setup is complete

@@ -87,7 +87,8 @@ class MediaServerForm(FlaskForm):
 
 class AppBaseUrlForm(FlaskForm):
     app_name = StringField("Application Name", validators=[DataRequired(), Length(max=100)])
-    app_base_url = StringField('Application Base URL', validators=[DataRequired(message="This URL is required."), URL(message="Invalid URL. Must be full public URL (e.g., https://mum.example.com).")], description="Full public URL where this application is accessible.")
+    app_base_url = StringField('Public Application URL', validators=[DataRequired(message="This URL is required."), URL(message="Invalid URL. Must be full public URL (e.g., https://mum.example.com).")], description="Full public URL where this application is accessible from the internet.")
+    app_local_url = StringField('Local Application URL', validators=[Optional(), URL(message="Invalid URL. Must be full local URL (e.g., http://192.168.1.100:5000).")], description="Local URL for internal network access (optional).")
     submit = SubmitField('Save and Continue')
 
 class DiscordConfigForm(FlaskForm):

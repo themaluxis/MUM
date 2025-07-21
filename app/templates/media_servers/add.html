@@ -149,7 +149,7 @@
                     <a href="{{ url_for('dashboard.settings_plugins') }}" class="btn btn-ghost">Cancel</a>
                     {% endif %}
                     <button type="button" onclick="testConnection(event)" class="btn btn-outline">Test Connection</button>
-                    {{ form.submit(class="btn btn-primary", onclick="console.log('Save button clicked')") }}
+                    {{ form.submit(class="btn btn-primary", id="submit-btn", disabled=true) }}
                 </div>
             </form>
         </div>
@@ -159,6 +159,10 @@
 </div>
 
 <script>
+// Connection test validation
+let connectionTested = false;
+let connectionSuccessful = false;
+
 function updateFormFields() {
     const serviceTypeSelect = document.getElementById('service_type');
     const serviceType = serviceTypeSelect ? serviceTypeSelect.value : '{{ form.service_type.data }}';
@@ -234,14 +238,31 @@ function testConnection(event) {
         return response.json();
     })
     .then(data => {
+        connectionTested = true;
         if (data.success) {
+            connectionSuccessful = true;
             showToast('Connection successful: ' + data.message, 'success');
+            // Enable submit button
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('btn-disabled');
         } else {
+            connectionSuccessful = false;
             showToast('Connection failed: ' + data.message, 'error');
+            // Keep submit button disabled
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('btn-disabled');
         }
     })
     .catch(error => {
+        connectionTested = true;
+        connectionSuccessful = false;
         showToast('Error testing connection: ' + error.message, 'error');
+        // Keep submit button disabled
+        const submitBtn = document.getElementById('submit-btn');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('btn-disabled');
     })
     .finally(() => {
         btn.innerHTML = originalText;
@@ -271,9 +292,41 @@ function showToast(message, type) {
     }, 5000);
 }
 
+// Form submission validation
+function validateForm(event) {
+    if (!connectionTested || !connectionSuccessful) {
+        event.preventDefault();
+        showToast('Please test the connection successfully before saving the server.', 'error');
+        return false;
+    }
+    return true;
+}
+
+// Reset connection status when form fields change
+function resetConnectionStatus() {
+    connectionTested = false;
+    connectionSuccessful = false;
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.classList.add('btn-disabled');
+}
+
 // Initialize form fields on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateFormFields();
+    
+    // Add event listeners to form fields to reset connection status
+    const formFields = ['name', 'url', 'api_key', 'username', 'password'];
+    formFields.forEach(fieldName => {
+        const field = document.querySelector(`[name="${fieldName}"]`);
+        if (field) {
+            field.addEventListener('input', resetConnectionStatus);
+            field.addEventListener('change', resetConnectionStatus);
+        }
+    });
+    
+    // Add form submission validation
+    document.querySelector('form').addEventListener('submit', validateForm);
 });
 </script>
 {% endblock %}

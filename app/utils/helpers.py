@@ -40,7 +40,10 @@ def setup_required(f):
         # since the app is already configured and we're just managing existing setup
         bypass_endpoints = [
             'dashboard.settings_plugin_configure', 'dashboard.settings_plugins',
-            'dashboard.settings'
+            'dashboard.settings',
+            # Plugin management endpoints should work even when setup is not complete
+            'plugins.enable_plugin', 'plugins.disable_plugin', 'plugins.reload_plugins',
+            'plugins.install_plugin', 'plugins.uninstall_plugin', 'setup.plugins'
         ]
         
         # Also bypass if the endpoint starts with 'dashboard.' or 'media_servers.'

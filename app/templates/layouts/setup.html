@@ -14,7 +14,7 @@
 
     {% set setup_steps_list = [
         {'id': 'account', 'name': 'Admin Account', 'url': url_for('setup.account_setup')},
-        {'id': 'plugins', 'name': 'Media Services', 'url': url_for('plugins.setup_plugins')},
+        {'id': 'plugins', 'name': 'Media Services', 'url': url_for('setup.plugins')},
         {'id': 'app', 'name': 'App', 'url': url_for('setup.app_config')},
         {'id': 'discord', 'name': 'Discord', 'url': url_for('setup.discord_config')},
         {'id': 'finish', 'name': 'Finish', 'url': '#'} 

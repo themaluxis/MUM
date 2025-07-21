@@ -16,7 +16,38 @@
             </p>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+        <!-- Service Descriptions -->
+        <div class="collapse collapse-arrow bg-base-200 mb-6">
+            <input type="checkbox" /> 
+            <div class="collapse-title text-lg font-medium">
+                <i class="fas fa-info-circle mr-2"></i>
+                Service Information
+            </div>
+            <div class="collapse-content"> 
+                <div class="space-y-4 text-sm">
+                    <div>
+                        <strong>Plex Media Server:</strong> Full-featured media server with user management, sharing, transcoding, and mobile apps. Recommended for most users.
+                    </div>
+                    <div>
+                        <strong>Emby/Jellyfin:</strong> Open-source media servers with similar features to Plex. Good alternatives with more customization options.
+                    </div>
+                    <div>
+                        <strong>Kavita:</strong> Specialized server for comics, manga, and digital books. Perfect for comic book collections.
+                    </div>
+                    <div>
+                        <strong>AudiobookShelf:</strong> Dedicated audiobook and podcast server with chapter support and progress tracking.
+                    </div>
+                    <div>
+                        <strong>Komga:</strong> Comic and manga server with advanced metadata management and reading features.
+                    </div>
+                    <div>
+                        <strong>RomM:</strong> Retro gaming ROM management server for organizing and playing classic games.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 mb-8">
             {% for plugin in plugins %}
             <div class="card bg-base-200 hover:bg-base-300 transition-colors">
                 <div class="card-body p-4">
@@ -67,49 +98,6 @@
             {% endfor %}
         </div>
 
-            <!-- Service Descriptions -->
-            <div class="collapse collapse-arrow bg-base-200 mb-6">
-                <input type="checkbox" /> 
-                <div class="collapse-title text-lg font-medium">
-                    <i class="fas fa-info-circle mr-2"></i>
-                    Service Information
-                </div>
-                <div class="collapse-content"> 
-                    <div class="space-y-4 text-sm">
-                        <div>
-                            <strong>Plex Media Server:</strong> Full-featured media server with user management, sharing, transcoding, and mobile apps. Recommended for most users.
-                        </div>
-                        <div>
-                            <strong>Emby/Jellyfin:</strong> Open-source media servers with similar features to Plex. Good alternatives with more customization options.
-                        </div>
-                        <div>
-                            <strong>Kavita:</strong> Specialized server for comics, manga, and digital books. Perfect for comic book collections.
-                        </div>
-                        <div>
-                            <strong>AudiobookShelf:</strong> Dedicated audiobook and podcast server with chapter support and progress tracking.
-                        </div>
-                        <div>
-                            <strong>Komga:</strong> Comic and manga server with advanced metadata management and reading features.
-                        </div>
-                        <div>
-                            <strong>RomM:</strong> Retro gaming ROM management server for organizing and playing classic games.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Requirements Notice -->
-            <div class="alert alert-info mb-6">
-                <i class="fas fa-lightbulb"></i>
-                <div>
-                    <h4 class="font-semibold">Setup Requirements</h4>
-                    <p class="text-sm mt-1">
-                        After setup, you'll need to configure each selected service with its server URL and authentication details. 
-                        Make sure your media servers are running and accessible.
-                    </p>
-                </div>
-            </div>
-
         <!-- Action Buttons -->
         <div class="flex justify-between items-center">
             <a href="{{ url_for('setup.account_setup') }}" class="btn btn-ghost">
@@ -117,26 +105,13 @@
                 Back
             </a>
             
-            <div class="flex gap-2">
-                <button onclick="refreshPluginStatus()" class="btn btn-outline btn-sm">
-                    <i class="fas fa-sync-alt mr-1"></i>
-                    Refresh Status
-                </button>
-                <a href="{{ url_for('setup.discord_config') }}" class="btn btn-primary">
-                    Continue
-                    <i class="fas fa-arrow-right ml-2"></i>
-                </a>
-            </div>
+            <a href="{{ url_for('setup.discord_config') }}" class="btn btn-primary">
+                Continue
+                <i class="fas fa-arrow-right ml-2"></i>
+            </a>
         </div>
     </div>
 </div>
 
-<script>
-function refreshPluginStatus() {
-    // Simple page reload to refresh the plugin status
-    // The servers_count should be updated by the SQLAlchemy event listeners
-    window.location.reload();
-}
-</script>
 
 {% endblock %}

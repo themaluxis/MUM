@@ -58,7 +58,7 @@ def app_login():
                 if 'account' not in completed_steps:
                     return redirect(url_for('setup.account_setup'))
                 if 'plugins' not in completed_steps:
-                    return redirect(url_for('plugins.setup_plugins'))
+                    return redirect(url_for('setup.plugins'))
                 if 'app' not in completed_steps:
                     return redirect(url_for('setup.app_config'))
                 return redirect(url_for('setup.discord_config'))
