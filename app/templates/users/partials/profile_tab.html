@@ -10,10 +10,37 @@
     <div class="col-span-1">
         <h3 class="text-xl font-bold mb-4">User Summary</h3>
         <div class="space-y-2 text-sm p-4 bg-base-200 rounded-lg shadow-md">
-           <p><strong>Plex Email:</strong> {{ user.plex_email or 'N/A' }}</p>
-           <p><strong>Plex User ID:</strong> {{ user.plex_user_id or 'N/A' }}</p>
-           <p><strong>Plex Join Date:</strong> {{ user.plex_join_date | format_datetime_user(include_time=False) if user.plex_join_date else 'N/A' }}</p>
-           <p><strong>Last Known IP:</strong> <span class="font-mono">{{ user.last_known_ip }}</span></p>
+           {# Determine service type for dynamic labels #}
+           {% set service_types = user_service_types.get(user.id, []) %}
+           {% set primary_service = service_types[0] if service_types else none %}
+           {% if primary_service %}
+               {% if primary_service.value == 'plex' %}
+                   {% set service_name = "Plex" %}
+               {% elif primary_service.value == 'jellyfin' %}
+                   {% set service_name = "Jellyfin" %}
+               {% elif primary_service.value == 'emby' %}
+                   {% set service_name = "Emby" %}
+               {% elif primary_service.value == 'kavita' %}
+                   {% set service_name = "Kavita" %}
+               {% elif primary_service.value == 'audiobookshelf' %}
+                   {% set service_name = "AudiobookShelf" %}
+               {% elif primary_service.value == 'komga' %}
+                   {% set service_name = "Komga" %}
+               {% elif primary_service.value == 'romm' %}
+                   {% set service_name = "RomM" %}
+               {% else %}
+                   {% set service_name = "Media Server" %}
+               {% endif %}
+           {% else %}
+               {% set service_name = "Media Server" %}
+           {% endif %}
+           
+           <p><strong>Email:</strong> {{ user.plex_email or user.primary_email or 'N/A' }}</p>
+           <p><strong>{{ service_name }} User ID:</strong> {{ user.plex_user_id or 'N/A' }}</p>
+           {% if user.plex_join_date %}
+           <p><strong>{{ service_name }} Join Date:</strong> {{ user.plex_join_date | format_datetime_user(include_time=False) }}</p>
+           {% endif %}
+           <p><strong>Last Known IP:</strong> <span class="font-mono">{{ user.last_known_ip or 'N/A' }}</span></p>
            <p><strong>Account Added:</strong> {{ user.created_at | format_datetime_user }}</p>
            <p><strong>Last Synced:</strong> {{ user.last_synced_with_plex | time_ago if user.last_synced_with_plex else 'Never' }}</p>
            

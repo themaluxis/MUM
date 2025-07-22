@@ -183,9 +183,14 @@ def view_user(user_id):
             .order_by(StreamHistory.started_at.desc())\
             .paginate(page=page, per_page=15, error_out=False)
             
-    # No need for the elif, stream_stats are now always available on the user object
-    # elif tab == 'profile':
-    #     stream_stats = user_service.get_user_stream_stats(user_id)
+    # Get user service types for service-aware display
+    user_service_types = {}
+    from app.models_media_services import UserMediaAccess
+    user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
+    user_service_types[user.id] = []
+    for access in user_access_records:
+        if access.server.service_type not in user_service_types[user.id]:
+            user_service_types[user.id].append(access.server.service_type)
 
     if request.headers.get('HX-Request') and tab == 'history':
         return render_template('users/partials/history_tab_content.html', 
@@ -201,6 +206,7 @@ def view_user(user_id):
         active_tab=tab,
         is_admin=AdminAccount.query.filter_by(plex_uuid=user.plex_uuid).first() is not None if user.plex_uuid else False,
         stream_stats=stream_stats,
+        user_service_types=user_service_types,  # Add this context variable
         now_utc=datetime.now(timezone.utc)
     )
 

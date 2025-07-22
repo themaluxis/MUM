@@ -15,11 +15,29 @@
     <div class="flex items-center space-x-4 p-4">
         <div class="avatar">
             <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                <img src="{{ user.get_avatar(url_for('static', filename='img/default_avatar.png')) }}" alt="{{ user.plex_username }} avatar" />
+                {# Use service-aware avatar logic similar to user cards #}
+                {% set avatar_url = user.get_avatar(url_for('static', filename='img/default_avatar.png')) %}
+                {% set service_types = user_service_types.get(user.id, []) %}
+                {% set primary_service = service_types[0] if service_types else none %}
+                
+                {# Check if this is a Jellyfin user and try to get their avatar #}
+                {% if primary_service and primary_service.value == 'jellyfin' and user.raw_plex_data and user.raw_plex_data.startswith('{') %}
+                    {# Extract Jellyfin user info using the custom filter #}
+                    {% set jellyfin_info = user.raw_plex_data | extract_jellyfin_user_info %}
+                    {% if jellyfin_info[0] and jellyfin_info[1] %}
+                        {% set jellyfin_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_info[0]) %}
+                        <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
+                             onerror="this.onerror=null; this.src='{{ avatar_url }}';" />
+                    {% else %}
+                        <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" />
+                    {% endif %}
+                {% else %}
+                    <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" />
+                {% endif %}
             </div>
         </div>
         <div>
-            <h1 class="text-4xl font-bold">{{ user.plex_username }}</h1>            
+            <h1 class="text-4xl font-bold">{{ user.get_display_name() }}</h1>            
         </div>
     </div>
 

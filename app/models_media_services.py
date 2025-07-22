@@ -17,6 +17,26 @@ class ServiceType(enum.Enum):
     AUDIOBOOKSHELF = "audiobookshelf"
     KOMGA = "komga"
     ROMM = "romm"
+    
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
+    
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value <= other.value
+        return NotImplemented
+    
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value > other.value
+        return NotImplemented
+    
+    def __ge__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value >= other.value
+        return NotImplemented
 
 class MediaServer(db.Model):
     """Represents a media server instance (can have multiple servers of same type)"""
