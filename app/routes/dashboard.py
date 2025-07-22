@@ -742,7 +742,7 @@ def streaming_sessions():
 
     current_app.logger.debug(f"Streaming page will use refresh interval: {streaming_refresh_interval_seconds} seconds.")
     
-    return render_template('dashboard/streaming.html', 
+    return render_template('streaming/index.html', 
                            title="Active Streams", 
                            streaming_refresh_interval=streaming_refresh_interval_seconds)
 
@@ -1208,15 +1208,15 @@ def streaming_sessions_partial():
         current_app.logger.error(f"STREAMING_DEBUG: Error during streaming_sessions_partial: {e}", exc_info=True)
     
     if view_mode == 'categorized':
-        return render_template('dashboard/partials/streaming_sessions_categorized.html', 
+        return render_template('streaming/partials/sessions_categorized.html', 
                                sessions_by_server=sessions_by_server, 
                                summary_stats=summary_stats)
     elif view_mode == 'service':
-        return render_template('dashboard/partials/streaming_sessions_categorized_by_service.html', 
+        return render_template('streaming/partials/sessions_categorized_by_service.html', 
                                sessions_by_service=sessions_by_service, 
                                summary_stats=summary_stats)
     else:
-        return render_template('dashboard/partials/streaming_sessions.html', 
+        return render_template('streaming/partials/sessions.html', 
                                sessions=active_sessions_data, 
                                summary_stats=summary_stats)
 
