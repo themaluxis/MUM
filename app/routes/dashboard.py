@@ -841,11 +841,22 @@ def streaming_sessions_partial():
                     # Generate Plex user avatar URL if available
                     user_avatar_url = None
                     if hasattr(raw_session.user, 'thumb') and raw_session.user.thumb:
-                        try:
-                            user_avatar_url = url_for('api.plex_image_proxy', path=raw_session.user.thumb.lstrip('/'))
-                        except Exception as e:
-                            current_app.logger.debug(f"Could not generate Plex avatar URL: {e}")
-                            user_avatar_url = None
+                        user_thumb_url = raw_session.user.thumb  # Use different variable name to avoid collision
+                        # Check if this is a Plex.tv hosted avatar (external URL)
+                        if user_thumb_url.startswith('https://plex.tv/') or user_thumb_url.startswith('http://plex.tv/'):
+                            # Use the Plex.tv URL directly, no need to proxy
+                            user_avatar_url = user_thumb_url
+                            current_app.logger.debug(f"Using direct Plex.tv avatar URL for user {user_name}: {user_avatar_url}")
+                        else:
+                            # This is a local Plex server avatar, proxy it through our API
+                            try:
+                                user_avatar_url = url_for('api.plex_image_proxy', path=user_thumb_url.lstrip('/'))
+                                current_app.logger.debug(f"Generated proxied Plex avatar URL for user {user_name}: {user_avatar_url}")
+                            except Exception as e:
+                                current_app.logger.error(f"Could not generate Plex avatar URL for user {user_name} with thumb '{user_thumb_url}': {e}")
+                                user_avatar_url = None
+                    else:
+                        current_app.logger.debug(f"Plex user {user_name} has no thumb attribute or thumb is empty")
                     
                 elif is_jellyfin_session:
                     # Handle Jellyfin session format
