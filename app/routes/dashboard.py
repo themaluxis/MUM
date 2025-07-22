@@ -838,6 +838,15 @@ def streaming_sessions_partial():
                     mum_user_id = mum_user.id if mum_user else None
                     session_key = raw_session.sessionKey
                     
+                    # Generate Plex user avatar URL if available
+                    user_avatar_url = None
+                    if hasattr(raw_session.user, 'thumb') and raw_session.user.thumb:
+                        try:
+                            user_avatar_url = url_for('api.plex_image_proxy', path=raw_session.user.thumb.lstrip('/'))
+                        except Exception as e:
+                            current_app.logger.debug(f"Could not generate Plex avatar URL: {e}")
+                            user_avatar_url = None
+                    
                 elif is_jellyfin_session:
                     # Handle Jellyfin session format
                     user_name = raw_session.get('UserName', 'Unknown User')
@@ -879,6 +888,17 @@ def streaming_sessions_partial():
                     mum_user = mum_users_map_by_username.get(user_name)
                     mum_user_id = mum_user.id if mum_user else None
                     session_key = raw_session.get('Id', '')
+                    
+                    # Generate Jellyfin user avatar URL if available
+                    user_avatar_url = None
+                    jellyfin_user_id = raw_session.get('UserId')
+                    if jellyfin_user_id:
+                        try:
+                            # Generate Jellyfin user avatar URL - the API route will handle checking for PrimaryImageTag
+                            user_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_user_id)
+                        except Exception as e:
+                            current_app.logger.debug(f"Could not generate Jellyfin avatar URL for user {jellyfin_user_id}: {e}")
+                            user_avatar_url = None
                     
                 else:
                     # Skip unknown session formats
@@ -1042,6 +1062,7 @@ def streaming_sessions_partial():
                     'parent_title': parent_title, 'media_type': media_type,
                     'library_name': library_name, 'year': year, 'state': player_state,
                     'progress': round(progress, 1), 'thumb_url': thumb_url, 'session_key': session_key,
+                    'user_avatar_url': user_avatar_url,  # Add user avatar URL
                     'quality_detail': quality_detail, 'stream_detail': stream_details,
                     'container_detail': container_detail,
                     'video_detail': video_detail, 'audio_detail': audio_detail, 'subtitle_detail': subtitle_detail,

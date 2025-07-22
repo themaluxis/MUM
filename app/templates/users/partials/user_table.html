@@ -57,7 +57,28 @@
                 </td>
                 <td data-col="user">
                     <div class="flex items-center space-x-3">
-                        <div class="avatar"><div class="mask mask-squircle w-10 h-10"><img src="{{ user.get_avatar(url_for('static', filename='img/default_avatar.png')) }}" alt="{{ user.plex_username }} avatar" onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}';"/></div></div>
+                        <div class="avatar"><div class="mask mask-squircle w-10 h-10">
+                            {% set avatar_url = user.get_avatar(url_for('static', filename='img/default_avatar.png')) %}
+                            {% set service_types = user_service_types.get(user.id, []) %}
+                            {% set primary_service = service_types[0] if service_types else none %}
+                            
+                            {# Check if this is a Jellyfin user and try to get their avatar #}
+                            {% if primary_service and primary_service.value == 'jellyfin' and user.raw_plex_data and user.raw_plex_data.startswith('{') %}
+                                {# Extract Jellyfin user info using the custom filter #}
+                                {% set jellyfin_info = user.raw_plex_data | extract_jellyfin_user_info %}
+                                {% if jellyfin_info[0] and jellyfin_info[1] %}
+                                    {% set jellyfin_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_info[0]) %}
+                                    <img src="{{ jellyfin_avatar_url }}" alt="{{ user.plex_username }} avatar" 
+                                         onerror="this.onerror=null; this.src='{{ avatar_url }}';"/>
+                                {% else %}
+                                    <img src="{{ avatar_url }}" alt="{{ user.plex_username }} avatar" 
+                                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}';"/>
+                                {% endif %}
+                            {% else %}
+                                <img src="{{ avatar_url }}" alt="{{ user.plex_username }} avatar" 
+                                     onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}';"/>
+                            {% endif %}
+                        </div></div>
                         <div>
                             {% if current_user.has_permission('view_user') %}
                             <a href="{{ url_for('user.view_user', user_id=user.id, view='table', page=users.page, per_page=current_per_page) }}" title="User Profile" class="text-primary link link-hover">

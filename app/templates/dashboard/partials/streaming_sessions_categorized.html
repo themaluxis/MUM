@@ -93,7 +93,17 @@
                                 {# User and Player Info #}
                                 <div class="text-xs text-base-content/70 mb-2 space-y-1">
                                     <div class="flex items-center">
-                                        <i class="fa-solid fa-user fa-fw mr-1 text-info"></i>
+                                        {% if session.user_avatar_url %}
+                                            <div class="avatar avatar-xs mr-2">
+                                                <div class="w-4 h-4 rounded-full">
+                                                    <img src="{{ session.user_avatar_url }}" alt="{{ session.user }} avatar" 
+                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';" />
+                                                </div>
+                                            </div>
+                                            <i class="fa-solid fa-user fa-fw mr-1 text-info" style="display:none;"></i>
+                                        {% else %}
+                                            <i class="fa-solid fa-user fa-fw mr-1 text-info"></i>
+                                        {% endif %}
                                         <span class="truncate">{{ session.user }}</span>
                                     </div>
                                     <div class="flex items-center">
@@ -132,14 +142,19 @@
                         <form method="dialog">
                             <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
                         </form>
-                        <h3 class="font-bold text-lg mb-4">Raw Session Data</h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg">Raw Session Data</h3>
+                            <button class="btn btn-sm btn-outline" onclick="copyRawData('rawDataModal-{{ session.session_key }}')">
+                                <i class="fa-solid fa-copy mr-1"></i> Copy
+                            </button>
+                        </div>
                         <div class="text-xs">
                             <strong>User:</strong> {{ session.user }}<br>
                             <strong>Media:</strong> {{ session.media_title }}<br>
                             <strong>Player:</strong> {{ session.player_title }}<br>
                             <strong>Session Key:</strong> {{ session.session_key }}
                         </div>
-                        <div class="mockup-code mt-4 max-h-96 overflow-y-auto">
+                        <div class="mockup-code mt-4 max-h-96 overflow-y-auto" id="rawDataContent-{{ session.session_key }}">
                             <pre><code>{{ session.raw_data_json }}</code></pre>
                         </div>
                     </div>

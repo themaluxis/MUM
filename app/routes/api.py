@@ -160,6 +160,69 @@ def jellyfin_image_proxy():
         current_app.logger.error(f"API jellyfin_image_proxy: Unexpected error for item {item_id}: {e}", exc_info=True)
         return "Error fetching image", 500
 
+@bp.route('/jellyfin_user_avatar_proxy')
+@login_required
+def jellyfin_user_avatar_proxy():
+    user_id = request.args.get('user_id')
+    
+    current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Received request for user_id='{user_id}'")
+    
+    if not user_id:
+        current_app.logger.warning("API jellyfin_user_avatar_proxy: 'user_id' parameter is missing.")
+        abort(400)
+
+    try:
+        jellyfin_servers = MediaServiceManager.get_servers_by_type(ServiceType.JELLYFIN, active_only=True)
+        
+        if not jellyfin_servers:
+            current_app.logger.error("API jellyfin_user_avatar_proxy: No Jellyfin servers found.")
+            abort(404)
+
+        jellyfin_server = jellyfin_servers[0]  # Use first available server
+        current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Using Jellyfin server: {jellyfin_server.name}")
+        
+        # First, get user data to check if PrimaryImageTag exists
+        headers = {
+            'X-Emby-Token': jellyfin_server.api_key,
+        }
+        
+        # Get user info to check for PrimaryImageTag
+        user_info_url = f"{jellyfin_server.url.rstrip('/')}/Users/{user_id}"
+        user_response = requests.get(user_info_url, headers=headers, timeout=5)
+        user_response.raise_for_status()
+        user_data = user_response.json()
+        
+        # Check if user has a PrimaryImageTag (avatar)
+        primary_image_tag = user_data.get('PrimaryImageTag')
+        if not primary_image_tag:
+            current_app.logger.debug(f"API jellyfin_user_avatar_proxy: User {user_id} has no PrimaryImageTag, no avatar available")
+            abort(404)
+        
+        # Construct Jellyfin user avatar URL with tag parameter (required for Jellyfin avatars)
+        avatar_url = f"{jellyfin_server.url.rstrip('/')}/Users/{user_id}/Images/Primary?tag={primary_image_tag}&width=64&quality=90"
+        
+        current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Fetching avatar from: {avatar_url}")
+
+        img_response = requests.get(avatar_url, headers=headers, stream=True, timeout=10)
+        img_response.raise_for_status()
+
+        content_type = img_response.headers.get('Content-Type', 'image/jpeg')
+        
+        return Response(img_response.content, content_type=content_type)
+
+    except requests.exceptions.HTTPError as e_http:
+        if e_http.response.status_code == 404:
+            current_app.logger.debug(f"API jellyfin_user_avatar_proxy: User {user_id} avatar not found (404)")
+        else:
+            current_app.logger.error(f"API jellyfin_user_avatar_proxy: HTTPError ({e_http.response.status_code}) fetching avatar for user {user_id}: {e_http}")
+        abort(e_http.response.status_code)
+    except requests.exceptions.RequestException as e_req:
+        current_app.logger.error(f"API jellyfin_user_avatar_proxy: RequestException fetching avatar for user {user_id}: {e_req}")
+        abort(500)
+    except Exception as e:
+        current_app.logger.error(f"API jellyfin_user_avatar_proxy: Unexpected error for user {user_id}: {e}", exc_info=True)
+        abort(500)
+
 @bp.route('/terminate_plex_session', methods=['POST'])
 @login_required
 @csrf.exempt # Or ensure your JS sends CSRF token for POST via HTMX

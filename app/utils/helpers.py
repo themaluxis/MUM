@@ -283,3 +283,31 @@ def format_json(json_string):
     except (json.JSONDecodeError, TypeError):
         # If it's not valid JSON, return as-is
         return json_string
+
+def extract_jellyfin_user_info(raw_data_str):
+    """Extract Jellyfin user ID and PrimaryImageTag from raw JSON string"""
+    try:
+        import json
+        import re
+        
+        if not raw_data_str or not raw_data_str.startswith('{'):
+            return None, None
+            
+        # Try to parse as JSON first
+        try:
+            data = json.loads(raw_data_str)
+            user_id = data.get('Id')
+            primary_image_tag = data.get('PrimaryImageTag')
+            return user_id, primary_image_tag
+        except json.JSONDecodeError:
+            # Fallback to regex extraction if JSON parsing fails
+            id_match = re.search(r'"Id"\s*:\s*"([^"]+)"', raw_data_str)
+            tag_match = re.search(r'"PrimaryImageTag"\s*:\s*"([^"]+)"', raw_data_str)
+            
+            user_id = id_match.group(1) if id_match else None
+            primary_image_tag = tag_match.group(1) if tag_match else None
+            
+            return user_id, primary_image_tag
+            
+    except Exception as e:
+        return None, None

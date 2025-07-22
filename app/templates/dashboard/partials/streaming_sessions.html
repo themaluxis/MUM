@@ -65,7 +65,17 @@
                         {# User, Player, Media Type - styled as per your preferred layout #}
                         <div class="text-xs space-y-0.5 mt-1">
                             <p class="text-base-content/80 flex items-center" title="{{ session.user }}">
-                                <i class="fa-solid fa-user fa-fw mr-1.5 text-info w-4 text-center"></i> 
+                                {% if session.user_avatar_url %}
+                                    <div class="avatar avatar-xs mr-1.5">
+                                        <div class="w-4 h-4 rounded-full">
+                                            <img src="{{ session.user_avatar_url }}" alt="{{ session.user }} avatar" 
+                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';" />
+                                        </div>
+                                    </div>
+                                    <i class="fa-solid fa-user fa-fw mr-1.5 text-info w-4 text-center" style="display:none;"></i>
+                                {% else %}
+                                    <i class="fa-solid fa-user fa-fw mr-1.5 text-info w-4 text-center"></i>
+                                {% endif %}
                                 {% if session.mum_user_id %}
                                     <a href="{{ url_for('user.view_user', user_id=session.mum_user_id) }}" class="link link-hover text-info">
                                         {{ session.user }}

@@ -32,7 +32,26 @@
         <div class="flex flex-row items-center mb-3">
             <div class="avatar mr-3">
                 <div class="w-10 rounded-full">
-                    <img src="{{ user.get_avatar(url_for('static', filename='img/default_avatar.png')) }}" alt="{{ user.get_display_name() }} avatar" onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}'; this.classList.add('object-scale-down');" />
+                    {% set avatar_url = user.get_avatar(url_for('static', filename='img/default_avatar.png')) %}
+                    {% set service_types = user_service_types.get(user.id, []) %}
+                    {% set primary_service = service_types[0] if service_types else none %}
+                    
+                    {# Check if this is a Jellyfin user and try to get their avatar #}
+                    {% if primary_service and primary_service.value == 'jellyfin' and user.raw_plex_data and user.raw_plex_data.startswith('{') %}
+                        {# Extract Jellyfin user info using the custom filter #}
+                        {% set jellyfin_info = user.raw_plex_data | extract_jellyfin_user_info %}
+                        {% if jellyfin_info[0] and jellyfin_info[1] %}
+                            {% set jellyfin_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_info[0]) %}
+                            <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
+                                 onerror="this.onerror=null; this.src='{{ avatar_url }}'; this.classList.add('object-scale-down');" />
+                        {% else %}
+                            <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
+                                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}'; this.classList.add('object-scale-down');" />
+                        {% endif %}
+                    {% else %}
+                        <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
+                             onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}'; this.classList.add('object-scale-down');" />
+                    {% endif %}
                 </div>
             </div>
             <div class="flex flex-col">

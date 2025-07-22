@@ -3,7 +3,13 @@
 
 <div class="space-y-4">
     {% if user.raw_plex_data %}
-        <div class="mockup-code">
+        <div class="flex justify-between items-center mb-4">
+            <h4 class="font-semibold">Raw User Data</h4>
+            <button class="btn btn-sm btn-outline" onclick="copyUserRawData('{{ user.id }}')">
+                <i class="fa-solid fa-copy mr-1"></i> Copy
+            </button>
+        </div>
+        <div class="mockup-code" id="userRawDataContent-{{ user.id }}">
             <pre><code>{% if user.raw_plex_data.startswith('{') %}{{ user.raw_plex_data | format_json }}{% else %}{{ user.raw_plex_data }}{% endif %}</code></pre>
         </div>
     {% else %}

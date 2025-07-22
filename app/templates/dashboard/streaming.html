@@ -327,5 +327,45 @@ function setStreamingView(view) {
     // Update the auto-refresh URL
     updateAutoRefreshUrl();
 }
+
+// Global copy function for raw data modals
+function copyRawData(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        const codeElement = modal.querySelector('pre code');
+        if (codeElement) {
+            const textToCopy = codeElement.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                // Find the copy button in this modal
+                const copyButton = modal.querySelector('button[onclick*="copyRawData"]');
+                if (copyButton) {
+                    const originalHTML = copyButton.innerHTML;
+                    copyButton.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Copied!';
+                    copyButton.classList.add('btn-success');
+                    copyButton.classList.remove('btn-outline');
+                    setTimeout(() => {
+                        copyButton.innerHTML = originalHTML;
+                        copyButton.classList.remove('btn-success');
+                        copyButton.classList.add('btn-outline');
+                    }, 2000);
+                }
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+                const copyButton = modal.querySelector('button[onclick*="copyRawData"]');
+                if (copyButton) {
+                    const originalHTML = copyButton.innerHTML;
+                    copyButton.innerHTML = '<i class="fa-solid fa-times mr-1"></i> Error!';
+                    copyButton.classList.add('btn-error');
+                    copyButton.classList.remove('btn-outline');
+                    setTimeout(() => {
+                        copyButton.innerHTML = originalHTML;
+                        copyButton.classList.remove('btn-error');
+                        copyButton.classList.add('btn-outline');
+                    }, 2000);
+                }
+            });
+        }
+    }
+}
 </script>
 {% endblock %}
