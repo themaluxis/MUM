@@ -43,10 +43,16 @@
                         {% if jellyfin_info[0] and jellyfin_info[1] %}
                             {% set jellyfin_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_info[0]) %}
                             <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
-                                 onerror="this.onerror=null; this.src='{{ avatar_url }}'; this.classList.add('object-scale-down');" />
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                            {# Jellyfin fallback avatar with purple theme #}
+                            <div class="bg-purple-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style="display: none;">
+                                {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
+                            </div>
                         {% else %}
-                            <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
-                                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}'; this.classList.add('object-scale-down');" />
+                            {# No Jellyfin user ID found, show purple fallback directly #}
+                            <div class="bg-purple-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold">
+                                {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
+                            </div>
                         {% endif %}
                     {% else %}
                         <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" 

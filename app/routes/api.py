@@ -223,6 +223,7 @@ def jellyfin_user_avatar_proxy():
         current_app.logger.error(f"API jellyfin_user_avatar_proxy: Unexpected error for user {user_id}: {e}", exc_info=True)
         abort(500)
 
+
 @bp.route('/terminate_plex_session', methods=['POST'])
 @login_required
 @csrf.exempt # Or ensure your JS sends CSRF token for POST via HTMX
