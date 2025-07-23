@@ -187,9 +187,9 @@ def edit_server(server_id):
             flash(f'Media server "{server.name}" updated successfully!', 'success')
             # Redirect to the appropriate plugin settings page based on service type
             if server.service_type.value == 'plex':
-                return redirect(url_for('dashboard.settings_plugin_configure', plugin_id='plex'))
+                return redirect(url_for('plugin_management.configure', plugin_id='plex'))
             else:
-                return redirect(url_for('dashboard.settings_plugin_configure', plugin_id=server.service_type.value))
+                return redirect(url_for('plugin_management.configure', plugin_id=server.service_type.value))
             
         except Exception as e:
             db.session.rollback()
@@ -293,7 +293,7 @@ def delete_server(server_id):
     if return_to == 'plugin_config':
         plugin_id = request.form.get('plugin_id') or request.args.get('plugin_id')
         if plugin_id:
-            return redirect(url_for('dashboard.settings_plugin_configure', plugin_id=plugin_id))
+            return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
     
     # Fallback: check referer
     referer = request.headers.get('Referer', '')

@@ -1,0 +1,181 @@
+# File: app/routes/plugin_management.py
+from flask import (
+    Blueprint, render_template, redirect, url_for, 
+    flash, request, current_app
+)
+from flask_login import login_required, current_user
+from app.models import Setting, EventType
+from app.forms import PluginSettingsForm
+from app.extensions import db
+from app.utils.helpers import log_event, setup_required, permission_required
+from app.services.plugin_manager import plugin_manager
+import traceback
+
+bp = Blueprint('plugin_management', __name__)
+
+@bp.route('/')
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def index():
+    # This route now just renders the main settings layout.
+    # The content will be loaded via the partial included in settings/index.html
+    
+    # Refresh plugin servers count to ensure accuracy
+    try:
+        from app.models_media_services import MediaServer, ServiceType
+        from app.models_plugins import Plugin
+        
+        plugins = Plugin.query.all()
+        for plugin in plugins:
+            try:
+                # Find the corresponding ServiceType enum value
+                service_type = None
+                for st in ServiceType:
+                    if st.value == plugin.plugin_id:
+                        service_type = st
+                        break
+                
+                if service_type:
+                    # Count actual servers
+                    actual_count = MediaServer.query.filter_by(service_type=service_type).count()
+                    if plugin.servers_count != actual_count:
+                        current_app.logger.debug(f"Updating plugin {plugin.plugin_id} servers_count from {plugin.servers_count} to {actual_count}")
+                        plugin.servers_count = actual_count
+                        db.session.add(plugin)
+                else:
+                    # For plugins without corresponding ServiceType, set to 0
+                    if plugin.servers_count != 0:
+                        current_app.logger.debug(f"Setting plugin {plugin.plugin_id} servers_count to 0 (no ServiceType)")
+                        plugin.servers_count = 0
+                        db.session.add(plugin)
+            except Exception as e:
+                current_app.logger.error(f"Error updating servers_count for plugin {plugin.plugin_id}: {e}")
+        
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.error(f"Error refreshing plugin servers count in settings: {e}")
+    
+    available_plugins = plugin_manager.get_available_plugins()
+    enabled_plugins = [p.plugin_id for p in plugin_manager.get_enabled_plugins()]
+
+    return render_template(
+        'settings/index.html',
+        title="Plugin Manager",
+        available_plugins=available_plugins,
+        enabled_plugins=enabled_plugins,
+        active_tab='plugins'
+    )
+
+@bp.route('/<plugin_id>')
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def configure(plugin_id):
+    from app.models_plugins import Plugin
+    from app.models_media_services import MediaServer, ServiceType, UserMediaAccess
+    from app.services.media_service_factory import MediaServiceFactory
+
+    plugin = Plugin.query.filter_by(plugin_id=plugin_id).first_or_404()
+    
+    try:
+        service_type_enum = ServiceType[plugin_id.upper()]
+    except KeyError:
+        flash(f"Invalid service type: {plugin_id}", "danger")
+        return redirect(url_for('plugin_management.index'))
+
+    servers = MediaServer.query.filter_by(service_type=service_type_enum).all()
+    
+    servers_with_details = []
+    for server in servers:
+        member_count = UserMediaAccess.query.filter_by(server_id=server.id).count()
+        server_details = {
+            'server': server,
+            'member_count': member_count,
+            'libraries': [],
+            'error': None
+        }
+        try:
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service:
+                # Get libraries
+                try:
+                    libs = service.get_libraries()
+                    server_details['libraries'] = [lib.get('name', 'Unknown Library') for lib in libs] if libs else []
+                except Exception as e:
+                    current_app.logger.error(f"Error getting libraries for server {server.name}: {e}")
+                    server_details['error'] = "Could not fetch libraries."
+            else:
+                server_details['error'] = "Could not create media service."
+        except Exception as e:
+            current_app.logger.error(f"Error creating service for server {server.name}: {e}\n{traceback.format_exc()}")
+            server_details['error'] = "Failed to connect to server."
+            
+        servers_with_details.append(server_details)
+
+    return render_template(
+        'settings/index.html',
+        title=f"Configure {plugin.name}",
+        plugin=plugin,
+        servers_with_details=servers_with_details, # Pass new list to template
+        active_tab='plugin_configure'
+    )
+
+@bp.route('/<plugin_id>/<int:server_id>/edit', methods=['GET', 'POST'])
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def edit_server(plugin_id, server_id):
+    from app.models_plugins import Plugin
+    from app.models_media_services import MediaServer, ServiceType
+    from app.forms import MediaServerForm
+
+    plugin = Plugin.query.filter_by(plugin_id=plugin_id).first_or_404()
+    
+    # Convert plugin_id string to ServiceType enum
+    try:
+        service_type_enum = ServiceType[plugin_id.upper()]
+    except KeyError:
+        flash(f"Invalid service type: {plugin_id}", "danger")
+        return redirect(url_for('plugin_management.index'))
+
+    server = MediaServer.query.filter_by(id=server_id, service_type=service_type_enum).first_or_404()
+    
+    form = MediaServerForm(server_id=server.id, obj=server)
+    form.service_type.data = server.service_type.value
+    
+    if form.validate_on_submit():
+        try:
+            # Update server
+            server.name = form.name.data
+            server.url = form.url.data.rstrip('/')
+            server.api_key = form.api_key.data
+            server.username = form.username.data
+            if form.password.data:  # Only update password if provided
+                server.password = form.password.data
+            server.is_active = form.is_active.data
+            
+            db.session.commit()
+            
+            log_event(
+                EventType.SETTING_CHANGE,
+                f"Updated media server: {server.name}",
+                admin_id=current_user.id
+            )
+            
+            flash(f'Media server "{server.name}" updated successfully!', 'success')
+            return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error updating media server: {e}")
+            flash(f'Error updating server: {str(e)}', 'danger')
+    
+    return render_template(
+        'settings/index.html',
+        title=f"Edit {server.name}",
+        plugin=plugin,
+        server=server,
+        form=form,
+        active_tab='plugin_edit_server'
+    )

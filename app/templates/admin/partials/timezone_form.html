@@ -5,7 +5,7 @@
         <p class="text-sm text-base-content text-opacity-60 mb-4">
             Choose how timestamps are displayed throughout the application.
         </p>
-        <form method="POST" action="{{ url_for('dashboard.settings_account') }}" id="timezoneForm">
+        <form method="POST" action="{{ url_for('settings.account') }}" id="timezoneForm">
             {{ timezone_form.hidden_tag() }}
             
             <div class="form-control w-full max-w-xs">

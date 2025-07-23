@@ -362,13 +362,14 @@ class RoleEditForm(FlaskForm):
         Optional(), Length(max=100)
     ], description='CSS classes for the badge icon (e.g., "fas fa-star")')
     
-    # Permissions
-    can_manage_users = BooleanField('Can Manage Users')
-    can_manage_invites = BooleanField('Can Manage Invites') 
-    can_manage_settings = BooleanField('Can Manage Settings')
-    can_view_logs = BooleanField('Can View Logs')
+    # Permissions - using SelectMultipleField with checkbox widget for dynamic permission choices
+    permissions = SelectMultipleField('Permissions', choices=[], coerce=str, widget=ListWidget(prefix_label=False), option_widget=CheckboxInput())
     
     submit = SubmitField('Save Changes')
+    
+    def __init__(self, original_name=None, *args, **kwargs):
+        super(RoleEditForm, self).__init__(*args, **kwargs)
+        self.original_name = original_name
 
 class RoleMemberForm(FlaskForm):
     # This is the corrected field definition

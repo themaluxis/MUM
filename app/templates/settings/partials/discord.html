@@ -1,5 +1,5 @@
 {# File: app/templates/settings/_discord_settings.html #}
-<form method="POST" action="{{ url_for('dashboard.settings_discord') }}" id="mainDiscordSettingsForm">
+<form method="POST" action="{{ url_for('settings.discord') }}" id="mainDiscordSettingsForm">
     {{ form.hidden_tag() }}
     <h2 class="text-xl font-semibold mb-2">Discord Integration Settings</h2>
     <p class="text-sm text-base-content/70 mb-6">Configure Discord OAuth for invitees, admin linking, optional server membership checks, and advanced Discord Bot features.</p>

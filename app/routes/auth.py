@@ -106,7 +106,7 @@ def plex_sso_login_admin():
         # If user is already logged in, the "next page" should be their account settings.
         # Otherwise, it's a fresh login, so go to the dashboard.
         if current_user.is_authenticated:
-            session['plex_admin_login_next_url'] = url_for('dashboard.settings_account')
+            session['plex_admin_login_next_url'] = url_for('settings.account')
         else:
             session['plex_admin_login_next_url'] = request.args.get('next') or url_for('dashboard.index')
 
@@ -118,7 +118,7 @@ def plex_sso_login_admin():
 
     # If an error occurs, send the user back to the most relevant page
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard.settings_account'))
+        return redirect(url_for('settings.account'))
     else:
         return redirect(url_for('auth.app_login'))
 
@@ -128,7 +128,7 @@ def plex_sso_callback_admin():
     pin_headers = session.get('plex_headers_admin_login', {})
     
     # Context-aware fallback URL
-    fallback_url = url_for('dashboard.settings_account') if current_user.is_authenticated else url_for('auth.app_login')
+    fallback_url = url_for('settings.account') if current_user.is_authenticated else url_for('auth.app_login')
     
     if not pin_id_from_session:
         flash('Plex login callback invalid or session expired.', 'danger')
@@ -249,7 +249,7 @@ def discord_link_admin():
 
     if not discord_enabled_for_invitees:
         flash('Discord OAuth for Invitees must be enabled and configured before linking your admin account.', 'warning')
-        return redirect(url_for('dashboard.settings_discord'))
+        return redirect(url_for('settings.discord'))
 
     # The flash message you saw "Discord Client ID and Secret are required if enabled."
     # does not come from this route. It comes from dashboard.settings_discord on *saving* that form.
@@ -289,12 +289,12 @@ def discord_callback_admin():
     returned_state = request.args.get('state')
     if not returned_state or returned_state != session.pop('discord_oauth_state_admin_link', None):
         flash('Discord linking failed: Invalid state.', 'danger')
-        return redirect(url_for('dashboard.settings_discord'))
+        return redirect(url_for('settings.discord'))
     
     code = request.args.get('code')
     if not code:
         flash(f'Discord linking failed: {request.args.get("error_description", "No code.")}', 'danger')
-        return redirect(url_for('dashboard.settings_discord'))
+        return redirect(url_for('settings.discord'))
 
     client_id = Setting.get('DISCORD_CLIENT_ID')
     client_secret = Setting.get('DISCORD_CLIENT_SECRET')
@@ -342,7 +342,7 @@ def discord_callback_admin():
 
         if existing_link:
             flash(f"Discord account '{discord_user['username']}' is already linked to another admin account ({existing_link.username or existing_link.plex_username}).", 'danger')
-            return redirect(url_for('dashboard.settings_discord'))
+            return redirect(url_for('settings.discord'))
 
         admin_to_update.discord_user_id = discord_user['id']
         admin_to_update.discord_username = discord_user['username']
@@ -386,7 +386,7 @@ def discord_callback_admin():
         current_app.logger.error(f"Unexpected error during Discord admin link callback: {e_gen}", exc_info=True)
         flash('An unexpected error occurred while linking Discord.', 'danger')
         
-    return redirect(url_for('dashboard.settings_discord'))
+    return redirect(url_for('settings.discord'))
 
 @bp.route('/discord/unlink_admin', methods=['POST'])
 @login_required
@@ -396,4 +396,4 @@ def discord_unlink_admin():
     current_user.discord_access_token = None; current_user.discord_refresh_token = None; current_user.discord_token_expires_at = None
     db.session.commit()
     log_event(EventType.DISCORD_ADMIN_UNLINK, f"Admin '{current_user.username or current_user.plex_username}' unlinked Discord '{discord_username_log}'.", admin_id=current_user.id)
-    flash('Discord account unlinked.', 'success'); return redirect(url_for('dashboard.settings_discord'))
+    flash('Discord account unlinked.', 'success'); return redirect(url_for('settings.discord'))

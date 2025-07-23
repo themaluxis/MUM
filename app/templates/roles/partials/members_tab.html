@@ -1,4 +1,4 @@
-<!-- File: app/templates/roles/_members_tab.html -->
+<!-- File: app/templates/roles/partials/members_tab.html -->
 {# Expects 'role', 'current_members', and 'member_form' in context #}
 
 <div class="flex justify-between items-center mb-4">
@@ -10,7 +10,7 @@
 
 {# Container for the member list, with HTMX refresh trigger #}
 <div id="role-members-list-container"
-     hx-get="{{ url_for('dashboard.edit_role', role_id=role.id, tab='members') }}"
+     hx-get="{{ url_for('role_management.edit', role_id=role.id, tab='members') }}"
      hx-trigger="load, refreshMembersList from:body"
      hx-select="#role-members-list-container > *"
      hx-swap="innerHTML">
@@ -21,7 +21,7 @@
                name="search_members"
                placeholder="Search current members..."
                value="{{ request.args.get('search_members', '') }}"
-               hx-get="{{ url_for('dashboard.edit_role', role_id=role.id, tab='members') }}"
+               hx-get="{{ url_for('role_management.edit', role_id=role.id, tab='members') }}"
                hx-trigger="keyup changed delay:500ms"
                hx-target="#role-members-list-container"
                hx-select="#role-members-list-container > *"
@@ -57,7 +57,7 @@
                         {# --- END CORRECTION --- #}
                         <td class="text-right">
                             <button class="btn btn-xs btn-ghost text-error"
-                                    hx-post="{{ url_for('dashboard.remove_role_member', role_id=role.id, admin_id=admin.id) }}"
+                                    hx-post="{{ url_for('role_management.remove_member', role_id=role.id, admin_id=admin.id) }}"
                                     hx-target="closest tr"
                                     hx-swap="outerHTML"
                                     hx-confirm="Remove {{ admin.username or admin.plex_username }} from this role?">
@@ -80,7 +80,7 @@
     <h3 class="font-bold text-lg">Add Admins to Role</h3>
     <div id="add_member_modal_content">
         {# Pass role and member_form from the parent template's context #}
-        {% include 'roles/_add_member_modal.html' %}
+        {% include 'roles/partials/add_member_modal.html' %}
     </div>
   </div>
 </dialog>

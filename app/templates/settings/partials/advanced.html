@@ -19,7 +19,7 @@
                     <p class="text-xs text-base-content/70">This will invalidate all current sessions and require users (including admin) to log in again. Use only if you suspect the current key is compromised.</p>
                 </div>
                 <button class="btn btn-error btn-sm mt-2 sm:mt-0"
-                        hx-post="{{ url_for('dashboard.regenerate_secret_key') }}"
+                        hx-post="{{ url_for('settings.regenerate_secret_key') }}"
                         hx-confirm="Are you absolutely sure you want to re-generate the SECRET_KEY? This will log everyone out."
                         hx-target="#secret_key_status_message"
                         hx-swap="innerHTML"

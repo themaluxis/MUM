@@ -1,6 +1,6 @@
 <!-- File: app/templates/settings/_general_settings.html -->
 {# Expects 'form' (GeneralSettingsForm instance) in context #}
-<form method="POST" action="{{ url_for('dashboard.settings_general') }}">
+<form method="POST" action="{{ url_for('settings.general') }}">
     {{ form.hidden_tag() }}
     <h2 class="text-xl font-semibold mb-6">General Application Settings</h2>
 

@@ -9,10 +9,10 @@
 </div>
 
 <!-- Filter Form -->
-<form method="GET" action="{{ url_for('dashboard.settings_logs_partial') }}" 
+<form method="GET" action="{{ url_for('settings.logs_partial') }}" 
       class="mb-6 p-4 bg-base-100 rounded-lg shadow" 
       id="logsFilterForm"
-      hx-get="{{ url_for('dashboard.settings_logs_partial') }}"
+      hx-get="{{ url_for('settings.logs_partial') }}"
       hx-target="#logs_table_container"
       hx-swap="innerHTML"
       hx-indicator="#logs_loading_indicator">
@@ -54,7 +54,7 @@
 
 <!-- Container for the log entries -->
 <div id="logs_table_container"
-     hx-get="{{ url_for('dashboard.settings_logs_partial') }}"
+     hx-get="{{ url_for('settings.logs_partial') }}"
      hx-trigger="load, refreshHistoryList from:body"
      hx-swap="innerHTML">
     <div class="text-center p-8"><span class="loading loading-lg loading-spinner"></span><p>Loading logs...</p></div>

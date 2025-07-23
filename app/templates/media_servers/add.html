@@ -15,33 +15,33 @@
                     <h2 class="menu-title"><span><i class="fa-solid fa-cog fa-fw mr-2"></i> Settings</span></h2>
                     <ul>
                         {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
-                        <li><a href="{{ url_for('dashboard.settings_general') }}"><i class="fa-solid fa-sliders mr-2"></i> General</a></li>
+                        <li><a href="{{ url_for('settings.general') }}"><i class="fa-solid fa-sliders mr-2"></i> General</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('view_admins_tab') %}
                         <h2 class="menu-title"><span><i class="fa-solid fa-user-shield fa-fw mr-2"></i> Manage Admins</span></h2>
                         <ul>
                             {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
-                                <li><a href="{{ url_for('dashboard.settings_admins') }}"><i class="fa-solid fa-shield-halved mr-2"></i> Admins</a></li>
+                                <li><a href="{{ url_for('admin_management.index') }}"><i class="fa-solid fa-shield-halved mr-2"></i> Admins</a></li>
                             {% endif %}
                             {% if current_user.id == 1 or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
-                                <li><a href="{{ url_for('dashboard.settings_roles') }}"><i class="fa-solid fa-shield mr-2"></i> Roles</a></li>
+                                <li><a href="{{ url_for('role_management.index') }}"><i class="fa-solid fa-shield mr-2"></i> Roles</a></li>
                             {% endif %}
                         </ul>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('manage_plex_settings') %}
-                        <li><a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id='plex') }}"><i class="fa-solid fa-network-wired mr-2"></i> Plex</a></li>
+                        <li><a href="{{ url_for('plugin_management.configure', plugin_id='plex') }}"><i class="fa-solid fa-network-wired mr-2"></i> Plex</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
-                        <li><a href="{{ url_for('dashboard.settings_discord') }}"><i class="fa-brands fa-discord mr-2"></i> Discord</a></li>
+                        <li><a href="{{ url_for('settings.discord') }}"><i class="fa-brands fa-discord mr-2"></i> Discord</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
-                        <li><a href="{{ url_for('dashboard.settings_plugins') }}" class="active menu-active"><i class="fa-solid fa-puzzle-piece mr-2"></i> Plugins</a></li>
+                        <li><a href="{{ url_for('plugin_management.index') }}" class="active menu-active"><i class="fa-solid fa-puzzle-piece mr-2"></i> Plugins</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
-                        <li><a href="{{ url_for('dashboard.settings_logs') }}"><i class="fa-solid fa-timeline mr-2"></i> Logs</a></li>
+                        <li><a href="{{ url_for('settings.logs') }}"><i class="fa-solid fa-timeline mr-2"></i> Logs</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
-                        <li><a href="{{ url_for('dashboard.settings_advanced') }}"><i class="fa-solid fa-cogs mr-2"></i> Advanced</a></li>
+                        <li><a href="{{ url_for('settings.advanced') }}"><i class="fa-solid fa-cogs mr-2"></i> Advanced</a></li>
                         {% endif %}
                     </ul>
                 </li>
@@ -53,9 +53,9 @@
             <div class="mb-6">
                 <div class="breadcrumbs text-sm">
                     <ul>
-                        <li><a href="{{ url_for('dashboard.settings_plugins') }}">Plugins</a></li>
+                        <li><a href="{{ url_for('plugin_management.index') }}">Plugins</a></li>
                         {% if request.args.get('service_type') %}
-                        <li><a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=request.args.get('service_type')) }}">{{ request.args.get('service_type').title() }}</a></li>
+                        <li><a href="{{ url_for('plugin_management.configure', plugin_id=request.args.get('service_type')) }}">{{ request.args.get('service_type').title() }}</a></li>
                         {% endif %}
                         <li>Add Server</li>
                     </ul>
@@ -144,9 +144,9 @@
 
                 <div class="card-actions justify-end">
                     {% if request.args.get('service_type') %}
-                    <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=request.args.get('service_type')) }}" class="btn btn-ghost">Cancel</a>
+                    <a href="{{ url_for('plugin_management.configure', plugin_id=request.args.get('service_type')) }}" class="btn btn-ghost">Cancel</a>
                     {% else %}
-                    <a href="{{ url_for('dashboard.settings_plugins') }}" class="btn btn-ghost">Cancel</a>
+                    <a href="{{ url_for('plugin_management.index') }}" class="btn btn-ghost">Cancel</a>
                     {% endif %}
                     <button type="button" onclick="testConnection(event)" class="btn btn-outline">Test Connection</button>
                     {{ form.submit(class="btn btn-primary", id="submit-btn", disabled=true) }}

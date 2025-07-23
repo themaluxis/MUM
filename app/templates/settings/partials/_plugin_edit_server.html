@@ -2,8 +2,8 @@
 <div class="mb-6">
     <div class="breadcrumbs text-sm">
         <ul>
-            <li><a href="{{ url_for('dashboard.settings_plugins') }}">Plugins</a></li>
-            <li><a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=plugin.plugin_id) }}">{{ plugin.name }}</a></li>
+            <li><a href="{{ url_for('plugin_management.index') }}">Plugins</a></li>
+            <li><a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}">{{ plugin.name }}</a></li>
             <li>Edit {{ server.name }}</li>
         </ul>
     </div>
@@ -82,7 +82,7 @@
             </div>
 
             <div class="card-actions justify-end">
-                <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=plugin.plugin_id) }}" class="btn btn-ghost">Cancel</a>
+                <a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}" class="btn btn-ghost">Cancel</a>
                 <button type="button" onclick="testConnection()" class="btn btn-outline">Test Connection</button>
                 {{ form.submit(class="btn btn-primary") }}
             </div>

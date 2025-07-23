@@ -1,8 +1,8 @@
-<!-- File: app/templates/roles/_add_member_modal.html -->
+<!-- File: app/templates/roles/partials/add_member_modal.html -->
 
 <form method="POST"
       id="addMemberForm"
-      hx-post="{{ url_for('dashboard.edit_role', role_id=role.id, tab='members') }}"
+      hx-post="{{ url_for('role_management.edit', role_id=role.id, tab='members') }}"
       hx-target="#add_member_modal_content"
       hx-swap="innerHTML"
       hx-on::after-request="if(event.detail.successful) { add_member_modal.close(); }">

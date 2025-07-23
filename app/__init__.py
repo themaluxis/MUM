@@ -225,9 +225,9 @@ def create_app(config_name=None):
     def check_force_password_change():
         if current_user.is_authenticated and \
            getattr(current_user, 'force_password_change', False) and \
-           request.endpoint not in ['dashboard.settings_account', 'static', 'auth.logout']:
+           request.endpoint not in ['settings.account', 'static', 'auth.logout']:
             flash("For security, you must change your temporary password before proceeding.", "warning")
-            return redirect(url_for('dashboard.settings_account'))
+            return redirect(url_for('settings.account'))
 
     @app.before_request
     def before_request_tasks():
@@ -386,6 +386,14 @@ def create_app(config_name=None):
     app.register_blueprint(setup_bp, url_prefix='/setup')
     from .routes.dashboard import bp as dashboard_bp
     app.register_blueprint(dashboard_bp) # Root blueprint
+    from .routes.settings import bp as settings_bp
+    app.register_blueprint(settings_bp, url_prefix='/settings')
+    from .routes.plugin_management import bp as plugin_management_bp
+    app.register_blueprint(plugin_management_bp, url_prefix='/settings/plugins')
+    from .routes.admin_management import bp as admin_management_bp
+    app.register_blueprint(admin_management_bp, url_prefix='/settings/admins')
+    from .routes.role_management import bp as role_management_bp
+    app.register_blueprint(role_management_bp, url_prefix='/settings/roles')
     from .routes.users import bp as users_bp
     app.register_blueprint(users_bp, url_prefix='/users')
     from .routes.invites import bp as invites_bp

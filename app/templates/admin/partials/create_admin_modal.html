@@ -1,9 +1,9 @@
-<!-- File: app/templates/admins/_create_admin_modal_form_content.html -->
+<!-- File: app/templates/admin/partials/create_admin_modal.html -->
 {# This partial template is rendered inside the "Create Admin" modal. #}
 {# It expects 'form' (AdminCreateForm) in the context. #}
 
 <form id="createAdminForm"
-      hx-post="{{ url_for('dashboard.create_admin') }}"
+      hx-post="{{ url_for('admin_management.create') }}"
       hx-target="this"
       hx-swap="outerHTML"
       hx-indicator="#create_admin_loader"

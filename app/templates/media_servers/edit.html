@@ -15,22 +15,22 @@
                     <h2 class="menu-title"><span><i class="fa-solid fa-cog fa-fw mr-2"></i> Settings</span></h2>
                     <ul>
                         {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
-                        <li><a href="{{ url_for('dashboard.settings_general') }}"><i class="fa-solid fa-sliders mr-2"></i> General</a></li>
+                        <li><a href="{{ url_for('settings.general') }}"><i class="fa-solid fa-sliders mr-2"></i> General</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
-                        <li><a href="{{ url_for('dashboard.settings_plugins') }}"><i class="fa-solid fa-puzzle-piece mr-2"></i> Plugins</a></li>
+                        <li><a href="{{ url_for('plugin_management.index') }}"><i class="fa-solid fa-puzzle-piece mr-2"></i> Plugins</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('view_admins_tab') %}
-                        <li><a href="{{ url_for('dashboard.settings_admins') }}"><i class="fa-solid fa-user-shield mr-2"></i> Admins</a></li>
+                        <li><a href="{{ url_for('admin_management.index') }}"><i class="fa-solid fa-user-shield mr-2"></i> Admins</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('manage_roles') %}
-                        <li><a href="{{ url_for('dashboard.settings_roles') }}"><i class="fa-solid fa-users-gear mr-2"></i> Roles</a></li>
+                        <li><a href="{{ url_for('role_management.index') }}"><i class="fa-solid fa-users-gear mr-2"></i> Roles</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
-                        <li><a href="{{ url_for('dashboard.settings_logs') }}"><i class="fa-solid fa-file-lines mr-2"></i> Logs</a></li>
+                        <li><a href="{{ url_for('settings.logs') }}"><i class="fa-solid fa-file-lines mr-2"></i> Logs</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
-                        <li><a href="{{ url_for('dashboard.settings_advanced') }}"><i class="fa-solid fa-gear mr-2"></i> Advanced</a></li>
+                        <li><a href="{{ url_for('settings.advanced') }}"><i class="fa-solid fa-gear mr-2"></i> Advanced</a></li>
                         {% endif %}
                     </ul>
                 </li>
@@ -42,8 +42,8 @@
             <div class="mb-6">
                 <div class="breadcrumbs text-sm">
                     <ul>
-                        <li><a href="{{ url_for('dashboard.settings_plugins') }}">Plugins</a></li>
-                        <li><a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=server.service_type.value) }}">{{ server.service_type.value.title() }}</a></li>
+                        <li><a href="{{ url_for('plugin_management.index') }}">Plugins</a></li>
+                        <li><a href="{{ url_for('plugin_management.configure', plugin_id=server.service_type.value) }}">{{ server.service_type.value.title() }}</a></li>
                         <li>Edit {{ server.name }}</li>
                     </ul>
                 </div>
@@ -120,7 +120,7 @@
                 </div>
 
                 <div class="card-actions justify-end">
-                    <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=server.service_type.value) }}" class="btn btn-ghost">Cancel</a>
+                    <a href="{{ url_for('plugin_management.configure', plugin_id=server.service_type.value) }}" class="btn btn-ghost">Cancel</a>
                     <button type="button" onclick="testConnection()" class="btn btn-outline">Test Connection</button>
                     {{ form.submit(class="btn btn-primary") }}
                 </div>

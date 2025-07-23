@@ -1,7 +1,7 @@
-<!-- File: app/templates/roles/_display_tab.html -->
+<!-- File: app/templates/roles/partials/display_tab.html -->
 {# Expects 'edit_form' and 'role' in context #}
 
-<form method="POST" action="{{ url_for('dashboard.edit_role', role_id=role.id, tab='display') }}" class="max-w-md space-y-4">
+<form method="POST" action="{{ url_for('role_management.edit', role_id=role.id, tab='display') }}" class="max-w-md space-y-4">
     {{ edit_form.hidden_tag() }}
     
     <div class="form-control">

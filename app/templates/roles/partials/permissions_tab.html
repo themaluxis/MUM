@@ -1,5 +1,5 @@
-<!-- File: app/templates/roles/_permissions_tab.html -->
-<form method="POST" action="{{ url_for('dashboard.edit_role', role_id=role.id, tab='permissions') }}">
+<!-- File: app/templates/roles/partials/permissions_tab.html -->
+<form method="POST" action="{{ url_for('role_management.edit', role_id=role.id, tab='permissions') }}">
     {{ form.hidden_tag() }}
     
     <div class="form-control">
@@ -21,18 +21,18 @@
             <div class="pl-8 pt-2 space-y-1">
                 {# Loop through the permission dictionary now #}
                 {% for p_key, p_data in data.children.items() %}
-                    {# Find the corresponding WTForms field #}
-                    {% set field = form.permissions | selectattr('data', '==', p_key) | first %}
-                    {% if field %}
-                        <div class="py-1 {% if p_key == 'view_admins_tab' %}hidden{% endif %}">
-                             <label class="label cursor-pointer justify-start" title="{{ p_data.description }}">
-                                 {# Child checkboxes need their class and data attributes restored #}
-                                 {{ field(class="toggle toggle-secondary permission-child", **{'data-category': category, 'data-permission-key': p_key}) }}
-                                 <span class="label-text text-sm ml-2">{{ p_data.label }}</span>
-                            </label>
-                            <p class="text-xs text-base-content/60 pl-14">{{ p_data.description }}</p>
-                        </div>
-                    {% endif %}
+                    <div class="py-1 {% if p_key == 'view_admins_tab' %}hidden{% endif %}">
+                         <label class="label cursor-pointer justify-start" title="{{ p_data.description }}">
+                             {# Create individual checkbox for each permission #}
+                             <input type="checkbox" name="permissions" value="{{ p_key }}" 
+                                    class="toggle toggle-secondary permission-child" 
+                                    data-category="{{ category }}" 
+                                    data-permission-key="{{ p_key }}"
+                                    {% if form.permissions.data and p_key in form.permissions.data %}checked{% endif %}>
+                             <span class="label-text text-sm ml-2">{{ p_data.label }}</span>
+                        </label>
+                        <p class="text-xs text-base-content/60 pl-14">{{ p_data.description }}</p>
+                    </div>
                 {% endfor %}
             </div>
             {% endif %}

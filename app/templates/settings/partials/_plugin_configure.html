@@ -1,6 +1,6 @@
 <!-- File: app/templates/settings/partials/_plugin_configure.html -->
 <div class="mb-6">
-    <a href="{{ url_for('dashboard.settings_plugins') }}" class="btn btn-ghost">
+    <a href="{{ url_for('plugin_management.index') }}" class="btn btn-ghost">
         <i class="fas fa-arrow-left mr-2"></i>
         Back to Plugins
     </a>
@@ -120,7 +120,7 @@
                         {% endif %}
                         
                         <!-- Edit Button -->
-                        <a href="{{ url_for('dashboard.settings_plugin_edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" 
+                        <a href="{{ url_for('plugin_management.edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" 
                            class="btn btn-ghost btn-sm" title="Edit Server">
                             <i class="fas fa-edit"></i>
                         </a>

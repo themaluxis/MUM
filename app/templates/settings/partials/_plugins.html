@@ -106,7 +106,7 @@
                     </button>
                 </form>
                 {% endif %}
-                <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=plugin.plugin_id) }}" class="btn btn-primary btn-sm">
+                <a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}" class="btn btn-primary btn-sm">
                     Configure
                 </a>
             </div>
@@ -213,7 +213,7 @@
                         </button>
                     </form>
                     {% endif %}
-                    <a href="{{ url_for('dashboard.settings_plugin_configure', plugin_id=plugin.plugin_id) }}" class="btn btn-primary btn-sm">
+                    <a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}" class="btn btn-primary btn-sm">
                         Configure
                     </a>
                     <form method="POST" action="{{ url_for('plugins.uninstall_plugin', plugin_id=plugin.plugin_id) }}" class="inline">

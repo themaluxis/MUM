@@ -1,4 +1,4 @@
-<!-- File: app/templates/admins/edit.html -->
+<!-- File: app/templates/admin/edit.html -->
 {% extends "settings/index.html" %}
 
 {% block title %}{{ super() }} - Edit Admin{% endblock %}
@@ -6,7 +6,7 @@
 {# This block will replace the `{% block settings_content %}` in settings/index.html #}
 {% block settings_content %}
     <div class="flex items-center mb-6">
-        <a href="{{ url_for('dashboard.settings_admins') }}" class="btn btn-ghost btn-sm mr-2">
+        <a href="{{ url_for('admin_management.index') }}" class="btn btn-ghost btn-sm mr-2">
             <i class="fa-solid fa-arrow-left"></i> Back to Admin List
         </a>
     </div>
@@ -36,7 +36,7 @@
                                 </label>
                             {% endfor %}
                         {% else %}
-                            <p class="text-xs italic text-base-content/70">No roles exist. <a href="{{ url_for('dashboard.settings_roles') }}" class="link link-primary">Create one first.</a></p>
+                            <p class="text-xs italic text-base-content/70">No roles exist. <a href="{{ url_for('role_management.index') }}" class="link link-primary">Create one first.</a></p>
                         {% endif %}
                     </div>
                 </div>
@@ -50,7 +50,7 @@
                                 <p class="text-sm text-base-content/70">Generate a new temporary password for this admin. They will be forced to change it on their next login.</p>
                             </div>
                             <button class="btn btn-warning btn-sm"
-                                    hx-get="{{ url_for('dashboard.reset_admin_password', admin_id=admin.id) }}"
+                                    hx-get="{{ url_for('admin_management.reset_password', admin_id=admin.id) }}"
                                     hx-target="#reset_password_modal_content"
                                     hx-swap="innerHTML"
                                     onclick="document.getElementById('reset_password_modal').showModal()">

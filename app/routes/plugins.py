@@ -161,15 +161,15 @@ def uninstall_plugin(plugin_id):
     
     if not plugin:
         flash('Plugin not found', 'danger')
-        return redirect(url_for('dashboard.settings_plugins'))
+        return redirect(url_for('plugin_management.index'))
     
     if plugin.plugin_type == PluginType.CORE:
         flash('Cannot uninstall core plugins', 'danger')
-        return redirect(url_for('dashboard.settings_plugins'))
+        return redirect(url_for('plugin_management.index'))
     
     if not plugin.can_be_disabled():
         flash('Cannot uninstall plugin while it has active servers', 'danger')
-        return redirect(url_for('dashboard.settings_plugins'))
+        return redirect(url_for('plugin_management.index'))
     
     success = plugin_manager.uninstall_plugin(plugin_id)
     
@@ -181,9 +181,9 @@ def uninstall_plugin(plugin_id):
     
     # Check if we're coming from settings page
     if request.referrer and 'settings/plugins' in request.referrer:
-        return redirect(url_for('dashboard.settings_plugins'))
+        return redirect(url_for('plugin_management.index'))
     else:
-        return redirect(url_for('dashboard.settings_plugins'))
+        return redirect(url_for('plugin_management.index'))
 
 
 

@@ -20,4 +20,4 @@ def set_timezone():
         flash('Timezone preference saved.', 'success')
     else:
         flash('Could not save timezone preference.', 'error')
-    return redirect(url_for('dashboard.settings_general'))
+    return redirect(url_for('settings.general'))
