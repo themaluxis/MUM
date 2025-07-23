@@ -2382,6 +2382,9 @@
   .top-1 {
     top: calc(var(--spacing) * 1);
   }
+  .top-1\/2 {
+    top: calc(1/2 * 100%);
+  }
   .top-1\/5 {
     top: calc(1/5 * 100%);
   }
@@ -3669,6 +3672,9 @@
       rotate: calc(45deg * -1);
     }
   }
+  .-rotate-90 {
+    rotate: calc(90deg * -1);
+  }
   .transform {
     transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
   }
@@ -4591,6 +4597,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       color: color-mix(in oklab, var(--color-accent) 80%, transparent);
     }
+  }
+  .text-base-300 {
+    color: var(--color-base-300);
   }
   .text-base-content {
     color: var(--color-base-content);

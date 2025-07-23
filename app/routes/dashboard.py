@@ -433,19 +433,116 @@ def streaming_sessions_partial():
                     quality_detail = f"Original ({original_media.bitrate / 1000:.1f} Mbps)"
 
                 else:
-                    # Jellyfin session handling (simplified)
-                    if is_transcoding:
-                        stream_details = "Transcode"
-                        container_detail = "Converting"
-                        video_detail = "Transcode"
-                        audio_detail = "Transcode"
-                        quality_detail = "Transcoding"
+                    # Jellyfin session handling (enhanced)
+                    transcoding_info = raw_session.get('TranscodingInfo', {})
+                    media_streams = now_playing.get('MediaStreams', [])
+                    
+                    # Find original video and audio streams
+                    original_video_stream = next((s for s in media_streams if s.get('Type') == 'Video'), None)
+                    original_audio_stream = next((s for s in media_streams if s.get('Type') == 'Audio' and s.get('IsDefault', False)), None)
+                    
+                    if is_transcoding and transcoding_info:
+                        # Enhanced Jellyfin transcode details
+                        hardware_accel = transcoding_info.get('HardwareAccelerationType', 'none')
+                        if hardware_accel and hardware_accel != 'none':
+                            stream_details = f"Transcode (HW: {hardware_accel.upper()})"
+                        else:
+                            stream_details = "Transcode"
+                        
+                        # Container details
+                        original_container = now_playing.get('Container', 'Unknown').upper()
+                        transcoded_container = transcoding_info.get('Container', 'Unknown').upper()
+                        if original_container != transcoded_container:
+                            container_detail = f"Converting ({original_container} -> {transcoded_container})"
+                        else:
+                            container_detail = f"Container: {transcoded_container}"
+                        
+                        # Video details
+                        is_video_direct = transcoding_info.get('IsVideoDirect', False)
+                        if is_video_direct and original_video_stream:
+                            # Video is direct stream
+                            original_height = original_video_stream.get('Height', 0)
+                            original_res = get_standard_resolution(original_height)
+                            original_codec = original_video_stream.get('Codec', 'Unknown').upper()
+                            video_detail = f"Direct Stream ({original_codec} {original_res})"
+                        else:
+                            # Video is being transcoded
+                            original_height = original_video_stream.get('Height', 0) if original_video_stream else 0
+                            original_res = get_standard_resolution(original_height)
+                            original_codec = original_video_stream.get('Codec', 'Unknown').upper() if original_video_stream else 'Unknown'
+                            
+                            transcoded_height = transcoding_info.get('Height', 0)
+                            transcoded_res = get_standard_resolution(transcoded_height)
+                            transcoded_codec = transcoding_info.get('VideoCodec', 'Unknown').upper()
+                            
+                            if original_video_stream:
+                                video_detail = f"Transcode ({original_codec} {original_res} -> {transcoded_codec} {transcoded_res})"
+                            else:
+                                video_detail = f"Transcode (-> {transcoded_codec} {transcoded_res})"
+                        
+                        # Audio details
+                        is_audio_direct = transcoding_info.get('IsAudioDirect', False)
+                        if is_audio_direct and original_audio_stream:
+                            # Audio is direct stream
+                            audio_display = original_audio_stream.get('DisplayTitle', 'Unknown Audio')
+                            audio_detail = f"Direct Stream ({audio_display})"
+                        else:
+                            # Audio is being transcoded
+                            original_audio_display = original_audio_stream.get('DisplayTitle', 'Unknown Audio') if original_audio_stream else 'Unknown Audio'
+                            transcoded_codec = transcoding_info.get('AudioCodec', 'Unknown').upper()
+                            transcoded_channels = transcoding_info.get('AudioChannels', 0)
+                            
+                            # Map channel count to layout
+                            channel_layout_map = {1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1"}
+                            transcoded_layout = channel_layout_map.get(transcoded_channels, f"{transcoded_channels}ch")
+                            transcoded_audio_display = f"{transcoded_codec} {transcoded_layout}"
+                            
+                            if original_audio_stream:
+                                audio_detail = f"Transcode ({original_audio_display} -> {transcoded_audio_display})"
+                            else:
+                                audio_detail = f"Transcode (-> {transcoded_audio_display})"
+                        
+                        # Quality details with bitrate
+                        transcoded_height = transcoding_info.get('Height', 0)
+                        transcoded_res = get_standard_resolution(transcoded_height)
+                        transcoded_bitrate = transcoding_info.get('Bitrate', 0)
+                        if transcoded_bitrate > 0:
+                            bitrate_mbps = transcoded_bitrate / 1000000  # Convert from bps to Mbps
+                            quality_detail = f"{transcoded_res} ({bitrate_mbps:.1f} Mbps)"
+                        else:
+                            quality_detail = f"{transcoded_res} (Transcoding)"
+                            
                     else:
+                        # Direct Play for Jellyfin
                         stream_details = "Direct Play"
                         container_detail = now_playing.get('Container', 'Unknown').upper()
-                        video_detail = "Direct Play"
-                        audio_detail = "Direct Play"
-                        quality_detail = "Direct Play"
+                        
+                        if original_video_stream:
+                            original_height = original_video_stream.get('Height', 0)
+                            original_res = get_standard_resolution(original_height)
+                            original_codec = original_video_stream.get('Codec', 'Unknown').upper()
+                            video_detail = f"Direct Play ({original_codec} {original_res})"
+                        else:
+                            video_detail = "Direct Play (Unknown Video)"
+                        
+                        if original_audio_stream:
+                            audio_display = original_audio_stream.get('DisplayTitle', 'Unknown Audio')
+                            audio_detail = f"Direct Play ({audio_display})"
+                        else:
+                            audio_detail = "Direct Play (Unknown Audio)"
+                        
+                        # Quality for direct play
+                        if original_video_stream:
+                            original_height = original_video_stream.get('Height', 0)
+                            original_res = get_standard_resolution(original_height)
+                            original_bitrate = original_video_stream.get('BitRate', 0)
+                            if original_bitrate > 0:
+                                bitrate_mbps = original_bitrate / 1000000  # Convert from bps to Mbps
+                                quality_detail = f"Original ({original_res}, {bitrate_mbps:.1f} Mbps)"
+                            else:
+                                quality_detail = f"Original ({original_res})"
+                        else:
+                            quality_detail = "Direct Play"
 
                 # Prepare raw data for modal
                 raw_session_dict = {}
@@ -468,7 +565,13 @@ def streaming_sessions_partial():
                     grandparent_title = now_playing.get('SeriesName', None)
                     parent_title = now_playing.get('SeasonName', None)
                     player_state = 'Playing' if not play_state.get('IsPaused', False) else 'Paused'
-                    bitrate_calc = 0  # Jellyfin bitrate calculation would need more work
+                    # Enhanced Jellyfin bitrate calculation for display
+                    if transcoding_info and transcoding_info.get('Bitrate'):
+                        bitrate_calc = transcoding_info.get('Bitrate', 0) / 1000  # Convert from bps to kbps for consistency with Plex
+                    elif original_video_stream and original_video_stream.get('BitRate'):
+                        bitrate_calc = original_video_stream.get('BitRate', 0) / 1000  # Convert from bps to kbps
+                    else:
+                        bitrate_calc = 0
 
                 session_details = {
                     'user': user_name, 'mum_user_id': mum_user_id, 'player_title': player_title,
@@ -576,7 +679,13 @@ def streaming_sessions_partial():
                 if is_plex_session:
                     bitrate_kbps = getattr(raw_session.session, 'bandwidth', 0)
                 else:
-                    bitrate_kbps = 0  # Jellyfin bandwidth calculation would need different approach
+                    # Enhanced Jellyfin bandwidth calculation
+                    if transcoding_info and transcoding_info.get('Bitrate'):
+                        bitrate_kbps = transcoding_info.get('Bitrate', 0) / 1000  # Convert from bps to kbps
+                    elif original_video_stream and original_video_stream.get('BitRate'):
+                        bitrate_kbps = original_video_stream.get('BitRate', 0) / 1000  # Convert from bps to kbps
+                    else:
+                        bitrate_kbps = 0
                 bitrate_mbps = (bitrate_kbps or 0) / 1000
                 summary_stats["total_bandwidth_mbps"] += bitrate_mbps
                 if is_lan:
