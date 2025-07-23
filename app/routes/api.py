@@ -305,3 +305,29 @@ def geoip_lookup(ip_address):
         abort(503)
     geoip_data = plex_service.get_geoip_info(ip_address)
     return render_template('components/modals/geoip_modal.html', geoip_data=geoip_data, ip_address=ip_address)
+
+@bp.route('/session-count')
+@login_required
+def session_count():
+    """
+    API endpoint to get the current count of active streaming sessions.
+    Returns JSON with the total session count.
+    """
+    try:
+        # Get active sessions from all services
+        active_sessions_data = MediaServiceManager.get_all_active_sessions()
+        
+        # Count total sessions
+        total_sessions = len(active_sessions_data)
+        
+        return jsonify({
+            'success': True,
+            'count': total_sessions
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error getting session count: {e}")
+        return jsonify({
+            'success': False,
+            'count': 0,
+            'error': str(e)
+        }), 500

@@ -170,5 +170,88 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // --- Session Count Badge Monitoring ---
+    function updateSessionBadges() {
+        // Only update if user is authenticated (badges exist)
+        const desktopBadge = document.getElementById('streaming-badge-desktop');
+        const mobileBadge = document.getElementById('streaming-badge-mobile');
+        
+        if (!desktopBadge && !mobileBadge) {
+            return; // No badges found, user might not be logged in
+        }
+
+        fetch('/api/session-count', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const count = data.count;
+                
+                // Update both desktop and mobile badges
+                [desktopBadge, mobileBadge].forEach(badge => {
+                    if (badge) {
+                        badge.textContent = count;
+                        
+                        // Show/hide badge with smooth transition
+                        if (count > 0) {
+                            if (badge.style.display === 'none') {
+                                badge.style.display = 'inline-block';
+                                badge.style.opacity = '0';
+                                badge.style.transform = 'scale(0.8)';
+                                badge.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                                
+                                // Trigger animation
+                                setTimeout(() => {
+                                    badge.style.opacity = '1';
+                                    badge.style.transform = 'scale(1)';
+                                }, 10);
+                            }
+                        } else {
+                            if (badge.style.display !== 'none') {
+                                badge.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                                badge.style.opacity = '0';
+                                badge.style.transform = 'scale(0.8)';
+                                
+                                setTimeout(() => {
+                                    badge.style.display = 'none';
+                                }, 300);
+                            }
+                        }
+                    }
+                });
+            }
+        })
+        .catch(error => {
+            console.debug('Session count update failed:', error);
+            // Silently fail - don't show errors for this background task
+        });
+    }
+
+    // Initial session count update
+    updateSessionBadges();
+
+    // Set up periodic updates every 10 seconds
+    setInterval(updateSessionBadges, 10000);
+
+    // Update session count when returning to the page (visibility change)
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            updateSessionBadges();
+        }
+    });
+
+    // Update session count when streaming page content changes (if on streaming page)
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        // If we're on the streaming page and content was updated, refresh the badge
+        if (event.detail.target && event.detail.target.id === 'streaming-sessions-container') {
+            setTimeout(updateSessionBadges, 500); // Small delay to ensure backend is updated
+        }
+    });
+
 }); // End of DOMContentLoaded
 
