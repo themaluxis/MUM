@@ -446,6 +446,12 @@ class GeneralSettingsForm(FlaskForm): # As before
         validators=[Optional(), URL(message="Invalid URL. Must be full local URL (e.g., http://192.168.1.100:5000).")], 
         description="Local URL for internal network access (optional)."
     )
+    session_monitoring_interval = IntegerField(
+        'Session Monitoring Interval (seconds)',
+        validators=[DataRequired(), NumberRange(min=10, max=300)],
+        default=30,
+        description="How often to check for new media sessions (in seconds). Lower values are more responsive but increase system load."
+    )
     submit = SubmitField('Save General Settings')
 
     def __init__(self, *args, **kwargs):

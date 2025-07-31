@@ -476,9 +476,8 @@ def plex_oauth_callback():
     try:
         # Recreate pin login object for checking status
         from plexapi.myplex import MyPlexPinLogin
-        pin_login = MyPlexPinLogin(headers=pin_headers, oauth=False)
-        # Set the PIN code (pin_id_from_session is actually the PIN code)
-        pin_login.pin = pin_id_from_session
+        # Pass the PIN code during instantiation
+        pin_login = MyPlexPinLogin(headers=pin_headers, oauth=False, pin=pin_id_from_session)
         current_app.logger.debug(f"Recreated pin_login with PIN: {pin_id_from_session}")
         
         # Use plexapi helper to check PIN status

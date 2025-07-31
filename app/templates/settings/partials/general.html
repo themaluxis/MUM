@@ -1,46 +1,50 @@
 <!-- File: app/templates/settings/_general_settings.html -->
-{# Expects 'form' (GeneralSettingsForm instance) in context #}
+{# File: app/templates/settings/partials/general.html #}
+{# Expects 'form' of type GeneralSettingsForm #}
 <form method="POST" action="{{ url_for('settings.general') }}">
     {{ form.hidden_tag() }}
     <h2 class="text-xl font-semibold mb-6">General Application Settings</h2>
 
-    <div class="space-y-4">
-        <div class="form-control w-full max-w-md">
+    <div class="space-y-6">
+        
+        <div class="form-control">
             {{ form.app_name.label(class="label") }}
-            {{ form.app_name(class="input input-bordered " + ("input-error" if form.app_name.errors else ""), placeholder="e.g., My Plex Manager") }}
-            {% if form.app_name.errors %}
-                {% for error in form.app_name.errors %}
-                <label class="label"><span class="label-text-alt text-error">{{ error }}</span></label>
-                {% endfor %}
-            {% endif %}
+            {{ form.app_name(class="input input-bordered w-full " + ("input-error" if form.app_name.errors else "")) }}
+            {% if form.app_name.errors %}<span class="label-text-alt text-error mt-1">{{ form.app_name.errors[0] }}</span>{% endif %}
             <label class="label"><span class="label-text-alt whitespace-normal">The public name for this application.</span></label>
         </div>
 
-        <div class="form-control w-full max-w-md">
-            {{ form.app_base_url.label(class="label required") }}
-            {{ form.app_base_url(class="input input-bordered " + ("input-error" if form.app_base_url.errors else ""), placeholder="https://plex.example.com") }}
+        <div class="form-control">
+            {{ form.app_base_url.label(class="label") }}
+            {{ form.app_base_url(class="input input-bordered w-full " + ("input-error" if form.app_base_url.errors else "")) }}
             {% if form.app_base_url.errors %}
-                {% for error in form.app_base_url.errors %}
-                <label class="label"><span class="label-text-alt text-error">{{ error }}</span></label>
-                {% endfor %}
+                <span class="label-text-alt text-error mt-1">{{ form.app_base_url.errors[0] }}</span>
             {% else %}
-                 <label class="label"><span class="label-text-alt whitespace-normal">{{ form.app_base_url.description }}</span></label>
+                <span class="label-text-alt">{{ form.app_base_url.description }}</span>
             {% endif %}
         </div>
 
-        <div class="form-control w-full max-w-md">
+        <div class="form-control">
             {{ form.app_local_url.label(class="label") }}
-            {{ form.app_local_url(class="input input-bordered " + ("input-error" if form.app_local_url.errors else ""), placeholder="http://192.168.1.100:5000") }}
+            {{ form.app_local_url(class="input input-bordered w-full " + ("input-error" if form.app_local_url.errors else "")) }}
             {% if form.app_local_url.errors %}
-                {% for error in form.app_local_url.errors %}
-                <label class="label"><span class="label-text-alt text-error">{{ error }}</span></label>
-                {% endfor %}
+                <span class="label-text-alt text-error mt-1">{{ form.app_local_url.errors[0] }}</span>
             {% else %}
-                 <label class="label"><span class="label-text-alt whitespace-normal">{{ form.app_local_url.description }}</span></label>
+                <span class="label-text-alt">{{ form.app_local_url.description }}</span>
             {% endif %}
         </div>
 
-        <div class="form-control mt-8">
+        <div class="form-control">
+            {{ form.session_monitoring_interval.label(class="label") }}
+            {{ form.session_monitoring_interval(class="input input-bordered w-full " + ("input-error" if form.session_monitoring_interval.errors else "")) }}
+            {% if form.session_monitoring_interval.errors %}
+                <span class="label-text-alt text-error mt-1">{{ form.session_monitoring_interval.errors[0] }}</span>
+            {% else %}
+                <span class="label-text-alt">{{ form.session_monitoring_interval.description }}</span>
+            {% endif %}
+        </div>
+
+        <div class="flex justify-end pt-4">
             {{ form.submit(class="btn btn-primary") }}
         </div>
     </div>

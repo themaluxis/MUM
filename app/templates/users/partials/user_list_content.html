@@ -5,7 +5,11 @@
     {% if current_view == 'table' %}
         {% include 'users/partials/user_table.html' with context %}
     {% else %} 
-        {% include 'users/partials/user_cards.html' with context %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {% for user in users.items %}
+                {% include 'users/partials/_single_user_card.html' %}
+            {% endfor %}
+        </div>
     {% endif %}
 
     {% if users.pages > 1 %}
