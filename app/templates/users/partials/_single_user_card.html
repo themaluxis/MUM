@@ -5,19 +5,19 @@
 {% set primary_service = service_types[0] if service_types else none %}
 {% if primary_service %}
     {% if primary_service.value == 'plex' %}
-        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-yellow-500/10" %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-plex/10" %}
     {% elif primary_service.value == 'jellyfin' %}
-        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-purple-500/10" %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-jellyfin/10" %}
     {% elif primary_service.value == 'emby' %}
-        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-green-500/10" %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-emby/10" %}
     {% elif primary_service.value == 'kavita' %}
-        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-orange-500/10" %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-kavita/10" %}
     {% elif primary_service.value == 'audiobookshelf' %}
-        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-blue-500/10" %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-audiobookshelf/10" %}
     {% elif primary_service.value == 'komga' %}
-        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-red-500/10" %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-komga/10" %}
     {% elif primary_service.value == 'romm' %}
-        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-indigo-500/10" %}
+        {% set card_bg_class = "bg-gradient-to-br from-base-200 to-romm/10" %}
     {% else %}
         {% set card_bg_class = "bg-base-200" %}
     {% endif %}
@@ -45,12 +45,12 @@
                             <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
                             {# Jellyfin fallback avatar with purple theme #}
-                            <div class="bg-purple-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style="display: none;">
+                            <div class="bg-jellyfin text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style="display: none;">
                                 {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
                             </div>
                         {% else %}
                             {# No Jellyfin user ID found, show purple fallback directly #}
-                            <div class="bg-purple-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold">
+                            <div class="bg-jellyfin text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold">
                                 {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
                             </div>
                         {% endif %}
@@ -67,25 +67,25 @@
                 {# Service type badge #}
                 {% if primary_service %}
                     {% if primary_service.value == 'plex' %}
-                        {% set badge_class = "bg-yellow-500 text-yellow-900" %}
+                        {% set badge_class = "bg-plex text-plex-content" %}
                         {% set service_name = "Plex" %}
                     {% elif primary_service.value == 'jellyfin' %}
-                        {% set badge_class = "bg-purple-500 text-purple-100" %}
+                        {% set badge_class = "bg-jellyfin text-jellyfin-content" %}
                         {% set service_name = "Jellyfin" %}
                     {% elif primary_service.value == 'emby' %}
-                        {% set badge_class = "bg-green-500 text-green-100" %}
+                        {% set badge_class = "bg-emby text-emby-content" %}
                         {% set service_name = "Emby" %}
                     {% elif primary_service.value == 'kavita' %}
-                        {% set badge_class = "bg-orange-500 text-orange-100" %}
+                        {% set badge_class = "bg-kavita text-kavita-content" %}
                         {% set service_name = "Kavita" %}
                     {% elif primary_service.value == 'audiobookshelf' %}
-                        {% set badge_class = "bg-blue-500 text-blue-100" %}
+                        {% set badge_class = "bg-audiobookshelf text-audiobookshelf-content" %}
                         {% set service_name = "AudiobookShelf" %}
                     {% elif primary_service.value == 'komga' %}
-                        {% set badge_class = "bg-red-500 text-red-100" %}
+                        {% set badge_class = "bg-komga text-komga-content" %}
                         {% set service_name = "Komga" %}
                     {% elif primary_service.value == 'romm' %}
-                        {% set badge_class = "bg-indigo-500 text-indigo-100" %}
+                        {% set badge_class = "bg-romm text-romm-content" %}
                         {% set service_name = "RomM" %}
                     {% else %}
                         {% set badge_class = "bg-gray-500 text-gray-100" %}

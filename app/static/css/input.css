@@ -14,6 +14,11 @@
 @theme {
   --color-plex: oklch(74.22% 0.18 80.28);
   --color-jellyfin: oklch(0.63 0.27 304.24);
+  --color-emby: oklch(73.4% 0.19 150.17);
+  --color-kavita: oklch(71.41% 0.19 53.8);
+  --color-audiobookshelf: oklch(62.8% 0.16 263.78);
+  --color-komga: oklch(64.9% 0.22 29.4);
+  --color-romm: oklch(62.28% 0.16 282.4);
 }
 
 /* Custom base styles or overrides can go here */
