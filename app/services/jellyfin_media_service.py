@@ -463,7 +463,7 @@ class JellyfinMediaService(BaseMediaService):
             for session in sessions:
                 # Only include sessions that are actively playing something
                 if not session.get('NowPlayingItem'):
-                    self.log_debug(f"Skipping inactive session: {session.get('Id', 'Unknown')}")
+                    self.log_info(f"Skipping inactive session: {session.get('Id', 'Unknown')}")
                     continue
                 
                 now_playing = session.get('NowPlayingItem', {})
@@ -512,8 +512,49 @@ class JellyfinMediaService(BaseMediaService):
             else:
                 info = self._make_request('System/Info')
             
+            # Try multiple endpoints to find the server name
+            try:
+                # Try System/Configuration
+                config_info = self._make_request('System/Configuration')
+                self.log_info(f"DEBUG JELLYFIN CONFIG - ServerName from config: '{config_info.get('ServerName', 'NOT_FOUND')}'")
+                
+                # Try Branding/Configuration which might have display name
+                branding_info = self._make_request('Branding/Configuration')
+                self.log_info(f"DEBUG JELLYFIN BRANDING - CustomCss: '{branding_info.get('CustomCss', 'NOT_FOUND')}'")
+                self.log_info(f"DEBUG JELLYFIN BRANDING - LoginDisclaimer: '{branding_info.get('LoginDisclaimer', 'NOT_FOUND')}'")
+                
+                # Try System/Configuration/MetadataOptions
+                try:
+                    metadata_info = self._make_request('System/Configuration/MetadataOptions')
+                    self.log_info(f"DEBUG JELLYFIN METADATA - Response type: {type(metadata_info)}")
+                except:
+                    pass
+                
+                # Check if ServerName is in config_info
+                if not info.get('ServerName') and config_info.get('ServerName'):
+                    info['ServerName'] = config_info.get('ServerName')
+                    self.log_info(f"DEBUG JELLYFIN CONFIG - Using ServerName from config: '{config_info.get('ServerName')}'")
+                    
+            except Exception as e:
+                self.log_info(f"DEBUG JELLYFIN CONFIG - Could not fetch additional config: {e}")
+            
+            # Extract server name and handle empty values
+            # Try multiple possible fields for server name
+            server_name = (info.get('ServerName') or 
+                          info.get('Name') or 
+                          info.get('LocalAddress') or 
+                          self.name)
+            
+            # Handle empty values
+            if not server_name or server_name.strip() == '':
+                server_name = self.name
+            
+            # DEBUG: Log what fields are available to find the server name
+            self.log_info(f"DEBUG JELLYFIN SERVER NAME - Available fields: ServerName='{info.get('ServerName')}', Name='{info.get('Name')}', LocalAddress='{info.get('LocalAddress')}'")
+            self.log_info(f"DEBUG JELLYFIN SERVER NAME - Using: '{server_name}'")
+            
             return {
-                'name': info.get('ServerName', self.name),
+                'name': server_name,
                 'url': self.url,
                 'service_type': self.service_type.value,
                 'online': True,

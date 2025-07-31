@@ -27,6 +27,9 @@
                     {% if group.value == 'plex' %}
                         <svg class="w-6 h-6 inline-block text-primary bottom-0.5 relative" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="#000000" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
                     {% endif %}
+                    {% if group.value == 'jellyfin' %}
+                    <i class="fa-solid fa-cube text-purple-500 fa-lg"></i>
+                    {% endif %}
                     {{ group.name.capitalize() }}
                 </summary>
                 <div class="collapse-content">
@@ -163,87 +166,6 @@
         </div>
     </details>
     {# --- END Advanced Options --- #}
-
-    {# Server Selection #}
-    <div class="divider text-xs">Select Server & Grant Access</div>
-    <div class="form-control mb-4 space-y-2">
-        <input type="hidden" name="server_id" id="selected_server_id">
-        {% for group, servers in all_servers | groupby('service_type') %}
-            <details class="collapse collapse-arrow bg-base-200/50 border border-base-300 rounded-md server-group-details">
-                <summary class="collapse-title text-lg font-medium flex items-center">
-                    {% if group.value == 'plex' %}
-                        <svg class="w-6 h-6 inline-block text-primary bottom-0.5 relative" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="#000000" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
-                    {% endif %}
-                    {{ group.name.capitalize() }}
-                </summary>
-                <div class="collapse-content">
-                    <div class="grid grid-cols-1 gap-4">
-                        {% for server in servers %}
-                            <div class="card bg-base-100 shadow-xl cursor-pointer server-card border-2 border-transparent relative" data-server-id="{{ server.id }}">
-                                <div class="absolute top-2 right-2 checkmark-icon hidden">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <div class="card-body p-4">
-                                    <h2 class="card-title text-base">{{ server.name }}</h2>
-                                    
-                                    <div class="server-options-content hidden mt-4 space-y-4">
-                                        {# Library Access #}
-                                        <div class="form-control">
-                                            <label class="label">
-                                                <span class="label-text">{{ form.libraries.label.text }}</span>
-                                                <span class="label-text-alt">
-                                                    <button type="button" class="btn btn-xs btn-ghost select-all-libs">All</button> |
-                                                    <button type="button" class="btn btn-xs btn-ghost deselect-all-libs">None</button>
-                                                </span>
-                                            </label>
-                                            <div class="max-h-40 overflow-y-auto p-2 border border-base-300 rounded-md bg-base-100/30 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                                                {% for value, label in form.libraries.choices %}
-                                                    <label class="label cursor-pointer justify-start py-1">
-                                                        <input type="checkbox" name="{{ form.libraries.name }}" value="{{ value }}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" {% if form.libraries.data and value in form.libraries.data %}checked{% endif %}>
-                                                        <span class="label-text" title="{{ label }}">{{ label | truncate(30, True) }}</span>
-                                                    </label>
-                                                {% endfor %}
-                                            </div>
-                                            {% if form.libraries.errors %}<span class="label-text-alt text-error mt-1">{{ form.libraries.errors[0] }}</span>{% endif %}
-                                        </div>
-                                        
-                                        {# Allow Downloads #}
-                                        <div class="form-control">
-                                            <label class="label cursor-pointer justify-start">
-                                                {{ form.allow_downloads(class="toggle toggle-accent mr-3") }}
-                                                <span class="label-text font-medium">{{ form.allow_downloads.label.text }}</span>
-                                            </label>
-                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_downloads.description }}</p>
-                                        </div>
-
-                                        {# Plex-specific options #}
-                                        {% if server.service_type.value == 'plex' %}
-                                        <div class="form-control">
-                                            <label class="label cursor-pointer justify-start">
-                                                {{ form.invite_to_plex_home(class="toggle toggle-primary mr-3") }}
-                                                <span class="label-text font-medium">{{ form.invite_to_plex_home.label.text }}</span>
-                                            </label>
-                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.invite_to_plex_home.description }}</p>
-                                        </div>
-                                        <div class="form-control">
-                                            <label class="label cursor-pointer justify-start">
-                                                {{ form.allow_live_tv(class="toggle toggle-secondary mr-3") }}
-                                                <span class="label-text font-medium">{{ form.allow_live_tv.label.text }}</span>
-                                            </label>
-                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_live_tv.description }}</p>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </details>
-        {% endfor %}
-    </div>
 
     {# Submit actions are unchanged #}
     <div class="modal-action mt-6">
