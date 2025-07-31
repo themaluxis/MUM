@@ -82,6 +82,8 @@
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     --default-font-family: var(--font-sans);
     --default-mono-font-family: var(--font-mono);
+    --color-plex: oklch(74.22% 0.18 80.28);
+    --color-jellyfin: oklch(0.63 0.27 304.24);
   }
 }
 @layer base {
@@ -3878,6 +3880,9 @@
   .stroke-current {
     stroke: currentcolor;
   }
+  .stroke-transparent {
+    stroke: transparent;
+  }
   .object-cover {
     object-fit: cover;
   }
@@ -4265,6 +4270,9 @@
   .text-info {
     color: var(--color-info);
   }
+  .text-jellyfin {
+    color: var(--color-jellyfin);
+  }
   .text-neutral-content {
     color: var(--color-neutral-content);
   }
@@ -4282,6 +4290,9 @@
   }
   .text-orange-500 {
     color: var(--color-orange-500);
+  }
+  .text-plex {
+    color: var(--color-plex);
   }
   .text-primary {
     color: var(--color-primary);
@@ -5325,39 +5336,6 @@ label.required::after {
   0%, 40% {
     scale: 1.1;
     filter: brightness(1.05) contrast(1.05);
-  }
-}
-@layer base {
-  :root:has(input.theme-controller[value=light]:checked),[data-theme="light"] {
-    color-scheme: light;
-    --color-base-100: oklch(100% 0 0);
-    --color-base-200: oklch(98% 0 0);
-    --color-base-300: oklch(95% 0 0);
-    --color-base-content: oklch(21% 0.006 285.885);
-    --color-primary: oklch(66% 0.179 58.318);
-    --color-primary-content: oklch(93% 0.034 272.788);
-    --color-secondary: oklch(65% 0.241 354.308);
-    --color-secondary-content: oklch(94% 0.028 342.258);
-    --color-accent: oklch(77% 0.152 181.912);
-    --color-accent-content: oklch(38% 0.063 188.416);
-    --color-neutral: oklch(14% 0.005 285.823);
-    --color-neutral-content: oklch(92% 0.004 286.32);
-    --color-info: oklch(74% 0.16 232.661);
-    --color-info-content: oklch(29% 0.066 243.157);
-    --color-success: oklch(76% 0.177 163.223);
-    --color-success-content: oklch(37% 0.077 168.94);
-    --color-warning: oklch(82% 0.189 84.429);
-    --color-warning-content: oklch(41% 0.112 45.904);
-    --color-error: oklch(71% 0.194 13.428);
-    --color-error-content: oklch(27% 0.105 12.094);
-    --radius-selector: 0.5rem;
-    --radius-field: 0.25rem;
-    --radius-box: 0.5rem;
-    --size-selector: 0.25rem;
-    --size-field: 0.25rem;
-    --border: 1px;
-    --depth: 1;
-    --noise: 0;
   }
 }
 @property --tw-translate-x {
