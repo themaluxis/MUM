@@ -369,88 +369,62 @@ def streaming_sessions_partial():
 
                     # Determine stream type for Plex
                     if is_transcoding:
-                        # For transcodes, the session data is for the *output* stream.
-                        # We need to fetch the original item to get the source quality.
-                        try:
-                            full_media_item = raw_session._server.fetchItem(raw_session.ratingKey)
-                            original_media_part = full_media_item.media[0].parts[0]
-                            original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
-                            original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
-                        except Exception as e:
-                            current_app.logger.error(f"Could not fetch full media item for transcode session: {e}")
-                            # Fallback to the potentially inaccurate session data
-                            original_media_part = next((p for m in raw_session.media for p in m.parts if not p.selected), raw_session.media[0].parts[0])
-                            original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
-                            original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
+                        speed = f"(Speed: {transcode_session.speed:.1f})" if transcode_session and transcode_session.speed is not None else ""
+                        status = "Throttled" if transcode_session and transcode_session.throttled else ""
+                        stream_details = f"Transcode {status} {speed}".strip()
+                        
+                        # Container
+                        original_container = original_media_part.container.upper() if original_media_part else 'N/A'
+                        transcoded_container = transcode_session.container.upper() if transcode_session else 'N/A'
+                        container_detail = f"Converting ({original_container} \u2192 {transcoded_container})"
 
-                    speed = f"(Speed: {transcode_session.speed:.1f})" if transcode_session.speed is not None else ""
-                    status = "Throttled" if transcode_session.throttled else ""
-                    stream_details = f"Transcode {status} {speed}".strip()
-                    
-                    # Container
-                    original_container = original_media_part.container.upper() if original_media_part else 'N/A'
-                    transcoded_container = transcode_session.container.upper()
-                    container_detail = f"Converting ({original_container} \u2192 {transcoded_container})"
-
-                    # Video
-                    original_res = get_standard_resolution(original_video_stream.height) if original_video_stream else "Unknown"
-                    transcoded_res = get_standard_resolution(transcode_session.height)
-                    if transcode_session.videoDecision == "copy":
-                        video_detail = f"Direct Stream ({original_video_stream.codec.upper()} {original_res})"
-                    else:
-                        video_detail = f"Transcode ({original_video_stream.codec.upper()} {original_res} \u2192 {transcode_session.videoCodec.upper()} {transcoded_res})"
-
-                    # Audio
-                    if transcode_session.audioDecision == "copy":
-                        audio_detail = f"Direct Stream ({original_audio_stream.displayTitle})"
-                    else:
-                        original_audio_display = original_audio_stream.displayTitle if original_audio_stream else "Unknown"
-                        audio_channel_layout_map = {1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1"}
-                        transcoded_channel_layout = audio_channel_layout_map.get(transcode_session.audioChannels, f"{transcode_session.audioChannels}ch")
-                        transcoded_audio_display = f"{transcode_session.audioCodec.upper()} {transcoded_channel_layout}"
-                        audio_detail = f"Transcode ({original_audio_display} \u2192 {transcoded_audio_display})"
-
-                    # Subtitle
-                    selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
-                    if transcode_session.subtitleDecision == "transcode":
-                        if selected_subtitle_stream:
-                            lang = selected_subtitle_stream.language or "Unknown"
-                            # The 'format' attribute seems to reliably hold the destination container (e.g., 'ass', 'srt')
-                            dest_format = (getattr(selected_subtitle_stream, 'format', '???') or '???').upper()
-                            display_title = selected_subtitle_stream.displayTitle
-                            match = re.search(r'\((.*?)\)', display_title)
-                            if match:
-                                # Extracts "SRT" from "English (SRT)"
-                                original_format = match.group(1).upper()
-                            else:
-                                original_format = '???'
-                            
-                            if original_format != dest_format and dest_format != '???':
-                                subtitle_detail = f"Transcode ({lang} - {original_format} → {dest_format})"
-                            else:
-                                # Fallback to a simpler display if formats match or dest is unknown
-                                subtitle_detail = f"Transcode ({display_title})"
+                        # Video
+                        original_res = get_standard_resolution(original_video_stream.height) if original_video_stream else "Unknown"
+                        transcoded_res = get_standard_resolution(transcode_session.height) if transcode_session else "Unknown"
+                        if transcode_session and transcode_session.videoDecision == "copy":
+                            video_detail = f"Direct Stream ({original_video_stream.codec.upper()} {original_res})"
                         else:
-                            subtitle_detail = "Transcode (Unknown)"
-                    elif transcode_session.subtitleDecision == "copy":
-                        if selected_subtitle_stream:
-                            subtitle_detail = f"Direct Stream ({selected_subtitle_stream.displayTitle})"
+                            video_detail = f"Transcode ({original_video_stream.codec.upper()} {original_res} \u2192 {transcode_session.videoCodec.upper() if transcode_session else 'N/A'} {transcoded_res})"
+
+                        # Audio
+                        if transcode_session and transcode_session.audioDecision == "copy":
+                            audio_detail = f"Direct Stream ({original_audio_stream.displayTitle})"
                         else:
-                            subtitle_detail = "Direct Stream (Unknown)"
+                            original_audio_display = original_audio_stream.displayTitle if original_audio_stream else "Unknown"
+                            audio_channel_layout_map = {1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1"}
+                            transcoded_channel_layout = audio_channel_layout_map.get(transcode_session.audioChannels, f"{transcode_session.audioChannels}ch") if transcode_session else "N/A"
+                            transcoded_audio_display = f"{transcode_session.audioCodec.upper() if transcode_session else 'N/A'} {transcoded_channel_layout}"
+                            audio_detail = f"Transcode ({original_audio_display} \u2192 {transcoded_audio_display})"
 
-                    # Quality
-                    transcoded_media = next((m for m in raw_session.media if m.selected), None)
-                    quality_res = get_standard_resolution(getattr(transcoded_media, 'height', transcode_session.height))
-                    if transcoded_media:
-                        quality_detail = f"{quality_res} ({transcoded_media.bitrate / 1000:.1f} Mbps)"
-                    else:
-                        quality_detail = f"{quality_res} (Bitrate N/A)"
+                        # Subtitle
+                        selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
+                        if transcode_session and transcode_session.subtitleDecision == "transcode":
+                            if selected_subtitle_stream:
+                                lang = selected_subtitle_stream.language or "Unknown"
+                                dest_format = (getattr(selected_subtitle_stream, 'format', '???') or '???').upper()
+                                display_title = selected_subtitle_stream.displayTitle
+                                match = re.search(r'\((.*?)\)', display_title)
+                                original_format = match.group(1).upper() if match else '???'
+                                
+                                if original_format != dest_format and dest_format != '???':
+                                    subtitle_detail = f"Transcode ({lang} - {original_format} → {dest_format})"
+                                else:
+                                    subtitle_detail = f"Transcode ({display_title})"
+                            else:
+                                subtitle_detail = "Transcode (Unknown)"
+                        elif transcode_session and transcode_session.subtitleDecision == "copy":
+                            subtitle_detail = f"Direct Stream ({selected_subtitle_stream.displayTitle})" if selected_subtitle_stream else "Direct Stream (Unknown)"
 
-                elif is_plex_session and not is_transcoding:
-                    # Plex Direct Play
-                    stream_details = "Direct Play"
-                    if any(p.decision == 'transcode' for m in raw_session.media for p in m.parts):
-                        stream_details = "Direct Stream"
+                        # Quality
+                        transcoded_media = next((m for m in raw_session.media if m.selected), None)
+                        quality_res = get_standard_resolution(getattr(transcoded_media, 'height', transcode_session.height if transcode_session else 0))
+                        quality_detail = f"{quality_res} ({transcoded_media.bitrate / 1000:.1f} Mbps)" if transcoded_media else f"{quality_res} (Bitrate N/A)"
+
+                    elif is_plex_session and not is_transcoding:
+                        # Plex Direct Play
+                        stream_details = "Direct Play"
+                        if any(p.decision == 'transcode' for m in raw_session.media for p in m.parts):
+                            stream_details = "Direct Stream"
 
                     original_res = get_standard_resolution(original_video_stream.height) if original_video_stream else "Unknown"
                     container_detail = original_media_part.container.upper()
