@@ -18,7 +18,7 @@
                 {# Use service-aware avatar logic similar to user cards #}
                 {% set avatar_url = user.get_avatar(url_for('static', filename='img/default_avatar.png')) %}
                 {% set service_types = user_service_types.get(user.id, []) %}
-                {% set primary_service = service_types[0] if service_types else none %}
+                {% set primary_service = service_types[0] if service_types else None %}
                 
                 {# Check if this is a Jellyfin user and try to get their avatar #}
                 {% if primary_service and primary_service.value == 'jellyfin' and user.raw_plex_data and user.raw_plex_data.startswith('{') %}

@@ -22,7 +22,7 @@ class PluginManager:
         self._plugin_instances: Dict[str, BaseMediaService] = {}
         self._core_plugins = {
             'plex': {
-                'name': 'Plex Media Server',
+                'name': 'Plex',
                 'module_path': 'app.services.plex_media_service',
                 'service_class': 'PlexMediaService',
                 'description': 'Plex Media Server integration with full feature support',
@@ -35,14 +35,14 @@ class PluginManager:
                 }
             },
             'emby': {
-                'name': 'Emby Server',
+                'name': 'Emby',
                 'module_path': 'app.services.emby_media_service',
                 'service_class': 'EmbyMediaService',
                 'description': 'Emby Server integration with user management and streaming',
                 'supported_features': ['user_management', 'library_access', 'active_sessions', 'downloads', 'transcoding']
             },
             'jellyfin': {
-                'name': 'Jellyfin Server',
+                'name': 'Jellyfin',
                 'module_path': 'app.services.jellyfin_media_service',
                 'service_class': 'JellyfinMediaService',
                 'description': 'Jellyfin Server integration with user management and streaming',

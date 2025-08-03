@@ -62,7 +62,7 @@
                         
                         {# Paused Column #}
                         <td>
-                            {% if entry.stopped_at and entry.duration_seconds is not none %}
+                            {% if entry.stopped_at and entry.duration_seconds is not None %}
                                 {# Calculate paused time for completed sessions #}
                                 {% set total_elapsed = (entry.stopped_at - entry.started_at).total_seconds() %}
                                 {% set paused_seconds = total_elapsed - entry.duration_seconds %}
@@ -84,7 +84,7 @@
                         
                         {# Duration Column #}
                         <td>
-                            {% if entry.stopped_at and entry.duration_seconds is not none %}
+                            {% if entry.stopped_at and entry.duration_seconds is not None %}
                                 {# Completed session - show final duration #}
                                 {{ entry.duration_seconds | format_duration }}
                             {% elif not entry.stopped_at and entry.view_offset_at_end_seconds %}

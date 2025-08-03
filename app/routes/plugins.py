@@ -50,9 +50,9 @@ def enable_plugin(plugin_id):
     else:
         # Check if we're coming from settings page
         if request.referrer and 'settings/plugins' in request.referrer:
-            return redirect(url_for('dashboard.settings_plugins'))
+            return redirect(url_for('plugin_management.index'))
         else:
-            return redirect(url_for('plugins.list_plugins'))
+            return redirect(url_for('plugin_management.index'))
 
 @bp.route('/plugins/<plugin_id>/disable', methods=['POST'])
 @login_required
@@ -84,9 +84,9 @@ def disable_plugin(plugin_id):
     else:
         # Check if we're coming from settings page
         if request.referrer and 'settings/plugins' in request.referrer:
-            return redirect(url_for('dashboard.settings_plugins'))
+            return redirect(url_for('plugin_management.index'))
         else:
-            return redirect(url_for('plugins.list_plugins'))
+            return redirect(url_for('plugin_management.index'))
 
 @bp.route('/plugins/<plugin_id>/info')
 @login_required
@@ -145,7 +145,7 @@ def install_plugin():
         else:
             flash('Invalid file format. Please upload a .zip or .tar.gz file.', 'danger')
         
-        return redirect(url_for('dashboard.settings_plugins'))
+        return redirect(url_for('plugin_management.index'))
     
     return render_template('settings/index.html', 
                          title="Install Plugin",

@@ -179,3 +179,176 @@ def edit_server(plugin_id, server_id):
         form=form,
         active_tab='plugin_edit_server'
     )
+
+@bp.route('/<plugin_id>/add', methods=['GET', 'POST'])
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def add_server(plugin_id):
+    from app.models_plugins import Plugin
+    from app.models_media_services import MediaServer, ServiceType
+    from app.forms import MediaServerForm
+
+    plugin = Plugin.query.filter_by(plugin_id=plugin_id).first_or_404()
+    
+    # Convert plugin_id string to ServiceType enum
+    try:
+        service_type_enum = ServiceType[plugin_id.upper()]
+    except KeyError:
+        flash(f"Invalid service type: {plugin_id}", "danger")
+        return redirect(url_for('plugin_management.index'))
+
+    form = MediaServerForm()
+    form.service_type.data = service_type_enum.value
+    
+    if form.validate_on_submit():
+        try:
+            # Create new server
+            new_server = MediaServer(
+                name=form.name.data,
+                url=form.url.data.rstrip('/'),
+                api_key=form.api_key.data,
+                username=form.username.data,
+                password=form.password.data,
+                service_type=service_type_enum,
+                is_active=form.is_active.data
+            )
+            
+            db.session.add(new_server)
+            db.session.commit()
+            
+            # Enable the plugin if it's not already enabled
+            from app.services.plugin_manager import plugin_manager
+            plugin_enabled = plugin_manager.enable_plugin(plugin_id)
+            
+            # Sync libraries for the new server
+            from app.services.media_service_manager import MediaServiceManager
+            MediaServiceManager.sync_server_libraries(new_server.id)
+            
+            log_event(
+                EventType.SETTING_CHANGE,
+                f"Added new media server: {new_server.name}",
+                admin_id=current_user.id
+            )
+            
+            flash(f'Media server "{new_server.name}" added successfully!', 'success')
+            return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error adding media server: {e}")
+            flash(f'Error adding server: {str(e)}', 'danger')
+    
+    return render_template(
+        'settings/index.html',
+        title=f"Add {plugin.name} Server",
+        plugin=plugin,
+        form=form,
+        active_tab='plugin_add_server'
+    )
+
+@bp.route('/<plugin_id>/<int:server_id>/disable', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def disable_server(plugin_id, server_id):
+    """Disable a specific server"""
+    from app.models_media_services import MediaServer, ServiceType
+    
+    # Verify plugin exists
+    from app.models_plugins import Plugin
+    plugin = Plugin.query.filter_by(plugin_id=plugin_id).first_or_404()
+    
+    # Convert plugin_id string to ServiceType enum
+    try:
+        service_type_enum = ServiceType[plugin_id.upper()]
+    except KeyError:
+        flash(f"Invalid service type: {plugin_id}", "danger")
+        return redirect(url_for('plugin_management.index'))
+    
+    server = MediaServer.query.filter_by(id=server_id, service_type=service_type_enum).first_or_404()
+    
+    try:
+        server.is_active = False
+        db.session.commit()
+        
+        flash(f'Server "{server.name}" disabled successfully!', 'success')
+        log_event(EventType.SETTING_CHANGE, f"Server '{server.name}' disabled", admin_id=current_user.id)
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error disabling server {server_id}: {e}")
+        flash(f'Failed to disable server "{server.name}": {str(e)}', 'danger')
+    
+    return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
+
+@bp.route('/<plugin_id>/<int:server_id>/enable', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def enable_server(plugin_id, server_id):
+    """Enable a specific server"""
+    from app.models_media_services import MediaServer, ServiceType
+    
+    # Verify plugin exists
+    from app.models_plugins import Plugin
+    plugin = Plugin.query.filter_by(plugin_id=plugin_id).first_or_404()
+    
+    # Convert plugin_id string to ServiceType enum
+    try:
+        service_type_enum = ServiceType[plugin_id.upper()]
+    except KeyError:
+        flash(f"Invalid service type: {plugin_id}", "danger")
+        return redirect(url_for('plugin_management.index'))
+    
+    server = MediaServer.query.filter_by(id=server_id, service_type=service_type_enum).first_or_404()
+    
+    try:
+        server.is_active = True
+        db.session.commit()
+        
+        flash(f'Server "{server.name}" enabled successfully!', 'success')
+        log_event(EventType.SETTING_CHANGE, f"Server '{server.name}' enabled", admin_id=current_user.id)
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error enabling server {server_id}: {e}")
+        flash(f'Failed to enable server "{server.name}": {str(e)}', 'danger')
+    
+    return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
+
+@bp.route('/<plugin_id>/<int:server_id>/delete', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def delete_server(plugin_id, server_id):
+    """Delete a specific server"""
+    from app.models_media_services import MediaServer, ServiceType
+    
+    # Verify plugin exists
+    from app.models_plugins import Plugin
+    plugin = Plugin.query.filter_by(plugin_id=plugin_id).first_or_404()
+    
+    # Convert plugin_id string to ServiceType enum
+    try:
+        service_type_enum = ServiceType[plugin_id.upper()]
+    except KeyError:
+        flash(f"Invalid service type: {plugin_id}", "danger")
+        return redirect(url_for('plugin_management.index'))
+    
+    server = MediaServer.query.filter_by(id=server_id, service_type=service_type_enum).first_or_404()
+    server_name = server.name  # Store name before deletion
+    
+    try:
+        db.session.delete(server)
+        db.session.commit()
+        
+        flash(f'Server "{server_name}" deleted successfully!', 'success')
+        log_event(EventType.SETTING_CHANGE, f"Server '{server_name}' deleted", admin_id=current_user.id)
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting server {server_id}: {e}")
+        flash(f'Failed to delete server "{server_name}": {str(e)}', 'danger')
+    
+    return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))

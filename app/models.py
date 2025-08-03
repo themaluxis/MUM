@@ -255,8 +255,8 @@ class Invite(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True); redeemed_users = db.relationship('User', back_populates='invite') # Added nullable=False
     invite_usages = db.relationship('InviteUsage', back_populates='invite', cascade="all, delete-orphan")
     membership_duration_days = db.Column(db.Integer, nullable=True) # Duration in days set at invite creation
-    force_discord_auth = db.Column(db.Boolean, nullable=True)
-    force_guild_membership = db.Column(db.Boolean, nullable=True)
+    require_discord_auth = db.Column(db.Boolean, nullable=True)
+    require_discord_guild_membership = db.Column(db.Boolean, nullable=True)
     grant_purge_whitelist = db.Column(db.Boolean, nullable=True, default=False)
     grant_bot_whitelist = db.Column(db.Boolean, nullable=True, default=False)
     invite_to_plex_home = db.Column(db.Boolean, nullable=True, default=False)

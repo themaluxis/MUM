@@ -2,7 +2,7 @@
 {# Expects 'user' object and other context variables like 'user_sorted_libraries', 'admins_by_uuid' etc. #}
 {# Determine service-specific background tint #}
 {% set service_types = user_service_types.get(user.id, []) %}
-{% set primary_service = service_types[0] if service_types else none %}
+{% set primary_service = service_types[0] if service_types else None %}
 {% if primary_service %}
     {% if primary_service.value == 'plex' %}
         {% set card_bg_class = "bg-gradient-to-br from-base-200 to-plex/10" %}
@@ -34,7 +34,7 @@
                 <div class="w-10 rounded-full">
                     {% set avatar_url = user.get_avatar(url_for('static', filename='img/default_avatar.png')) %}
                     {% set service_types = user_service_types.get(user.id, []) %}
-                    {% set primary_service = service_types[0] if service_types else none %}
+                    {% set primary_service = service_types[0] if service_types else None %}
                     
                     {# Check if this is a Jellyfin user and try to get their avatar #}
                     {% if primary_service and primary_service.value == 'jellyfin' and user.raw_plex_data and user.raw_plex_data.startswith('{') %}

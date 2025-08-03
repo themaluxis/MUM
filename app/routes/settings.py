@@ -182,8 +182,7 @@ def discord():
 
             enable_oauth_from_form = form.enable_discord_oauth.data
             enable_bot_from_form = form.enable_discord_bot.data
-            require_guild_membership_from_form = form.discord_require_guild_membership.data
-            require_sso_on_invite_from_form = form.discord_bot_require_sso_on_invite.data
+            require_guild_membership_from_form = form.enable_discord_membership_requirement.data
 
             final_enable_oauth = enable_oauth_from_form
             if (enable_bot_from_form or require_guild_membership_from_form) and not final_enable_oauth:
@@ -206,42 +205,7 @@ def discord():
                 Setting.set('DISCORD_REDIRECT_URI_INVITE', discord_invite_redirect_uri_generated, SettingValueType.STRING)
                 Setting.set('DISCORD_REDIRECT_URI_ADMIN_LINK', discord_admin_link_redirect_uri_generated, SettingValueType.STRING)
 
-                if enable_bot_from_form: 
-                    Setting.set('DISCORD_BOT_REQUIRE_SSO_ON_INVITE', True, SettingValueType.BOOLEAN)
-                else: 
-                    Setting.set('DISCORD_BOT_REQUIRE_SSO_ON_INVITE', require_sso_on_invite_from_form, SettingValueType.BOOLEAN)
-                
-                # --- NEW LOGIC: Grandfathering invites when guild requirement is disabled ---
-                if original_require_guild is True and require_guild_membership_from_form is False:
-                    now = datetime.utcnow()
-                    affected_invites_query = Invite.query.filter(
-                        Invite.is_active == True,
-                        (Invite.expires_at == None) | (Invite.expires_at > now),
-                        (Invite.max_uses == None) | (Invite.current_uses < Invite.max_uses),
-                        Invite.force_guild_membership.is_(None)
-                    )
-                    affected_invites = affected_invites_query.all()
-                    
-                    if affected_invites:
-                        updated_invite_ids = []
-                        for invite in affected_invites:
-                            invite.force_guild_membership = True
-                            updated_invite_ids.append(invite.id)
-                        
-                        try:
-                            # The commit for this is handled below with other settings
-                            log_event(
-                                EventType.SETTING_CHANGE,
-                                f"Admin disabled 'Require Guild Membership'. Grandfathered {len(affected_invites)} existing invite(s) by forcing their requirement to ON.",
-                                admin_id=current_user.id,
-                                details={'updated_invite_ids': updated_invite_ids}
-                            )
-                        except Exception as e_log:
-                            current_app.logger.error(f"Error logging grandfathering of invites: {e_log}")
-                # --- END NEW LOGIC ---
-
-                # Now save the new global setting
-                Setting.set('DISCORD_REQUIRE_GUILD_MEMBERSHIP', require_guild_membership_from_form, SettingValueType.BOOLEAN)
+                Setting.set('ENABLE_DISCORD_MEMBERSHIP_REQUIREMENT', require_guild_membership_from_form, SettingValueType.BOOLEAN)
                 
                 if enable_bot_from_form or require_guild_membership_from_form:
                     Setting.set('DISCORD_GUILD_ID', form.discord_guild_id.data or Setting.get('DISCORD_GUILD_ID', ""), SettingValueType.STRING)
@@ -296,14 +260,9 @@ def discord():
         form.enable_discord_bot.data = is_bot_enabled_db
 
         if is_oauth_enabled_db:
-            if is_bot_enabled_db:
-                form.discord_bot_require_sso_on_invite.data = True
-            else:
-                form.discord_bot_require_sso_on_invite.data = Setting.get_bool('DISCORD_BOT_REQUIRE_SSO_ON_INVITE', False)
-            form.discord_require_guild_membership.data = Setting.get_bool('DISCORD_REQUIRE_GUILD_MEMBERSHIP', False)
+            form.enable_discord_membership_requirement.data = Setting.get_bool('ENABLE_DISCORD_MEMBERSHIP_REQUIREMENT', False)
         else:
-            form.discord_bot_require_sso_on_invite.data = False
-            form.discord_require_guild_membership.data = False
+            form.enable_discord_membership_requirement.data = False
             
         form.discord_guild_id.data = Setting.get('DISCORD_GUILD_ID')
         form.discord_server_invite_url.data = Setting.get('DISCORD_SERVER_INVITE_URL')

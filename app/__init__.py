@@ -291,13 +291,14 @@ def create_app(config_name=None):
             'auth.',
             'static',
             'api.',
-            'media_servers.add_server',
-            'media_servers.add_server_setup',
-            'media_servers.setup_list_servers',
-            'media_servers.edit_server',
-            'media_servers.setup_edit_server',
-            'media_servers.delete_server',
-            'media_servers.test_new_server_connection',
+            # Media server routes moved to plugin management
+            # 'media_servers.add_server',
+            # 'media_servers.add_server_setup',
+            # 'media_servers.setup_list_servers',
+            # 'media_servers.edit_server',
+            # 'media_servers.setup_edit_server',
+            # 'media_servers.delete_server',
+            # 'media_servers.test_new_server_connection',
             'setup.plugins',
             # Allow plugin management endpoints in both setup and normal flows
             'dashboard.settings_plugins',
@@ -358,12 +359,11 @@ def create_app(config_name=None):
                 # When no plugins are enabled, only allow access to plugin management endpoints
                 # and essential auth/static endpoints
                 allowed_endpoints = [
-                    'dashboard.settings_plugins', 'plugins.enable_plugin', 'plugins.disable_plugin',
+                    'plugin_management.index', 'plugins.enable_plugin', 'plugins.disable_plugin',
                     'plugins.reload_plugins', 'plugins.install_plugin', 'plugins.uninstall_plugin',
                     'auth.app_login', 'auth.logout', 'static', 'api.health',
-                    # Add media server management endpoints to allow adding servers
-                    'media_servers.add_server', 'media_servers.list_servers', 'media_servers.edit_server',
-                    'dashboard.settings_plugin_configure', 'dashboard.settings_plugin_edit_server'
+                    # Plugin management endpoints for server configuration
+                    'plugin_management.index', 'plugin_management.configure', 'plugin_management.edit_server', 'plugin_management.add_server'
                 ]
                 
                 # Block ALL routes except the explicitly allowed ones when no plugins are configured
@@ -374,7 +374,7 @@ def create_app(config_name=None):
                 
                 if should_redirect:
                     current_app.logger.info(f"Init.py - before_request_tasks(): No plugins enabled, blocking access to '{request.endpoint}', redirecting to plugins settings.")
-                    return redirect(url_for('dashboard.settings_plugins'))
+                    return redirect(url_for('plugin_management.index'))
         except Exception as e_plugin_check:
             current_app.logger.error(f"Init.py - before_request_tasks(): DB error during plugin validation: {e_plugin_check}", exc_info=True)
 
@@ -402,8 +402,9 @@ def create_app(config_name=None):
     app.register_blueprint(api_bp, url_prefix='/api')
     from .routes.user import bp as user_bp
     app.register_blueprint(user_bp, url_prefix='/user')
-    from .routes.media_servers import bp as media_servers_bp
-    app.register_blueprint(media_servers_bp, url_prefix='/admin')
+    # Media servers are now managed through plugin management
+    # from .routes.media_servers import bp as media_servers_bp
+    # app.register_blueprint(media_servers_bp, url_prefix='/admin')
     from .routes.plugins import bp as plugins_bp
     app.register_blueprint(plugins_bp, url_prefix='/admin')
     from .routes.user_preferences import user_preferences_bp

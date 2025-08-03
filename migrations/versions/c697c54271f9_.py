@@ -1,16 +1,17 @@
-"""Initial
+"""empty message
 
-Revision ID: 00e4195c7282
+Revision ID: c697c54271f9
 Revises: 
-Create Date: 2025-07-20 13:51:44.354883
+Create Date: 2025-07-31 00:11:33.569573
 
 """
 from alembic import op
 import sqlalchemy as sa
 import app
 
+
 # revision identifiers, used by Alembic.
-revision = '00e4195c7282'
+revision = 'c697c54271f9'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -155,8 +156,8 @@ def upgrade():
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('membership_duration_days', sa.Integer(), nullable=True),
-    sa.Column('force_discord_auth', sa.Boolean(), nullable=True),
-    sa.Column('force_guild_membership', sa.Boolean(), nullable=True),
+    sa.Column('require_discord_auth', sa.Boolean(), nullable=True),
+    sa.Column('require_discord_guild_membership', sa.Boolean(), nullable=True),
     sa.Column('grant_purge_whitelist', sa.Boolean(), nullable=True),
     sa.Column('grant_bot_whitelist', sa.Boolean(), nullable=True),
     sa.Column('invite_to_plex_home', sa.Boolean(), nullable=True),
@@ -190,6 +191,7 @@ def upgrade():
     sa.Column('admin_id', sa.Integer(), nullable=False),
     sa.Column('timezone_preference', sa.String(length=10), nullable=False),
     sa.Column('local_timezone', sa.String(length=100), nullable=True),
+    sa.Column('time_format', sa.String(length=2), nullable=False),
     sa.ForeignKeyConstraint(['admin_id'], ['admin_accounts.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('admin_id')
@@ -226,6 +228,7 @@ def upgrade():
     sa.Column('access_expires_at', sa.DateTime(), nullable=True),
     sa.Column('is_discord_bot_whitelisted', sa.Boolean(), nullable=False),
     sa.Column('is_purge_whitelisted', sa.Boolean(), nullable=False),
+    sa.Column('raw_plex_data', sa.Text(), nullable=True),
     sa.Column('used_invite_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['used_invite_id'], ['invites.id'], ),
     sa.PrimaryKeyConstraint('id'),

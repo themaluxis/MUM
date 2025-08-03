@@ -142,7 +142,7 @@ def add_server():
             
             MediaServiceManager.sync_server_libraries(server.id)
             
-            return redirect(url_for('dashboard.settings_plugin_configure', plugin_id=server.service_type.value))
+            return redirect(url_for('plugin_management.configure', plugin_id=server.service_type.value))
             
         except Exception as e:
             db.session.rollback()
@@ -303,7 +303,7 @@ def delete_server(server_id):
         plugin_match = re.search(r'/settings/plugins/([^/]+)', referer)
         if plugin_match:
             plugin_id = plugin_match.group(1)
-            return redirect(url_for('dashboard.settings_plugin_configure', plugin_id=plugin_id))
+            return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
     
     return redirect(url_for('media_servers.list_servers'))
 
@@ -450,7 +450,7 @@ def enable_server(server_id):
         flash(f'Failed to enable server "{server.name}": {str(e)}', 'danger')
     
     # Redirect back to plugin configuration page
-    return redirect(url_for('dashboard.settings_plugin_configure', plugin_id=server.service_type.value))
+    return redirect(url_for('plugin_management.configure', plugin_id=server.service_type.value))
 
 @bp.route('/servers/<int:server_id>/disable', methods=['POST'])
 @login_required
@@ -473,4 +473,4 @@ def disable_server(server_id):
         flash(f'Failed to disable server "{server.name}": {str(e)}', 'danger')
     
     # Redirect back to plugin configuration page
-    return redirect(url_for('dashboard.settings_plugin_configure', plugin_id=server.service_type.value))
+    return redirect(url_for('plugin_management.configure', plugin_id=server.service_type.value))

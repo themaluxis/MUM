@@ -112,15 +112,11 @@ class DiscordConfigForm(FlaskForm):
         validators=[Optional(), URL()],
         description="The authorization URL for your Discord OAuth application. Usually auto-generated."
     )
-    discord_bot_require_sso_on_invite = BooleanField(
-        'Make Discord Login Mandatory', 
+    
+    enable_discord_membership_requirement = BooleanField(
+        'Enable Discord Server Membership Requirement', 
         default=False,
-        description="Require Discord authentication for all new invites (can be overridden per invite)."
-    )
-    discord_require_guild_membership = BooleanField(
-        'Require Discord Server Membership', 
-        default=False,
-        description="Require users to be members of your Discord server."
+        description="Enable the ability to require Discord server membership on a per-invite basis."
     )
     discord_guild_id = StringField( # Used by "Require Guild Membership" and/or Bot Features
         'Discord Server (Guild) ID', 
@@ -173,11 +169,11 @@ class DiscordConfigForm(FlaskForm):
             raise ValidationError('Discord Client Secret is required when Discord OAuth is enabled.')
 
     def validate_discord_guild_id(self, field):
-        if (self.discord_require_guild_membership.data or self.enable_discord_bot.data) and not field.data:
+        if (self.enable_discord_membership_requirement.data or self.enable_discord_bot.data) and not field.data:
             raise ValidationError('Discord Server ID is required when guild membership is required or bot features are enabled.')
 
     def validate_discord_server_invite_url(self, field):
-        if self.discord_require_guild_membership.data and not field.data:
+        if self.enable_discord_membership_requirement.data and not field.data:
             raise ValidationError('Discord Server Invite URL is required when guild membership is required.')
 
     def validate_discord_bot_token(self, field):
@@ -247,8 +243,8 @@ class InviteCreateForm(FlaskForm):
     allow_downloads = BooleanField('Enable Downloads (Allow Sync)', default=False, description="Allow the invited user to download/sync content from shared libraries.")
     invite_to_plex_home = BooleanField('Invite to Plex Home', default=False, description="Invite the user to your Plex Home. This allows them to switch between users.")
     allow_live_tv = BooleanField('Allow Live TV Access', default=False, description="Grant access to Live TV channels.")
-    override_force_discord_auth = BooleanField("Override 'Make Discord Login Mandatory'")
-    override_force_guild_membership = BooleanField("Override 'Require Discord Server Membership'")
+    require_discord_auth = BooleanField("Make Discord Login Mandatory", default=False, description="Require the user to log in with Discord to use this invite.")
+    require_discord_guild_membership = BooleanField("Require Discord Server Membership", default=False, description="Require the user to be a member of the configured Discord server.")
     grant_purge_whitelist = BooleanField('Whitelist user from Inactivity Purge')
     grant_bot_whitelist = BooleanField('Whitelist user from Discord Bot Actions')
     membership_expires_at = DateField(
@@ -273,9 +269,8 @@ class InviteEditForm(FlaskForm):
     allow_downloads = BooleanField('Enable Downloads (Allow Sync)', default=False)
     invite_to_plex_home = BooleanField('Invite to Plex Home', default=False)
     allow_live_tv = BooleanField('Allow Live TV Access', default=False)
-    
-    override_force_discord_auth = BooleanField("Override 'Make Discord Login Mandatory'")
-    override_force_guild_membership = BooleanField("Override 'Require Discord Server Membership'")
+    require_discord_auth = BooleanField("Make Discord Login Mandatory", default=False, description="Require the user to log in with Discord to use this invite.")
+    require_discord_guild_membership = BooleanField("Require Discord Server Membership", default=False, description="Require the user to be a member of the configured Discord server.")
     grant_purge_whitelist = BooleanField('Whitelist user from Inactivity Purge')
     grant_bot_whitelist = BooleanField('Whitelist user from Discord Bot Actions')
     submit = SubmitField('Save Changes')

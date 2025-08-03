@@ -12,6 +12,7 @@ from plexapi.myplex import MyPlexAccount
 from plexapi.exceptions import Unauthorized, NotFound, PlexApiException
 from datetime import datetime, timezone, timedelta
 from app.utils.plex_auth_helpers import create_plex_pin_login, check_plex_pin_status, get_plex_auth_url
+import requests
 
 bp = Blueprint('auth', __name__)
 
@@ -135,20 +136,24 @@ def plex_sso_callback_admin():
         return redirect(fallback_url)
     
     try:
-        # Recreate pin login object for checking status
-        from plexapi.myplex import MyPlexPinLogin
-        pin_login = MyPlexPinLogin(headers=pin_headers, oauth=False)
-        # Restore PIN ID using safe attribute setting
-        if hasattr(pin_login, 'id'):
-            pin_login.id = pin_id_from_session
-        elif hasattr(pin_login, 'identifier'):
-            pin_login.identifier = pin_id_from_session
-        pin_login.pin = session.get('plex_pin_code_admin_login')
+        # FIXED: Check PIN status using direct API calls instead of reconstructing the object
+        import requests
         
-        # Use plexapi helper to check PIN status
-        plex_auth_token, error_msg = check_plex_pin_status(pin_login)
+        pin_code = session.get('plex_pin_code_admin_login')
+        current_app.logger.debug(f"Checking admin PIN status for PIN: {pin_code}")
         
-        if not plex_auth_token: 
+        # Make direct API call to check PIN status
+        pin_url = f"https://plex.tv/api/v2/pins/{pin_code}"
+        response = requests.get(pin_url, headers=pin_headers)
+        
+        if response.status_code != 200:
+            flash('Plex PIN not yet linked or has expired.', 'warning')
+            return redirect(fallback_url)
+        
+        pin_data = response.json()
+        plex_auth_token = pin_data.get('authToken')
+        
+        if not plex_auth_token:
             flash('Plex PIN not yet linked or has expired.', 'warning')
             return redirect(fallback_url)
         

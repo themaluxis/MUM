@@ -31,7 +31,7 @@
                     </button>
                 </form>
                 {% endif %}
-                <a href="{{ url_for('media_servers.add_server', service_type=plugin.plugin_id) }}" class="btn btn-primary">
+                <a href="{{ url_for('plugin_management.add_server', plugin_id=plugin.plugin_id) }}" class="btn btn-primary">
                     <i class="fas fa-plus mr-2"></i>
                     Add Server
                 </a>
@@ -104,14 +104,14 @@
 
                     <div class="card-actions justify-end mt-4">
                         {% if server.is_active %}
-                        <form method="POST" action="{{ url_for('media_servers.disable_server', server_id=server.id) }}" class="inline mr-2">
+                        <form method="POST" action="{{ url_for('plugin_management.disable_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" class="inline mr-2">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="btn btn-warning btn-sm">
                                 <i class="fas fa-pause mr-1"></i>Disable
                             </button>
                         </form>
                         {% else %}
-                        <form method="POST" action="{{ url_for('media_servers.enable_server', server_id=server.id) }}" class="inline mr-2">
+                        <form method="POST" action="{{ url_for('plugin_management.enable_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" class="inline mr-2">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="btn btn-success btn-sm">
                                 <i class="fas fa-play mr-1"></i>Enable
@@ -246,7 +246,7 @@ function syncUsers(serverId) {
 
 function deleteServer(serverId, serverName) {
     document.getElementById('serverName').textContent = serverName;
-    document.getElementById('deleteForm').action = `/admin/servers/${serverId}/delete`;
+    document.getElementById('deleteForm').action = `/settings/plugins/{{ plugin.plugin_id }}/${serverId}/delete`;
     document.getElementById('deleteModal').classList.add('modal-open');
 }
 

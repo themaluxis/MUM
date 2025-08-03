@@ -56,10 +56,10 @@
                         {% endif %}
                         {# --- NEW: Override Indicators --- #}
                         <div class="flex flex-col space-y-1 mt-1">
-                            {% if invite.force_discord_auth is not none %}
+                            {% if invite.force_discord_auth is not None %}
                                 <span class="badge badge-info badge-xs" title="Override: Force Discord Auth is {{ invite.force_discord_auth }}"><i class="fa-solid fa-right-to-bracket fa-fw"></i> Auth Rule</span>
                             {% endif %}
-                            {% if invite.force_guild_membership is not none %}
+                            {% if invite.force_guild_membership is not None %}
                                 <span class="badge badge-warning badge-xs" title="Override: Force Guild Membership is {{ invite.force_guild_membership }}"><i class="fa-solid fa-users-viewfinder fa-fw"></i> Guild Rule</span>
                             {% endif %}
                         </div>

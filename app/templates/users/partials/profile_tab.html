@@ -12,7 +12,7 @@
         <div class="space-y-2 text-sm p-4 bg-base-200 rounded-lg shadow-md">
            {# Determine service type for dynamic labels #}
            {% set service_types = user_service_types.get(user.id, []) %}
-           {% set primary_service = service_types[0] if service_types else none %}
+           {% set primary_service = service_types[0] if service_types else None %}
            {% if primary_service %}
                {% if primary_service.value == 'plex' %}
                    {% set service_name = "Plex" %}

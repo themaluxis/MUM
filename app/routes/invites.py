@@ -15,7 +15,9 @@ from app.services.media_service_factory import MediaServiceFactory
 from app.services.media_service_manager import MediaServiceManager
 from app.models_media_services import ServiceType 
 import json
+import time
 from flask_login import login_required, current_user # <<< MAKE SURE login_required IS HERE
+import requests
 
 bp = Blueprint('invites', __name__)
 
@@ -64,11 +66,14 @@ def list_invites():
             current_app.logger.error(f"Could not fetch libraries for server {all_servers[0].name}: {e}")
 
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
+    
+    # Discord settings
+    discord_oauth_enabled = Setting.get_bool('DISCORD_OAUTH_ENABLED', False)
     bot_is_enabled = Setting.get_bool('DISCORD_BOT_ENABLED', False)
     global_force_sso = Setting.get_bool('DISCORD_BOT_REQUIRE_SSO_ON_INVITE', False) or bot_is_enabled
-    global_require_guild = Setting.get_bool('DISCORD_REQUIRE_GUILD_MEMBERSHIP', False)
-    form.override_force_discord_auth.data = global_force_sso
-    form.override_force_guild_membership.data = global_require_guild
+    enable_discord_membership_requirement = Setting.get_bool('ENABLE_DISCORD_MEMBERSHIP_REQUIREMENT', False)
+    form.require_discord_auth.data = global_force_sso
+    form.require_discord_guild_membership.data = enable_discord_membership_requirement
     
     # If the request is from HTMX, render the list content partial
     if request.headers.get('HX-Request'):
@@ -79,16 +84,26 @@ def list_invites():
                                current_view=view_mode,
                                current_per_page=items_per_page)
 
+    # Create grouped_servers for the template
+    grouped_servers = {}
+    for server in all_servers:
+        service_type_name = server.service_type.name.capitalize()
+        if service_type_name not in grouped_servers:
+            grouped_servers[service_type_name] = []
+        grouped_servers[service_type_name].append(server)
+
     # For a full page load, render the main list.html
     return render_template('invites/list.html', 
                            title="Manage Invites", 
                            invites_count=invites_count, 
                            form=form, 
                            all_servers=all_servers,
+                           grouped_servers=grouped_servers,
                            available_libraries=available_libraries, 
                            current_per_page=items_per_page,
+                           discord_oauth_enabled=discord_oauth_enabled,
                            global_force_sso=global_force_sso,
-                           global_require_guild=global_require_guild,
+                           enable_discord_membership_requirement=enable_discord_membership_requirement,
                            current_view=view_mode) # Pass the view mode
 
 @bp.route('/manage/create', methods=['POST'])
@@ -115,6 +130,8 @@ def create_invite():
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
     
+    # Discord settings
+    discord_oauth_enabled = Setting.get_bool('DISCORD_OAUTH_ENABLED', False)
     bot_is_enabled = Setting.get_bool('DISCORD_BOT_ENABLED', False)
     global_force_sso = Setting.get_bool('DISCORD_BOT_REQUIRE_SSO_ON_INVITE', False) or bot_is_enabled
     global_require_guild = Setting.get_bool('DISCORD_REQUIRE_GUILD_MEMBERSHIP', False)
@@ -126,6 +143,18 @@ def create_invite():
     toast_category = "info"
 
     if form.validate_on_submit():
+        # Validate that a server is selected
+        if not selected_server_id:
+            # Add a custom error for server selection
+            flash("Please select a server to grant access to.", "danger")
+            grouped_servers = {}
+            for server in all_servers:
+                service_type_name = server.service_type.name.capitalize()
+                if service_type_name not in grouped_servers:
+                    grouped_servers[service_type_name] = []
+                grouped_servers[service_type_name].append(server)
+            return render_template('invites/partials/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
+        
         custom_path = form.custom_path.data.strip() if form.custom_path.data else None
         if custom_path:
             existing_invite = Invite.query.filter(Invite.custom_path == custom_path, Invite.is_active == True).first()
@@ -139,7 +168,7 @@ def create_invite():
                     if service_type_name not in grouped_servers:
                         grouped_servers[service_type_name] = []
                     grouped_servers[service_type_name].append(server)
-                return render_template('invites/partials/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
+                return render_template('invites/partials/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
         
         # Convert date object to datetime at the end of the selected day
         expires_at = datetime.combine(form.expires_at.data, datetime.max.time()) if form.expires_at.data else None
@@ -151,16 +180,6 @@ def create_invite():
 
         max_uses = form.number_of_uses.data if form.number_of_uses.data and form.number_of_uses.data > 0 else None
         
-        form_force_sso = form.override_force_discord_auth.data
-        force_sso_db_value = None
-        if form_force_sso != global_force_sso:
-            force_sso_db_value = form_force_sso
-
-        form_require_guild = form.override_force_guild_membership.data
-        require_guild_db_value = None
-        if global_require_guild and form_require_guild != global_require_guild:
-            require_guild_db_value = form_require_guild
-
         new_invite = Invite(
             custom_path=custom_path, expires_at=expires_at, max_uses=max_uses,
             grant_library_ids=form.libraries.data or [],
@@ -168,8 +187,8 @@ def create_invite():
             invite_to_plex_home=form.invite_to_plex_home.data,
             allow_live_tv=form.allow_live_tv.data,
             membership_duration_days=membership_duration, created_by_admin_id=current_user.id,
-            force_discord_auth=force_sso_db_value,
-            force_guild_membership=require_guild_db_value,
+            require_discord_auth=form.require_discord_auth.data,
+            require_discord_guild_membership=form.require_discord_guild_membership.data,
             server_id=selected_server_id
         )
         try:
@@ -206,7 +225,7 @@ def create_invite():
                 if service_type_name not in grouped_servers:
                     grouped_servers[service_type_name] = []
                 grouped_servers[service_type_name].append(server)
-            return render_template('invites/partials/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
+            return render_template('invites/partials/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
         for field, errors_list in form.errors.items():
             for error in errors_list: flash(f"Error in {getattr(form, field).label.text}: {error}", "danger")
         return redirect(url_for('invites.list_invites'))
@@ -309,21 +328,11 @@ def process_invite_form(invite_path_or_token):
     already_authenticated_plex_user_info = session.get(f'invite_{invite.id}_plex_user')
     already_authenticated_discord_user_info = session.get(f'invite_{invite.id}_discord_user')
     
-    # --- MODIFIED: Determine effective Discord settings using invite overrides ---
+    # --- MODIFIED: Determine effective Discord settings using invite fields ---
     oauth_is_generally_enabled = Setting.get_bool('DISCORD_OAUTH_ENABLED', False)
     
-    # Determine effective "Require SSO" setting
-    if invite.force_discord_auth is not None:
-        effective_require_sso = invite.force_discord_auth
-    else:
-        bot_is_enabled = Setting.get_bool('DISCORD_BOT_ENABLED', False)
-        effective_require_sso = Setting.get_bool('DISCORD_BOT_REQUIRE_SSO_ON_INVITE', False) or bot_is_enabled
-        
-    # Determine effective "Require Guild Membership" setting
-    if invite.force_guild_membership is not None:
-        effective_require_guild = invite.force_guild_membership
-    else:
-        effective_require_guild = Setting.get_bool('DISCORD_REQUIRE_GUILD_MEMBERSHIP', False)
+    effective_require_sso = invite.require_discord_auth
+    effective_require_guild = invite.require_discord_guild_membership
 
     # These settings are fetched for display purposes if guild membership is required
     setting_discord_guild_id = Setting.get('DISCORD_GUILD_ID')
@@ -349,25 +358,11 @@ def process_invite_form(invite_path_or_token):
                 if not pin_login:
                     raise Exception(f"Could not create Plex PIN: {error_msg}")
                 
-                # Since MyPlexPinLogin doesn't expose an ID, use the PIN code as identifier
-                pin_code = pin_login.pin
-                current_app.logger.debug(f"PIN creation - using pin_code as identifier: {pin_code}")
+                current_app.logger.debug(f"PIN creation - PIN code: {pin_login.pin}")
                 
-                session['plex_pin_id_invite_flow'] = pin_code
+                # Store the necessary details for the callback
                 session['plex_pin_code_invite_flow'] = pin_login.pin
-                # Store headers for callback recreation - only store serializable dict
-                try:
-                    if hasattr(pin_login, '_headers'):
-                        headers = pin_login._headers() if callable(pin_login._headers) else pin_login._headers
-                        if isinstance(headers, dict):
-                            session['plex_headers_invite_flow'] = {k: str(v) for k, v in headers.items() if isinstance(v, (str, int, float, bool))}
-                        else:
-                            session['plex_headers_invite_flow'] = {}
-                    else:
-                        session['plex_headers_invite_flow'] = {}
-                except Exception as e:
-                    current_app.logger.warning(f"Could not store headers in session: {e}")
-                    session['plex_headers_invite_flow'] = {}
+                session['plex_headers_invite_flow'] = pin_login.headers
                 
                 app_base_url = Setting.get('APP_BASE_URL', request.url_root.rstrip('/'))
                 callback_path_segment = url_for('invites.plex_oauth_callback', _external=False)
@@ -442,14 +437,11 @@ def process_invite_form(invite_path_or_token):
 @setup_required
 def plex_oauth_callback():
     invite_id = session.get('plex_oauth_invite_id')
-    pin_id_from_session = session.get('plex_pin_id_invite_flow')
+    pin_code_from_session = session.get('plex_pin_code_invite_flow')
     pin_headers = session.get('plex_headers_invite_flow', {})
     
-    # Debug logging to understand what's missing
     current_app.logger.debug(f"Plex callback - invite_id from session: {invite_id}")
-    current_app.logger.debug(f"Plex callback - pin_code_from_session: {pin_id_from_session}")
-    current_app.logger.debug(f"Plex callback - pin_headers: {pin_headers}")
-    current_app.logger.debug(f"Plex callback - all session keys: {list(session.keys())}")
+    current_app.logger.debug(f"Plex callback - pin_code_from_session: {pin_code_from_session}")
     
     invite_path_or_token_for_redirect = "error_path" 
     if invite_id: 
@@ -459,13 +451,12 @@ def plex_oauth_callback():
     
     fallback_redirect = url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token_for_redirect)
     
-    if not invite_id or not pin_id_from_session:
-        current_app.logger.warning(f"Plex callback failed - invite_id: {invite_id}, pin_code: {pin_id_from_session}")
+    if not invite_id or not pin_code_from_session:
         flash('Plex login callback invalid. Try invite again.', 'danger')
-        session.pop('plex_pin_id_invite_flow', None)
+        # Clear all session keys related to this flow
+        session.pop('plex_oauth_invite_id', None)
         session.pop('plex_pin_code_invite_flow', None)
         session.pop('plex_headers_invite_flow', None)
-        session.pop('plex_oauth_invite_id', None)
         return redirect(fallback_redirect) 
     
     invite = Invite.query.get(invite_id)
@@ -474,29 +465,30 @@ def plex_oauth_callback():
         return redirect(url_for('invites.invite_landing_page'))
     
     try:
-        # Recreate pin login object for checking status
         from plexapi.myplex import MyPlexPinLogin
-        # Pass the PIN code during instantiation
-        pin_login = MyPlexPinLogin(headers=pin_headers, oauth=False, pin=pin_id_from_session)
-        current_app.logger.debug(f"Recreated pin_login with PIN: {pin_id_from_session}")
         
-        # Use plexapi helper to check PIN status
-        plex_auth_token, error_msg = check_plex_pin_status(pin_login)
+        # Recreate the pin_login object exactly as it was created initially.
+        # The plexapi library uses the headers (especially the client ID) to retrieve the same PIN session.
+        pin_login = MyPlexPinLogin(headers=pin_headers)
+        
+        # Now, check the status. The checkLogin method will automatically use the PIN associated with the session.
+        plex_auth_token = pin_login.checkLogin()
+
         if not plex_auth_token: 
-            flash('Plex PIN not linked or expired.', 'warning')
-            return redirect(url_for('invites.process_invite_form', invite_path_or_token=invite.custom_path or invite.token))
+            flash('Plex PIN not yet authenticated. Please complete the authentication on plex.tv/link', 'warning')
+            return redirect(fallback_redirect)
+
         plex_account = MyPlexAccount(token=plex_auth_token)
-        plex_user_id_int = getattr(plex_account, 'id', None)
-        user_uuid_str = str(plex_user_id_int) if plex_user_id_int is not None else None # Or plex_account.uuid if that's preferred for consistency
         
         session[f'invite_{invite.id}_plex_user'] = {
-            'id': plex_user_id_int, 
-            'uuid': user_uuid_str, 
+            'id': getattr(plex_account, 'id', None), 
+            'uuid': getattr(plex_account, 'uuid', None), 
             'username': getattr(plex_account, 'username', None), 
             'email': getattr(plex_account, 'email', None), 
             'thumb': getattr(plex_account, 'thumb', None)
         }
         log_event(EventType.INVITE_USED_SUCCESS_PLEX, f"Plex auth success for {plex_account.username} on invite {invite.id}.", invite_id=invite.id)
+
     except PlexApiException as e_plex:
         flash(f'Plex API error: {str(e_plex)}', 'danger')
         log_event(EventType.ERROR_PLEX_API, f"Invite {invite.id}: Plex PIN check PlexApiException: {e_plex}", invite_id=invite.id)
@@ -504,11 +496,11 @@ def plex_oauth_callback():
         flash(f"Error during Plex login for invite: {str(e)[:150]}", "danger")
         log_event(EventType.ERROR_PLEX_API, f"Invite {invite.id}: Plex callback error: {e}", invite_id=invite.id)
     finally: 
-        session.pop('plex_pin_id_invite_flow', None)
+        session.pop('plex_oauth_invite_id', None)
         session.pop('plex_pin_code_invite_flow', None)
         session.pop('plex_headers_invite_flow', None)
-        session.pop('plex_oauth_invite_id', None)
-    return redirect(url_for('invites.process_invite_form', invite_path_or_token=invite.custom_path or invite.token))
+        
+    return redirect(fallback_redirect)
 
 @bp.route('/discord_callback')
 @setup_required
@@ -707,8 +699,8 @@ def get_edit_invite_form(invite_id):
     global_force_sso = Setting.get_bool('DISCORD_BOT_REQUIRE_SSO_ON_INVITE', False) or bot_is_enabled
     global_require_guild = Setting.get_bool('DISCORD_REQUIRE_GUILD_MEMBERSHIP', False)
     
-    form.override_force_discord_auth.data = invite.force_discord_auth if invite.force_discord_auth is not None else global_force_sso
-    form.override_force_guild_membership.data = invite.force_guild_membership if invite.force_guild_membership is not None else global_require_guild
+    form.require_discord_auth.data = invite.require_discord_auth
+    form.require_discord_guild_membership.data = invite.require_discord_guild_membership
 
     return render_template(
         'invites/partials/edit_invite_modal.html',
@@ -786,20 +778,8 @@ def update_invite(invite_id):
         invite.grant_purge_whitelist = form.grant_purge_whitelist.data
         invite.grant_bot_whitelist = form.grant_bot_whitelist.data
 
-        # Discord Override Logic
-        if form.override_force_discord_auth.data == global_force_sso:
-            invite.force_discord_auth = None # Set to NULL if it matches global setting
-        else:
-            invite.force_discord_auth = form.override_force_discord_auth.data
-        
-        if global_require_guild:
-            if form.override_force_guild_membership.data == global_require_guild:
-                invite.force_guild_membership = None # Set to NULL if it matches global
-            else:
-                invite.force_guild_membership = form.override_force_guild_membership.data
-        else:
-            # If global setting is off, this override can only be False, so store NULL
-            invite.force_guild_membership = None
+        invite.require_discord_auth = form.require_discord_auth.data
+        invite.require_discord_guild_membership = form.require_discord_guild_membership.data
 
         db.session.commit()
         log_event(EventType.SETTING_CHANGE, f"Invite '{invite.custom_path or invite.token}' updated.", invite_id=invite.id, admin_id=current_user.id)

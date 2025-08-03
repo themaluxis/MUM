@@ -56,38 +56,16 @@
                     {% if form.discord_oauth_auth_url.errors %}{% for e in form.discord_oauth_auth_url.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %}
                 </div>
 
-                {# "Make Discord Login Mandatory" Toggle #}
-                <div class="form-control w-full pt-3 border-t border-base-300/20 mt-4">
-                    <label class="label cursor-pointer justify-start">
-                        {{ form.discord_bot_require_sso_on_invite(class="toggle toggle-accent mr-3", id="discord_require_sso_on_invite_toggle") }}
-                        <span class="label-text font-medium whitespace-normal">{{ form.discord_bot_require_sso_on_invite.label.text }}</span>
-                    </label>
-                    <p id="discord_require_sso_help_text_dynamic" class="text-xs mt-1 pl-12 text-accent/80 {{ 'hidden' if not form.enable_discord_bot.data else '' }}">
-                        This is automatically enabled and mandatory when "Discord Bot Features" (Section 2) are active.
-                    </p>
-                    <p id="discord_require_sso_help_text_static" class="text-xs text-base-content/60 mt-1 pl-12 {{ '' if not form.enable_discord_bot.data else 'hidden' }}">
-                        {{ form.discord_bot_require_sso_on_invite.description }}
-                    </p>
-                    {% if form.discord_bot_require_sso_on_invite.errors %}{% for e in form.discord_bot_require_sso_on_invite.errors %}<p class="text-error text-xs mt-1 pl-12">{{e}}</p>{% endfor %}{% endif %}
-                </div>
+                
 
-                {# FINAL CORRECTED "Require Guild Membership" Toggle #}
+                {# "Enable Discord Server Membership Requirement" Toggle #}
                 <div class="form-control w-full pt-3 border-t border-base-300/20 mt-4">
                     <label class="label cursor-pointer justify-start">
-                        <input type="hidden" name="discord_require_guild_membership" id="hidden_require_guild_membership_input" value="{{ 'true' if form.discord_require_guild_membership.data else 'false' }}">
-                        {# The visible toggle now has hx-* attributes again. This is the most stable approach. #}
-                        <input type="checkbox" id="visible_require_guild_membership_toggle" 
-                               class="toggle toggle-warning mr-3" 
-                               {{ 'checked' if form.discord_require_guild_membership.data else '' }}
-                               hx-get="{{ url_for('api.check_guild_invites') }}"
-                               hx-trigger="click"
-                               hx-swap="none"
-                               hx-indicator="#guild_check_loader">
-                        <span class="label-text font-medium whitespace-normal">{{ form.discord_require_guild_membership.label.text }}</span>
-                        <span id="guild_check_loader" class="htmx-indicator loading loading-spinner loading-xs ml-2"></span>
+                        {{ form.enable_discord_membership_requirement(class="toggle toggle-warning mr-3", id="enable_discord_membership_requirement_toggle") }}
+                        <span class="label-text font-medium whitespace-normal">{{ form.enable_discord_membership_requirement.label.text }}</span>
                     </label>
-                    <p class="text-xs text-base-content/60 mt-1 pl-12">{{ form.discord_require_guild_membership.description }}</p>
-                    {% if form.discord_require_guild_membership.errors %}{% for e in form.discord_require_guild_membership.errors %}<p class="text-error text-xs mt-1 pl-12">{{e}}</p>{% endfor %}{% endif %}
+                    <p class="text-xs text-base-content/60 mt-1 pl-12">{{ form.enable_discord_membership_requirement.description }}</p>
+                    {% if form.enable_discord_membership_requirement.errors %}{% for e in form.enable_discord_membership_requirement.errors %}<p class="text-error text-xs mt-1 pl-12">{{e}}</p>{% endfor %}{% endif %}
                 </div>
                 
                 {# Guild ID Field - Visibility controlled by JS #}
@@ -197,13 +175,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const oauthToggle = document.getElementById('enable_discord_oauth_toggle');
     const botToggle = document.getElementById('enable_discord_bot_toggle');
-    const hiddenGuildReqInput = document.getElementById('hidden_require_guild_membership_input');
-    const visibleGuildReqToggle = document.getElementById('visible_require_guild_membership_toggle');
-    const disableGuildReqModal = document.getElementById('disable_guild_req_modal');
-    const cancelGuildReqDisableBtn = document.getElementById('cancel_guild_req_disable');
-    const confirmGuildReqDisableBtn = document.getElementById('confirm_guild_req_disable');
-    const guildCheckLoader = document.getElementById('guild_check_loader');
-    const requireSsoToggle = document.getElementById('discord_require_sso_on_invite_toggle');
+    const guildReqToggle = document.getElementById('enable_discord_membership_requirement_toggle');
     
     // Main UI update function
     function updateDiscordSettingsUI() {
@@ -211,134 +183,31 @@ document.addEventListener('DOMContentLoaded', function () {
         const botFieldsDiv = document.getElementById('discord_bot_dependent_fields');
         const guildIdFieldContainer = document.getElementById('discord_guild_id_field_container');
         const serverInviteUrlFieldContainer = document.getElementById('discord_server_invite_url_field_container');
-        const requireSsoHelpDynamic = document.getElementById('discord_require_sso_help_text_dynamic');
-        const requireSsoHelpStatic = document.getElementById('discord_require_sso_help_text_static');
         
         let isOAuthEnabled = oauthToggle ? oauthToggle.checked : false;
         let isBotEnabled = botToggle ? botToggle.checked : false;
-        
-        // Always derive isRequireSsoEnabled from the visual toggle's state
-        let isRequireSsoEnabled = requireSsoToggle ? requireSsoToggle.checked : false; 
-        
-        // This value is also derived from its visual toggle. It will be updated by other functions if needed.
-        let isRequireGuildMembershipEnabled = visibleGuildReqToggle ? visibleGuildReqToggle.checked : false;
+        let isGuildReqEnabled = guildReqToggle ? guildReqToggle.checked : false;
 
         // --- Logic for OAuth toggle as master switch ---
-        if ((isBotEnabled || isRequireGuildMembershipEnabled) && oauthToggle && !oauthToggle.checked) {
+        if ((isBotEnabled || isGuildReqEnabled) && oauthToggle && !oauthToggle.checked) {
             oauthToggle.checked = true; isOAuthEnabled = true;
         }
         if (oauthFieldsDiv) oauthFieldsDiv.classList.toggle('hidden', !isOAuthEnabled);
         
-        // --- Logic for SSO toggle ---
-        if (requireSsoToggle) {
-            if (!isOAuthEnabled) { // If OAuth is off, SSO must be off and disabled.
-                requireSsoToggle.checked = false; requireSsoToggle.disabled = true;
-            } else if (isBotEnabled) { // If Bot is on, SSO is forced on.
-                requireSsoToggle.checked = true; requireSsoToggle.disabled = true;
-            } else { // Otherwise, user can control it.
-                requireSsoToggle.disabled = false;
-            }
-            isRequireSsoEnabled = requireSsoToggle.checked; // Re-evaluate after changes
-            if (requireSsoHelpDynamic) requireSsoHelpDynamic.classList.toggle('hidden', !(isOAuthEnabled && isBotEnabled));
-            if (requireSsoHelpStatic) requireSsoHelpStatic.classList.toggle('hidden', (isOAuthEnabled && isBotEnabled));
-        }
-
-        // --- Logic for Guild toggle (dependency check) ---
-        if (visibleGuildReqToggle) {
-            if (!isOAuthEnabled || !isRequireSsoEnabled) {
-                // If its master dependencies are off, disable it.
-                visibleGuildReqToggle.disabled = true;
-                if (visibleGuildReqToggle.checked) {
-                    // If it was on, it must now be turned off.
-                    visibleGuildReqToggle.checked = false;
-                    hiddenGuildReqInput.value = 'false';
-                }
-            } else {
-                // Otherwise, it is controllable by the user.
-                visibleGuildReqToggle.disabled = false;
-            }
-             // Re-evaluate after changes
-            isRequireGuildMembershipEnabled = visibleGuildReqToggle.checked;
-        }
-
         // --- Logic for field visibility ---
-        const showGuildIdField = isOAuthEnabled && (isBotEnabled || isRequireGuildMembershipEnabled);
+        const showGuildIdField = isOAuthEnabled && (isBotEnabled || isGuildReqEnabled);
         if (guildIdFieldContainer) guildIdFieldContainer.classList.toggle('hidden', !showGuildIdField);
 
-        const showServerInviteUrlField = isOAuthEnabled && isRequireGuildMembershipEnabled;
+        const showServerInviteUrlField = isOAuthEnabled && isGuildReqEnabled;
         if (serverInviteUrlFieldContainer) serverInviteUrlFieldContainer.classList.toggle('hidden', !showServerInviteUrlField);
         
         if (botFieldsDiv) botFieldsDiv.classList.toggle('hidden', !isBotEnabled);
     }
     
-    // --- Final Click Handler ---
-    if (visibleGuildReqToggle) {
-        visibleGuildReqToggle.addEventListener('click', function(event) {
-            const wasChecked = hiddenGuildReqInput.value === 'true';
-
-            if (wasChecked) {
-                event.preventDefault(); 
-                if (guildCheckLoader) guildCheckLoader.style.display = 'inline-block';
-                
-                fetch("{{ url_for('api.check_guild_invites') }}")
-                    .then(response => {
-                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                        return response.json();
-                    })
-                    .then(data => {
-                        // ============ CORRECTED LOGIC HERE ============
-                        // The modal should ONLY show if there is at least one affected invite.
-                        // The 'data.affected' boolean is still useful, but the length is the real decider.
-                        if (data && data.invites && data.invites.length > 0) {
-                            // Populate and show modal.
-                            document.getElementById('affected_invites_count').textContent = data.invites.length;
-                            const listContainer = document.getElementById('affected_invites_list');
-                            listContainer.innerHTML = data.invites.map(inv => `<div class="font-mono" title="Created: ${new Date(inv.created_at).toLocaleString()}">${inv.path}</div>`).join('');
-                            if (disableGuildReqModal) disableGuildReqModal.showModal();
-                        } else {
-                            // No affected invites, so we can safely turn the toggle OFF now.
-                            visibleGuildReqToggle.checked = false;
-                            hiddenGuildReqInput.value = 'false';
-                            updateDiscordSettingsUI();
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Error checking for affected invites:", error);
-                        if (window.showToast) window.showToast('Could not check for affected invites. Please try again.', 'error');
-                    })
-                    .finally(() => {
-                        if (guildCheckLoader) guildCheckLoader.style.display = 'none';
-                    });
-            } else {
-                hiddenGuildReqInput.value = 'true';
-                updateDiscordSettingsUI();
-            }
-        });
-    }
-
-    // --- Modal button listeners ---
-    if (cancelGuildReqDisableBtn) {
-        cancelGuildReqDisableBtn.addEventListener('click', () => {
-            if (disableGuildReqModal) disableGuildReqModal.close();
-            // User cancelled, so do nothing. The click was prevented, so toggle is still visually ON.
-        });
-    }
-    
-    if (confirmGuildReqDisableBtn) {
-        confirmGuildReqDisableBtn.addEventListener('click', () => {
-            // User confirmed disable action. Update state and UI.
-            visibleGuildReqToggle.checked = false;
-            hiddenGuildReqInput.value = 'false';
-            if (disableGuildReqModal) disableGuildReqModal.close();
-            updateDiscordSettingsUI();
-            if (window.showToast) window.showToast("Guild requirement disabled. Click 'Save' to apply.", 'info');
-        });
-    }
-
     // --- Attach main listeners and run initial UI setup ---
     if (oauthToggle) oauthToggle.addEventListener('change', updateDiscordSettingsUI);
     if (botToggle) botToggle.addEventListener('change', updateDiscordSettingsUI);
-    if (requireSsoToggle) requireSsoToggle.addEventListener('change', updateDiscordSettingsUI);
+    if (guildReqToggle) guildReqToggle.addEventListener('change', updateDiscordSettingsUI);
     updateDiscordSettingsUI();
 });
 </script>
