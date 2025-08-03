@@ -116,17 +116,20 @@ def create_invite():
     
     # Server and library logic
     all_servers = media_service_manager.get_all_servers(active_only=True)
-    selected_server_id = request.form.get('server_id')
+    selected_server_ids_str = request.form.get('server_ids', '')
+    selected_server_ids = [id.strip() for id in selected_server_ids_str.split(',') if id.strip()]
     
+    # For the form, we'll use libraries from the first selected server for now
+    # The frontend will handle per-server library selection via AJAX
     available_libraries = {}
-    if selected_server_id:
-        server = media_service_manager.get_server_by_id(selected_server_id)
-        if server:
-            service = MediaServiceFactory.create_service_from_db(server)
+    if selected_server_ids:
+        first_server = media_service_manager.get_server_by_id(selected_server_ids[0])
+        if first_server:
+            service = MediaServiceFactory.create_service_from_db(first_server)
             try:
                 available_libraries = {lib['id']: lib['name'] for lib in service.get_libraries()}
             except Exception as e:
-                current_app.logger.error(f"Could not fetch libraries for server {server.name}: {e}")
+                current_app.logger.error(f"Could not fetch libraries for server {first_server.name}: {e}")
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
     
@@ -143,10 +146,10 @@ def create_invite():
     toast_category = "info"
 
     if form.validate_on_submit():
-        # Validate that a server is selected
-        if not selected_server_id:
+        # Validate that at least one server is selected
+        if not selected_server_ids:
             # Add a custom error for server selection
-            flash("Please select a server to grant access to.", "danger")
+            flash("Please select at least one server to grant access to.", "danger")
             grouped_servers = {}
             for server in all_servers:
                 service_type_name = server.service_type.name.capitalize()
@@ -189,7 +192,7 @@ def create_invite():
             membership_duration_days=membership_duration, created_by_admin_id=current_user.id,
             require_discord_auth=form.require_discord_auth.data,
             require_discord_guild_membership=form.require_discord_guild_membership.data,
-            server_id=selected_server_id
+            server_id=selected_server_ids[0] if selected_server_ids else None
         )
         try:
             db.session.add(new_invite); db.session.commit()
@@ -713,6 +716,32 @@ def get_edit_invite_form(invite_id):
 
 
 # --- NEW: Edit Invite POST Route (for saving changes) ---
+@bp.route('/api/server/<int:server_id>/libraries', methods=['GET'])
+@login_required
+@setup_required
+def get_server_libraries(server_id):
+    """Get libraries for a specific server"""
+    try:
+        media_service_manager = MediaServiceManager()
+        server = media_service_manager.get_server_by_id(server_id)
+        
+        if not server:
+            return {'error': 'Server not found'}, 404
+            
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service:
+            return {'error': 'Could not create service for server'}, 500
+            
+        libraries = service.get_libraries()
+        return {
+            'success': True,
+            'libraries': [{'id': lib['id'], 'name': lib['name']} for lib in libraries]
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"Error fetching libraries for server {server_id}: {e}")
+        return {'error': str(e)}, 500
+
 @bp.route('/manage/edit/<int:invite_id>', methods=['POST'])
 @login_required
 @setup_required

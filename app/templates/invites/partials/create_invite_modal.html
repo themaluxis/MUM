@@ -20,7 +20,7 @@
     {# Server Selection #}
     <div class="divider text-xs">Select Server & Grant Access</div>
     <div class="form-control mb-4 space-y-2">
-        <input type="hidden" name="server_id" id="selected_server_id">
+        <input type="hidden" name="server_ids" id="selected_server_ids">
         <div id="server_selection_error" class="text-error text-sm hidden">
             <i class="fa-solid fa-exclamation-triangle mr-1"></i>
             Please select at least one server to grant access to.
@@ -266,8 +266,9 @@
 
         // Server selection and dynamic options
         const serverCards = document.querySelectorAll('.server-card');
-        const selectedServerIdInput = document.getElementById('selected_server_id');
+        const selectedServerIdInput = document.getElementById('selected_server_ids');
         const serverGroups = document.querySelectorAll('.server-group-details');
+        let selectedServerIds = new Set();
 
         serverCards.forEach(card => {
             const optionsContent = card.querySelector('.server-options-content');
@@ -283,51 +284,39 @@
 
                 const isSelected = card.classList.contains('border-primary');
                 const parentDetails = card.closest('.server-group-details');
+                const serverId = card.dataset.serverId;
 
-                // If there's only one server and it's already selected, don't allow deselection
-                if (isSelected && serverCards.length === 1) {
-                    // Show the "Required" badge briefly to indicate why deselection isn't allowed
-                    const requiredBadge = card.querySelector('.required-badge');
-                    if (requiredBadge) {
-                        requiredBadge.classList.remove('opacity-0');
-                        requiredBadge.classList.add('opacity-100');
-                        // Hide the badge after 2 seconds with fade out
-                        setTimeout(() => {
-                            requiredBadge.classList.remove('opacity-100');
-                            requiredBadge.classList.add('opacity-0');
-                        }, 2000);
-                    }
-                    return; // Prevent deselection of the only server
-                }
-
-                // Hide all server options, reset borders, and hide checkmarks
-                serverCards.forEach(c => {
-                    c.classList.remove('border-primary');
-                    c.classList.add('border-transparent');
-                    c.querySelector('.server-options-content').classList.add('hidden');
-                    c.querySelector('.checkmark-icon').classList.add('hidden');
-                });
-
-                // Close all collapsible sections
-                serverGroups.forEach(group => {
-                    if (group !== parentDetails || isSelected) {
-                         group.removeAttribute('open');
-                    }
-                });
-
-                if (!isSelected) {
+                // Toggle server selection
+                if (isSelected) {
+                    // Deselect server
+                    selectedServerIds.delete(serverId);
+                    card.classList.remove('border-primary');
+                    card.classList.add('border-transparent');
+                    optionsContent.classList.add('hidden');
+                    checkmarkIcon.classList.add('hidden');
+                } else {
+                    // Select server
+                    selectedServerIds.add(serverId);
                     card.classList.remove('border-transparent');
                     card.classList.add('border-primary');
                     optionsContent.classList.remove('hidden');
                     checkmarkIcon.classList.remove('hidden');
-                    selectedServerIdInput.value = card.dataset.serverId;
                     if (parentDetails) {
                         parentDetails.setAttribute('open', '');
                     }
-                    // Hide server selection error when a server is selected
+                }
+
+                // Update hidden input with comma-separated server IDs
+                selectedServerIdInput.value = Array.from(selectedServerIds).join(',');
+                
+                // Load libraries for this server if it was just selected
+                if (!isSelected) {
+                    loadLibrariesForServer(serverId, card);
+                }
+                
+                // Hide server selection error when servers are selected
+                if (selectedServerIds.size > 0) {
                     document.getElementById('server_selection_error').classList.add('hidden');
-                } else {
-                    selectedServerIdInput.value = '';
                 }
             });
 
@@ -335,19 +324,82 @@
             if(deselectAllBtn) deselectAllBtn.addEventListener('click', () => libCheckboxes.forEach(cb => cb.checked = false));
         });
 
-        // Auto-select the first server if available
+        // Function to load libraries for a specific server
+        function loadLibrariesForServer(serverId, serverCard) {
+            // Find the libraries grid container in the server card
+            const librariesContainer = serverCard.querySelector('.max-h-40.overflow-y-auto');
+            if (!librariesContainer) return;
+            
+            // Show loading state
+            librariesContainer.innerHTML = '<div class="text-center py-4"><span class="loading loading-spinner loading-sm"></span> Loading libraries...</div>';
+            
+            fetch(`/api/server/${serverId}/libraries`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Build library checkboxes HTML
+                        let librariesHtml = '';
+                        data.libraries.forEach(lib => {
+                            librariesHtml += `
+                                <label class="label cursor-pointer justify-start py-1">
+                                    <input type="checkbox" name="libraries" value="${lib.id}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" checked>
+                                    <span class="label-text" title="${lib.name}">${lib.name.length > 30 ? lib.name.substring(0, 30) + '...' : lib.name}</span>
+                                </label>
+                            `;
+                        });
+                        
+                        if (librariesHtml) {
+                            librariesContainer.innerHTML = librariesHtml;
+                            
+                            // Re-attach select all/none functionality for this server card
+                            const selectAllBtn = serverCard.querySelector('.select-all-libs');
+                            const deselectAllBtn = serverCard.querySelector('.deselect-all-libs');
+                            const libCheckboxes = librariesContainer.querySelectorAll('.library-checkbox');
+                            
+                            if(selectAllBtn) {
+                                selectAllBtn.replaceWith(selectAllBtn.cloneNode(true)); // Remove old listeners
+                                const newSelectAllBtn = serverCard.querySelector('.select-all-libs');
+                                newSelectAllBtn.addEventListener('click', () => libCheckboxes.forEach(cb => cb.checked = true));
+                            }
+                            if(deselectAllBtn) {
+                                deselectAllBtn.replaceWith(deselectAllBtn.cloneNode(true)); // Remove old listeners
+                                const newDeselectAllBtn = serverCard.querySelector('.deselect-all-libs');
+                                newDeselectAllBtn.addEventListener('click', () => libCheckboxes.forEach(cb => cb.checked = false));
+                            }
+                        } else {
+                            librariesContainer.innerHTML = '<div class="text-center py-4 text-base-content/60">No libraries found</div>';
+                        }
+                    } else {
+                        librariesContainer.innerHTML = `<div class="text-center py-4 text-error">Error: ${data.error}</div>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading libraries:', error);
+                    librariesContainer.innerHTML = '<div class="text-center py-4 text-error">Failed to load libraries</div>';
+                });
+        }
+
+        // Load libraries for all servers initially, then auto-select first server
+        serverCards.forEach(card => {
+            const serverId = card.dataset.serverId;
+            loadLibrariesForServer(serverId, card);
+        });
+        
+        // Auto-select only the first server by default
         if (serverCards.length > 0) {
-            serverCards[0].click();
+            setTimeout(() => {
+                serverCards[0].click();
+            }, 100); // Small delay to ensure libraries are loaded first
         }
         
         // Add form validation for server selection
         const form = document.getElementById('createInviteForm');
         if (form) {
             form.addEventListener('submit', function(e) {
-                const selectedServerId = document.getElementById('selected_server_id').value;
+                const selectedServerIds = document.getElementById('selected_server_ids').value;
                 const errorDiv = document.getElementById('server_selection_error');
                 
-                if (!selectedServerId) {
+                if (!selectedServerIds || selectedServerIds.trim() === '') {
                     e.preventDefault();
                     errorDiv.classList.remove('hidden');
                     // Scroll to the error
