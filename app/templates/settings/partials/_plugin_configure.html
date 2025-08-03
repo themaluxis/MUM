@@ -24,10 +24,14 @@
             <h3 class="text-xl font-semibold">Configured Servers</h3>
             <div class="flex gap-2">
                 {% if servers_with_details|length > 0 and not plugin.is_enabled %}
-                <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline">
+                <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline"
+                      hx-post="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}"
+                      hx-trigger="submit"
+                      hx-indicator=".htmx-indicator">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-power-off mr-2"></i>Enable Plugin
+                        <span class="htmx-indicator loading loading-spinner loading-sm ml-2"></span>
                     </button>
                 </form>
                 {% endif %}

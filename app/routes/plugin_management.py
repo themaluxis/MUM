@@ -1,7 +1,7 @@
 # File: app/routes/plugin_management.py
 from flask import (
     Blueprint, render_template, redirect, url_for, 
-    flash, request, current_app
+    flash, request, current_app, make_response
 )
 from flask_login import login_required, current_user
 from app.models import Setting, EventType
@@ -10,6 +10,7 @@ from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
 from app.services.plugin_manager import plugin_manager
 import traceback
+import json
 
 bp = Blueprint('plugin_management', __name__)
 
@@ -163,22 +164,27 @@ def edit_server(plugin_id, server_id):
                 admin_id=current_user.id
             )
             
-            flash(f'Media server "{server.name}" updated successfully!', 'success')
-            return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
+            response = make_response(redirect(url_for('plugin_management.configure', plugin_id=plugin_id)))
+            response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": f'Media server "{server.name}" updated successfully!', "category": "success"}})
+            return response
             
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Error updating media server: {e}")
-            flash(f'Error updating server: {str(e)}', 'danger')
+            # Error will be shown via toast on redirect
     
-    return render_template(
+    # If we get here, there was an error
+    response = make_response(render_template(
         'settings/index.html',
         title=f"Edit {server.name}",
         plugin=plugin,
         server=server,
         form=form,
         active_tab='plugin_edit_server'
-    )
+    ))
+    if 'e' in locals():
+        response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": f'Error updating server: {str(e)}', "category": "error"}})
+    return response
 
 @bp.route('/<plugin_id>/add', methods=['GET', 'POST'])
 @login_required
@@ -231,21 +237,26 @@ def add_server(plugin_id):
                 admin_id=current_user.id
             )
             
-            flash(f'Media server "{new_server.name}" added successfully!', 'success')
-            return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
+            response = make_response(redirect(url_for('plugin_management.configure', plugin_id=plugin_id)))
+            response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": f'Media server "{new_server.name}" added successfully!', "category": "success"}})
+            return response
             
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Error adding media server: {e}")
-            flash(f'Error adding server: {str(e)}', 'danger')
+            # Error will be shown via toast on redirect
     
-    return render_template(
+    # If we get here, there was an error
+    response = make_response(render_template(
         'settings/index.html',
         title=f"Add {plugin.name} Server",
         plugin=plugin,
         form=form,
         active_tab='plugin_add_server'
-    )
+    ))
+    if 'e' in locals():
+        response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": f'Error adding server: {str(e)}', "category": "error"}})
+    return response
 
 @bp.route('/<plugin_id>/<int:server_id>/disable', methods=['POST'])
 @login_required
@@ -272,15 +283,19 @@ def disable_server(plugin_id, server_id):
         server.is_active = False
         db.session.commit()
         
-        flash(f'Server "{server.name}" disabled successfully!', 'success')
+        toast_message = f'Server "{server.name}" disabled successfully!'
+        toast_category = 'success'
         log_event(EventType.SETTING_CHANGE, f"Server '{server.name}' disabled", admin_id=current_user.id)
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error disabling server {server_id}: {e}")
-        flash(f'Failed to disable server "{server.name}": {str(e)}', 'danger')
+        toast_message = f'Failed to disable server "{server.name}": {str(e)}'
+        toast_category = 'error'
     
-    return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
+    response = make_response(redirect(url_for('plugin_management.configure', plugin_id=plugin_id)))
+    response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": toast_message, "category": toast_category}})
+    return response
 
 @bp.route('/<plugin_id>/<int:server_id>/enable', methods=['POST'])
 @login_required

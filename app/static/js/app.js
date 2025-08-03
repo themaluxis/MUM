@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Client-side Toast Notification System ---
     // Ensure a <div id="toast-container" class="toast ..."></div> exists in your base.html
-    function showToast(message, type = 'info') {
+    function showToast(message, type = 'info', duration = 5000) {
         const toastContainer = document.getElementById('toast-container');
         if (!toastContainer) {
             console.warn('JS app.js - showToast(): Toast container (#toast-container) not found!');
@@ -59,31 +59,88 @@ document.addEventListener('DOMContentLoaded', function () {
         else if (type === 'error' || type === 'danger') alertClass = 'alert-error'; // Map 'danger' from Flask to 'error'
         else if (type === 'warning') alertClass = 'alert-warning';
 
-        const toastId = 'toast-' + Date.now() + Math.random().toString(36).substr(2, 5); // Add random for more uniqueness
+        const toastId = 'toast-' + Date.now() + Math.random().toString(36).substr(2, 5);
         const toastElement = document.createElement('div');
         toastElement.id = toastId;
-        // Apply DaisyUI alert classes and your custom animation classes if defined in CSS
-        toastElement.className = `alert ${alertClass} shadow-lg w-auto`; 
-        toastElement.style.opacity = '0'; // Start transparent for fade-in effect
-        toastElement.innerHTML = `<div><span>${message}</span></div>`;
+        toastElement.className = `alert ${alertClass} shadow-lg w-auto relative overflow-hidden block`; 
+        toastElement.style.opacity = '0';
+        
+        // Create toast content with progress bar and close button
+        toastElement.innerHTML = `
+            <div class="flex items-center justify-between w-full">
+                <span>${message}</span>
+                <button class="btn btn-ghost btn-xs ml-2" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="absolute bottom-0 left-0 bg-black bg-opacity-20 transition-all ease-linear toast-progress h-full opacity-[.15] pointer-events-none" style="width: 100%;"></div>
+        `;
         
         toastContainer.appendChild(toastElement);
 
-        // Force reflow before adding class for transition, or just use opacity directly.
-        // Using opacity directly is simpler here.
+        // Fade in the toast
         setTimeout(() => { 
             toastElement.style.transition = 'opacity 0.3s ease-in-out'; 
             toastElement.style.opacity = '1'; 
-        }, 10); // Small delay to ensure element is in DOM for transition
+        }, 10);
 
-        // Auto-dismiss after a delay
-        setTimeout(() => {
+        // Progress bar and auto-dismiss logic
+        const progressBar = toastElement.querySelector('.toast-progress');
+        let startTime = Date.now();
+        let isPaused = false;
+        let remainingTime = duration;
+        let animationId;
+
+        function updateProgress() {
+            if (isPaused) return;
+            
+            const elapsed = Date.now() - startTime;
+            const progress = Math.max(0, (remainingTime - elapsed) / duration * 100);
+            
+            if (progressBar) {
+                progressBar.style.width = progress + '%';
+            }
+            
+            if (elapsed >= remainingTime) {
+                removeToast();
+            } else {
+                animationId = requestAnimationFrame(updateProgress);
+            }
+        }
+
+        function removeToast() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
             const toastToRemove = document.getElementById(toastId);
             if (toastToRemove) {
-                toastToRemove.style.opacity = '0'; // Start fade-out
-                setTimeout(() => toastToRemove.remove(), 300); // Remove after fade-out transition (300ms)
+                toastToRemove.style.opacity = '0';
+                setTimeout(() => toastToRemove.remove(), 300);
             }
-        }, 4700); // Toast visible for ~4.7s before fade-out starts (total ~5s)
+        }
+
+        // Hover functionality - pause on hover and reset timer, resume on leave
+        toastElement.addEventListener('mouseenter', () => {
+            isPaused = true;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            // Reset the timer completely on hover
+            remainingTime = duration;
+            if (progressBar) {
+                progressBar.style.width = '100%';
+            }
+        });
+
+        toastElement.addEventListener('mouseleave', () => {
+            isPaused = false;
+            startTime = Date.now(); // Reset start time
+            remainingTime = duration; // Ensure we start with full duration
+            updateProgress();
+        });
+
+        // Start the progress animation
+        updateProgress();
     }
     // Make showToast globally accessible so HTMX event listener can call it.
     window.showToast = showToast;

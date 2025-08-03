@@ -1,4 +1,5 @@
 <!-- File: app/templates/settings/partials/_plugins.html -->
+<div id="plugins-container">
 <!-- Desktop Layout -->
 <div class="hidden md:flex justify-between items-center mb-6">
     <div class="text-lg font-semibold">Plugins</div>
@@ -89,19 +90,31 @@
                     <i class="fas fa-info mr-1"></i>Info
                 </button>
                 {% if plugin.is_enabled %}
-                <form method="POST" action="{{ url_for('plugins.disable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2">
+                <form method="POST" action="{{ url_for('plugins.disable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2"
+                      hx-post="{{ url_for('plugins.disable_plugin', plugin_id=plugin.plugin_id) }}"
+                      hx-trigger="submit"
+                      hx-target="#plugins-container"
+                      hx-swap="outerHTML"
+                      hx-indicator=".htmx-indicator">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-warning btn-sm">
                         <i class="fas fa-power-off mr-1"></i>Disable
+                        <span class="htmx-indicator loading loading-spinner loading-xs ml-1"></span>
                     </button>
                 </form>
                 {% else %}
-                <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2">
+                <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2"
+                      hx-post="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}"
+                      hx-trigger="submit"
+                      hx-target="#plugins-container"
+                      hx-swap="outerHTML"
+                      hx-indicator=".htmx-indicator">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" 
                             class="btn btn-success btn-sm"
                             {% if plugin.servers_count == 0 %}disabled title="No servers configured for this plugin. Configure a server first."{% endif %}>
                         <i class="fas fa-power-off mr-1"></i>Enable
+                        <span class="htmx-indicator loading loading-spinner loading-xs ml-1"></span>
                         <!-- Debug: plugin_id={{ plugin.plugin_id }}, servers_count={{ plugin.servers_count }} -->
                     </button>
                 </form>
@@ -196,19 +209,31 @@
                         <i class="fas fa-info mr-1"></i>Info
                     </button>
                     {% if plugin.is_enabled %}
-                    <form method="POST" action="{{ url_for('plugins.disable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2">
+                    <form method="POST" action="{{ url_for('plugins.disable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2"
+                          hx-post="{{ url_for('plugins.disable_plugin', plugin_id=plugin.plugin_id) }}"
+                          hx-trigger="submit"
+                          hx-target="#plugins-container"
+                          hx-swap="outerHTML"
+                          hx-indicator=".htmx-indicator">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-warning btn-sm">
                             <i class="fas fa-power-off mr-1"></i>Disable
+                            <span class="htmx-indicator loading loading-spinner loading-xs ml-1"></span>
                         </button>
                     </form>
                     {% else %}
-                    <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2">
+                    <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline mr-2"
+                          hx-post="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}"
+                          hx-trigger="submit"
+                          hx-target="#plugins-container"
+                          hx-swap="outerHTML"
+                          hx-indicator=".htmx-indicator">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" 
                                 class="btn btn-success btn-sm"
                                 {% if plugin.servers_count == 0 %}disabled title="No servers configured for this plugin. Configure a server first."{% endif %}>
                             <i class="fas fa-power-off mr-1"></i>Enable
+                            <span class="htmx-indicator loading loading-spinner loading-xs ml-1"></span>
                             <!-- Debug: plugin_id={{ plugin.plugin_id }}, servers_count={{ plugin.servers_count }} -->
                         </button>
                     </form>
@@ -244,3 +269,4 @@
     </a>
 </div>
 {% endif %}
+</div>

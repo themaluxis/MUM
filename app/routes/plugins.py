@@ -13,6 +13,39 @@ from app.routes.setup import get_completed_steps
 
 bp = Blueprint('plugins', __name__)
 
+def refresh_plugin_servers_count():
+    """Refresh plugin servers count to ensure accuracy"""
+    try:
+        from app.models_media_services import MediaServer, ServiceType
+        
+        plugins = Plugin.query.all()
+        for plugin in plugins:
+            try:
+                # Find the corresponding ServiceType enum value
+                service_type = None
+                for st in ServiceType:
+                    if st.value == plugin.plugin_id:
+                        service_type = st
+                        break
+                
+                if service_type:
+                    # Count actual servers
+                    actual_count = MediaServer.query.filter_by(service_type=service_type).count()
+                    if plugin.servers_count != actual_count:
+                        plugin.servers_count = actual_count
+                        db.session.add(plugin)
+                else:
+                    # For plugins without corresponding ServiceType, set to 0
+                    if plugin.servers_count != 0:
+                        plugin.servers_count = 0
+                        db.session.add(plugin)
+            except Exception as e:
+                current_app.logger.error(f"Error updating servers_count for plugin {plugin.plugin_id}: {e}")
+        
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.error(f"Error refreshing plugin servers count: {e}")
+
 # Removed list_plugins route - functionality moved to dashboard.settings_plugins
 
 @bp.route('/plugins/<plugin_id>/enable', methods=['POST'])
@@ -31,28 +64,37 @@ def enable_plugin(plugin_id):
         # Check if plugin has servers that were auto-enabled
         plugin = Plugin.query.filter_by(plugin_id=plugin_id).first()
         if plugin and plugin.servers_count > 0:
-            flash(f'Plugin "{plugin_id}" enabled successfully! {plugin.servers_count} associated server(s) have been activated.', 'success')
+            toast_message = f'Plugin "{plugin_id}" enabled successfully! {plugin.servers_count} associated server(s) have been activated.'
             log_event(EventType.SETTING_CHANGE, f"Plugin '{plugin_id}' enabled and {plugin.servers_count} servers activated", admin_id=current_user.id)
         else:
-            flash(f'Plugin "{plugin_id}" enabled successfully!', 'success')
+            toast_message = f'Plugin "{plugin_id}" enabled successfully!'
             log_event(EventType.SETTING_CHANGE, f"Plugin '{plugin_id}' enabled", admin_id=current_user.id)
+        toast_category = 'success'
     else:
         plugin = Plugin.query.filter_by(plugin_id=plugin_id).first()
         error_msg = plugin.last_error if plugin else "Plugin not found"
-        flash(f'Failed to enable plugin "{plugin_id}": {error_msg}', 'danger')
+        toast_message = f'Failed to enable plugin "{plugin_id}": {error_msg}'
+        toast_category = 'error'
     
     # Check if this is an HTMX request
     if request.headers.get('HX-Request'):
-        # For HTMX requests, trigger a page refresh to update the navbar
-        response = make_response("", 200)
-        response.headers['HX-Refresh'] = 'true'
+        # Refresh plugin servers count before returning template
+        refresh_plugin_servers_count()
+        
+        # For HTMX requests, return updated plugins content with toast trigger
+        available_plugins = plugin_manager.get_available_plugins()
+        enabled_plugins = [p.plugin_id for p in plugin_manager.get_enabled_plugins()]
+        
+        response = make_response(render_template('settings/partials/_plugins.html', 
+                                               available_plugins=available_plugins,
+                                               enabled_plugins=enabled_plugins))
+        response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": toast_message, "category": toast_category}})
         return response
     else:
-        # Check if we're coming from settings page
-        if request.referrer and 'settings/plugins' in request.referrer:
-            return redirect(url_for('plugin_management.index'))
-        else:
-            return redirect(url_for('plugin_management.index'))
+        # For regular requests, return toast trigger
+        response = make_response(redirect(url_for('plugin_management.index')))
+        response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": toast_message, "category": toast_category}})
+        return response
 
 @bp.route('/plugins/<plugin_id>/disable', methods=['POST'])
 @login_required
@@ -66,27 +108,37 @@ def disable_plugin(plugin_id):
         # Check if this was the last enabled plugin
         remaining_enabled = Plugin.query.filter_by(status=PluginStatus.ENABLED).count()
         if remaining_enabled == 0:
-            flash(f'Plugin "{plugin_id}" disabled successfully! Warning: No plugins are now enabled. You must enable at least one plugin before leaving this page.', 'warning')
+            toast_message = f'Plugin "{plugin_id}" disabled successfully! Warning: No plugins are now enabled. You must enable at least one plugin before leaving this page.'
+            toast_category = 'warning'
         else:
-            flash(f'Plugin "{plugin_id}" disabled successfully! Associated servers have been deactivated.', 'success')
+            toast_message = f'Plugin "{plugin_id}" disabled successfully! Associated servers have been deactivated.'
+            toast_category = 'success'
         log_event(EventType.SETTING_CHANGE, f"Plugin '{plugin_id}' disabled and servers deactivated", admin_id=current_user.id)
     else:
         plugin = Plugin.query.filter_by(plugin_id=plugin_id).first()
         error_msg = plugin.last_error if plugin else "Plugin not found"
-        flash(f'Failed to disable plugin "{plugin_id}": {error_msg}', 'danger')
+        toast_message = f'Failed to disable plugin "{plugin_id}": {error_msg}'
+        toast_category = 'error'
     
     # Check if this is an HTMX request
     if request.headers.get('HX-Request'):
-        # For HTMX requests, trigger a page refresh to update the navbar
-        response = make_response("", 200)
-        response.headers['HX-Refresh'] = 'true'
+        # Refresh plugin servers count before returning template
+        refresh_plugin_servers_count()
+        
+        # For HTMX requests, return updated plugins content with toast trigger
+        available_plugins = plugin_manager.get_available_plugins()
+        enabled_plugins = [p.plugin_id for p in plugin_manager.get_enabled_plugins()]
+        
+        response = make_response(render_template('settings/partials/_plugins.html', 
+                                               available_plugins=available_plugins,
+                                               enabled_plugins=enabled_plugins))
+        response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": toast_message, "category": toast_category}})
         return response
     else:
-        # Check if we're coming from settings page
-        if request.referrer and 'settings/plugins' in request.referrer:
-            return redirect(url_for('plugin_management.index'))
-        else:
-            return redirect(url_for('plugin_management.index'))
+        # For regular requests, return toast trigger
+        response = make_response(redirect(url_for('plugin_management.index')))
+        response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": toast_message, "category": toast_category}})
+        return response
 
 @bp.route('/plugins/<plugin_id>/info')
 @login_required
