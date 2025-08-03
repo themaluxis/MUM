@@ -4918,6 +4918,11 @@
       }
     }
   }
+  .btn-lg {
+    --fontsize: 1.125rem;
+    --btn-p: 1.25rem;
+    --size: calc(var(--size-field, 0.25rem) * 12);
+  }
   .btn-sm {
     --fontsize: 0.75rem;
     --btn-p: 0.75rem;

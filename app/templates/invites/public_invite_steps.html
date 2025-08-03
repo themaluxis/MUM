@@ -1,0 +1,248 @@
+<!-- File: app/templates/invites/public_invite_steps.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ super() }} - You're Invited!{% endblock %}
+
+{% block content %} 
+<div class="hero min-h-[calc(100vh-12rem)] bg-base-100">
+    <div class="text-center p-4 max-w-4xl w-full mx-auto">
+            {% if error %}
+                <div class="card bg-error text-error-content shadow-xl p-6 sm:p-8">
+                    <i class="fa-solid fa-circle-xmark fa-5x mx-auto mb-4"></i>
+                    <h1 class="text-3xl sm:text-4xl font-bold">Invite Problem</h1>
+                    <p class="py-6 text-lg">{{ error }}</p>
+                    {% if g.setup_complete %}
+                        <a href="{{ url_for('auth.app_login') }}" class="btn btn-neutral btn-outline">Admin Login</a>
+                    {% else %}
+                         <a href="{{ url_for('setup.account_setup') }}" class="btn btn-neutral btn-outline">Go to Setup</a>
+                    {% endif %}
+                </div>
+            {% elif invite %}
+                <div class="card bg-base-200 shadow-xl p-6 sm:p-8">
+                    <figure class="mb-4"><i class="fa-solid fa-envelope-open-text fa-5x text-primary"></i></figure>
+                    <h1 class="text-3xl sm:text-4xl font-bold">You're Invited!</h1>
+                    <p class="py-4 text-base-content/80">You've been invited to join <strong class="text-accent">{{ server_name }}</strong>.</p>
+
+                    {# Build steps dynamically based on invite configuration #}
+                    {% set invite_steps = [] %}
+                    
+                    {# Step 1: Discord OAuth (if enabled) #}
+                    {% if show_discord_button %}
+                        {% set _ = invite_steps.append({
+                            'id': 'discord',
+                            'name': 'Discord Login',
+                            'icon': 'fa-brands fa-discord',
+                            'required': discord_sso_is_mandatory,
+                            'completed': already_authenticated_discord_user is not none
+                        }) %}
+                    {% endif %}
+                    
+                    {# Step 2: Plex Login (always required) #}
+                    {% set _ = invite_steps.append({
+                        'id': 'plex',
+                        'name': 'Plex Login',
+                        'icon': 'fa-solid fa-right-to-bracket',
+                        'required': true,
+                        'completed': already_authenticated_plex_user is not none
+                    }) %}
+                    
+                    {# Step 3+: Server Access (for each server in multi-server invites) #}
+                    {# For now, we'll show a single "Server Access" step #}
+                    {# TODO: Extend this when we have proper multi-server invite data #}
+                    {% set _ = invite_steps.append({
+                        'id': 'server_access',
+                        'name': 'Server Access',
+                        'icon': 'fa-solid fa-server',
+                        'required': true,
+                        'completed': false
+                    }) %}
+
+                    {# Display Steps #}
+                    {% if invite_steps|length > 1 %}
+                    <ul class="steps steps-horizontal w-full mb-8">
+                        {% for step in invite_steps %}
+                            {% set is_current = not step.completed and (loop.index0 == 0 or invite_steps[loop.index0-1].completed) %}
+                            {% set is_accessible = step.completed or is_current %}
+                            <li class="step
+                                {% if step.completed %}step-primary{% endif %}
+                                {% if is_current and not step.completed %}step-primary step-current{% endif %}
+                                {% if not is_accessible %}step-disabled{% endif %}
+                            ">
+                                <span class="text-xs sm:text-sm flex items-center">
+                                    <i class="{{ step.icon }} mr-1"></i>
+                                    {{ step.name }}
+                                    {% if step.required and not step.completed %}
+                                        <span class="badge badge-warning badge-xs ml-1">Required</span>
+                                    {% endif %}
+                                    {% if step.completed %}
+                                        <i class="fa-solid fa-check ml-1 text-success"></i>
+                                    {% endif %}
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+
+                    {# Current Step Content #}
+                    <div class="step-content max-w-2xl mx-auto">
+                        {% if show_discord_button and not already_authenticated_discord_user %}
+                            {# Discord Step #}
+                            <div class="step-section" id="discord-step">
+                                <h2 class="text-xl font-semibold mb-4">
+                                    <i class="fa-brands fa-discord mr-2"></i>
+                                    Discord Authentication
+                                    {% if discord_sso_is_mandatory %}
+                                        <span class="badge badge-warning badge-sm ml-2">Required</span>
+                                    {% else %}
+                                        <span class="badge badge-ghost badge-sm ml-2">Optional</span>
+                                    {% endif %}
+                                </h2>
+                                
+                                {% if setting_require_guild_membership %}
+                                    <div class="alert alert-info mb-4">
+                                        <i class="fa-solid fa-info-circle"></i>
+                                        <span>You must be a member of our Discord server to accept this invite.</span>
+                                    </div>
+                                    {% if setting_discord_server_invite_url %}
+                                        <div class="mb-4">
+                                            <a href="{{ setting_discord_server_invite_url }}" target="_blank" rel="noopener noreferrer" 
+                                               class="btn btn-secondary btn-block">
+                                                <i class="fa-brands fa-discord fa-lg mr-2"></i>
+                                                Join Discord Server First
+                                                <i class="fa-solid fa-external-link-alt ml-2"></i>
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+
+                                <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
+                                    {{ form.hidden_tag() }}
+                                    <button name="auth_method" value="discord" type="submit" class="btn btn-info bg-[#5865F2] hover:bg-[#4752C4] border-[#5865F2] hover:border-[#4752C4] text-white btn-block text-base">
+                                        <i class="fa-brands fa-discord fa-lg mr-2"></i>
+                                        Continue with Discord
+                                    </button>
+                                </form>
+                                
+                                {% if not discord_sso_is_mandatory %}
+                                    <div class="divider">OR</div>
+                                    <p class="text-sm text-base-content/60">You can skip Discord login and proceed directly to Plex authentication.</p>
+                                {% endif %}
+                            </div>
+                        {% elif not already_authenticated_plex_user %}
+                            {# Plex Step #}
+                            <div class="step-section" id="plex-step">
+                                <h2 class="text-xl font-semibold mb-4">
+                                    <i class="fa-solid fa-right-to-bracket mr-2"></i>
+                                    Plex Authentication
+                                    <span class="badge badge-error badge-sm ml-2">Required</span>
+                                </h2>
+                                
+                                {% if already_authenticated_discord_user %}
+                                    <div class="alert alert-success mb-4">
+                                        <i class="fa-brands fa-discord mr-2"></i>
+                                        <span>Discord account linked as <strong>{{ already_authenticated_discord_user.username }}</strong></span>
+                                    </div>
+                                {% endif %}
+
+                                <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
+                                    {{ form.hidden_tag() }}
+                                    <button name="auth_method" value="plex" type="submit" class="btn btn-primary bg-[#e5a00d] hover:bg-[#c4880b] border-[#e5a00d] hover:border-[#c4880b] text-black btn-block text-base">
+                                        <i class="fa-solid fa-right-to-bracket mr-2"></i>
+                                        Sign In with Plex
+                                    </button>
+                                </form>
+                            </div>
+                        {% else %}
+                            {# Final Step - Accept Invite #}
+                            <div class="step-section" id="accept-step">
+                                <h2 class="text-xl font-semibold mb-4">
+                                    <i class="fa-solid fa-check-circle mr-2"></i>
+                                    Ready to Join!
+                                </h2>
+
+                                {# Show completed authentications #}
+                                <div class="space-y-2 mb-6">
+                                    {% if already_authenticated_plex_user %}
+                                        <div class="alert alert-success">
+                                            <i class="fa-solid fa-right-to-bracket mr-2"></i>
+                                            <span>Plex account linked as <strong>{{ already_authenticated_plex_user.username }}</strong></span>
+                                        </div>
+                                    {% endif %}
+                                    {% if already_authenticated_discord_user %}
+                                        <div class="alert alert-success">
+                                            <i class="fa-brands fa-discord mr-2"></i>
+                                            <span>Discord account linked as <strong>{{ already_authenticated_discord_user.username }}</strong></span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                {% if not (discord_sso_is_mandatory and not already_authenticated_discord_user) %}
+                                    <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
+                                        {{ form.hidden_tag() }}
+                                        <button name="action" value="accept_invite" type="submit" class="btn btn-success btn-block text-base btn-lg">
+                                            <i class="fa-solid fa-check-circle mr-2"></i>
+                                            Accept Invite & Join {{ server_name }}
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <div class="alert alert-error">
+                                        <i class="fa-solid fa-circle-xmark mr-2"></i>
+                                        <span>Discord linking is required but not completed. Please go back and link your Discord account.</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        {# Invite Details (Collapsible) #}
+                        <div class="collapse collapse-arrow bg-base-100">
+                            <input type="checkbox" /> 
+                            <div class="collapse-title text-sm font-medium">
+                                <i class="fa-solid fa-info-circle mr-2"></i>
+                                Invite Details
+                            </div>
+                            <div class="collapse-content text-xs text-left space-y-1">
+                                <p><i class="fa-regular fa-clock fa-fw w-4"></i> Expires: {{ invite.expires_at | format_datetime_user if invite.expires_at else "Never" }}</p>
+                                <p><i class="fa-solid fa-users fa-fw w-4"></i> Uses Left: {{ (invite.max_uses - invite.current_uses) if invite.max_uses is not none else "Unlimited" }}</p>
+                                {% if invite.membership_duration_days %}
+                                    <p class="text-accent"><i class="fa-solid fa-user-clock fa-fw w-4"></i> Duration: {{ invite.membership_duration_days }} day{{'s' if invite.membership_duration_days != 1 else ''}} after acceptance</p>
+                                {% else %}
+                                    <p><i class="fa-solid fa-user-check fa-fw w-4"></i> Membership: Permanent</p>
+                                {% endif %}
+                                {% if invite.grant_library_ids|length > 0 %}
+                                    <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Access: {{ invite.grant_library_ids|length }} specific libraries</p>
+                                {% else %}
+                                    <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Access: All shared libraries</p>
+                                {% endif %}
+                                <p><i class="fa-solid fa-download fa-fw w-4"></i> Downloads: {{ "Enabled" if invite.allow_downloads else "Disabled" }}</p>
+                                <p><i class="fa-solid fa-house-user fa-fw w-4"></i> Plex Home: {{ "Enabled" if invite.invite_to_plex_home else "Disabled" }}</p>
+                                <p><i class="fa-solid fa-tv fa-fw w-4"></i> Live TV: {{ "Enabled" if invite.allow_live_tv else "Disabled" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            {% else %} 
+                <div class="card bg-warning text-warning-content shadow-xl p-8">
+                    <i class="fa-solid fa-question-circle fa-5x mx-auto mb-4"></i>
+                    <h1 class="text-3xl sm:text-4xl font-bold">Invite Information Unavailable</h1>
+                    <p class="py-6 text-lg">Could not load invite details at this time. The link may be invalid or there was an issue.</p>
+                     {% if g.setup_complete %}
+                        <a href="{{ url_for('auth.app_login') }}" class="btn btn-neutral btn-outline">Admin Login</a>
+                    {% else %}
+                         <a href="{{ url_for('setup.account_setup') }}" class="btn btn-neutral btn-outline">Go to Setup</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+    </div>
+</div>
+
+<style>
+
+.step-disabled {
+    opacity: 0.5;
+}
+
+.step-section {
+    min-height: 100px;
+}
+</style>
+{% endblock content %}

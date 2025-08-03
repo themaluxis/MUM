@@ -312,6 +312,12 @@
                 // Load libraries for this server if it was just selected
                 if (!isSelected) {
                     loadLibrariesForServer(serverId, card);
+                } else {
+                    // Clear libraries when server is deselected
+                    const librariesContainer = card.querySelector('.max-h-40.overflow-y-auto');
+                    if (librariesContainer) {
+                        librariesContainer.innerHTML = '<div class="text-center py-4 text-base-content/60">Select this server to see libraries</div>';
+                    }
                 }
                 
                 // Hide server selection error when servers are selected
@@ -379,17 +385,9 @@
                 });
         }
 
-        // Load libraries for all servers initially, then auto-select first server
-        serverCards.forEach(card => {
-            const serverId = card.dataset.serverId;
-            loadLibrariesForServer(serverId, card);
-        });
-        
         // Auto-select only the first server by default
         if (serverCards.length > 0) {
-            setTimeout(() => {
-                serverCards[0].click();
-            }, 100); // Small delay to ensure libraries are loaded first
+            serverCards[0].click();
         }
         
         // Add form validation for server selection

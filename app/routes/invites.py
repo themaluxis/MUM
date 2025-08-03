@@ -139,8 +139,31 @@ def create_invite():
     global_force_sso = Setting.get_bool('DISCORD_BOT_REQUIRE_SSO_ON_INVITE', False) or bot_is_enabled
     global_require_guild = Setting.get_bool('DISCORD_REQUIRE_GUILD_MEMBERSHIP', False)
     
-    if request.method == 'POST' and not form.libraries.data and 'libraries' in request.form:
-         form.libraries.data = request.form.getlist('libraries')
+    # Handle dynamic library selection from multiple servers
+    if request.method == 'POST':
+        # Get all submitted library IDs from the form
+        submitted_libraries = request.form.getlist('libraries')
+        
+        # Build valid choices from all selected servers
+        all_valid_choices = []
+        if selected_server_ids:
+            for server_id in selected_server_ids:
+                server = media_service_manager.get_server_by_id(server_id)
+                if server:
+                    service = MediaServiceFactory.create_service_from_db(server)
+                    try:
+                        server_libraries = service.get_libraries()
+                        for lib in server_libraries:
+                            all_valid_choices.append((lib['id'], lib['name']))
+                    except Exception as e:
+                        current_app.logger.error(f"Error fetching libraries for validation from server {server.name}: {e}")
+        
+        # Update form choices to include all valid libraries from selected servers
+        form.libraries.choices = all_valid_choices
+        
+        # Set the form data
+        if submitted_libraries:
+            form.libraries.data = submitted_libraries
 
     toast_message_text = ""
     toast_category = "info"
@@ -200,8 +223,8 @@ def create_invite():
             log_msg_details = f"Downloads: {'Enabled' if new_invite.allow_downloads else 'Disabled'}."
             if new_invite.membership_duration_days: log_msg_details += f" Membership: {new_invite.membership_duration_days} days."
             else: log_msg_details += " Membership: Permanent."
-            if new_invite.force_discord_auth is not None: log_msg_details += f" Force Discord Auth: {new_invite.force_discord_auth} (Override)."
-            if new_invite.force_guild_membership is not None: log_msg_details += f" Force Guild Membership: {new_invite.force_guild_membership} (Override)."
+            if hasattr(new_invite, 'force_discord_auth') and new_invite.force_discord_auth is not None: log_msg_details += f" Force Discord Auth: {new_invite.force_discord_auth} (Override)."
+            if hasattr(new_invite, 'force_guild_membership') and new_invite.force_guild_membership is not None: log_msg_details += f" Force Guild Membership: {new_invite.force_guild_membership} (Override)."
                 
             log_event(EventType.INVITE_CREATED, f"Invite created: Path='{custom_path or new_invite.token}'. {log_msg_details}", invite_id=new_invite.id, admin_id=current_user.id)
             toast_message_text = f"Invite link created successfully!"; toast_category = "success"
@@ -351,6 +374,10 @@ def process_invite_form(invite_path_or_token):
             server_name = server.name
     # --- END NEW ---
 
+    # Get all servers for template logic
+    media_service_manager = MediaServiceManager()
+    all_servers = media_service_manager.get_all_servers(active_only=True)
+
     if request.method == 'POST':
         auth_method = request.form.get('auth_method'); action_taken = request.form.get('action') 
         if auth_method == 'plex':
@@ -420,7 +447,17 @@ def process_invite_form(invite_path_or_token):
         
         return redirect(url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token))
 
-    return render_template('invites/public_invite.html', 
+    # Determine if we should use the steps-based template
+    # Use steps if Discord OAuth is enabled OR if we have multiple servers available
+    # For now, we'll use steps template when there are multiple servers in the system
+    # This encourages the better UX even for single-server invites when multi-server is possible
+    has_multiple_servers_available = len(all_servers) > 1
+    
+    use_steps_template = show_discord_button or has_multiple_servers_available
+    
+    template_name = 'invites/public_invite_steps.html' if use_steps_template else 'invites/public_invite.html'
+    
+    return render_template(template_name, 
                            form=form_instance, 
                            invite=invite, 
                            error=None,

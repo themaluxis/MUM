@@ -140,15 +140,15 @@
             <div class="divider text-xs">Discord Overrides</div>
             <div class="form-control">
                 <label class="label cursor-pointer justify-start">
-                    {{ form.override_force_discord_auth(class="toggle toggle-info mr-3", id="edit_modal_override_sso") }}
-                    <span class="label-text font-medium">{{ form.override_force_discord_auth.label.text }}</span>
+                    {{ form.require_discord_auth(class="toggle toggle-info mr-3", id="edit_modal_require_discord_auth") }}
+                    <span class="label-text font-medium">{{ form.require_discord_auth.label.text }}</span>
                 </label>
             </div>
             {% if global_require_guild %}
             <div class="form-control">
                 <label class="label cursor-pointer justify-start">
-                    {{ form.override_force_guild_membership(class="toggle toggle-warning mr-3", id="edit_modal_override_guild") }}
-                    <span class="label-text font-medium">{{ form.override_force_guild_membership.label.text }}</span>
+                    {{ form.require_discord_guild_membership(class="toggle toggle-warning mr-3", id="edit_modal_require_guild") }}
+                    <span class="label-text font-medium">{{ form.require_discord_guild_membership.label.text }}</span>
                 </label>
             </div>
             {% endif %}
