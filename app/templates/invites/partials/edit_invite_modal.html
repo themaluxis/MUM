@@ -21,40 +21,6 @@
     {{ form.hidden_tag() }}
 
     {# --- Basic, Always-Visible Options --- #}
-    <div class="form-control mb-3">
-        <label class="label text-base-content font-bold mb-1">Invite Code String</label>
-        <input type="text" value="{{ invite.custom_path or 'N/A' }}" class="input input-bordered w-full" disabled>
-        <span class="label-text-alt text-xs block mt-1">The custom path cannot be changed after creation.</span>
-    </div>
-
-    <div class="form-control mb-3">
-        <label class="label text-base-content font-bold mb-1">Attached Servers</label>
-        {% if invite.servers %}
-            <div class="space-y-2">
-                {% for server in invite.servers %}
-                    <div class="flex items-center gap-2 p-3 bg-base-200 rounded-lg">
-                        <div class="badge badge-primary badge-sm">{{ server.service_type.name.upper() }}</div>
-                        <span class="font-medium">{{ server.name }}</span>
-                        <span class="text-sm text-base-content/60">({{ server.url }})</span>
-                    </div>
-                {% endfor %}
-            </div>
-        {% elif invite_server %}
-            {# Fallback for legacy single server #}
-            <div class="flex items-center gap-2 p-3 bg-base-200 rounded-lg">
-                <div class="badge badge-primary badge-sm">{{ invite_server.service_type.name.upper() }}</div>
-                <span class="font-medium">{{ invite_server.name }}</span>
-                <span class="text-sm text-base-content/60">({{ invite_server.url }})</span>
-            </div>
-        {% else %}
-            <div class="flex items-center gap-2 p-3 bg-warning/20 rounded-lg">
-                <i class="fa-solid fa-exclamation-triangle text-warning"></i>
-                <span class="text-warning">No servers attached to this invite</span>
-            </div>
-        {% endif %}
-        <span class="label-text-alt text-xs block mt-1">Server assignments cannot be changed after creation.</span>
-    </div>
-
     <div class="form-control mb-4">
         {{ form.expires_in_days.label(class="label inline-block font-bold mb-1") }} <div class="badge badge-xs badge-outline badge-warning mb-1">In Days</div>
         <div class="join w-full">
