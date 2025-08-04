@@ -2706,6 +2706,21 @@
     grid-row-start: 1;
     min-width: calc(0.25rem * 0);
   }
+  .stat-value {
+    grid-column-start: 1;
+    white-space: nowrap;
+    font-size: 2rem;
+    font-weight: 800;
+  }
+  .stat-title {
+    grid-column-start: 1;
+    white-space: nowrap;
+    color: var(--color-base-content);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    }
+    font-size: 0.75rem;
+  }
   .container {
     width: 100%;
     @media (width >= 40rem) {
@@ -3143,6 +3158,21 @@
       }
     }
   }
+  .stat {
+    display: inline-grid;
+    width: 100%;
+    column-gap: calc(0.25rem * 4);
+    padding-inline: calc(0.25rem * 6);
+    padding-block: calc(0.25rem * 4);
+    grid-template-columns: repeat(1, 1fr);
+    &:not(:last-child) {
+      border-inline-end: var(--border) dashed currentColor;
+      @supports (color: color-mix(in lab, red, red)) {
+        border-inline-end: var(--border) dashed color-mix(in oklab, currentColor 10%, #0000);
+      }
+      border-block-end: none;
+    }
+  }
   .navbar-end {
     display: inline-flex;
     align-items: center;
@@ -3482,6 +3512,9 @@
   }
   .min-h-\[2rem\] {
     min-height: 2rem;
+  }
+  .min-h-\[60vh\] {
+    min-height: 60vh;
   }
   .min-h-\[calc\(100vh-10rem\)\] {
     min-height: calc(100vh - 10rem);

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ super() }} - Welcome{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="hero min-h-[60vh] bg-base-200 rounded-lg">
+        <div class="hero-content text-center">
+            <div class="max-w-md">
+                <h1 class="text-5xl font-bold mb-6">Welcome to {{ app_name }}</h1>
+                <p class="text-lg mb-8">Hello, {{ user.get_display_name() }}!</p>
+                <p class="text-base-content/70">
+                    You have successfully logged into your user account. 
+                    Your media access and settings are managed through your connected services.
+                </p>
+                
+                <div class="mt-8">
+                    <div class="stats shadow">
+                        <div class="stat">
+                            <div class="stat-title">Account Created</div>
+                            <div class="stat-value text-sm">{{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'Unknown' }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <a href="{{ url_for('auth.logout') }}" class="btn btn-outline">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

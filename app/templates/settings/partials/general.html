@@ -44,6 +44,16 @@
             {% endif %}
         </div>
 
+        <div class="form-control">
+            <label class="label cursor-pointer justify-start">
+                {{ form.allow_user_accounts(class="toggle toggle-primary mr-3") }}
+                <span class="label-text font-medium">{{ form.allow_user_accounts.label.text }}</span>
+            </label>
+            <label class="label">
+                <span class="label-text-alt">{{ form.allow_user_accounts.description }}</span>
+            </label>
+        </div>
+
         <div class="flex justify-end pt-4">
             {{ form.submit(class="btn btn-primary") }}
         </div>

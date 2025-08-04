@@ -1,7 +1,7 @@
 # File: app/forms.py
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, IntegerField, TextAreaField, HiddenField, DateField
-from wtforms.validators import DataRequired, EqualTo, Length, Optional, URL, NumberRange, Regexp, ValidationError
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, IntegerField, TextAreaField, HiddenField, DateField, EmailField
+from wtforms.validators import DataRequired, EqualTo, Length, Optional, URL, NumberRange, Regexp, ValidationError, Email
 from wtforms import SelectMultipleField
 from app.models import Setting, AdminAccount # For custom validator if checking existing secrets
 from wtforms.widgets import ListWidget, CheckboxInput # <--- ADDED THIS IMPORT
@@ -455,6 +455,43 @@ class GeneralSettingsForm(FlaskForm): # As before
     def __init__(self, *args, **kwargs):
         super(GeneralSettingsForm, self).__init__(*args, **kwargs)
 
+class UserAccountCreationForm(FlaskForm):
+    username = StringField(
+        'Username',
+        validators=[DataRequired(), Length(min=3, max=50), Regexp(r'^[a-zA-Z0-9_-]+$', message="Username can only contain letters, numbers, underscores, and hyphens")],
+        description="Choose a unique username for your account"
+    )
+    email = EmailField(
+        'Email Address',
+        validators=[DataRequired(), Email()],
+        description="Your email address for account recovery and notifications"
+    )
+    password = PasswordField(
+        'Password',
+        validators=[DataRequired(), Length(min=8)],
+        description="Choose a secure password (minimum 8 characters)"
+    )
+    confirm_password = PasswordField(
+        'Confirm Password',
+        validators=[DataRequired(), EqualTo('password', message='Passwords must match')],
+        description="Re-enter your password to confirm"
+    )
+    submit = SubmitField('Create Account')
+
+    def validate_username(self, field):
+        # Check if username already exists
+        from app.models import User
+        existing_user = User.query.filter_by(primary_username=field.data).first()
+        if existing_user:
+            raise ValidationError('Username already exists. Please choose a different one.')
+
+    def validate_email(self, field):
+        # Check if email already exists
+        from app.models import User
+        existing_user = User.query.filter_by(primary_email=field.data).first()
+        if existing_user:
+            raise ValidationError('Email already registered. Please use a different email address.')
+
 class TimezonePreferenceForm(FlaskForm):
     timezone_preference = SelectField(
         'Display Time In',
@@ -469,3 +506,8 @@ class TimezonePreferenceForm(FlaskForm):
     )
     local_timezone = HiddenField() # This will be populated by JavaScript
     submit = SubmitField('Save Timezone Setting')
+
+class UserLoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()], render_kw={"placeholder": "Username"})
+    password = PasswordField('Password', validators=[DataRequired()], render_kw={"placeholder": "Password"})
+    submit = SubmitField('Sign In')

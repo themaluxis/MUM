@@ -161,7 +161,7 @@ class AdminAccount(db.Model, UserMixin): # ... (no changes needed for bot featur
     def __repr__(self): return f'<AdminAccount {self.username or self.plex_username}>'
 
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True) 
     
@@ -212,6 +212,9 @@ class User(db.Model):
     # Raw data storage
     raw_plex_data = db.Column(db.Text, nullable=True)  # Store raw XML/JSON data from Plex API
     
+    # User account authentication (for user accounts created via invites)
+    password_hash = db.Column(db.String(256), nullable=True)  # For user account login
+    
     # Invite relationship
     used_invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True)
     invite = db.relationship('Invite', back_populates='redeemed_users')
@@ -247,6 +250,14 @@ class User(db.Model):
             user_id=self.id, 
             server_id=server_id
         ).first()
+    
+    def set_password(self, password):
+        """Set password hash for user account"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check password for user account"""
+        return check_password_hash(self.password_hash, password) if self.password_hash else False
 
 # (Invite, InviteUsage, HistoryLog models as before - no immediate changes for bot setup yet)
 class Invite(db.Model):

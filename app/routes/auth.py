@@ -5,8 +5,8 @@ from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlsplit, urljoin, urlencode, quote as url_quote
 import datetime 
 from app.utils.helpers import log_event
-from app.models import AdminAccount, Setting, EventType, SettingValueType 
-from app.forms import LoginForm
+from app.models import AdminAccount, User, Setting, EventType, SettingValueType 
+from app.forms import LoginForm, UserLoginForm
 from app.extensions import db, csrf # <<< IMPORT CSRF
 from plexapi.myplex import MyPlexAccount 
 from plexapi.exceptions import Unauthorized, NotFound, PlexApiException
@@ -229,6 +229,46 @@ def logout_setup():
         log_event(EventType.ADMIN_LOGOUT, f"Admin '{admin_name}' logged out during setup.", admin_id=current_user.id)
         logout_user()
     session.clear(); flash('Logged out of setup.', 'info'); return redirect(url_for('setup.account_setup'))
+
+@bp.route('/user/login', methods=['GET', 'POST'])
+def user_login():
+    """User login for regular user accounts"""
+    # Check if user accounts are enabled
+    allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+    if not allow_user_accounts:
+        flash('User accounts are not enabled on this server.', 'warning')
+        return redirect(url_for('auth.app_login'))
+    
+    if current_user.is_authenticated:
+        # Check if current user is an admin or regular user
+        if isinstance(current_user, AdminAccount):
+            return redirect(url_for('dashboard.index'))
+        else:
+            return redirect(url_for('user.index'))
+    
+    form = UserLoginForm()
+    
+    if form.validate_on_submit():
+        # Find the user by username
+        user = User.query.filter_by(primary_username=form.username.data).first()
+        
+        # Check if user exists and password matches
+        if user and user.check_password(form.password.data):
+            login_user(user, remember=True)
+            user.last_activity_at = db.func.now()
+            db.session.commit()
+            
+            log_event(EventType.ADMIN_LOGIN_SUCCESS, f"User '{user.primary_username}' logged in.", user_id=user.id)
+            
+            next_page = request.args.get('next')
+            if not next_page or not is_safe_url(next_page):
+                next_page = url_for('user.index')
+            return redirect(next_page)
+        else:
+            log_event(EventType.ADMIN_LOGIN_FAIL, f"Failed user login attempt for username '{form.username.data}'.")
+            flash('Invalid username or password.', 'danger')
+    
+    return render_template('auth/user_login.html', title="User Login", form=form)
 
 DISCORD_API_BASE_URL = 'https://discord.com/api/v10'
 

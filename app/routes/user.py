@@ -15,6 +15,29 @@ import json
 # Note the new blueprint name and singular URL prefix
 bp = Blueprint('user', __name__, url_prefix='/user')
 
+@bp.route('/')
+@bp.route('/index')
+@login_required
+def index():
+    """User dashboard/index page for regular user accounts"""
+    # Ensure this is a regular user, not an admin
+    if isinstance(current_user, AdminAccount):
+        return redirect(url_for('dashboard.index'))
+    
+    # Ensure this is a User with password_hash (user account)
+    if not isinstance(current_user, User) or not current_user.password_hash:
+        flash('Access denied. Please log in with a valid user account.', 'danger')
+        return redirect(url_for('auth.user_login'))
+    
+    # Get application name for welcome message
+    from app.models import Setting
+    app_name = Setting.get('APP_NAME', 'MUM')
+    
+    return render_template('user/index.html', 
+                         title="Welcome", 
+                         app_name=app_name,
+                         user=current_user)
+
 @bp.route('/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 @permission_required('view_user')

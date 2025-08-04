@@ -47,6 +47,54 @@
                     <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
                         {{ form.hidden_tag() }} {# For potential CSRF if form was more complex #}
 
+                        {# User Account Creation Section #}
+                        {% if allow_user_accounts and not user_account_created %}
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold mb-4">
+                                    <i class="fa-solid fa-user-plus mr-2"></i>
+                                    Create Your Account
+                                </h3>
+                                <p class="text-sm text-base-content/70 mb-4">
+                                    First, create your account to manage your media access and preferences.
+                                </p>
+                                
+                                <div class="form-control mb-3">
+                                    <label class="label">
+                                        <span class="label-text">{{ account_form.username.label.text }}</span>
+                                    </label>
+                                    {{ account_form.username(class="input input-bordered w-full") }}
+                                </div>
+
+                                <div class="form-control mb-3">
+                                    <label class="label">
+                                        <span class="label-text">{{ account_form.email.label.text }}</span>
+                                    </label>
+                                    {{ account_form.email(class="input input-bordered w-full") }}
+                                </div>
+
+                                <div class="form-control mb-3">
+                                    <label class="label">
+                                        <span class="label-text">{{ account_form.password.label.text }}</span>
+                                    </label>
+                                    {{ account_form.password(class="input input-bordered w-full") }}
+                                </div>
+
+                                <div class="form-control mb-4">
+                                    <label class="label">
+                                        <span class="label-text">{{ account_form.confirm_password.label.text }}</span>
+                                    </label>
+                                    {{ account_form.confirm_password(class="input input-bordered w-full") }}
+                                </div>
+
+                                <button name="action" value="create_user_account" type="submit" class="btn btn-primary btn-block text-base mb-6">
+                                    <i class="fa-solid fa-user-plus mr-2"></i>
+                                    Create Account & Continue
+                                </button>
+                                
+                                <div class="divider">Then continue with authentication</div>
+                            </div>
+                        {% endif %}
+
                         {# Plex Login Button #}
                         {% if not already_authenticated_plex_user %}
                         <div class="form-control mt-6">

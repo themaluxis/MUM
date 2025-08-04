@@ -18,7 +18,7 @@ from .extensions import (
     babel, 
     htmx
 )
-from .models import AdminAccount, Setting, EventType
+from .models import AdminAccount, User, Setting, EventType
 from .utils import helpers 
 
 def get_locale_for_babel():
@@ -208,14 +208,28 @@ def create_app(config_name=None):
 
     @login_manager.user_loader
     def load_user(user_id):
-        # Ensure table exists before querying, critical during first `flask db upgrade`
+        # Ensure tables exist before querying, critical during first `flask db upgrade`
         try:
             with app.app_context(): # Ensure context for db operations if called early
                 engine_conn_lu = db.engine.connect()
-                table_exists = db.engine.dialect.has_table(engine_conn_lu, AdminAccount.__tablename__)
+                admin_table_exists = db.engine.dialect.has_table(engine_conn_lu, AdminAccount.__tablename__)
+                user_table_exists = db.engine.dialect.has_table(engine_conn_lu, User.__tablename__)
                 engine_conn_lu.close()
-                if table_exists:
+                
+                if admin_table_exists and user_table_exists:
+                    # Try to load as AdminAccount first
+                    admin = AdminAccount.query.get(int(user_id))
+                    if admin:
+                        return admin
+                    
+                    # If not found as admin, try as regular User
+                    user = User.query.get(int(user_id))
+                    if user:
+                        return user
+                elif admin_table_exists:
+                    # Fallback to admin-only for backward compatibility
                     return AdminAccount.query.get(int(user_id))
+                
                 return None
         except Exception as e_load_user:
             app.logger.error(f"Init.py - load_user(): Error checking/loading user: {e_load_user}")
@@ -363,7 +377,9 @@ def create_app(config_name=None):
                     'plugins.reload_plugins', 'plugins.install_plugin', 'plugins.uninstall_plugin',
                     'auth.app_login', 'auth.logout', 'static', 'api.health',
                     # Plugin management endpoints for server configuration
-                    'plugin_management.index', 'plugin_management.configure', 'plugin_management.edit_server', 'plugin_management.add_server'
+                    'plugin_management.index', 'plugin_management.configure', 'plugin_management.edit_server', 'plugin_management.add_server',
+                    # Setup endpoints - needed when no admin exists yet
+                    'setup.account_setup', 'setup.create_admin', 'setup.app_config', 'setup.servers', 'setup.add_server', 'setup.edit_server', 'setup.plugins'
                 ]
                 
                 # Block ALL routes except the explicitly allowed ones when no plugins are configured

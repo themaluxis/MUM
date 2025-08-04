@@ -58,6 +58,7 @@ def general():
         app_local_url = form.app_local_url.data.rstrip('/') if form.app_local_url.data else None
         Setting.set('APP_LOCAL_URL', app_local_url or '', SettingValueType.STRING, "Application Local URL")
         Setting.set('SESSION_MONITORING_INTERVAL_SECONDS', form.session_monitoring_interval.data, SettingValueType.INTEGER, "Session Monitoring Interval")
+        Setting.set('ALLOW_USER_ACCOUNTS', form.allow_user_accounts.data, SettingValueType.BOOLEAN, "Allow User Accounts")
         
         # Update app config
         current_app.config['APP_NAME'] = form.app_name.data
@@ -76,6 +77,7 @@ def general():
         form.app_base_url.data = Setting.get('APP_BASE_URL')
         form.app_local_url.data = Setting.get('APP_LOCAL_URL')
         form.session_monitoring_interval.data = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', 30)
+        form.allow_user_accounts.data = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
     return render_template(
         'settings/index.html',
         title="General Settings", 

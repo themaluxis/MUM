@@ -20,6 +20,11 @@
                     <a href="{{ plex_app_url }}" target="_blank" class="btn btn-neutral">
                         Go to Plex <i class="fa-solid fa-arrow-up-right-from-square ml-2"></i>
                     </a>
+                    {% if allow_user_accounts %}
+                    <a href="{{ url_for('auth.user_login') }}" class="btn btn-secondary">
+                        <i class="fa-solid fa-user mr-2"></i> User Login
+                    </a>
+                    {% endif %}
                 </div>
                  <p class="text-xs mt-8">
                     If you encounter any issues, please contact the server administrator.

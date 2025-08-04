@@ -3,6 +3,7 @@ import uuid
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, session, g, make_response
 from markupsafe import Markup # Import Markup from markupsafefrom flask_login import login_required, current_user 
 from datetime import datetime, timezone
+from app.utils.timezone_utils import utcnow
 from urllib.parse import urlencode, quote as url_quote, urlparse, parse_qs, urlunparse 
 from plexapi.myplex import MyPlexAccount 
 from plexapi.exceptions import PlexApiException
@@ -441,10 +442,57 @@ def process_invite_form(invite_path_or_token):
     # Get all servers for template logic
     media_service_manager = MediaServiceManager()
     all_servers = media_service_manager.get_all_servers(active_only=True)
+    
+    # Check if user accounts are enabled
+    allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+    user_account_created = session.get(f'invite_{invite.id}_user_account_created', False)
+    
+    # Create user account form if needed
+    account_form = None
+    if allow_user_accounts:
+        from app.forms import UserAccountCreationForm
+        account_form = UserAccountCreationForm()
 
     if request.method == 'POST':
-        auth_method = request.form.get('auth_method'); action_taken = request.form.get('action') 
-        if auth_method == 'plex':
+        auth_method = request.form.get('auth_method'); action_taken = request.form.get('action')
+        
+        # Handle user account creation if enabled
+        if action_taken == 'create_user_account' and allow_user_accounts:
+            from app.forms import UserAccountCreationForm
+            from werkzeug.security import generate_password_hash
+            
+            account_form = UserAccountCreationForm()
+            if account_form.validate_on_submit():
+                try:
+                    # Create new user account
+                    new_user = User(
+                        primary_username=account_form.username.data,
+                        primary_email=account_form.email.data,
+                        password_hash=generate_password_hash(account_form.password.data),
+                        created_at=utcnow(),
+                        used_invite_id=invite.id
+                    )
+                    db.session.add(new_user)
+                    db.session.commit()
+                    
+                    # Mark account as created in session
+                    session[f'invite_{invite.id}_user_account_created'] = True
+                    session[f'invite_{invite.id}_user_account_id'] = new_user.id
+                    
+                    flash("Account created successfully! Please continue with the authentication steps.", "success")
+                    log_event(EventType.MUM_USER_ADDED_FROM_PLEX, f"User account '{account_form.username.data}' created via invite {invite.id}", user_id=new_user.id, invite_id=invite.id)
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    current_app.logger.error(f"Error creating user account for invite {invite.id}: {e}")
+                    flash("Error creating account. Please try again.", "error")
+            else:
+                # Form validation failed, show errors
+                for field, errors in account_form.errors.items():
+                    for error in errors:
+                        flash(f"{getattr(account_form, field).label.text}: {error}", "error")
+        
+        elif auth_method == 'plex':
             session['plex_oauth_invite_id'] = invite.id 
             try:
                 # Use plexapi instead of direct HTTP requests
@@ -534,7 +582,10 @@ def process_invite_form(invite_path_or_token):
                            already_authenticated_discord_user=already_authenticated_discord_user_info,
                            setting_discord_guild_id=setting_discord_guild_id,
                            setting_discord_server_invite_url=setting_discord_server_invite_url,
-                           server_name=server_name
+                           server_name=server_name,
+                           allow_user_accounts=allow_user_accounts,
+                           user_account_created=user_account_created,
+                           account_form=account_form
                            )
 
 @bp.route('/plex_callback') # Path is /invites/plex_callback
@@ -735,7 +786,8 @@ def discord_oauth_callback():
 @setup_required 
 def invite_success():
     username = request.args.get('username', 'there'); plex_app_url = "https://app.plex.tv"
-    return render_template('invites/success.html', username=username, plex_app_url=plex_app_url)
+    allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+    return render_template('invites/success.html', username=username, plex_app_url=plex_app_url, allow_user_accounts=allow_user_accounts)
 
 @bp.route('/') # Defines the base /invites/ path
 @setup_required 

@@ -26,7 +26,18 @@
                     {# Build steps dynamically based on invite configuration #}
                     {% set invite_steps = [] %}
                     
-                    {# Step 1: Discord OAuth (if enabled) #}
+                    {# Step 1: User Account Creation (if enabled) #}
+                    {% if allow_user_accounts %}
+                        {% set _ = invite_steps.append({
+                            'id': 'user_account',
+                            'name': 'Create Account',
+                            'icon': 'fa-solid fa-user-plus',
+                            'required': true,
+                            'completed': user_account_created
+                        }) %}
+                    {% endif %}
+                    
+                    {# Step 2: Discord OAuth (if enabled) #}
                     {% if show_discord_button %}
                         {% set _ = invite_steps.append({
                             'id': 'discord',
@@ -37,7 +48,7 @@
                         }) %}
                     {% endif %}
                     
-                    {# Step 2: Plex Login (always required) #}
+                    {# Step 3: Plex Login (always required) #}
                     {% set _ = invite_steps.append({
                         'id': 'plex',
                         'name': 'Plex Login',
@@ -85,7 +96,69 @@
 
                     {# Current Step Content #}
                     <div class="step-content max-w-2xl mx-auto">
-                        {% if show_discord_button and not already_authenticated_discord_user %}
+                        {% if allow_user_accounts and not user_account_created %}
+                            {# User Account Creation Step #}
+                            <div class="step-section" id="user-account-step">
+                                <h2 class="text-xl font-semibold mb-4">
+                                    <i class="fa-solid fa-user-plus mr-2"></i>
+                                    Create Your Account
+                                    <span class="badge badge-error badge-sm ml-2">Required</span>
+                                </h2>
+                                
+                                <p class="text-sm text-base-content/70 mb-6">
+                                    First, create your account to manage your media access and preferences.
+                                </p>
+
+                                <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
+                                    {{ form.hidden_tag() }}
+                                    
+                                    <div class="form-control mb-4">
+                                        <label class="label">
+                                            <span class="label-text">{{ account_form.username.label.text }}</span>
+                                        </label>
+                                        {{ account_form.username(class="input input-bordered w-full") }}
+                                        <label class="label">
+                                            <span class="label-text-alt">{{ account_form.username.description }}</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="form-control mb-4">
+                                        <label class="label">
+                                            <span class="label-text">{{ account_form.email.label.text }}</span>
+                                        </label>
+                                        {{ account_form.email(class="input input-bordered w-full") }}
+                                        <label class="label">
+                                            <span class="label-text-alt">{{ account_form.email.description }}</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="form-control mb-4">
+                                        <label class="label">
+                                            <span class="label-text">{{ account_form.password.label.text }}</span>
+                                        </label>
+                                        {{ account_form.password(class="input input-bordered w-full") }}
+                                        <label class="label">
+                                            <span class="label-text-alt">{{ account_form.password.description }}</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="form-control mb-6">
+                                        <label class="label">
+                                            <span class="label-text">{{ account_form.confirm_password.label.text }}</span>
+                                        </label>
+                                        {{ account_form.confirm_password(class="input input-bordered w-full") }}
+                                        <label class="label">
+                                            <span class="label-text-alt">{{ account_form.confirm_password.description }}</span>
+                                        </label>
+                                    </div>
+
+                                    <button name="action" value="create_user_account" type="submit" class="btn btn-primary btn-block text-base">
+                                        <i class="fa-solid fa-user-plus mr-2"></i>
+                                        Create Account & Continue
+                                    </button>
+                                </form>
+                            </div>
+                        {% elif show_discord_button and not already_authenticated_discord_user %}
                             {# Discord Step #}
                             <div class="step-section" id="discord-step">
                                 <h2 class="text-xl font-semibold mb-4">
@@ -193,7 +266,7 @@
                             </div>
                         {% endif %}
                         {# Invite Details (Collapsible) #}
-                        <div class="collapse collapse-arrow bg-base-100">
+                        <div class="collapse collapse-arrow bg-base-100 mt-1">
                             <input type="checkbox" /> 
                             <div class="collapse-title text-sm font-medium">
                                 <i class="fa-solid fa-info-circle mr-2"></i>
@@ -236,10 +309,6 @@
 </div>
 
 <style>
-
-.step-disabled {
-    opacity: 0.5;
-}
 
 .step-section {
     min-height: 100px;
