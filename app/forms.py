@@ -221,8 +221,6 @@ class MassUserEditForm(FlaskForm): # As updated
         ('extend_access', 'Extend Access by Days'),
         ('set_expiration', 'Set Expiration Date'),
         ('clear_expiration', 'Clear Expiration (Never Expire)'),
-        ('enable_downloads', 'Enable Downloads'),
-        ('disable_downloads', 'Disable Downloads'),
         ('whitelist_purge', 'Whitelist from Purge'),
         ('unwhitelist_purge', 'Remove Purge Whitelist'),
         ('delete_users', 'Delete Users')
@@ -446,6 +444,11 @@ class GeneralSettingsForm(FlaskForm): # As before
         validators=[DataRequired(), NumberRange(min=10, max=300)],
         default=30,
         description="How often to check for new media sessions (in seconds). Lower values are more responsive but increase system load."
+    )
+    allow_user_accounts = BooleanField(
+        'Allow User Accounts',
+        default=False,
+        description="When enabled, invited users will be prompted to create a user account before accessing media servers. This allows users to log in and manage their own settings."
     )
     submit = SubmitField('Save General Settings')
 
