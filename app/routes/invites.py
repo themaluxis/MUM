@@ -560,12 +560,13 @@ def process_invite_form(invite_path_or_token):
         return redirect(url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token))
 
     # Determine if we should use the steps-based template
-    # Use steps if Discord OAuth is enabled OR if we have multiple servers available
-    # For now, we'll use steps template when there are multiple servers in the system
-    # This encourages the better UX even for single-server invites when multi-server is possible
+    # Use steps if:
+    # - User accounts are enabled (account creation needs to be step 1)
+    # - Discord OAuth is enabled 
+    # - Multiple servers are available
     has_multiple_servers_available = len(all_servers) > 1
     
-    use_steps_template = show_discord_button or has_multiple_servers_available
+    use_steps_template = allow_user_accounts or show_discord_button or has_multiple_servers_available
     
     template_name = 'invites/public_invite_steps.html' if use_steps_template else 'invites/public_invite.html'
     

@@ -82,8 +82,8 @@
                                 <span class="text-xs sm:text-sm flex items-center">
                                     <i class="{{ step.icon }} mr-1"></i>
                                     {{ step.name }}
-                                    {% if step.required and not step.completed %}
-                                        <span class="badge badge-warning badge-xs ml-1">Required</span>
+                                    {% if not step.required %}
+                                        <span class="badge badge-ghost badge-xs ml-1">Optional</span>
                                     {% endif %}
                                     {% if step.completed %}
                                         <i class="fa-solid fa-check ml-1 text-success"></i>
@@ -95,14 +95,13 @@
                     {% endif %}
 
                     {# Current Step Content #}
-                    <div class="step-content max-w-2xl mx-auto">
+                    <div class="step-content max-w-sm mx-auto">
                         {% if allow_user_accounts and not user_account_created %}
                             {# User Account Creation Step #}
                             <div class="step-section" id="user-account-step">
                                 <h2 class="text-xl font-semibold mb-4">
                                     <i class="fa-solid fa-user-plus mr-2"></i>
                                     Create Your Account
-                                    <span class="badge badge-error badge-sm ml-2">Required</span>
                                 </h2>
                                 
                                 <p class="text-sm text-base-content/70 mb-6">
@@ -164,9 +163,7 @@
                                 <h2 class="text-xl font-semibold mb-4">
                                     <i class="fa-brands fa-discord mr-2"></i>
                                     Discord Authentication
-                                    {% if discord_sso_is_mandatory %}
-                                        <span class="badge badge-warning badge-sm ml-2">Required</span>
-                                    {% else %}
+                                    {% if not discord_sso_is_mandatory %}
                                         <span class="badge badge-ghost badge-sm ml-2">Optional</span>
                                     {% endif %}
                                 </h2>
@@ -207,7 +204,6 @@
                                 <h2 class="text-xl font-semibold mb-4">
                                     <i class="fa-solid fa-right-to-bracket mr-2"></i>
                                     Plex Authentication
-                                    <span class="badge badge-error badge-sm ml-2">Required</span>
                                 </h2>
                                 
                                 {% if already_authenticated_discord_user %}
@@ -264,32 +260,36 @@
                                     </div>
                                 {% endif %}
                             </div>
+                            {# Server Access Details (only show on final step) #}
+                            {% if already_authenticated_plex_user and (not discord_sso_is_mandatory or already_authenticated_discord_user) %}
+                                <div class="collapse collapse-arrow bg-base-100 mt-4">
+                                    <input type="checkbox" /> 
+                                    <div class="collapse-title text-sm font-medium">
+                                        <i class="fa-solid fa-info-circle mr-2"></i>
+                                        Server Access Details
+                                    </div>
+                                    <div class="collapse-content text-xs text-left space-y-1">
+                                        <p><i class="fa-solid fa-server fa-fw w-4"></i> Server: {{ server_name }}</p>
+                                        {% if invite.grant_library_ids|length > 0 %}
+                                            <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Library Access: {{ invite.grant_library_ids|length }} specific libraries</p>
+                                        {% else %}
+                                            <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Library Access: All shared libraries</p>
+                                        {% endif %}
+                                        <p><i class="fa-solid fa-download fa-fw w-4"></i> Downloads/Sync: {{ "Enabled" if invite.allow_downloads else "Disabled" }}</p>
+                                        <p><i class="fa-solid fa-house-user fa-fw w-4"></i> Plex Home Invite: {{ "Yes" if invite.invite_to_plex_home else "No" }}</p>
+                                        <p><i class="fa-solid fa-tv fa-fw w-4"></i> Live TV Access: {{ "Enabled" if invite.allow_live_tv else "Disabled" }}</p>
+                                        <div class="divider my-2"></div>
+                                        <p><i class="fa-regular fa-clock fa-fw w-4"></i> Invite Expires: {{ invite.expires_at | format_datetime_user if invite.expires_at else "Never" }}</p>
+                                        <p><i class="fa-solid fa-users fa-fw w-4"></i> Invite Uses Left: {{ (invite.max_uses - invite.current_uses) if invite.max_uses is not none else "Unlimited" }}</p>
+                                        {% if invite.membership_duration_days %}
+                                            <p class="text-accent"><i class="fa-solid fa-user-clock fa-fw w-4"></i> Membership Duration: {{ invite.membership_duration_days }} day{{'s' if invite.membership_duration_days != 1 else ''}} after acceptance</p>
+                                        {% else %}
+                                            <p><i class="fa-solid fa-user-check fa-fw w-4"></i> Membership: Permanent</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
                         {% endif %}
-                        {# Invite Details (Collapsible) #}
-                        <div class="collapse collapse-arrow bg-base-100 mt-1">
-                            <input type="checkbox" /> 
-                            <div class="collapse-title text-sm font-medium">
-                                <i class="fa-solid fa-info-circle mr-2"></i>
-                                Invite Details
-                            </div>
-                            <div class="collapse-content text-xs text-left space-y-1">
-                                <p><i class="fa-regular fa-clock fa-fw w-4"></i> Expires: {{ invite.expires_at | format_datetime_user if invite.expires_at else "Never" }}</p>
-                                <p><i class="fa-solid fa-users fa-fw w-4"></i> Uses Left: {{ (invite.max_uses - invite.current_uses) if invite.max_uses is not none else "Unlimited" }}</p>
-                                {% if invite.membership_duration_days %}
-                                    <p class="text-accent"><i class="fa-solid fa-user-clock fa-fw w-4"></i> Duration: {{ invite.membership_duration_days }} day{{'s' if invite.membership_duration_days != 1 else ''}} after acceptance</p>
-                                {% else %}
-                                    <p><i class="fa-solid fa-user-check fa-fw w-4"></i> Membership: Permanent</p>
-                                {% endif %}
-                                {% if invite.grant_library_ids|length > 0 %}
-                                    <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Access: {{ invite.grant_library_ids|length }} specific libraries</p>
-                                {% else %}
-                                    <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Access: All shared libraries</p>
-                                {% endif %}
-                                <p><i class="fa-solid fa-download fa-fw w-4"></i> Downloads: {{ "Enabled" if invite.allow_downloads else "Disabled" }}</p>
-                                <p><i class="fa-solid fa-house-user fa-fw w-4"></i> Plex Home: {{ "Enabled" if invite.invite_to_plex_home else "Disabled" }}</p>
-                                <p><i class="fa-solid fa-tv fa-fw w-4"></i> Live TV: {{ "Enabled" if invite.allow_live_tv else "Disabled" }}</p>
-                            </div>
-                        </div>
                     </div>
 
                 </div>
