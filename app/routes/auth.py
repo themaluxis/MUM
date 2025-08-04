@@ -51,9 +51,34 @@ def app_login():
             db.session.commit()
             log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Admin '{admin.username}' logged in (password).")
             
-            # REMOVED: No setup redirects after initial setup is complete
-            # Once an admin account exists and basic app config is done, 
-            # never redirect back to setup - handle plugin configuration in settings instead
+            # Check if setup is complete, if not redirect to appropriate setup step
+            if not getattr(g, 'setup_complete', False):
+                # Determine which setup step to redirect to based on current state
+                try:
+                    from app.models_plugins import Plugin
+                    from app.models import Setting
+                    
+                    # Check if any plugins are enabled with servers
+                    enabled_plugins_with_servers = Plugin.query.filter(
+                        Plugin.is_enabled == True,
+                        Plugin.servers_count > 0
+                    ).count()
+                    
+                    if enabled_plugins_with_servers == 0:
+                        # No plugins configured, go to plugins setup
+                        flash('Please configure at least one media service to continue.', 'info')
+                        return redirect(url_for('setup.plugins'))
+                    
+                    # Check if app configuration is done
+                    app_config_done = Setting.get_bool('APP_CONFIG_DONE', False)
+                    if not app_config_done:
+                        # App config not done, go to app config
+                        return redirect(url_for('setup.app_config'))
+                    
+                except Exception as e:
+                    current_app.logger.error(f"Error checking setup state: {e}")
+                    # If we can't determine state, go to plugins setup as safe default
+                    return redirect(url_for('setup.plugins'))
 
             next_page = request.args.get('next')
             if not next_page or not is_safe_url(next_page):

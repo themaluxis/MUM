@@ -305,14 +305,10 @@ def create_app(config_name=None):
             'auth.',
             'static',
             'api.',
-            # Media server routes moved to plugin management
-            # 'media_servers.add_server',
-            # 'media_servers.add_server_setup',
-            # 'media_servers.setup_list_servers',
-            # 'media_servers.edit_server',
-            # 'media_servers.setup_edit_server',
-            # 'media_servers.delete_server',
-            # 'media_servers.test_new_server_connection',
+            # Plugin management endpoints - needed during setup
+            'plugin_management.',
+            # Media server routes - needed for setup
+            'media_servers.',
             'setup.plugins',
             # Allow plugin management endpoints in both setup and normal flows
             'dashboard.settings_plugins',
@@ -378,6 +374,10 @@ def create_app(config_name=None):
                     'auth.app_login', 'auth.logout', 'static', 'api.health',
                     # Plugin management endpoints for server configuration
                     'plugin_management.index', 'plugin_management.configure', 'plugin_management.edit_server', 'plugin_management.add_server',
+                    'plugin_management.disable_server', 'plugin_management.enable_server', 'plugin_management.delete_server',
+                    # Media server setup endpoints
+                    'media_servers.setup_list_servers', 'media_servers.add_server_setup', 'media_servers.setup_edit_server',
+                    'media_servers.test_new_server_connection',
                     # Setup endpoints - needed when no admin exists yet
                     'setup.account_setup', 'setup.create_admin', 'setup.app_config', 'setup.servers', 'setup.add_server', 'setup.edit_server', 'setup.plugins'
                 ]
@@ -418,9 +418,9 @@ def create_app(config_name=None):
     app.register_blueprint(api_bp, url_prefix='/api')
     from .routes.user import bp as user_bp
     app.register_blueprint(user_bp, url_prefix='/user')
-    # Media servers are now managed through plugin management
-    # from .routes.media_servers import bp as media_servers_bp
-    # app.register_blueprint(media_servers_bp, url_prefix='/admin')
+    # Media servers - needed for setup routes
+    from .routes.media_servers import bp as media_servers_bp
+    app.register_blueprint(media_servers_bp)
     from .routes.plugins import bp as plugins_bp
     app.register_blueprint(plugins_bp, url_prefix='/admin')
     from .routes.user_preferences import user_preferences_bp

@@ -46,11 +46,12 @@ def setup_required(f):
             'plugins.install_plugin', 'plugins.uninstall_plugin', 'setup.plugins'
         ]
         
-        # Also bypass if the endpoint starts with 'dashboard.' or 'media_servers.'
+        # Also bypass if the endpoint starts with 'dashboard.' or 'media_servers.' or 'plugin_management.'
         if (request.endpoint in bypass_endpoints or 
             (request.endpoint and (request.endpoint.startswith('dashboard.') or 
                                  request.endpoint.startswith('media_servers.') or
-                                 request.endpoint.startswith('setup.')))):
+                                 request.endpoint.startswith('setup.') or
+                                 request.endpoint.startswith('plugin_management.')))):
             return f(*args, **kwargs)
         
         # We also check that we are not already on a setup page to avoid redirect loops.
