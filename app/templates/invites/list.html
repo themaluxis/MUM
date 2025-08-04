@@ -150,7 +150,25 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.detail.target.id === 'createInviteForm') initializeModalFormJS(event.detail.target);
     });
     const cimEl = document.getElementById('create_invite_modal');
-    if (cimEl) { cimEl.addEventListener('close', function() { const f = document.getElementById('createInviteForm'); if (f) { f.reset(); const e = f.querySelector('#calculated_expiry_date'); if(e) e.textContent = 'N/A'; f.querySelectorAll('.text-error').forEach(el => el.remove()); f.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));}}); }
+    if (cimEl) { 
+        cimEl.addEventListener('close', function() { 
+            const f = document.getElementById('createInviteForm'); 
+            if (f) { 
+                f.reset(); 
+                const e = f.querySelector('#calculated_expiry_date'); 
+                if(e) e.textContent = 'N/A'; 
+                f.querySelectorAll('.text-error').forEach(el => el.remove()); 
+                f.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+            }
+        });
+        
+        // Add click outside to close functionality
+        cimEl.addEventListener('click', function(e) {
+            if (e.target === cimEl) {
+                cimEl.close();
+            }
+        });
+    }
 });
 </script>
 {% endblock %}
