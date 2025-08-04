@@ -495,22 +495,54 @@ def process_invite_form(invite_path_or_token):
         elif auth_method == 'plex':
             session['plex_oauth_invite_id'] = invite.id 
             try:
-                # Use plexapi instead of direct HTTP requests
-                pin_login, error_msg = create_plex_pin_login(client_identifier_suffix="InvitePlexLink-" + str(invite.id)[:8])
-                if not pin_login:
-                    raise Exception(f"Could not create Plex PIN: {error_msg}")
+                # Use direct API calls like the sample code instead of plexapi
+                import requests
+                from urllib.parse import urlencode
                 
-                current_app.logger.debug(f"PIN creation - PIN code: {pin_login.pin}")
+                # Generate headers like the sample code
+                app_name = Setting.get('APP_NAME', 'MUM')
+                client_id = f"MUM-App-v1-InvitePlexLink-{str(invite.id)[:8]}"
+                
+                # Step 1: Create PIN using direct API call
+                pin_response = requests.post(
+                    "https://plex.tv/api/v2/pins",
+                    headers={"Accept": "application/json"},
+                    data={
+                        "strong": "true",
+                        "X-Plex-Product": app_name,
+                        "X-Plex-Client-Identifier": client_id,
+                    },
+                )
+                
+                if pin_response.status_code != 201:
+                    raise Exception(f"Failed to create PIN: {pin_response.status_code} - {pin_response.text}")
+                
+                pin_data = pin_response.json()
+                pin_id = pin_data["id"]
+                pin_code = pin_data["code"]
+                
+                current_app.logger.debug(f"PIN creation - PIN code: {pin_code}")
+                current_app.logger.debug(f"PIN creation - PIN ID: {pin_id}")
                 
                 # Store the necessary details for the callback
-                session['plex_pin_code_invite_flow'] = pin_login.pin
-                session['plex_headers_invite_flow'] = pin_login.headers
+                session['plex_pin_code_invite_flow'] = pin_code
+                session['plex_pin_id_invite_flow'] = pin_id
+                session['plex_client_id_invite_flow'] = client_id
+                session['plex_app_name_invite_flow'] = app_name
                 
+                # Step 2: Generate auth URL like the sample code
                 app_base_url = Setting.get('APP_BASE_URL', request.url_root.rstrip('/'))
                 callback_path_segment = url_for('invites.plex_oauth_callback', _external=False)
                 forward_url_to_our_app = f"{app_base_url.rstrip('/')}{callback_path_segment}"
                 
-                auth_url_for_user_to_visit = get_plex_auth_url(pin_login, forward_url_to_our_app)
+                encoded_params = urlencode({
+                    "clientID": client_id,
+                    "code": pin_code,
+                    "context[device][product]": app_name,
+                    "forwardUrl": forward_url_to_our_app,
+                })
+                auth_url_for_user_to_visit = f"https://app.plex.tv/auth#?{encoded_params}"
+                
                 return redirect(auth_url_for_user_to_visit)
             except Exception as e:
                 flash(f"Could not initiate Plex login: {str(e)[:150]}", "danger")
@@ -594,10 +626,14 @@ def process_invite_form(invite_path_or_token):
 def plex_oauth_callback():
     invite_id = session.get('plex_oauth_invite_id')
     pin_code_from_session = session.get('plex_pin_code_invite_flow')
-    pin_headers = session.get('plex_headers_invite_flow', {})
+    pin_id_from_session = session.get('plex_pin_id_invite_flow')
+    client_id_from_session = session.get('plex_client_id_invite_flow')
+    app_name_from_session = session.get('plex_app_name_invite_flow')
     
     current_app.logger.debug(f"Plex callback - invite_id from session: {invite_id}")
     current_app.logger.debug(f"Plex callback - pin_code_from_session: {pin_code_from_session}")
+    current_app.logger.debug(f"Plex callback - pin_id_from_session: {pin_id_from_session}")
+    current_app.logger.debug(f"Plex callback - client_id_from_session: {client_id_from_session}")
     
     invite_path_or_token_for_redirect = "error_path" 
     if invite_id: 
@@ -607,12 +643,14 @@ def plex_oauth_callback():
     
     fallback_redirect = url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token_for_redirect)
     
-    if not invite_id or not pin_code_from_session:
+    if not invite_id or not pin_code_from_session or not pin_id_from_session or not client_id_from_session:
         flash('Plex login callback invalid. Try invite again.', 'danger')
         # Clear all session keys related to this flow
         session.pop('plex_oauth_invite_id', None)
         session.pop('plex_pin_code_invite_flow', None)
-        session.pop('plex_headers_invite_flow', None)
+        session.pop('plex_pin_id_invite_flow', None)
+        session.pop('plex_client_id_invite_flow', None)
+        session.pop('plex_app_name_invite_flow', None)
         return redirect(fallback_redirect) 
     
     invite = Invite.query.get(invite_id)
@@ -623,14 +661,54 @@ def plex_oauth_callback():
     try:
         from plexapi.myplex import MyPlexPinLogin
         
-        # Recreate the pin_login object exactly as it was created initially.
-        # The plexapi library uses the headers (especially the client ID) to retrieve the same PIN session.
-        pin_login = MyPlexPinLogin(headers=pin_headers)
+        # Use direct API approach exactly like the sample code
+        current_app.logger.debug(f"Plex callback - Using direct API approach to check PIN ID {pin_id_from_session} (PIN code: {pin_code_from_session})")
         
-        # Now, check the status. The checkLogin method will automatically use the PIN associated with the session.
-        plex_auth_token = pin_login.checkLogin()
-
-        if not plex_auth_token: 
+        import requests
+        
+        # Retry mechanism for OAuth timing issues
+        max_retries = 3
+        retry_delay = 1  # seconds
+        plex_auth_token = None
+        
+        for attempt in range(max_retries):
+            current_app.logger.debug(f"Plex callback - Authentication attempt {attempt + 1}/{max_retries}")
+            
+            try:
+                # Make direct API call exactly like the sample code
+                headers = {"accept": "application/json"}
+                data = {"code": pin_code_from_session, "X-Plex-Client-Identifier": client_id_from_session}
+                
+                check_url = f"https://plex.tv/api/v2/pins/{pin_id_from_session}"
+                response = requests.get(check_url, headers=headers, data=data, timeout=10)
+                
+                current_app.logger.debug(f"Plex callback - PIN check response status: {response.status_code}")
+                current_app.logger.debug(f"Plex callback - PIN check response text: {response.text[:500]}")
+                
+                if response.status_code == 200:
+                    pin_data = response.json()
+                    current_app.logger.debug(f"Plex callback - PIN data: {pin_data}")
+                    
+                    if pin_data.get('authToken'):
+                        plex_auth_token = pin_data['authToken']
+                        current_app.logger.info(f"Plex callback - Successfully retrieved auth token via direct API for PIN {pin_code_from_session}")
+                        break
+                    else:
+                        current_app.logger.debug(f"Plex callback - PIN {pin_code_from_session} not yet authenticated (no authToken)")
+                elif response.status_code == 404:
+                    current_app.logger.warning(f"Plex callback - PIN {pin_code_from_session} not found (404)")
+                else:
+                    current_app.logger.warning(f"Plex callback - PIN check failed with status {response.status_code}: {response.text[:200]}")
+                    
+            except Exception as e:
+                current_app.logger.error(f"Plex callback - Error checking PIN via API: {e}")
+                
+            if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                current_app.logger.debug(f"Plex callback - Waiting {retry_delay}s before retry...")
+                time.sleep(retry_delay)
+        
+        if not plex_auth_token:
+            current_app.logger.warning(f"Plex callback - PIN {pin_code_from_session} not authenticated after {max_retries} attempts")
             flash('Plex PIN not yet authenticated. Please complete the authentication on plex.tv/link', 'warning')
             return redirect(fallback_redirect)
 
