@@ -215,10 +215,20 @@ def create_invite():
             membership_duration_days=membership_duration, created_by_admin_id=current_user.id,
             require_discord_auth=form.require_discord_auth.data,
             require_discord_guild_membership=form.require_discord_guild_membership.data,
-            server_id=selected_server_ids[0] if selected_server_ids else None
+            server_id=selected_server_ids[0] if selected_server_ids else None  # Keep for backward compatibility
         )
         try:
-            db.session.add(new_invite); db.session.commit()
+            db.session.add(new_invite)
+            db.session.flush()  # Flush to get the invite ID
+            
+            # Add all selected servers to the invite
+            if selected_server_ids:
+                for server_id in selected_server_ids:
+                    server = media_service_manager.get_server_by_id(server_id)
+                    if server:
+                        new_invite.servers.append(server)
+            
+            db.session.commit()
             invite_url = new_invite.get_full_url(g.app_base_url or request.url_root.rstrip('/'))
             log_msg_details = f"Downloads: {'Enabled' if new_invite.allow_downloads else 'Disabled'}."
             if new_invite.membership_duration_days: log_msg_details += f" Membership: {new_invite.membership_duration_days} days."
@@ -714,16 +724,38 @@ def get_edit_invite_form(invite_id):
             grouped_servers[service_type_name] = []
         grouped_servers[service_type_name].append(server)
 
+    # Get libraries from all attached servers
     available_libraries = {}
+    servers_with_libraries = {}
+    invite_servers = invite.servers if invite.servers else []
+    
+    # Fallback to legacy single server if no servers in many-to-many relationship
     invite_server = None
-    if invite.server_id:
+    if not invite_servers and invite.server_id:
         invite_server = media_service_manager.get_server_by_id(invite.server_id)
         if invite_server:
-            service = MediaServiceFactory.create_service_from_db(invite_server)
-            try:
-                available_libraries = {lib['id']: lib['name'] for lib in service.get_libraries()}
-            except Exception as e:
-                current_app.logger.error(f"Could not fetch libraries for server {invite_server.name}: {e}")
+            invite_servers = [invite_server]
+    
+    # Collect libraries from all servers
+    for server in invite_servers:
+        try:
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service:
+                server_libraries = service.get_libraries()
+                server_lib_dict = {lib['id']: lib['name'] for lib in server_libraries}
+                servers_with_libraries[server.id] = {
+                    'server': server,
+                    'libraries': server_lib_dict
+                }
+                # Add to combined libraries (prefix with server name if there are conflicts)
+                for lib_id, lib_name in server_lib_dict.items():
+                    if lib_id in available_libraries:
+                        # Handle ID conflicts by prefixing with server name
+                        available_libraries[f"{server.id}_{lib_id}"] = f"[{server.name}] {lib_name}"
+                    else:
+                        available_libraries[lib_id] = lib_name
+        except Exception as e:
+            current_app.logger.error(f"Could not fetch libraries for server {server.name}: {e}")
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
 
@@ -748,6 +780,7 @@ def get_edit_invite_form(invite_id):
         invite=invite,
         grouped_servers=grouped_servers,
         invite_server=invite_server,
+        servers_with_libraries=servers_with_libraries,
         global_require_guild=global_require_guild
     )
 

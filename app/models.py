@@ -19,6 +19,12 @@ admin_roles = db.Table('admin_roles',
     db.Column('role_id', db.Integer, db.ForeignKey('roles.id'), primary_key=True)
 )
 
+# Many-to-many relationship table for invites and servers
+invite_servers = db.Table('invite_servers',
+    db.Column('invite_id', db.Integer, db.ForeignKey('invites.id'), primary_key=True),
+    db.Column('server_id', db.Integer, db.ForeignKey('media_servers.id'), primary_key=True)
+)
+
 class SettingValueType(enum.Enum): # ... (as before)
     STRING = "string"; INTEGER = "integer"; BOOLEAN = "boolean"; JSON = "json"; SECRET = "secret"
 
@@ -261,8 +267,10 @@ class Invite(db.Model):
     grant_bot_whitelist = db.Column(db.Boolean, nullable=True, default=False)
     invite_to_plex_home = db.Column(db.Boolean, nullable=True, default=False)
     allow_live_tv = db.Column(db.Boolean, nullable=True, default=False)
-    server_id = db.Column(db.Integer, db.ForeignKey('media_servers.id'), nullable=True)
-    server = db.relationship('MediaServer')
+    server_id = db.Column(db.Integer, db.ForeignKey('media_servers.id'), nullable=True)  # Keep for backward compatibility
+    server = db.relationship('MediaServer')  # Keep for backward compatibility
+    servers = db.relationship('MediaServer', secondary=invite_servers, lazy='subquery',
+                              backref=db.backref('invites', lazy=True))
     def __repr__(self): return f'<Invite {self.custom_path or self.token}>'
     @property
     def is_expired(self): return self.expires_at and utcnow() > self.expires_at
