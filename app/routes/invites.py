@@ -297,6 +297,29 @@ def create_invite():
             for error in errors_list: flash(f"Error in {getattr(form, field).label.text}: {error}", "danger")
         return redirect(url_for('invites.list_invites'))
 
+@bp.route('/manage/toggle-status/<int:invite_id>', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('edit_invites')
+def toggle_invite_status(invite_id):
+    """Toggle invite active/inactive status"""
+    invite = Invite.query.get_or_404(invite_id)
+    
+    try:
+        # Toggle the status
+        invite.is_active = not invite.is_active
+        db.session.commit()
+        
+        status_text = "activated" if invite.is_active else "deactivated"
+        log_event(EventType.SETTING_CHANGE, f"Invite '{invite.custom_path or invite.token}' (ID: {invite_id}) {status_text} by admin.", invite_id=invite_id, admin_id=current_user.id)
+        
+        # Return the updated single invite card
+        return render_template('invites/partials/single_invite_card.html', invite=invite)
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error toggling invite status {invite_id}: {e}")
+        return f'<div class="alert alert-error"><span>Error updating invite status: {e}</span></div>', 500
+
 @bp.route('/manage/delete/<int:invite_id>', methods=['DELETE'])
 @login_required
 @setup_required

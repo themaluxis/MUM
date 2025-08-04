@@ -57,7 +57,7 @@ def general():
         Setting.set('APP_BASE_URL', form.app_base_url.data.rstrip('/'), SettingValueType.STRING, "Application Base URL")
         app_local_url = form.app_local_url.data.rstrip('/') if form.app_local_url.data else None
         Setting.set('APP_LOCAL_URL', app_local_url or '', SettingValueType.STRING, "Application Local URL")
-        Setting.set('SESSION_MONITOR_INTERVAL', form.session_monitoring_interval.data, SettingValueType.INTEGER, "Session Monitoring Interval")
+        Setting.set('SESSION_MONITORING_INTERVAL_SECONDS', form.session_monitoring_interval.data, SettingValueType.INTEGER, "Session Monitoring Interval")
         
         # Update app config
         current_app.config['APP_NAME'] = form.app_name.data
@@ -75,7 +75,7 @@ def general():
         form.app_name.data = Setting.get('APP_NAME')
         form.app_base_url.data = Setting.get('APP_BASE_URL')
         form.app_local_url.data = Setting.get('APP_LOCAL_URL')
-        form.session_monitoring_interval.data = Setting.get('SESSION_MONITOR_INTERVAL', 30)
+        form.session_monitoring_interval.data = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', 30)
     return render_template(
         'settings/index.html',
         title="General Settings", 
