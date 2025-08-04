@@ -35,7 +35,7 @@
         </div>
 
         <div class="form-control">
-            {{ form.session_monitoring_interval.label(class="label") }}
+            {{ form.session_monitoring_interval.label(class="label whitespace-normal") }}
             {{ form.session_monitoring_interval(class="input input-bordered w-full " + ("input-error" if form.session_monitoring_interval.errors else "")) }}
             {% if form.session_monitoring_interval.errors %}
                 <span class="label-text-alt text-error mt-1">{{ form.session_monitoring_interval.errors[0] }}</span>
@@ -50,7 +50,7 @@
                 <span class="label-text font-medium">{{ form.allow_user_accounts.label.text }}</span>
             </label>
             <label class="label">
-                <span class="label-text-alt">{{ form.allow_user_accounts.description }}</span>
+                <span class="label-text-alt whitespace-normal">{{ form.allow_user_accounts.description }}</span>
             </label>
         </div>
 

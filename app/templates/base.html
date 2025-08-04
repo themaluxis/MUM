@@ -107,6 +107,9 @@
                                         </details>
                                     </li>
                                 {% endif %}
+                                {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
+                                <li><a href="{{ url_for('plugin_management.index') }}" class="{{ 'active menu-active' if request.endpoint and request.endpoint.startswith('plugin_management.') else '' }}"><i class="fa-solid fa-puzzle-piece fa-fw"></i> Plugins</a></li>
+                                {% endif %}
                                 {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
                                 <li><a href="{{ url_for('settings.discord') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.discord' else '' }}"><i class="fa-brands fa-discord fa-fw"></i> Discord</a></li>
                                 {% endif %}
