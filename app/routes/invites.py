@@ -144,22 +144,53 @@ def create_invite():
         # Get all submitted library IDs from the form
         submitted_libraries = request.form.getlist('libraries')
         
-        # Build valid choices from all selected servers
-        all_valid_choices = []
-        if selected_server_ids:
+        # Use different logic for single vs multi-server invites
+        if len(selected_server_ids) == 1:
+            # Single server - choices already set above, no need to rebuild
+            pass
+        else:
+            # Multi-server - use conflict handling logic
+            all_valid_choices = []
+            servers_libraries = {}  # server_id -> {lib_id: lib_name}
+            
+            # First pass: collect all libraries from all servers
             for server_id in selected_server_ids:
                 server = media_service_manager.get_server_by_id(server_id)
                 if server:
                     service = MediaServiceFactory.create_service_from_db(server)
                     try:
                         server_libraries = service.get_libraries()
-                        for lib in server_libraries:
-                            all_valid_choices.append((lib['id'], lib['name']))
+                        server_lib_dict = {lib['id']: lib['name'] for lib in server_libraries}
+                        servers_libraries[server.id] = {
+                            'server': server,
+                            'libraries': server_lib_dict
+                        }
                     except Exception as e:
                         current_app.logger.error(f"Error fetching libraries for validation from server {server.name}: {e}")
-        
-        # Update form choices to include all valid libraries from selected servers
-        form.libraries.choices = all_valid_choices
+            
+            # Second pass: detect conflicts and build choices
+            for server_id, server_data in servers_libraries.items():
+                server = server_data['server']
+                server_lib_dict = server_data['libraries']
+                
+                for lib_id, lib_name in server_lib_dict.items():
+                    # Check if this lib_id exists in other servers
+                    conflicts_with_other_servers = any(
+                        lib_id in other_data['libraries'] 
+                        for other_server_id, other_data in servers_libraries.items() 
+                        if other_server_id != server_id
+                    )
+                    
+                    if conflicts_with_other_servers:
+                        # Use prefixed ID for conflicts
+                        prefixed_lib_id = f"{server.id}_{lib_id}"
+                        all_valid_choices.append((prefixed_lib_id, f"[{server.name}] {lib_name}"))
+                    else:
+                        # No conflict, use original ID
+                        all_valid_choices.append((lib_id, lib_name))
+            
+            # Update form choices for multi-server
+            form.libraries.choices = all_valid_choices
         
         # Set the form data
         if submitted_libraries:
