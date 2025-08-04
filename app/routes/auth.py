@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlsplit, urljoin, urlencode, quote as url_quote
 import datetime 
+import time
 from app.utils.helpers import log_event
 from app.models import AdminAccount, User, Setting, EventType, SettingValueType 
 from app.forms import LoginForm, UserLoginForm
@@ -99,35 +100,53 @@ def plex_sso_login_admin():
         return redirect(url_for('dashboard.index'))
 
     try:
-        # Use plexapi instead of direct HTTP requests
-        pin_login, error_msg = create_plex_pin_login(client_identifier_suffix="AdminLogin")
-        if not pin_login:
-            current_app.logger.error(f"Failed to create Plex PIN: {error_msg}")
-            raise Exception(f"Could not create Plex PIN: {error_msg}")
-
-        pin_id = getattr(pin_login, 'id', getattr(pin_login, 'identifier', None))
-        session['plex_pin_id_admin_login'] = pin_id
-        session['plex_pin_code_admin_login'] = pin_login.pin
-        # Store headers for callback recreation - only store serializable dict
-        try:
-            if hasattr(pin_login, '_headers'):
-                headers = pin_login._headers() if callable(pin_login._headers) else pin_login._headers
-                if isinstance(headers, dict):
-                    session['plex_headers_admin_login'] = {k: str(v) for k, v in headers.items() if isinstance(v, (str, int, float, bool))}
-                else:
-                    session['plex_headers_admin_login'] = {}
-            else:
-                session['plex_headers_admin_login'] = {}
-        except Exception as e:
-            current_app.logger.warning(f"Could not store headers in session: {e}")
-            session['plex_headers_admin_login'] = {}
+        # Use direct API calls like the working invite flow
+        import requests
+        from urllib.parse import urlencode
         
+        # Generate headers like the sample code
+        app_name = Setting.get('APP_NAME', 'MUM')
+        client_id = f"MUM-App-v1-AdminLogin"
+        
+        # Step 1: Create PIN using direct API call
+        pin_response = requests.post(
+            "https://plex.tv/api/v2/pins",
+            headers={"Accept": "application/json"},
+            data={
+                "strong": "true",
+                "X-Plex-Product": app_name,
+                "X-Plex-Client-Identifier": client_id,
+            },
+        )
+        
+        if pin_response.status_code != 201:
+            raise Exception(f"Failed to create PIN: {pin_response.status_code} - {pin_response.text}")
+        
+        pin_data = pin_response.json()
+        pin_id = pin_data["id"]
+        pin_code = pin_data["code"]
+        
+        current_app.logger.debug(f"Admin PIN creation - PIN code: {pin_code}")
+        current_app.logger.debug(f"Admin PIN creation - PIN ID: {pin_id}")
+        
+        # Store the necessary details for the callback
+        session['plex_pin_id_admin_login'] = pin_id
+        session['plex_pin_code_admin_login'] = pin_code
+        session['plex_client_id_admin_login'] = client_id
+        session['plex_app_name_admin_login'] = app_name
+        
+        # Step 2: Generate auth URL like the sample code
         app_base_url = Setting.get('APP_BASE_URL', request.url_root.rstrip('/'))
         callback_path_segment = url_for('auth.plex_sso_callback_admin', _external=False)
         forward_url_to_our_app = f"{app_base_url.rstrip('/')}{callback_path_segment}"
         
-        # Use plexapi helper to get auth URL
-        auth_url_for_user_to_visit = get_plex_auth_url(pin_login, forward_url_to_our_app)
+        encoded_params = urlencode({
+            "clientID": client_id,
+            "code": pin_code,
+            "context[device][product]": app_name,
+            "forwardUrl": forward_url_to_our_app,
+        })
+        auth_url_for_user_to_visit = f"https://app.plex.tv/auth#?{encoded_params}"
         
         # If user is already logged in, the "next page" should be their account settings.
         # Otherwise, it's a fresh login, so go to the dashboard.
@@ -151,34 +170,67 @@ def plex_sso_login_admin():
 @bp.route('/plex_sso_callback_admin') 
 def plex_sso_callback_admin():
     pin_id_from_session = session.get('plex_pin_id_admin_login')
-    pin_headers = session.get('plex_headers_admin_login', {})
+    pin_code_from_session = session.get('plex_pin_code_admin_login')
+    client_id_from_session = session.get('plex_client_id_admin_login')
     
     # Context-aware fallback URL
     fallback_url = url_for('settings.account') if current_user.is_authenticated else url_for('auth.app_login')
     
-    if not pin_id_from_session:
+    if not pin_id_from_session or not pin_code_from_session or not client_id_from_session:
         flash('Plex login callback invalid or session expired.', 'danger')
+        # Clear session data
+        session.pop('plex_pin_id_admin_login', None)
+        session.pop('plex_pin_code_admin_login', None)
+        session.pop('plex_client_id_admin_login', None)
+        session.pop('plex_app_name_admin_login', None)
         return redirect(fallback_url)
     
     try:
-        # FIXED: Check PIN status using direct API calls instead of reconstructing the object
+        # Use direct API approach exactly like the working invite flow
         import requests
         
-        pin_code = session.get('plex_pin_code_admin_login')
-        current_app.logger.debug(f"Checking admin PIN status for PIN: {pin_code}")
+        current_app.logger.debug(f"Checking admin PIN status for PIN ID: {pin_id_from_session} (PIN code: {pin_code_from_session})")
         
-        # Make direct API call to check PIN status
-        pin_url = f"https://plex.tv/api/v2/pins/{pin_code}"
-        response = requests.get(pin_url, headers=pin_headers)
+        # Retry mechanism for OAuth timing issues
+        max_retries = 3
+        retry_delay = 1  # seconds
+        plex_auth_token = None
         
-        if response.status_code != 200:
-            flash('Plex PIN not yet linked or has expired.', 'warning')
-            return redirect(fallback_url)
-        
-        pin_data = response.json()
-        plex_auth_token = pin_data.get('authToken')
+        for attempt in range(max_retries):
+            current_app.logger.debug(f"Admin PIN check - Authentication attempt {attempt + 1}/{max_retries}")
+            
+            try:
+                # Make direct API call exactly like the sample code
+                headers = {"accept": "application/json"}
+                data = {"code": pin_code_from_session, "X-Plex-Client-Identifier": client_id_from_session}
+                
+                check_url = f"https://plex.tv/api/v2/pins/{pin_id_from_session}"
+                response = requests.get(check_url, headers=headers, data=data, timeout=10)
+                
+                current_app.logger.debug(f"Admin PIN check - Response status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    pin_data = response.json()
+                    current_app.logger.debug(f"Admin PIN check - PIN data: {pin_data}")
+                    
+                    if pin_data.get('authToken'):
+                        plex_auth_token = pin_data['authToken']
+                        current_app.logger.info(f"Admin PIN check - Successfully retrieved auth token for PIN {pin_code_from_session}")
+                        break
+                    else:
+                        current_app.logger.debug(f"Admin PIN check - PIN {pin_code_from_session} not yet authenticated (no authToken)")
+                else:
+                    current_app.logger.warning(f"Admin PIN check - Failed with status {response.status_code}: {response.text[:200]}")
+                    
+            except Exception as e:
+                current_app.logger.error(f"Admin PIN check - Error checking PIN via API: {e}")
+                
+            if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                current_app.logger.debug(f"Admin PIN check - Waiting {retry_delay}s before retry...")
+                time.sleep(retry_delay)
         
         if not plex_auth_token:
+            current_app.logger.warning(f"Admin PIN check - PIN {pin_code_from_session} not authenticated after {max_retries} attempts")
             flash('Plex PIN not yet linked or has expired.', 'warning')
             return redirect(fallback_url)
         
@@ -222,7 +274,8 @@ def plex_sso_callback_admin():
         # Clean up session
         session.pop('plex_pin_id_admin_login', None)
         session.pop('plex_pin_code_admin_login', None)
-        session.pop('plex_headers_admin_login', None)
+        session.pop('plex_client_id_admin_login', None)
+        session.pop('plex_app_name_admin_login', None)
 
         return redirect(next_url)
 
