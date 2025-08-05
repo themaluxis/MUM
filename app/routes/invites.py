@@ -573,6 +573,12 @@ def process_invite_form(invite_path_or_token):
             if not already_authenticated_plex_user_info: flash("Please sign in with Plex first to accept the invite.", "warning")
             elif effective_require_sso and not already_authenticated_discord_user_info: flash("Discord account linking is required for this invite. Please link your Discord account.", "warning")
             else:
+                # Check if user account was created during this invite flow
+                existing_user_id = session.get(f'invite_{invite.id}_user_account_id')
+                current_app.logger.debug(f"Invite acceptance - Looking for session key: invite_{invite.id}_user_account_id")
+                current_app.logger.debug(f"Invite acceptance - Found existing_user_id: {existing_user_id}")
+                current_app.logger.debug(f"Invite acceptance - Session keys: {list(session.keys())}")
+                
                 success, result_object_or_message = invite_service.accept_invite_and_grant_access(
                     invite=invite, 
                     plex_user_uuid=already_authenticated_plex_user_info['uuid'], 
@@ -581,7 +587,8 @@ def process_invite_form(invite_path_or_token):
                     plex_thumb=already_authenticated_plex_user_info['thumb'], 
                     # Pass the entire dictionary as a single argument
                     discord_user_info=already_authenticated_discord_user_info, 
-                    ip_address=request.remote_addr
+                    ip_address=request.remote_addr,
+                    existing_user_id=existing_user_id
                 )
                 if success: 
                     session.pop(f'invite_{invite.id}_plex_user', None); session.pop(f'invite_{invite.id}_discord_user', None)

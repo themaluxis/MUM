@@ -10,7 +10,10 @@ class MediaServiceFactory:
     @classmethod
     def create_service(cls, server_config: Dict[str, Any]) -> Optional[BaseMediaService]:
         """Create a media service instance based on server configuration using plugins"""
+        from flask import current_app
+        
         service_type = server_config.get('service_type')
+        current_app.logger.debug(f"MediaServiceFactory - Creating service for type: {service_type} (type: {type(service_type)})")
         
         # Handle both string and enum service types
         if isinstance(service_type, ServiceType):
@@ -18,25 +21,39 @@ class MediaServiceFactory:
         elif isinstance(service_type, str):
             plugin_id = service_type
         else:
+            current_app.logger.error(f"MediaServiceFactory - Invalid service_type: {service_type} (type: {type(service_type)})")
             return None
+        
+        current_app.logger.debug(f"MediaServiceFactory - Looking for plugin_id: {plugin_id}")
         
         # Get plugin class from plugin manager
         service_class = plugin_manager.get_plugin_class(plugin_id)
+        current_app.logger.debug(f"MediaServiceFactory - Plugin class from manager: {service_class}")
         
         # If plugin isn't enabled but exists, try to load it temporarily for testing
         if not service_class:
             from app.models_plugins import Plugin
             try:
                 plugin = Plugin.query.filter_by(plugin_id=plugin_id).first()
+                current_app.logger.debug(f"MediaServiceFactory - Found plugin in DB: {plugin}")
                 if plugin:
                     service_class = plugin_manager._load_plugin(plugin)
-            except:
+                    current_app.logger.debug(f"MediaServiceFactory - Loaded plugin class: {service_class}")
+            except Exception as e:
+                current_app.logger.error(f"MediaServiceFactory - Error loading plugin: {e}")
                 pass
         
         if not service_class:
+            current_app.logger.error(f"MediaServiceFactory - No service class found for plugin_id: {plugin_id}")
             return None
         
-        return service_class(server_config)
+        try:
+            service_instance = service_class(server_config)
+            current_app.logger.debug(f"MediaServiceFactory - Successfully created service instance: {service_instance}")
+            return service_instance
+        except Exception as e:
+            current_app.logger.error(f"MediaServiceFactory - Error creating service instance: {e}")
+            return None
     
     @classmethod
     def create_service_from_db(cls, media_server: MediaServer) -> Optional[BaseMediaService]:

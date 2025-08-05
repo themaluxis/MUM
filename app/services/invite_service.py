@@ -67,7 +67,7 @@ def record_invite_usage_attempt(invite_id, ip_address, plex_user_info=None, disc
 
 def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_username: str, plex_email: str, plex_thumb: str,
                                    discord_user_info: dict,
-                                   ip_address: str = None):
+                                   ip_address: str = None, existing_user_id: int = None):
     """
     Processes invite acceptance:
     1. Checks if Plex user already exists in MUM or on Plex server.
@@ -133,27 +133,42 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
     
     for server in servers_to_grant_access:
         try:
+            current_app.logger.debug(f"Invite service - Processing server: {server.name}, service_type: {server.service_type}, id: {server.id}")
             service = MediaServiceFactory.create_service_from_db(server)
             if not service:
+                current_app.logger.error(f"Invite service - Failed to create service for server {server.name} with service_type: {server.service_type}")
                 failed_servers.append(f"{server.name} (service creation failed)")
                 continue
                 
             # For now, we'll use the invite_user_to_plex_server method for all services
             # This assumes all services have this method or we need service-specific logic
-            if hasattr(service, 'invite_user_to_plex_server'):
-                service.invite_user_to_plex_server(
-                    plex_username_or_email=plex_email or plex_username,
-                    library_ids_to_share=invite.grant_library_ids,
-                    allow_sync=invite.allow_downloads
+            current_app.logger.debug(f"Invite service - Service created successfully: {service}")
+            current_app.logger.debug(f"Invite service - Service has invite_user_to_plex_server: {hasattr(service, 'invite_user_to_plex_server')}")
+            current_app.logger.debug(f"Invite service - Service has add_user: {hasattr(service, 'add_user')}")
+            
+            # Use the correct methods that actually exist in the Plex service
+            if hasattr(service, 'update_user_access'):
+                current_app.logger.debug(f"Invite service - Calling update_user_access for {plex_username}")
+                # For Plex, we need to grant access to an existing user
+                success = service.update_user_access(
+                    user_id=plex_username,  # Plex uses username as user_id
+                    library_ids=invite.grant_library_ids
                 )
-            elif hasattr(service, 'add_user'):
-                # Alternative method for other service types
-                service.add_user(
-                    username_or_email=plex_email or plex_username,
-                    library_ids=invite.grant_library_ids,
-                    allow_downloads=invite.allow_downloads
+                if not success:
+                    raise Exception("Failed to update user access")
+                current_app.logger.debug(f"Invite service - Successfully called update_user_access")
+            elif hasattr(service, 'create_user'):
+                # Fallback to create_user if update_user_access doesn't work
+                current_app.logger.debug(f"Invite service - Calling create_user for {plex_username}")
+                result = service.create_user(
+                    username=plex_username,
+                    email=plex_email or f"{plex_username}@example.com"
                 )
+                if result.get('error'):
+                    raise Exception(result['error'])
+                current_app.logger.debug(f"Invite service - Successfully called create_user")
             else:
+                current_app.logger.error(f"Invite service - Service {service} has no supported methods")
                 failed_servers.append(f"{server.name} (unsupported service type)")
                 continue
                 
@@ -174,34 +189,68 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
         current_app.logger.warning(f"Partial success for invite {invite.id}: Access granted to {successful_servers}, but failed for {failed_servers}")
         log_event(EventType.ERROR_GENERAL, f"Partial success for invite {invite.id}: granted access to {successful_servers}, failed for {failed_servers}", invite_id=invite.id)
 
-    # Create new MUM User
+    # Create or update MUM User
     try:
         user_access_expires_at = None
         if invite.membership_duration_days and invite.membership_duration_days > 0:
             user_access_expires_at = datetime.now(timezone.utc) + timedelta(days=invite.membership_duration_days)
             current_app.logger.info(f"User {plex_username} access from invite {invite.id} will expire on {user_access_expires_at}.")
 
-        new_user = User(
-            plex_uuid=plex_user_uuid,
-            plex_username=plex_username,
-            plex_email=plex_email,
-            plex_thumb_url=plex_thumb,
-            allowed_library_ids=list(invite.grant_library_ids),
-            used_invite_id=invite.id,
+        # Check if we should update an existing user (when user accounts are enabled)
+        if existing_user_id:
+            current_app.logger.debug(f"Updating existing user ID {existing_user_id} with Plex info")
+            new_user = User.query.get(existing_user_id)
+            if not new_user:
+                raise Exception(f"Existing user with ID {existing_user_id} not found")
             
-            discord_user_id=discord_user_info.get('id') if discord_user_info else None,
-            discord_username=discord_user_info.get('username') if discord_user_info else None,
-            discord_avatar_hash=discord_user_info.get('avatar') if discord_user_info else None,
-            discord_email=discord_user_info.get('email') if discord_user_info else None,
-            discord_email_verified=discord_user_info.get('verified') if discord_user_info else None,
+            # Update the existing user with Plex information
+            new_user.plex_uuid = plex_user_uuid
+            new_user.plex_username = plex_username
+            new_user.plex_email = plex_email
+            new_user.plex_thumb_url = plex_thumb
+            new_user.allowed_library_ids = list(invite.grant_library_ids)
+            new_user.used_invite_id = invite.id
+            
+            # Update Discord info if provided
+            if discord_user_info:
+                new_user.discord_user_id = discord_user_info.get('id')
+                new_user.discord_username = discord_user_info.get('username')
+                new_user.discord_avatar_hash = discord_user_info.get('avatar')
+                new_user.discord_email = discord_user_info.get('email')
+                new_user.discord_email_verified = discord_user_info.get('verified')
 
-            access_expires_at=user_access_expires_at,
-            last_synced_with_plex=datetime.now(timezone.utc),
+            new_user.access_expires_at = user_access_expires_at
+            new_user.last_synced_with_plex = datetime.now(timezone.utc)
+            new_user.is_purge_whitelisted = bool(invite.grant_purge_whitelist)
+            new_user.is_discord_bot_whitelisted = bool(invite.grant_bot_whitelist)
             
-            is_purge_whitelisted=bool(invite.grant_purge_whitelist),
-            is_discord_bot_whitelisted=bool(invite.grant_bot_whitelist)
-        )
-        db.session.add(new_user)
+            current_app.logger.debug(f"Updated existing user: {new_user.primary_username} with Plex username: {plex_username}")
+        else:
+            # Create new user (legacy flow when user accounts are not enabled)
+            current_app.logger.debug(f"Creating new user for Plex username: {plex_username}")
+            new_user = User(
+                primary_username=plex_username,  # Use Plex username as primary_username to satisfy NOT NULL constraint
+                primary_email=plex_email,  # Use Plex email as primary_email
+                plex_uuid=plex_user_uuid,
+                plex_username=plex_username,
+                plex_email=plex_email,
+                plex_thumb_url=plex_thumb,
+                allowed_library_ids=list(invite.grant_library_ids),
+                used_invite_id=invite.id,
+                
+                discord_user_id=discord_user_info.get('id') if discord_user_info else None,
+                discord_username=discord_user_info.get('username') if discord_user_info else None,
+                discord_avatar_hash=discord_user_info.get('avatar') if discord_user_info else None,
+                discord_email=discord_user_info.get('email') if discord_user_info else None,
+                discord_email_verified=discord_user_info.get('verified') if discord_user_info else None,
+
+                access_expires_at=user_access_expires_at,
+                last_synced_with_plex=datetime.now(timezone.utc),
+                
+                is_purge_whitelisted=bool(invite.grant_purge_whitelist),
+                is_discord_bot_whitelisted=bool(invite.grant_bot_whitelist)
+            )
+            db.session.add(new_user)
         
         invite.current_uses += 1
         
