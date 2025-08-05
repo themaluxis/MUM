@@ -13,7 +13,11 @@
     <div class="card-body">
         <h2 class="card-title text-2xl mb-4">Edit {{ server.name }}</h2>
         
-        <form method="POST">
+        <form method="POST" 
+              hx-post="{{ url_for('plugin_management.edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}"
+              hx-trigger="submit"
+              hx-swap="none"
+              hx-on::after-request="if(event.detail.xhr.status === 200) { window.location.href = '{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}'; }">
             {{ form.hidden_tag() }}
             
             <div class="form-control w-full mb-4">
@@ -100,8 +104,14 @@ function testConnection() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing...';
     btn.disabled = true;
     
-    // Test the current server
-    fetch(`/admin/api/servers/{{ server.id }}/test`)
+    // Test the current server using the plugin management endpoint
+    fetch(`{{ url_for('plugin_management.test_existing_server_connection', plugin_id=plugin.plugin_id, server_id=server.id) }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        }
+    })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
@@ -119,18 +129,4 @@ function testConnection() {
     });
 }
 
-function showToast(message, type) {
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type} fixed top-4 right-4 w-auto z-50`;
-    toast.innerHTML = `
-        <div>
-            <span>${message}</span>
-        </div>
-    `;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 5000);
-}
 </script>

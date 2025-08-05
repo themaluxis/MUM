@@ -192,20 +192,5 @@ function closeDeleteModal() {
     document.getElementById('deleteModal').classList.remove('modal-open');
 }
 
-function showToast(message, type) {
-    // Create toast notification
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type} fixed top-4 right-4 w-auto z-50`;
-    toast.innerHTML = `
-        <div>
-            <span>${message}</span>
-        </div>
-    `;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 5000);
-}
 </script>
 {% endblock %}

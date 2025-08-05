@@ -94,11 +94,30 @@ def configure(plugin_id):
             'server': server,
             'member_count': member_count,
             'libraries': [],
-            'error': None
+            'error': None,
+            'actual_server_name': None
         }
         try:
             service = MediaServiceFactory.create_service_from_db(server)
             if service:
+                # Get actual server name from the API
+                try:
+                    if hasattr(service, '_make_request'):
+                        if server.service_type.value.lower() == 'jellyfin':
+                            info = service._make_request('System/Info')
+                            server_details['actual_server_name'] = info.get('ServerName', server.service_type.value.title())
+                        elif server.service_type.value.lower() == 'plex':
+                            server_instance = service._get_server_instance()
+                            if server_instance:
+                                server_details['actual_server_name'] = getattr(server_instance, 'friendlyName', server.service_type.value.title())
+                        else:
+                            server_details['actual_server_name'] = server.service_type.value.title()
+                    else:
+                        server_details['actual_server_name'] = server.service_type.value.title()
+                except Exception as e:
+                    current_app.logger.debug(f"Could not get actual server name for {server.name}: {e}")
+                    server_details['actual_server_name'] = server.service_type.value.title()
+                
                 # Get libraries
                 try:
                     libs = service.get_libraries()
@@ -108,9 +127,11 @@ def configure(plugin_id):
                     server_details['error'] = "Could not fetch libraries."
             else:
                 server_details['error'] = "Could not create media service."
+                server_details['actual_server_name'] = server.service_type.value.title()
         except Exception as e:
             current_app.logger.error(f"Error creating service for server {server.name}: {e}\n{traceback.format_exc()}")
             server_details['error'] = "Failed to connect to server."
+            server_details['actual_server_name'] = server.service_type.value.title()
             
         servers_with_details.append(server_details)
 
@@ -373,6 +394,65 @@ def test_existing_server_connection(plugin_id, server_id):
     except Exception as e:
         current_app.logger.error(f"Error testing existing server connection: {e}")
         return jsonify({'success': False, 'message': f'Connection test failed: {str(e)}'})
+
+@bp.route('/<plugin_id>/<int:server_id>/raw-info', methods=['GET'])
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def get_raw_server_info(plugin_id, server_id):
+    """Get raw server information (System/Info) for debugging"""
+    try:
+        from app.services.media_service_factory import MediaServiceFactory
+        from app.models_media_services import MediaServer, ServiceType
+        from flask import jsonify
+        
+        # Convert plugin_id string to ServiceType enum
+        try:
+            service_type_enum = ServiceType[plugin_id.upper()]
+        except KeyError:
+            return jsonify({'success': False, 'message': f'Invalid service type: {plugin_id}'})
+        
+        # Get the existing server
+        server = MediaServer.query.filter_by(id=server_id, service_type=service_type_enum).first()
+        if not server:
+            return jsonify({'success': False, 'message': 'Server not found'})
+        
+        # Create service instance and get raw info
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service:
+            return jsonify({'success': False, 'message': f'Failed to create service for {plugin_id}'})
+        
+        # Get raw system info - this will vary by service type
+        if hasattr(service, '_make_request'):
+            # For services that have _make_request method (like Jellyfin)
+            if plugin_id.lower() == 'jellyfin':
+                raw_info = service._make_request('System/Info')
+            elif plugin_id.lower() == 'plex':
+                # For Plex, we might want to get server info differently
+                server_instance = service._get_server_instance()
+                if server_instance:
+                    raw_info = {
+                        'friendlyName': getattr(server_instance, 'friendlyName', 'Unknown'),
+                        'version': getattr(server_instance, 'version', 'Unknown'),
+                        'machineIdentifier': getattr(server_instance, 'machineIdentifier', 'Unknown'),
+                        'platform': getattr(server_instance, 'platform', 'Unknown'),
+                        'platformVersion': getattr(server_instance, 'platformVersion', 'Unknown'),
+                        'updatedAt': getattr(server_instance, 'updatedAt', 'Unknown'),
+                        'myPlexSigninState': getattr(server_instance, 'myPlexSigninState', 'Unknown'),
+                    }
+                else:
+                    raw_info = {'error': 'Could not connect to Plex server'}
+            else:
+                # For other services, try to get some basic info
+                raw_info = {'message': f'Raw info not implemented for {plugin_id}'}
+        else:
+            raw_info = {'message': f'Service does not support raw info retrieval'}
+        
+        return jsonify({'success': True, 'info': raw_info})
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting raw server info: {e}")
+        return jsonify({'success': False, 'message': f'Failed to get server info: {str(e)}'})
 
 @bp.route('/<plugin_id>/<int:server_id>/enable', methods=['POST'])
 @login_required

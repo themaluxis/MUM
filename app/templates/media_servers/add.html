@@ -270,27 +270,6 @@ function testConnection(event) {
     });
 }
 
-function showToast(message, type) {
-    // A simple toast implementation. In a real app, you'd use a more robust library.
-    const toastContainer = document.body; // Or a specific container
-    const toast = document.createElement('div');
-    const alertType = type === 'success' ? 'alert-success' : 'alert-error';
-    
-    toast.className = `alert ${alertType} shadow-lg fixed top-5 right-5 w-auto max-w-xs z-50`;
-    toast.innerHTML = `
-        <div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span>${message}</span>
-        </div>
-    `;
-    
-    toastContainer.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-    }, 5000);
-}
 
 // Form submission validation
 function validateForm(event) {

@@ -176,16 +176,23 @@ class JellyfinMediaService(BaseMediaService):
     def test_connection(self) -> Tuple[bool, str]:
         """Test connection to Jellyfin server"""
         try:
-            # Use the official client's system info method if available
-            client = self._get_client()
-            if hasattr(client, 'jellyfin') and hasattr(client.jellyfin, 'get_system_info'):
-                info = client.jellyfin.get_system_info()
-            else:
-                # Fallback to direct API call
-                info = self._make_request('System/Info')
+            # Get system info from System/Info endpoint (this contains the version)
+            info = self._make_request('System/Info')
             
-            server_name = info.get('ServerName', 'Jellyfin Server')
-            version = info.get('Version', 'Unknown')
+            # Use the MUM server nickname instead of Jellyfin's internal server name
+            server_name = self.name  # This is the nickname from MUM database
+            
+            # Get version from System/Info - try different possible field names
+            version = (info.get('Version') or 
+                      info.get('ServerVersion') or 
+                      info.get('ApplicationVersion') or 
+                      info.get('ProductVersion') or 
+                      'Unknown')
+            
+            # Debug logging to see what's available
+            self.log_info(f"Jellyfin system info keys: {list(info.keys())}")
+            self.log_info(f"Jellyfin version found: {version}")
+            
             return True, f"Connected to {server_name} (v{version})"
         except Exception as e:
             return False, f"Connection failed: {str(e)}"

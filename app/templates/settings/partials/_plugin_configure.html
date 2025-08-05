@@ -58,7 +58,7 @@
                     <div class="space-y-2">
                         <div class="flex items-center">
                             <i class="fas fa-server mr-2 text-gray-500"></i>
-                            <span class="text-sm">{{ server.service_type.value.title() }}</span>
+                            <span class="text-sm">{{ details.actual_server_name or server.service_type.value.title() }}</span>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-link mr-2 text-gray-500"></i>
@@ -156,6 +156,11 @@
                                         <i class="fas fa-users mr-2"></i>Sync Users
                                     </button>
                                 </li>
+                                <li>
+                                    <button onclick="showRawServerInfo({{ server.id }}, '{{ server.name }}')" class="text-gray-600">
+                                        <i class="fas fa-code mr-2"></i>Raw Server Info
+                                    </button>
+                                </li>
                             </ul>
                         </div>
                     </div>
@@ -185,6 +190,26 @@
                 <button type="submit" class="btn btn-error">Delete</button>
                 <button type="button" class="btn" onclick="closeDeleteModal()">Cancel</button>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Raw Server Info Modal -->
+<div id="rawServerInfoModal" class="modal">
+    <div class="modal-box max-w-4xl">
+        <h3 class="font-bold text-lg">Raw Server Information</h3>
+        <p class="py-2">Server: <span id="rawServerInfoName" class="font-semibold"></span></p>
+        
+        <div class="py-4">
+            <div class="loading loading-spinner loading-lg mx-auto" id="rawServerInfoLoading"></div>
+            <pre id="rawServerInfoContent" class="bg-base-200 p-4 rounded-lg text-xs overflow-auto max-h-96 hidden"></pre>
+            <div id="rawServerInfoError" class="alert alert-error hidden">
+                <span id="rawServerInfoErrorMessage"></span>
+            </div>
+        </div>
+        
+        <div class="modal-action">
+            <button type="button" class="btn" onclick="closeRawServerInfoModal()">Close</button>
         </div>
     </div>
 </div>
@@ -264,19 +289,45 @@ function closeDeleteModal() {
     document.getElementById('deleteModal').classList.remove('modal-open');
 }
 
-function showToast(message, type) {
-    // Create toast notification
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type} fixed top-4 right-4 w-auto z-50`;
-    toast.innerHTML = `
-        <div>
-            <span>${message}</span>
-        </div>
-    `;
-    document.body.appendChild(toast);
+function showRawServerInfo(serverId, serverName) {
+    // Show modal and set server name
+    document.getElementById('rawServerInfoName').textContent = serverName;
+    document.getElementById('rawServerInfoModal').classList.add('modal-open');
     
-    setTimeout(() => {
-        toast.remove();
-    }, 5000);
+    // Show loading state
+    document.getElementById('rawServerInfoLoading').classList.remove('hidden');
+    document.getElementById('rawServerInfoContent').classList.add('hidden');
+    document.getElementById('rawServerInfoError').classList.add('hidden');
+    
+    // Fetch raw server info
+    fetch(`{{ url_for('plugin_management.get_raw_server_info', plugin_id=plugin.plugin_id, server_id=999) }}`.replace('999', serverId), {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('rawServerInfoLoading').classList.add('hidden');
+        
+        if (data.success) {
+            document.getElementById('rawServerInfoContent').textContent = JSON.stringify(data.info, null, 2);
+            document.getElementById('rawServerInfoContent').classList.remove('hidden');
+        } else {
+            document.getElementById('rawServerInfoErrorMessage').textContent = data.message || 'Failed to fetch server information';
+            document.getElementById('rawServerInfoError').classList.remove('hidden');
+        }
+    })
+    .catch(error => {
+        document.getElementById('rawServerInfoLoading').classList.add('hidden');
+        document.getElementById('rawServerInfoErrorMessage').textContent = 'Error fetching server information: ' + error.message;
+        document.getElementById('rawServerInfoError').classList.remove('hidden');
+    });
 }
+
+function closeRawServerInfoModal() {
+    document.getElementById('rawServerInfoModal').classList.remove('modal-open');
+}
+
 </script>
