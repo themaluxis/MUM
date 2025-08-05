@@ -204,7 +204,13 @@ function showMoreLibraries(serverId, libraries) {
 }
 
 function testConnection(serverId) {
-    fetch(`/admin/api/servers/${serverId}/test`)
+    fetch(`{{ url_for('plugin_management.test_existing_server_connection', plugin_id=plugin.plugin_id, server_id=999) }}`.replace('999', serverId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        }
+    })
         .then(response => response.json())
         .then(data => {
             if (data.success) {

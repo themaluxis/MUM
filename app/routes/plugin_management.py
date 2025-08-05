@@ -297,6 +297,83 @@ def disable_server(plugin_id, server_id):
     response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": toast_message, "category": toast_category}})
     return response
 
+@bp.route('/<plugin_id>/test-connection', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def test_connection(plugin_id):
+    """Test connection for a new server configuration"""
+    try:
+        from app.services.media_service_factory import MediaServiceFactory
+        from flask import jsonify
+        
+        # Get form data
+        name = request.form.get('name', '').strip()
+        url = request.form.get('url', '').strip()
+        api_key = request.form.get('api_key', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        if not url or not api_key:
+            return jsonify({'success': False, 'message': 'URL and API key are required'})
+        
+        # Create temporary server config for testing
+        server_config = {
+            'name': name or 'Test Server',
+            'service_type': plugin_id,
+            'url': url,
+            'api_key': api_key,
+            'username': username if username else None,
+            'password': password if password else None,
+            'config': {}
+        }
+        
+        # Create service instance and test connection
+        service = MediaServiceFactory.create_service(server_config)
+        if not service:
+            return jsonify({'success': False, 'message': f'Failed to create service for {plugin_id}'})
+        
+        success, message = service.test_connection()
+        return jsonify({'success': success, 'message': message})
+        
+    except Exception as e:
+        current_app.logger.error(f"Error testing plugin connection: {e}")
+        return jsonify({'success': False, 'message': f'Connection test failed: {str(e)}'})
+
+@bp.route('/<plugin_id>/<int:server_id>/test', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('manage_plugins')
+def test_existing_server_connection(plugin_id, server_id):
+    """Test connection for an existing server"""
+    try:
+        from app.services.media_service_factory import MediaServiceFactory
+        from app.models_media_services import MediaServer, ServiceType
+        from flask import jsonify
+        
+        # Convert plugin_id string to ServiceType enum
+        try:
+            service_type_enum = ServiceType[plugin_id.upper()]
+        except KeyError:
+            return jsonify({'success': False, 'message': f'Invalid service type: {plugin_id}'})
+        
+        # Get the existing server
+        server = MediaServer.query.filter_by(id=server_id, service_type=service_type_enum).first()
+        if not server:
+            return jsonify({'success': False, 'message': 'Server not found'})
+        
+        # Create service instance and test connection
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service:
+            return jsonify({'success': False, 'message': f'Failed to create service for {plugin_id}'})
+        
+        success, message = service.test_connection()
+        return jsonify({'success': success, 'message': message})
+        
+    except Exception as e:
+        current_app.logger.error(f"Error testing existing server connection: {e}")
+        return jsonify({'success': False, 'message': f'Connection test failed: {str(e)}'})
+
 @bp.route('/<plugin_id>/<int:server_id>/enable', methods=['POST'])
 @login_required
 @setup_required

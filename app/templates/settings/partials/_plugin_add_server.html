@@ -83,7 +83,11 @@
                 {# Submit Buttons #}
                 <div class="card-actions justify-end">
                     <a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}" class="btn btn-ghost">Cancel</a>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="button" id="test-connection-btn" class="btn btn-outline">
+                        <i class="fa-solid fa-plug mr-2"></i>
+                        Test Connection
+                    </button>
+                    <button type="submit" id="add-server-btn" class="btn btn-primary" disabled>
                         <i class="fa-solid fa-plus mr-2"></i>
                         Add Server
                     </button>
@@ -92,3 +96,99 @@
         </div>
     </div>
 </div>
+
+<script>
+let connectionTested = false;
+
+function testConnection() {
+    const testBtn = document.getElementById('test-connection-btn');
+    const addBtn = document.getElementById('add-server-btn');
+    const originalText = testBtn.innerHTML;
+    
+    // Get form data
+    const formData = new FormData();
+    formData.append('name', document.querySelector('input[name="name"]').value);
+    formData.append('url', document.querySelector('input[name="url"]').value);
+    formData.append('api_key', document.querySelector('input[name="api_key"]').value);
+    
+    // Add username/password if they exist (for Emby/Jellyfin)
+    const usernameField = document.querySelector('input[name="username"]');
+    const passwordField = document.querySelector('input[name="password"]');
+    if (usernameField) formData.append('username', usernameField.value);
+    if (passwordField) formData.append('password', passwordField.value);
+    
+    formData.append('service_type', '{{ plugin.plugin_id }}');
+    
+    // Update button state
+    testBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';
+    testBtn.disabled = true;
+    
+    fetch("{{ url_for('plugin_management.test_connection', plugin_id=plugin.plugin_id) }}", {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            testBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i>Connection Successful';
+            testBtn.className = 'btn btn-success';
+            addBtn.disabled = false;
+            connectionTested = true;
+            showToast('Connection test successful!', 'success');
+        } else {
+            testBtn.innerHTML = '<i class="fa-solid fa-times mr-2"></i>Connection Failed';
+            testBtn.className = 'btn btn-error';
+            addBtn.disabled = true;
+            connectionTested = false;
+            showToast('Connection test failed: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        testBtn.innerHTML = '<i class="fa-solid fa-times mr-2"></i>Test Failed';
+        testBtn.className = 'btn btn-error';
+        addBtn.disabled = true;
+        connectionTested = false;
+        showToast('Error testing connection: ' + error.message, 'error');
+    })
+    .finally(() => {
+        testBtn.disabled = false;
+        
+        // Reset button after 3 seconds if successful
+        if (connectionTested) {
+            setTimeout(() => {
+                testBtn.innerHTML = originalText;
+                testBtn.className = 'btn btn-outline';
+            }, 3000);
+        }
+    });
+}
+
+// Prevent form submission if connection not tested
+document.querySelector('form').addEventListener('submit', function(e) {
+    if (!connectionTested) {
+        e.preventDefault();
+        showToast('Please test the connection successfully before adding the server.', 'error');
+        return false;
+    }
+});
+
+// Reset connection test status when form fields change
+document.querySelectorAll('input[name="url"], input[name="api_key"], input[name="username"], input[name="password"]').forEach(input => {
+    input.addEventListener('input', function() {
+        if (connectionTested) {
+            connectionTested = false;
+            const testBtn = document.getElementById('test-connection-btn');
+            const addBtn = document.getElementById('add-server-btn');
+            testBtn.innerHTML = '<i class="fa-solid fa-plug mr-2"></i>Test Connection';
+            testBtn.className = 'btn btn-outline';
+            addBtn.disabled = true;
+        }
+    });
+});
+
+// Add event listener to test button
+document.getElementById('test-connection-btn').addEventListener('click', testConnection);
+</script>
