@@ -423,30 +423,87 @@ def get_raw_server_info(plugin_id, server_id):
             return jsonify({'success': False, 'message': f'Failed to create service for {plugin_id}'})
         
         # Get raw system info - this will vary by service type
-        if hasattr(service, '_make_request'):
-            # For services that have _make_request method (like Jellyfin)
-            if plugin_id.lower() == 'jellyfin':
-                raw_info = service._make_request('System/Info')
-            elif plugin_id.lower() == 'plex':
-                # For Plex, we might want to get server info differently
-                server_instance = service._get_server_instance()
-                if server_instance:
-                    raw_info = {
-                        'friendlyName': getattr(server_instance, 'friendlyName', 'Unknown'),
-                        'version': getattr(server_instance, 'version', 'Unknown'),
-                        'machineIdentifier': getattr(server_instance, 'machineIdentifier', 'Unknown'),
-                        'platform': getattr(server_instance, 'platform', 'Unknown'),
-                        'platformVersion': getattr(server_instance, 'platformVersion', 'Unknown'),
-                        'updatedAt': getattr(server_instance, 'updatedAt', 'Unknown'),
-                        'myPlexSigninState': getattr(server_instance, 'myPlexSigninState', 'Unknown'),
-                    }
-                else:
-                    raw_info = {'error': 'Could not connect to Plex server'}
+        current_app.logger.debug(f"Getting raw info for plugin_id: '{plugin_id}' (type: {type(plugin_id)})")
+        current_app.logger.debug(f"Service type: {type(service).__name__}")
+        
+        if plugin_id.lower() == 'plex':
+            # For Plex, get comprehensive server information using PlexServer attributes
+            current_app.logger.debug("Processing Plex server raw info")
+            server_instance = service._get_server_instance()
+            if server_instance:
+                raw_info = {
+                    # Basic Server Info
+                    'friendlyName': getattr(server_instance, 'friendlyName', 'Unknown'),
+                    'machineIdentifier': getattr(server_instance, 'machineIdentifier', 'Unknown'),
+                    'version': getattr(server_instance, 'version', 'Unknown'),
+                    'platform': getattr(server_instance, 'platform', 'Unknown'),
+                    'platformVersion': getattr(server_instance, 'platformVersion', 'Unknown'),
+                    'product': getattr(server_instance, 'product', 'Unknown'),
+                    'productVersion': getattr(server_instance, 'productVersion', 'Unknown'),
+                    
+                    # Network & Connection
+                    'baseurl': getattr(server_instance, 'baseurl', 'Unknown'),
+                    'token': getattr(server_instance, 'token', 'Unknown')[:20] + '...' if getattr(server_instance, 'token', None) else 'None',
+                    'isLocal': getattr(server_instance, 'isLocal', 'Unknown'),
+                    'isSecure': getattr(server_instance, 'isSecure', 'Unknown'),
+                    
+                    # MyPlex Integration
+                    'myPlex': getattr(server_instance, 'myPlex', 'Unknown'),
+                    'myPlexSigninState': getattr(server_instance, 'myPlexSigninState', 'Unknown'),
+                    'myPlexSubscription': getattr(server_instance, 'myPlexSubscription', 'Unknown'),
+                    'myPlexUsername': getattr(server_instance, 'myPlexUsername', 'Unknown'),
+                    
+                    # Server Capabilities
+                    'allowCameraUpload': getattr(server_instance, 'allowCameraUpload', 'Unknown'),
+                    'allowChannelAccess': getattr(server_instance, 'allowChannelAccess', 'Unknown'),
+                    'allowMediaDeletion': getattr(server_instance, 'allowMediaDeletion', 'Unknown'),
+                    'allowSharing': getattr(server_instance, 'allowSharing', 'Unknown'),
+                    'allowSync': getattr(server_instance, 'allowSync', 'Unknown'),
+                    'allowTuners': getattr(server_instance, 'allowTuners', 'Unknown'),
+                    
+                    # Media & Libraries
+                    'backgroundProcessing': getattr(server_instance, 'backgroundProcessing', 'Unknown'),
+                    'certificate': getattr(server_instance, 'certificate', 'Unknown'),
+                    'companionProxy': getattr(server_instance, 'companionProxy', 'Unknown'),
+                    'diagnostics': getattr(server_instance, 'diagnostics', 'Unknown'),
+                    'eventStream': getattr(server_instance, 'eventStream', 'Unknown'),
+                    
+                    # Timestamps
+                    'createdAt': str(getattr(server_instance, 'createdAt', 'Unknown')),
+                    'updatedAt': str(getattr(server_instance, 'updatedAt', 'Unknown')),
+                    
+                    # Hardware & Performance
+                    'multiuser': getattr(server_instance, 'multiuser', 'Unknown'),
+                    'ownerFeatures': getattr(server_instance, 'ownerFeatures', 'Unknown'),
+                    'photoAutoTag': getattr(server_instance, 'photoAutoTag', 'Unknown'),
+                    'pushNotifications': getattr(server_instance, 'pushNotifications', 'Unknown'),
+                    'readOnlyLibraries': getattr(server_instance, 'readOnlyLibraries', 'Unknown'),
+                    'requestParametersInCookie': getattr(server_instance, 'requestParametersInCookie', 'Unknown'),
+                    'streamingBrainABRVersion': getattr(server_instance, 'streamingBrainABRVersion', 'Unknown'),
+                    'streamingBrainVersion': getattr(server_instance, 'streamingBrainVersion', 'Unknown'),
+                    'sync': getattr(server_instance, 'sync', 'Unknown'),
+                    'transcoderActiveVideoSessions': getattr(server_instance, 'transcoderActiveVideoSessions', 'Unknown'),
+                    'transcoderAudio': getattr(server_instance, 'transcoderAudio', 'Unknown'),
+                    'transcoderLyrics': getattr(server_instance, 'transcoderLyrics', 'Unknown'),
+                    'transcoderPhoto': getattr(server_instance, 'transcoderPhoto', 'Unknown'),
+                    'transcoderSubtitles': getattr(server_instance, 'transcoderSubtitles', 'Unknown'),
+                    'transcoderVideo': getattr(server_instance, 'transcoderVideo', 'Unknown'),
+                    'transcoderVideoBitrates': getattr(server_instance, 'transcoderVideoBitrates', 'Unknown'),
+                    'transcoderVideoQualities': getattr(server_instance, 'transcoderVideoQualities', 'Unknown'),
+                    'transcoderVideoResolutions': getattr(server_instance, 'transcoderVideoResolutions', 'Unknown'),
+                    'voiceSearch': getattr(server_instance, 'voiceSearch', 'Unknown'),
+                }
             else:
-                # For other services, try to get some basic info
-                raw_info = {'message': f'Raw info not implemented for {plugin_id}'}
+                raw_info = {'error': 'Could not connect to Plex server'}
+        elif plugin_id.lower() == 'jellyfin':
+            # For Jellyfin, use the System/Info API
+            if hasattr(service, '_make_request'):
+                raw_info = service._make_request('System/Info')
+            else:
+                raw_info = {'error': 'Jellyfin service does not support API requests'}
         else:
-            raw_info = {'message': f'Service does not support raw info retrieval'}
+            # For other services, try to get some basic info
+            raw_info = {'message': f'Raw info not implemented for {plugin_id}'}
         
         return jsonify({'success': True, 'info': raw_info})
         

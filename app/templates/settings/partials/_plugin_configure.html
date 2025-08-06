@@ -229,6 +229,12 @@ function showMoreLibraries(serverId, libraries) {
 }
 
 function testConnection(serverId) {
+    // Find the button and show loading state
+    const button = document.querySelector(`[onclick*="testConnection(${serverId})"]`);
+    const originalText = button.innerHTML;
+    button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';
+    button.disabled = true;
+    
     fetch(`{{ url_for('plugin_management.test_existing_server_connection', plugin_id=plugin.plugin_id, server_id=999) }}`.replace('999', serverId), {
         method: 'POST',
         headers: {
@@ -246,10 +252,21 @@ function testConnection(serverId) {
         })
         .catch(error => {
             showToast('Error testing connection', 'error');
+        })
+        .finally(() => {
+            // Restore button state
+            button.innerHTML = originalText;
+            button.disabled = false;
         });
 }
 
 function syncLibraries(serverId) {
+    // Find the button and show loading state
+    const button = document.querySelector(`[onclick*="syncLibraries(${serverId})"]`);
+    const originalText = button.innerHTML;
+    button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Syncing...';
+    button.disabled = true;
+    
     fetch(`/admin/api/servers/${serverId}/sync/libraries`)
         .then(response => response.json())
         .then(data => {
@@ -261,10 +278,21 @@ function syncLibraries(serverId) {
         })
         .catch(error => {
             showToast('Error syncing libraries', 'error');
+        })
+        .finally(() => {
+            // Restore button state
+            button.innerHTML = originalText;
+            button.disabled = false;
         });
 }
 
 function syncUsers(serverId) {
+    // Find the button and show loading state
+    const button = document.querySelector(`[onclick*="syncUsers(${serverId})"]`);
+    const originalText = button.innerHTML;
+    button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Syncing...';
+    button.disabled = true;
+    
     fetch(`/api/servers/${serverId}/sync/users`)
         .then(response => response.json())
         .then(data => {
@@ -276,6 +304,11 @@ function syncUsers(serverId) {
         })
         .catch(error => {
             showToast('Error syncing users', 'error');
+        })
+        .finally(() => {
+            // Restore button state
+            button.innerHTML = originalText;
+            button.disabled = false;
         });
 }
 
