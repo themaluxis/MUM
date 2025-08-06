@@ -255,15 +255,3 @@ def uninstall_plugin(plugin_id):
 
 
 
-@bp.route('/api/plugins/reload')
-@login_required
-@setup_required
-@permission_required('manage_plugins')
-def reload_plugins():
-    """Reload all enabled plugins"""
-    try:
-        plugin_manager.load_all_enabled_plugins()
-        return jsonify({'success': True, 'message': 'Plugins reloaded successfully'})
-    except Exception as e:
-        current_app.logger.error(f"Error reloading plugins: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500

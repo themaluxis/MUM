@@ -219,3 +219,21 @@ class AudiobookShelfMediaService(BaseMediaService):
                 'online': False,
                 'version': 'Unknown'
             }
+
+    def get_formatted_sessions(self) -> List[Dict[str, Any]]:
+        """Get active AudiobookShelf sessions formatted for display"""
+        # TODO: Implement AudiobookShelf session formatting
+        return []
+
+    def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
+        """Get GeoIP information for a given IP address."""
+        if not ip_address or ip_address in ['127.0.0.1', 'localhost']:
+            return {"status": "local", "message": "This is a local address."}
+        
+        try:
+            response = requests.get(f"http://ip-api.com/json/{ip_address}")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self.log_error(f"Failed to get GeoIP info for {ip_address}: {e}")
+            return {"status": "error", "message": str(e)}

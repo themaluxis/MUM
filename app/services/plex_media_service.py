@@ -387,6 +387,222 @@ class PlexMediaService(BaseMediaService):
             self.log_error(f"Error fetching active sessions: {e}")
         
         return sessions
+
+    def get_formatted_sessions(self) -> List[Dict[str, Any]]:
+        """Get active Plex sessions formatted for display"""
+        from app.models import User
+        from flask import url_for
+        import re
+        
+        raw_sessions = self.get_active_sessions()
+        if not raw_sessions:
+            return []
+        
+        # Get user mapping for Plex users
+        user_ids_in_session = {int(session.user.id) for session in raw_sessions if hasattr(session, 'user') and session.user and hasattr(session.user, 'id')}
+        mum_users_map_by_plex_id = {u.plex_user_id: u for u in User.query.filter(User.plex_user_id.in_(list(user_ids_in_session)))} if user_ids_in_session else {}
+        
+        formatted_sessions = []
+        
+        def get_standard_resolution(height_str):
+            if not height_str: return "SD"
+            try:
+                height = int(height_str)
+                if height <= 240: return "240p"
+                if height <= 360: return "360p"
+                if height <= 480: return "480p"
+                if height <= 576: return "576p"
+                if height <= 720: return "720p"
+                if height <= 1080: return "1080p"
+                if height <= 1440: return "1440p"
+                if height <= 2160: return "4K"
+                return f"{height}p"
+            except (ValueError, TypeError):
+                return "SD"
+        
+        for raw_session in raw_sessions:
+            try:
+                # Basic session info
+                user_name = getattr(raw_session.user, 'title', 'Unknown User')
+                player = raw_session.player
+                player_title = getattr(player, 'title', 'Unknown Player')
+                player_platform = getattr(player, 'platform', '')
+                product = getattr(player, 'product', 'N/A')
+                media_title = getattr(raw_session, 'title', "Unknown Title")
+                media_type = getattr(raw_session, 'type', 'unknown').capitalize()
+                year = getattr(raw_session, 'year', None)
+                library_name = getattr(raw_session, 'librarySectionTitle', "N/A")
+                progress = (raw_session.viewOffset / raw_session.duration) * 100 if raw_session.duration else 0
+                
+                # Thumbnail handling
+                thumb_path = raw_session.thumb
+                if media_type == 'Episode' and hasattr(raw_session, 'grandparentThumb'):
+                    thumb_path = raw_session.grandparentThumb
+                thumb_url = url_for('api.plex_image_proxy', path=thumb_path.lstrip('/')) if thumb_path else None
+                
+                # Transcoding info
+                transcode_session = raw_session.transcodeSession
+                is_transcoding = transcode_session is not None
+                
+                # Location info
+                location_ip = getattr(player, 'address', 'N/A')
+                is_lan = getattr(player, 'local', False)
+                location_lan_wan = "LAN" if is_lan else "WAN"
+                mum_user = mum_users_map_by_plex_id.get(int(raw_session.user.id))
+                mum_user_id = mum_user.id if mum_user else None
+                session_key = raw_session.sessionKey
+                
+                # User avatar
+                user_avatar_url = None
+                if hasattr(raw_session.user, 'thumb') and raw_session.user.thumb:
+                    user_thumb_url = raw_session.user.thumb
+                    if user_thumb_url.startswith('https://plex.tv/') or user_thumb_url.startswith('http://plex.tv/'):
+                        user_avatar_url = user_thumb_url
+                    else:
+                        try:
+                            user_avatar_url = url_for('api.plex_image_proxy', path=user_thumb_url.lstrip('/'))
+                        except Exception:
+                            user_avatar_url = None
+                
+                # Media details
+                original_media = next((m for m in raw_session.media if not m.selected), raw_session.media[0])
+                original_media_part = original_media.parts[0]
+                original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
+                original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
+                
+                # Initialize details
+                quality_detail = ""
+                stream_details = ""
+                video_detail = ""
+                audio_detail = ""
+                subtitle_detail = "None"
+                container_detail = ""
+                
+                if is_transcoding:
+                    # Transcoding details
+                    speed = f"(Speed: {transcode_session.speed:.1f})" if transcode_session and transcode_session.speed is not None else ""
+                    status = "Throttled" if transcode_session and transcode_session.throttled else ""
+                    stream_details = f"Transcode {status} {speed}".strip()
+                    
+                    # Container
+                    original_container = original_media_part.container.upper() if original_media_part else 'N/A'
+                    transcoded_container = transcode_session.container.upper() if transcode_session else 'N/A'
+                    container_detail = f"Converting ({original_container} → {transcoded_container})"
+
+                    # Video
+                    original_res = get_standard_resolution(original_video_stream.height) if original_video_stream else "Unknown"
+                    transcoded_res = get_standard_resolution(transcode_session.height) if transcode_session else "Unknown"
+                    if transcode_session and transcode_session.videoDecision == "copy":
+                        video_detail = f"Direct Stream ({original_video_stream.codec.upper()} {original_res})"
+                    else:
+                        video_detail = f"Transcode ({original_video_stream.codec.upper()} {original_res} → {transcode_session.videoCodec.upper() if transcode_session else 'N/A'} {transcoded_res})"
+
+                    # Audio
+                    if transcode_session and transcode_session.audioDecision == "copy":
+                        audio_detail = f"Direct Stream ({original_audio_stream.displayTitle})"
+                    else:
+                        original_audio_display = original_audio_stream.displayTitle if original_audio_stream else "Unknown"
+                        audio_channel_layout_map = {1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1"}
+                        transcoded_channel_layout = audio_channel_layout_map.get(transcode_session.audioChannels, f"{transcode_session.audioChannels}ch") if transcode_session else "N/A"
+                        transcoded_audio_display = f"{transcode_session.audioCodec.upper() if transcode_session else 'N/A'} {transcoded_channel_layout}"
+                        audio_detail = f"Transcode ({original_audio_display} → {transcoded_audio_display})"
+
+                    # Subtitle
+                    selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
+                    if transcode_session and transcode_session.subtitleDecision == "transcode":
+                        if selected_subtitle_stream:
+                            lang = selected_subtitle_stream.language or "Unknown"
+                            dest_format = (getattr(selected_subtitle_stream, 'format', '???') or '???').upper()
+                            display_title = selected_subtitle_stream.displayTitle
+                            match = re.search(r'\((.*?)\)', display_title)
+                            original_format = match.group(1).upper() if match else '???'
+                            
+                            if original_format != dest_format and dest_format != '???':
+                                subtitle_detail = f"Transcode ({lang} - {original_format} → {dest_format})"
+                            else:
+                                subtitle_detail = f"Transcode ({display_title})"
+                        else:
+                            subtitle_detail = "Transcode (Unknown)"
+                    elif transcode_session and transcode_session.subtitleDecision == "copy":
+                        subtitle_detail = f"Direct Stream ({selected_subtitle_stream.displayTitle})" if selected_subtitle_stream else "Direct Stream (Unknown)"
+
+                    # Quality
+                    transcoded_media = next((m for m in raw_session.media if m.selected), None)
+                    quality_res = get_standard_resolution(getattr(transcoded_media, 'height', transcode_session.height if transcode_session else 0))
+                    quality_detail = f"{quality_res} ({transcoded_media.bitrate / 1000:.1f} Mbps)" if transcoded_media else f"{quality_res} (Bitrate N/A)"
+
+                else:
+                    # Direct Play
+                    stream_details = "Direct Play"
+                    if any(p.decision == 'transcode' for m in raw_session.media for p in m.parts):
+                        stream_details = "Direct Stream"
+
+                    original_res = get_standard_resolution(original_video_stream.height) if original_video_stream else "Unknown"
+                    container_detail = original_media_part.container.upper()
+                    video_detail = f"Direct Play ({original_video_stream.codec.upper()} {original_res})" if original_video_stream else "Direct Play (Unknown Video)"
+                    audio_detail = f"Direct Play ({original_audio_stream.displayTitle})" if original_audio_stream else "Direct Play (Unknown Audio)"
+                    
+                    selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
+                    if selected_subtitle_stream:
+                        subtitle_detail = f"Direct Play ({selected_subtitle_stream.displayTitle})"
+
+                    quality_detail = f"Original ({original_media.bitrate / 1000:.1f} Mbps)"
+
+                # Raw data for modal
+                raw_session_dict = {}
+                if hasattr(raw_session, '_data') and raw_session._data is not None:
+                    raw_xml_string = ET.tostring(raw_session._data, encoding='unicode')
+                    raw_session_dict = xmltodict.parse(raw_xml_string)
+                raw_json_string = json.dumps(raw_session_dict, indent=2)
+
+                # Additional details
+                grandparent_title = getattr(raw_session, 'grandparentTitle', None)
+                parent_title = getattr(raw_session, 'parentTitle', None)
+                player_state = getattr(raw_session.player, 'state', 'N/A').capitalize()
+                bitrate_calc = raw_session.media[0].bitrate if raw_session.media else 0
+
+                session_details = {
+                    'user': user_name,
+                    'mum_user_id': mum_user_id,
+                    'player_title': player_title,
+                    'player_platform': player_platform,
+                    'product': product,
+                    'media_title': media_title,
+                    'grandparent_title': grandparent_title,
+                    'parent_title': parent_title,
+                    'media_type': media_type,
+                    'library_name': library_name,
+                    'year': year,
+                    'state': player_state,
+                    'progress': round(progress, 1),
+                    'thumb_url': thumb_url,
+                    'session_key': session_key,
+                    'user_avatar_url': user_avatar_url,
+                    'quality_detail': quality_detail,
+                    'stream_detail': stream_details,
+                    'container_detail': container_detail,
+                    'video_detail': video_detail,
+                    'audio_detail': audio_detail,
+                    'subtitle_detail': subtitle_detail,
+                    'location_detail': f"{location_lan_wan}: {location_ip}",
+                    'is_public_ip': not is_lan,
+                    'location_ip': location_ip,
+                    'bandwidth_detail': f"Streaming via {location_lan_wan}",
+                    'bitrate_calc': bitrate_calc,
+                    'location_type_calc': location_lan_wan,
+                    'is_transcode_calc': is_transcoding,
+                    'raw_data_json': raw_json_string,
+                    'raw_data_json_lines': raw_json_string.splitlines(),
+                    'service_type': 'plex',
+                    'server_name': self.name
+                }
+                formatted_sessions.append(session_details)
+                
+            except Exception as e:
+                self.log_error(f"Error formatting Plex session: {e}")
+                continue
+        
+        return formatted_sessions
     
     def terminate_session(self, session_id: str, reason: str = None) -> bool:
         """Terminate a Plex session"""

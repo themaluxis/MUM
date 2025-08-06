@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Session Count Badge Monitoring ---
     function updateSessionBadges() {
         // Check if navbar stream badge is enabled first
-        fetch('/api/navbar-stream-badge-status')
+        fetch('/api/settings/navbar-stream-badge-status')
             .then(response => response.json())
             .then(statusData => {
                 const desktopBadge = document.getElementById('streaming-badge-desktop');
@@ -251,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.debug('FRONTEND: Requesting session count (navbar badge enabled)');
 
                 // Fetch session count
-                fetch('/api/session-count', {
+                fetch('/api/streaming/sessions/count', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log('FRONTEND: Setting up session monitoring...');
     
     // Check if navbar stream badge is enabled
-    fetch('/api/navbar-stream-badge-status')
+    fetch('/api/settings/navbar-stream-badge-status')
         .then(response => response.json())
         .then(data => {
             if (data.enabled) {
@@ -330,7 +330,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 console.log('FRONTEND: Navbar stream badge disabled - using configured interval');
                 // Get the configured session monitoring interval
-                fetch('/api/session-monitoring-interval')
+                fetch('/api/settings/session-monitoring-interval')
                     .then(response => response.json())
                     .then(intervalData => {
                         const intervalSeconds = intervalData.interval || 30;

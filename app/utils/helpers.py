@@ -312,3 +312,15 @@ def extract_jellyfin_user_info(raw_data_str):
             
     except Exception as e:
         return None, None
+
+def super_admin_required(f):
+    """
+    Decorator to ensure only the super admin (user ID 1) can access certain routes.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.id == 1:
+            flash("You do not have permission to access this page.", "danger")
+            return redirect(url_for('dashboard.index'))
+        return f(*args, **kwargs)
+    return decorated_function

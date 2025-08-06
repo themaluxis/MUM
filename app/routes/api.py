@@ -2,7 +2,7 @@
 from flask import Blueprint, request, current_app, render_template, Response, abort, jsonify
 from flask_login import login_required, current_user
 import requests
-from app.models import EventType, Invite 
+from app.models import EventType, Invite, Setting
 from app.utils.helpers import log_event, permission_required
 from app.extensions import csrf, db
 from app.models_media_services import ServiceType
@@ -11,22 +11,23 @@ from app.services.media_service_manager import MediaServiceManager
 
 bp = Blueprint('api', __name__)
 
-
-
+# =============================================================================
+# SYSTEM HEALTH
+# =============================================================================
 
 @bp.route('/health')
 def health_check():
-    """
-    Health check endpoint for Docker HEALTHCHECK.
-    """
+    """Health check endpoint for Docker HEALTHCHECK."""
     return jsonify(status="ok"), 200
 
-@bp.route('/session-monitoring-interval')
-def session_monitoring_interval():
+# =============================================================================
+# SETTINGS API
+# =============================================================================
+
+@bp.route('/settings/session-monitoring-interval')
+@login_required
+def get_session_monitoring_interval():
     """Get the current session monitoring interval setting"""
-    from app.models import Setting
-    from flask import current_app
-    
     # Add comprehensive logging
     raw_setting = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', 30)
     current_app.logger.info(f"API: Raw session monitoring setting from DB: '{raw_setting}' (type: {type(raw_setting)})")
@@ -41,18 +42,22 @@ def session_monitoring_interval():
     current_app.logger.info(f"API: Returning session monitoring interval: {interval} seconds")
     return jsonify({'interval': interval})
 
-@bp.route('/navbar-stream-badge-status')
-def navbar_stream_badge_status():
+@bp.route('/settings/navbar-stream-badge-status')
+@login_required
+def get_navbar_stream_badge_status():
     """Get the current navbar stream badge setting"""
-    from app.models import Setting
-    
     enabled = Setting.get_bool('ENABLE_NAVBAR_STREAM_BADGE', False)
     return jsonify({'enabled': enabled})
 
-@bp.route('/check_server_status/<int:server_id>', methods=['POST'])
+# =============================================================================
+# SERVERS API
+# =============================================================================
+
+@bp.route('/servers/<int:server_id>/status', methods=['POST'])
 @login_required
-@csrf.exempt # Assuming CSRF is handled or exempted appropriately for this API endpoint
+@csrf.exempt
 def check_server_status(server_id):
+    """Check and return server status"""
     current_app.logger.debug(f"Api.py - check_server_status(): HTMX call received for server_id {server_id}. Forcing connection check.")
     
     server = MediaServiceManager.get_server_by_id(server_id)
@@ -71,12 +76,88 @@ def check_server_status(server_id):
     current_app.logger.debug(f"Api.py - check_server_status(): Status after forced check: {server_status_for_htmx}")
             
     # Render the partial template with the fresh status data.
-    # This is still plex-specific, but can be adapted later
     return render_template('dashboard/partials/plex_status_card.html', plex_server_status=server_status_for_htmx)
 
-@bp.route('/plex_image_proxy')
+@bp.route('/servers/<int:server_id>/libraries', methods=['GET'])
+@login_required
+def get_server_libraries(server_id):
+    """Get libraries for a specific server"""
+    server = MediaServiceManager.get_server_by_id(server_id)
+    if not server:
+        return jsonify({'error': 'Server not found'}), 404
+    
+    service = MediaServiceFactory.create_service_from_db(server)
+    if not service:
+        return jsonify({'error': 'Service not available'}), 503
+    
+    try:
+        libraries = service.get_libraries()
+        return jsonify({'success': True, 'libraries': libraries})
+    except Exception as e:
+        current_app.logger.error(f"Error getting libraries for server {server_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@bp.route('/servers/test', methods=['POST'])
+@csrf.exempt
+def test_new_server():
+    """Test connection to a new server"""
+    # Allow during setup, but require auth after setup is complete
+    if not current_user.is_authenticated:
+        from app.models import AdminAccount
+        try:
+            admin_exists = AdminAccount.query.first() is not None
+            if admin_exists:
+                return jsonify({'success': False, 'message': 'Authentication required'}), 401
+        except:
+            pass  # Database might not be ready yet
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'No data provided'}), 400
+    
+    try:
+        service = MediaServiceFactory.create_service(data)
+        if not service:
+            return jsonify({'success': False, 'message': 'Unsupported service type'}), 400
+        
+        success, message = service.test_connection()
+        return jsonify({'success': success, 'message': message})
+    except Exception as e:
+        current_app.logger.error(f"Error testing new server: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@bp.route('/servers/<int:server_id>/test', methods=['POST'])
+@login_required
+@csrf.exempt
+def test_existing_server(server_id):
+    """Test connection to an existing server"""
+    result = MediaServiceManager.test_server_connection(server_id)
+    return jsonify(result)
+
+@bp.route('/servers/<int:server_id>/sync/libraries', methods=['POST'])
+@login_required
+@csrf.exempt
+def sync_server_libraries(server_id):
+    """Sync libraries for a server"""
+    result = MediaServiceManager.sync_server_libraries(server_id)
+    return jsonify(result)
+
+@bp.route('/servers/<int:server_id>/sync/users', methods=['POST'])
+@login_required
+@csrf.exempt
+def sync_server_users(server_id):
+    """Sync users for a server"""
+    result = MediaServiceManager.sync_server_users(server_id)
+    return jsonify(result)
+
+# =============================================================================
+# MEDIA SERVICES API
+# =============================================================================
+
+@bp.route('/media/plex/images/proxy')
 @login_required
 def plex_image_proxy():
+    """Proxy Plex images through the application"""
     image_path_on_plex = request.args.get('path')
     if not image_path_on_plex:
         current_app.logger.warning("API plex_image_proxy: 'path' parameter is missing.")
@@ -97,9 +178,6 @@ def plex_image_proxy():
         # Ensure the path for plex.url starts with a '/' if it's meant to be from the server root
         path_for_plexapi = image_path_on_plex
         if not path_for_plexapi.startswith('/'):
-            # This check assumes that paths like "library/metadata/..." should be "/library/metadata/..."
-            # If plexapi could also receive paths like "some/other/endpoint" that don't start with /,
-            # this logic might need adjustment. For thumbs, "/library/..." is standard.
             path_for_plexapi = '/' + path_for_plexapi
         
         plex = plex_service._get_server_instance()
@@ -117,19 +195,19 @@ def plex_image_proxy():
         return Response(img_response.iter_content(chunk_size=1024*8), content_type=content_type)
 
     except requests.exceptions.HTTPError as e_http:
-        current_app.logger.error(f"API plex_image_proxy: HTTPError ({e_http.response.status_code}) fetching from Plex: {e_http} for path {image_path_on_plex} (URL: {full_authed_plex_image_url})")
+        current_app.logger.error(f"API plex_image_proxy: HTTPError ({e_http.response.status_code}) fetching from Plex: {e_http} for path {image_path_on_plex}")
         abort(e_http.response.status_code)
     except requests.exceptions.RequestException as e_req:
-        current_app.logger.error(f"API plex_image_proxy: RequestException fetching from Plex: {e_req} for path {image_path_on_plex} (URL: {full_authed_plex_image_url})")
-        abort(500) # Or a more specific error if RequestException implies client-side vs server-side issue with the request construction
+        current_app.logger.error(f"API plex_image_proxy: RequestException fetching from Plex: {e_req} for path {image_path_on_plex}")
+        abort(500)
     except Exception as e:
         current_app.logger.error(f"API plex_image_proxy: Unexpected error for path {image_path_on_plex}: {e}", exc_info=True)
         abort(500)
 
-
-@bp.route('/jellyfin_image_proxy')
+@bp.route('/media/jellyfin/images/proxy')
 @login_required
 def jellyfin_image_proxy():
+    """Proxy Jellyfin images through the application"""
     item_id = request.args.get('item_id')
     image_type = request.args.get('image_type', 'Primary')
     
@@ -140,11 +218,7 @@ def jellyfin_image_proxy():
         return "Missing item_id parameter", 400
 
     try:
-        from app.services.media_service_manager import MediaServiceManager
-        from app.models_media_services import ServiceType
-        
-        media_service_manager = MediaServiceManager()
-        jellyfin_servers = media_service_manager.get_servers_by_type(ServiceType.JELLYFIN, active_only=True)
+        jellyfin_servers = MediaServiceManager.get_servers_by_type(ServiceType.JELLYFIN, active_only=True)
         
         if not jellyfin_servers:
             current_app.logger.error("API jellyfin_image_proxy: No Jellyfin servers found.")
@@ -170,7 +244,6 @@ def jellyfin_image_proxy():
         }
         current_app.logger.info(f"API jellyfin_image_proxy: Using API key: {jellyfin_server.api_key[:8]}...")
         
-        import requests
         img_response = requests.get(jellyfin_image_url, headers=headers, stream=True, timeout=10)
         img_response.raise_for_status()
 
@@ -188,9 +261,10 @@ def jellyfin_image_proxy():
         current_app.logger.error(f"API jellyfin_image_proxy: Unexpected error for item {item_id}: {e}", exc_info=True)
         return "Error fetching image", 500
 
-@bp.route('/jellyfin_user_avatar_proxy')
+@bp.route('/media/jellyfin/users/avatar')
 @login_required
 def jellyfin_user_avatar_proxy():
+    """Proxy Jellyfin user avatars through the application"""
     user_id = request.args.get('user_id')
     
     current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Received request for user_id='{user_id}'")
@@ -251,14 +325,14 @@ def jellyfin_user_avatar_proxy():
         current_app.logger.error(f"API jellyfin_user_avatar_proxy: Unexpected error for user {user_id}: {e}", exc_info=True)
         abort(500)
 
-
-@bp.route('/terminate_plex_session', methods=['POST'])
+@bp.route('/media/plex/sessions/terminate', methods=['POST'])
 @login_required
-@csrf.exempt # Or ensure your JS sends CSRF token for POST via HTMX
+@csrf.exempt
 @permission_required('kill_stream')
-def terminate_plex_session_route():
+def terminate_plex_session():
+    """Terminate a Plex session"""
     session_key = request.form.get('session_key')
-    message = request.form.get('message', None) # Optional message
+    message = request.form.get('message', None)
 
     if not session_key:
         current_app.logger.error("API terminate_plex_session: Missing 'session_key'.")
@@ -276,26 +350,90 @@ def terminate_plex_session_route():
 
         success = plex_service.terminate_session(session_key, message)
         if success:
-            # The session might take a moment to disappear from Plex's /status/sessions.
-            # The client-side HTMX should trigger a refresh of the sessions list.
             return jsonify(success=True, message=f"Termination command sent for session {session_key}.")
         else:
-            # This case might occur if plex_service.get_plex_instance() failed initially
             return jsonify(success=False, error="Failed to send termination command (Plex connection issue?)."), 500
     except Exception as e:
         current_app.logger.error(f"API terminate_plex_session: Exception: {e}", exc_info=True)
-        # Provide the error message from the service layer if available
         return jsonify(success=False, error=str(e)), 500
-    
-@bp.route('/check_guild_invites', methods=['GET'])
+
+# =============================================================================
+# STREAMING API
+# =============================================================================
+
+@bp.route('/streaming/sessions/count')
+@login_required
+def get_session_count():
+    """Get the current count of active streaming sessions with server-side throttling"""
+    try:
+        import time
+        
+        # Check if navbar stream badge is enabled
+        navbar_badge_enabled = Setting.get_bool('ENABLE_NAVBAR_STREAM_BADGE', False)
+        
+        if navbar_badge_enabled:
+            # When navbar badge is enabled, use 5-second interval and always fetch fresh data
+            interval_seconds = 5
+            current_app.logger.debug(f"API: Navbar stream badge enabled, using 5s interval")
+        else:
+            # Use configured session monitoring interval
+            interval_str = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', '30')
+            try:
+                interval_seconds = int(interval_str)
+            except (ValueError, TypeError):
+                interval_seconds = 30
+            current_app.logger.debug(f"API: Using configured interval: {interval_seconds}s")
+        
+        # Check if we have cached session data that's still fresh
+        cache_key = 'last_session_check'
+        last_check_time = getattr(get_session_count, cache_key, 0)
+        current_time = time.time()
+        time_since_last_check = current_time - last_check_time
+        
+        current_app.logger.debug(f"API: Session count requested, {time_since_last_check:.1f}s since last check (interval: {interval_seconds}s)")
+        
+        # Only fetch fresh data if enough time has passed
+        if time_since_last_check >= interval_seconds:
+            current_app.logger.info(f"API: Fetching fresh session data ({time_since_last_check:.1f}s >= {interval_seconds}s)")
+            
+            # Get active sessions from all services
+            active_sessions_data = MediaServiceManager.get_all_active_sessions()
+            
+            # Count total sessions
+            total_sessions = len(active_sessions_data)
+            
+            # Cache the result and timestamp
+            setattr(get_session_count, cache_key, current_time)
+            setattr(get_session_count, 'cached_count', total_sessions)
+            
+        else:
+            # Use cached data
+            total_sessions = getattr(get_session_count, 'cached_count', 0)
+            current_app.logger.debug(f"API: Using cached session data: {total_sessions} sessions")
+        
+        return jsonify({
+            'success': True,
+            'count': total_sessions,
+            'cached': time_since_last_check < interval_seconds,
+            'time_since_last_check': round(time_since_last_check, 1)
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error getting session count: {e}")
+        return jsonify({
+            'success': False,
+            'count': 0,
+            'error': str(e)
+        }), 500
+
+# =============================================================================
+# INVITES API
+# =============================================================================
+
+@bp.route('/invites/guild-check', methods=['GET'])
 @login_required
 @csrf.exempt
 def check_guild_invites():
-    """
-    Checks for active, usable invites that don't have a specific override
-    to disable guild membership checking. These are the invites that would be
-    affected if the global 'Require Guild Membership' setting is turned off.
-    """
+    """Check for active, usable invites that would be affected by guild membership settings"""
     now = db.func.now()
     affected_invites = Invite.query.filter(
         Invite.is_active == True,
@@ -317,12 +455,44 @@ def check_guild_invites():
     
     return jsonify(affected=True, invites=invites_data)
 
-@bp.route('/geoip_lookup/<ip_address>')
+# =============================================================================
+# PLUGINS API
+# =============================================================================
+
+@bp.route('/plugins/reload', methods=['POST'])
+@login_required
+@csrf.exempt
+def reload_plugins():
+    """Reload all plugins"""
+    try:
+        from app.services.plugin_manager import plugin_manager
+        plugin_manager.reload_all_plugins()
+        return jsonify({'success': True, 'message': 'Plugins reloaded successfully'})
+    except Exception as e:
+        current_app.logger.error(f"Error reloading plugins: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@bp.route('/plugins/refresh-servers-count', methods=['POST'])
+@login_required
+@csrf.exempt
+def refresh_plugins_servers_count():
+    """Refresh the servers count for all plugins"""
+    try:
+        from app.services.plugin_manager import plugin_manager
+        plugin_manager.refresh_servers_count()
+        return jsonify({'success': True, 'message': 'Plugin servers count refreshed'})
+    except Exception as e:
+        current_app.logger.error(f"Error refreshing plugin servers count: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# =============================================================================
+# NETWORK API
+# =============================================================================
+
+@bp.route('/network/geoip/<ip_address>')
 @login_required
 def geoip_lookup(ip_address):
-    """
-    Looks up GeoIP information for a given IP address and returns an HTML partial.
-    """
+    """Look up GeoIP information for a given IP address and return HTML partial"""
     plex_servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX)
     if not plex_servers:
         abort(503)
@@ -333,71 +503,3 @@ def geoip_lookup(ip_address):
         abort(503)
     geoip_data = plex_service.get_geoip_info(ip_address)
     return render_template('components/modals/geoip_modal.html', geoip_data=geoip_data, ip_address=ip_address)
-
-@bp.route('/session-count')
-@login_required
-def session_count():
-    """
-    API endpoint to get the current count of active streaming sessions with server-side throttling.
-    Returns JSON with the total session count.
-    """
-    try:
-        from app.models import Setting
-        import time
-        
-        # Check if navbar stream badge is enabled
-        navbar_badge_enabled = Setting.get_bool('ENABLE_NAVBAR_STREAM_BADGE', False)
-        
-        if navbar_badge_enabled:
-            # When navbar badge is enabled, use 5-second interval and always fetch fresh data
-            interval_seconds = 5
-            current_app.logger.debug(f"API: Navbar stream badge enabled, using 5s interval")
-        else:
-            # Use configured session monitoring interval
-            interval_str = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', '30')
-            try:
-                interval_seconds = int(interval_str)
-            except (ValueError, TypeError):
-                interval_seconds = 30
-            current_app.logger.debug(f"API: Using configured interval: {interval_seconds}s")
-        
-        # Check if we have cached session data that's still fresh
-        cache_key = 'last_session_check'
-        last_check_time = getattr(session_count, cache_key, 0)
-        current_time = time.time()
-        time_since_last_check = current_time - last_check_time
-        
-        current_app.logger.debug(f"API: Session count requested, {time_since_last_check:.1f}s since last check (interval: {interval_seconds}s)")
-        
-        # Only fetch fresh data if enough time has passed
-        if time_since_last_check >= interval_seconds:
-            current_app.logger.info(f"API: Fetching fresh session data ({time_since_last_check:.1f}s >= {interval_seconds}s)")
-            
-            # Get active sessions from all services
-            active_sessions_data = MediaServiceManager.get_all_active_sessions()
-            
-            # Count total sessions
-            total_sessions = len(active_sessions_data)
-            
-            # Cache the result and timestamp
-            setattr(session_count, cache_key, current_time)
-            setattr(session_count, 'cached_count', total_sessions)
-            
-        else:
-            # Use cached data
-            total_sessions = getattr(session_count, 'cached_count', 0)
-            current_app.logger.debug(f"API: Using cached session data: {total_sessions} sessions")
-        
-        return jsonify({
-            'success': True,
-            'count': total_sessions,
-            'cached': time_since_last_check < interval_seconds,
-            'time_since_last_check': round(time_since_last_check, 1)
-        })
-    except Exception as e:
-        current_app.logger.error(f"Error getting session count: {e}")
-        return jsonify({
-            'success': False,
-            'count': 0,
-            'error': str(e)
-        }), 500

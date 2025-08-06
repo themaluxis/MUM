@@ -142,7 +142,7 @@ function testConnection() {
     btn.disabled = true;
     
     // Test the current server
-    fetch(`/admin/api/servers/{{ server.id }}/test`)
+    fetch(`/api/servers/{{ server.id }}/test`)
     .then(response => response.json())
     .then(data => {
         if (data.success) {

@@ -978,31 +978,6 @@ def get_edit_invite_form(invite_id):
 
 
 # --- NEW: Edit Invite POST Route (for saving changes) ---
-@bp.route('/api/server/<int:server_id>/libraries', methods=['GET'])
-@login_required
-@setup_required
-def get_server_libraries(server_id):
-    """Get libraries for a specific server"""
-    try:
-        media_service_manager = MediaServiceManager()
-        server = media_service_manager.get_server_by_id(server_id)
-        
-        if not server:
-            return {'error': 'Server not found'}, 404
-            
-        service = MediaServiceFactory.create_service_from_db(server)
-        if not service:
-            return {'error': 'Could not create service for server'}, 500
-            
-        libraries = service.get_libraries()
-        return {
-            'success': True,
-            'libraries': [{'id': lib['id'], 'name': lib['name']} for lib in libraries]
-        }
-        
-    except Exception as e:
-        current_app.logger.error(f"Error fetching libraries for server {server_id}: {e}")
-        return {'error': str(e)}, 500
 
 @bp.route('/manage/edit/<int:invite_id>', methods=['POST'])
 @login_required

@@ -488,6 +488,266 @@ class JellyfinMediaService(BaseMediaService):
         except Exception as e:
             self.log_error(f"Error fetching active sessions: {e}")
             return []
+
+    def get_formatted_sessions(self) -> List[Dict[str, Any]]:
+        """Get active Jellyfin sessions formatted for display"""
+        from app.models import User
+        from flask import url_for
+        import json
+        
+        raw_sessions = self.get_active_sessions()
+        if not raw_sessions:
+            return []
+        
+        # Get user mapping for Jellyfin users
+        jellyfin_usernames = {session.get('UserName') for session in raw_sessions if session.get('UserName')}
+        mum_users_map_by_username = {u.primary_username: u for u in User.query.filter(User.primary_username.in_(list(jellyfin_usernames)))} if jellyfin_usernames else {}
+        
+        formatted_sessions = []
+        
+        def get_standard_resolution(height_str):
+            if not height_str: return "SD"
+            try:
+                height = int(height_str)
+                if height <= 240: return "240p"
+                if height <= 360: return "360p"
+                if height <= 480: return "480p"
+                if height <= 576: return "576p"
+                if height <= 720: return "720p"
+                if height <= 1080: return "1080p"
+                if height <= 1440: return "1440p"
+                if height <= 2160: return "4K"
+                return f"{height}p"
+            except (ValueError, TypeError):
+                return "SD"
+        
+        for raw_session in raw_sessions:
+            try:
+                # Basic session info
+                user_name = raw_session.get('UserName', 'Unknown User')
+                now_playing = raw_session.get('NowPlayingItem', {})
+                play_state = raw_session.get('PlayState', {})
+                
+                player_title = raw_session.get('DeviceName', 'Unknown Device')
+                player_platform = raw_session.get('Client', '')
+                product = raw_session.get('ApplicationVersion', 'N/A')
+                media_title = now_playing.get('Name', "Unknown Title")
+                media_type = now_playing.get('Type', 'unknown').capitalize()
+                year = now_playing.get('ProductionYear', None)
+                library_name = "Library"  # Generic library name for Jellyfin
+                
+                # Calculate progress for Jellyfin
+                position_ticks = play_state.get('PositionTicks', 0)
+                runtime_ticks = now_playing.get('RunTimeTicks', 0)
+                progress = (position_ticks / runtime_ticks) * 100 if runtime_ticks else 0
+                
+                # Handle Jellyfin thumbnails
+                thumb_url = None
+                item_id = now_playing.get('Id')
+                if item_id:
+                    # For episodes, prefer series poster; for movies, use primary image
+                    if media_type == 'Episode' and now_playing.get('SeriesId'):
+                        thumb_url = url_for('api.jellyfin_image_proxy', item_id=now_playing.get('SeriesId'), image_type='Primary')
+                    else:
+                        thumb_url = url_for('api.jellyfin_image_proxy', item_id=item_id, image_type='Primary')
+                
+                is_transcoding = play_state.get('PlayMethod') == 'Transcode'
+                
+                location_ip = raw_session.get('RemoteEndPoint', 'N/A')
+                is_lan = not raw_session.get('IsLocal', True)  # Jellyfin logic might be inverted
+                location_lan_wan = "LAN" if is_lan else "WAN"
+                
+                # Find MUM user by username for Jellyfin
+                mum_user = mum_users_map_by_username.get(user_name)
+                mum_user_id = mum_user.id if mum_user else None
+                session_key = raw_session.get('Id', '')
+                
+                # Generate Jellyfin user avatar URL if available
+                user_avatar_url = None
+                jellyfin_user_id = raw_session.get('UserId')
+                if jellyfin_user_id:
+                    try:
+                        user_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_user_id)
+                    except Exception:
+                        user_avatar_url = None
+                
+                # Initialize details
+                quality_detail = ""
+                stream_details = ""
+                video_detail = ""
+                audio_detail = ""
+                subtitle_detail = "None"
+                container_detail = ""
+                
+                # Handle session details for Jellyfin
+                transcoding_info = raw_session.get('TranscodingInfo', {})
+                media_streams = now_playing.get('MediaStreams', [])
+                
+                # Find original video and audio streams
+                original_video_stream = next((s for s in media_streams if s.get('Type') == 'Video'), None)
+                original_audio_stream = next((s for s in media_streams if s.get('Type') == 'Audio' and s.get('IsDefault', False)), None)
+                
+                if is_transcoding and transcoding_info:
+                    # Enhanced Jellyfin transcode details
+                    hardware_accel = transcoding_info.get('HardwareAccelerationType', 'none')
+                    if hardware_accel and hardware_accel != 'none':
+                        stream_details = f"Transcode (HW: {hardware_accel.upper()})"
+                    else:
+                        stream_details = "Transcode"
+                    
+                    # Container details
+                    original_container = now_playing.get('Container', 'Unknown').upper()
+                    transcoded_container = transcoding_info.get('Container', 'Unknown').upper()
+                    if original_container != transcoded_container:
+                        container_detail = f"Converting ({original_container} -> {transcoded_container})"
+                    else:
+                        container_detail = f"Container: {transcoded_container}"
+                    
+                    # Video details
+                    is_video_direct = transcoding_info.get('IsVideoDirect', False)
+                    if is_video_direct and original_video_stream:
+                        # Video is direct stream
+                        original_height = original_video_stream.get('Height', 0)
+                        original_res = get_standard_resolution(original_height)
+                        original_codec = original_video_stream.get('Codec', 'Unknown').upper()
+                        video_detail = f"Direct Stream ({original_codec} {original_res})"
+                    else:
+                        # Video is being transcoded
+                        original_height = original_video_stream.get('Height', 0) if original_video_stream else 0
+                        original_res = get_standard_resolution(original_height)
+                        original_codec = original_video_stream.get('Codec', 'Unknown').upper() if original_video_stream else 'Unknown'
+                        
+                        transcoded_height = transcoding_info.get('Height', 0)
+                        transcoded_res = get_standard_resolution(transcoded_height)
+                        transcoded_codec = transcoding_info.get('VideoCodec', 'Unknown').upper()
+                        
+                        if original_video_stream:
+                            video_detail = f"Transcode ({original_codec} {original_res} -> {transcoded_codec} {transcoded_res})"
+                        else:
+                            video_detail = f"Transcode (-> {transcoded_codec} {transcoded_res})"
+                    
+                    # Audio details
+                    is_audio_direct = transcoding_info.get('IsAudioDirect', False)
+                    if is_audio_direct and original_audio_stream:
+                        # Audio is direct stream
+                        audio_display = original_audio_stream.get('DisplayTitle', 'Unknown Audio')
+                        audio_detail = f"Direct Stream ({audio_display})"
+                    else:
+                        # Audio is being transcoded
+                        original_audio_display = original_audio_stream.get('DisplayTitle', 'Unknown Audio') if original_audio_stream else 'Unknown Audio'
+                        transcoded_codec = transcoding_info.get('AudioCodec', 'Unknown').upper()
+                        transcoded_channels = transcoding_info.get('AudioChannels', 0)
+                        
+                        # Map channel count to layout
+                        channel_layout_map = {1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1"}
+                        transcoded_layout = channel_layout_map.get(transcoded_channels, f"{transcoded_channels}ch")
+                        transcoded_audio_display = f"{transcoded_codec} {transcoded_layout}"
+                        
+                        if original_audio_stream:
+                            audio_detail = f"Transcode ({original_audio_display} -> {transcoded_audio_display})"
+                        else:
+                            audio_detail = f"Transcode (-> {transcoded_audio_display})"
+                    
+                    # Quality details with bitrate
+                    transcoded_height = transcoding_info.get('Height', 0)
+                    transcoded_res = get_standard_resolution(transcoded_height)
+                    transcoded_bitrate = transcoding_info.get('Bitrate', 0)
+                    if transcoded_bitrate > 0:
+                        bitrate_mbps = transcoded_bitrate / 1000000  # Convert from bps to Mbps
+                        quality_detail = f"{transcoded_res} ({bitrate_mbps:.1f} Mbps)"
+                    else:
+                        quality_detail = f"{transcoded_res} (Transcoding)"
+                        
+                else:
+                    # Direct Play for Jellyfin
+                    stream_details = "Direct Play"
+                    container_detail = now_playing.get('Container', 'Unknown').upper()
+                    
+                    if original_video_stream:
+                        original_height = original_video_stream.get('Height', 0)
+                        original_res = get_standard_resolution(original_height)
+                        original_codec = original_video_stream.get('Codec', 'Unknown').upper()
+                        video_detail = f"Direct Play ({original_codec} {original_res})"
+                    else:
+                        video_detail = "Direct Play (Unknown Video)"
+                    
+                    if original_audio_stream:
+                        audio_display = original_audio_stream.get('DisplayTitle', 'Unknown Audio')
+                        audio_detail = f"Direct Play ({audio_display})"
+                    else:
+                        audio_detail = "Direct Play (Unknown Audio)"
+                    
+                    # Quality for direct play
+                    if original_video_stream:
+                        original_height = original_video_stream.get('Height', 0)
+                        original_res = get_standard_resolution(original_height)
+                        original_bitrate = original_video_stream.get('BitRate', 0)
+                        if original_bitrate > 0:
+                            bitrate_mbps = original_bitrate / 1000000  # Convert from bps to Mbps
+                            quality_detail = f"Original ({original_res}, {bitrate_mbps:.1f} Mbps)"
+                        else:
+                            quality_detail = f"Original ({original_res})"
+                    else:
+                        quality_detail = "Direct Play"
+
+                # Raw data for modal (Jellyfin sessions are already dict format)
+                raw_json_string = json.dumps(raw_session, indent=2)
+
+                # Additional details
+                grandparent_title = now_playing.get('SeriesName', None)
+                parent_title = now_playing.get('SeasonName', None)
+                player_state = 'Playing' if not play_state.get('IsPaused', False) else 'Paused'
+                
+                # Enhanced Jellyfin bitrate calculation for display
+                if transcoding_info and transcoding_info.get('Bitrate'):
+                    bitrate_calc = transcoding_info.get('Bitrate', 0) / 1000  # Convert from bps to kbps for consistency with Plex
+                elif original_video_stream and original_video_stream.get('BitRate'):
+                    bitrate_calc = original_video_stream.get('BitRate', 0) / 1000  # Convert from bps to kbps
+                else:
+                    bitrate_calc = 0
+
+                session_details = {
+                    'user': user_name,
+                    'mum_user_id': mum_user_id,
+                    'player_title': player_title,
+                    'player_platform': player_platform,
+                    'product': product,
+                    'media_title': media_title,
+                    'grandparent_title': grandparent_title,
+                    'parent_title': parent_title,
+                    'media_type': media_type,
+                    'library_name': library_name,
+                    'year': year,
+                    'state': player_state,
+                    'progress': round(progress, 1),
+                    'thumb_url': thumb_url,
+                    'session_key': session_key,
+                    'user_avatar_url': user_avatar_url,
+                    'quality_detail': quality_detail,
+                    'stream_detail': stream_details,
+                    'container_detail': container_detail,
+                    'video_detail': video_detail,
+                    'audio_detail': audio_detail,
+                    'subtitle_detail': subtitle_detail,
+                    'location_detail': f"{location_lan_wan}: {location_ip}",
+                    'is_public_ip': not is_lan,
+                    'location_ip': location_ip,
+                    'bandwidth_detail': f"Streaming via {location_lan_wan}",
+                    'bitrate_calc': bitrate_calc,
+                    'location_type_calc': location_lan_wan,
+                    'is_transcode_calc': is_transcoding,
+                    'raw_data_json': raw_json_string,
+                    'raw_data_json_lines': raw_json_string.splitlines(),
+                    'service_type': 'jellyfin',
+                    'server_name': self.name
+                }
+                formatted_sessions.append(session_details)
+                
+            except Exception as e:
+                self.log_error(f"Error formatting Jellyfin session: {e}")
+                continue
+        
+        return formatted_sessions
     
     def _calculate_progress(self, play_state: Dict, item: Dict) -> float:
         """Calculate playback progress percentage"""

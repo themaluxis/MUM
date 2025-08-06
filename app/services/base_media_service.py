@@ -64,6 +64,11 @@ class BaseMediaService(ABC):
         pass
 
     @abstractmethod
+    def get_formatted_sessions(self) -> List[Dict[str, Any]]:
+        """Get active sessions formatted for display with standardized structure"""
+        pass
+
+    @abstractmethod
     def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
         """Get GeoIP information for a given IP address."""
         pass

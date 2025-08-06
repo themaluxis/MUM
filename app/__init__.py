@@ -425,6 +425,10 @@ def create_app(config_name=None):
     app.register_blueprint(plugins_bp, url_prefix='/admin')
     from .routes.user_preferences import user_preferences_bp
     app.register_blueprint(user_preferences_bp, url_prefix='/user/preferences')
+    from .routes.streaming import bp as streaming_bp
+    app.register_blueprint(streaming_bp)
+    from .routes.libraries import bp as libraries_bp
+    app.register_blueprint(libraries_bp)
     
 
     register_error_handlers(app)

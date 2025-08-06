@@ -58,7 +58,7 @@
             </div>
 
             <button class="btn btn-secondary btn-sm"
-                    hx-get="{{ url_for('dashboard.streaming_sessions_partial') }}?view={{ request.args.get('view', 'merged') }}"
+                    hx-get="{{ url_for('streaming.sessions_partial') }}?view={{ request.args.get('view', 'merged') }}"
                     hx-target="#streaming-sessions-container"
                     hx-swap="innerHTML"
                     hx-indicator="#streaming-manual-refresh-loader"
@@ -70,7 +70,7 @@
     </div>
 
     <div id="streaming-sessions-container" 
-         hx-get="{{ url_for('dashboard.streaming_sessions_partial') }}?view={{ request.args.get('view', 'merged') }}" 
+         hx-get="{{ url_for('streaming.sessions_partial') }}?view={{ request.args.get('view', 'merged') }}" 
          hx-trigger="load, every {{ streaming_refresh_interval | default(15) }}s"
          hx-swap="innerHTML"
          hx-indicator="#streaming-auto-refresh-loader">
@@ -99,7 +99,7 @@
     <p class="py-2 text-sm">Are you sure you want to terminate the session for <strong id="terminate-user-name">user</strong> playing <strong id="terminate-media-title">media</strong>?</p>
     
     <form id="confirmTerminateForm" 
-          hx-post="{{ url_for('api.terminate_plex_session_route') }}"
+          hx-post="{{ url_for('api.terminate_plex_session') }}"
           hx-target="#terminate-status-message" {# For messages within the modal #}
           hx-swap="innerHTML"
           hx-indicator="#terminate-session-loader">
@@ -291,7 +291,7 @@ let currentStreamingView = '{{ request.args.get('view', 'merged') }}';
 function updateAutoRefreshUrl() {
     const streamingContainer = document.getElementById('streaming-sessions-container');
     if (streamingContainer) {
-        const newUrl = `{{ url_for('dashboard.streaming_sessions_partial') }}?view=${currentStreamingView}`;
+        const newUrl = `{{ url_for('streaming.sessions_partial') }}?view=${currentStreamingView}`;
         streamingContainer.setAttribute('hx-get', newUrl);
     }
 }
@@ -312,7 +312,7 @@ function setStreamingView(view) {
     // Update the streaming content with the new view
     const streamingContainer = document.getElementById('streaming-sessions-container');
     if (streamingContainer) {
-        htmx.ajax('GET', `{{ url_for('dashboard.streaming_sessions_partial') }}?view=${view}`, {
+        htmx.ajax('GET', `{{ url_for('streaming.sessions_partial') }}?view=${view}`, {
             target: '#streaming-sessions-container',
             swap: 'innerHTML'
         });
@@ -321,7 +321,7 @@ function setStreamingView(view) {
     // Update the manual refresh button URL
     const manualRefreshButton = document.getElementById('manual-refresh-button');
     if (manualRefreshButton) {
-        manualRefreshButton.setAttribute('hx-get', `{{ url_for('dashboard.streaming_sessions_partial') }}?view=${view}`);
+        manualRefreshButton.setAttribute('hx-get', `{{ url_for('streaming.sessions_partial') }}?view=${view}`);
     }
 
     // Update the auto-refresh URL

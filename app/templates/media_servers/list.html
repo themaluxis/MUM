@@ -115,7 +115,7 @@ function testConnection(serverId) {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing...';
     btn.disabled = true;
     
-    fetch(`/admin/api/servers/${serverId}/test`)
+    fetch(`/api/servers/${serverId}/test`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -139,7 +139,7 @@ function syncLibraries(serverId) {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Syncing...';
     btn.disabled = true;
     
-    fetch(`/admin/api/servers/${serverId}/sync/libraries`)
+    fetch(`/api/servers/${serverId}/sync/libraries`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -164,7 +164,7 @@ function syncUsers(serverId) {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Syncing...';
     btn.disabled = true;
     
-    fetch(`/admin/api/servers/${serverId}/sync/users`)
+    fetch(`/api/servers/${serverId}/sync/users`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {

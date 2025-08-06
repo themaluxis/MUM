@@ -267,7 +267,7 @@ function syncLibraries(serverId) {
     button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Syncing...';
     button.disabled = true;
     
-    fetch(`/admin/api/servers/${serverId}/sync/libraries`)
+    fetch(`/api/servers/${serverId}/sync/libraries`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {

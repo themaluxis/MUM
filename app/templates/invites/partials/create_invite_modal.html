@@ -339,10 +339,15 @@
             // Show loading state
             librariesContainer.innerHTML = '<div class="text-center py-4"><span class="loading loading-spinner loading-sm"></span> Loading libraries...</div>';
             
-            fetch(`/api/server/${serverId}/libraries`)
-                .then(response => response.json())
+            fetch(`/api/servers/${serverId}/libraries`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    if (data.success) {
+                    if (data.success && data.libraries) {
                         // Build library checkboxes HTML
                         let librariesHtml = '';
                         data.libraries.forEach(lib => {
@@ -376,12 +381,13 @@
                             librariesContainer.innerHTML = '<div class="text-center py-4 text-base-content/60">No libraries found</div>';
                         }
                     } else {
-                        librariesContainer.innerHTML = `<div class="text-center py-4 text-error">Error: ${data.error}</div>`;
+                        const errorMsg = data && data.error ? data.error : 'Unknown error occurred';
+                        librariesContainer.innerHTML = `<div class="text-center py-4 text-error">Error: ${errorMsg}</div>`;
                     }
                 })
                 .catch(error => {
                     console.error('Error loading libraries:', error);
-                    librariesContainer.innerHTML = '<div class="text-center py-4 text-error">Failed to load libraries</div>';
+                    librariesContainer.innerHTML = `<div class="text-center py-4 text-error">Failed to load libraries: ${error.message}</div>`;
                 });
         }
 
