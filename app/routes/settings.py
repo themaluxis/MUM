@@ -64,7 +64,7 @@ def general():
         current_app.config['APP_NAME'] = form.app_name.data
         current_app.config['APP_BASE_URL'] = form.app_base_url.data.rstrip('/')
         current_app.config['APP_LOCAL_URL'] = app_local_url
-        current_app.config['SESSION_MONITOR_INTERVAL'] = form.session_monitoring_interval.data
+        current_app.config['SESSION_MONITORING_INTERVAL_SECONDS'] = form.session_monitoring_interval.data
         if hasattr(g, 'app_name'): g.app_name = form.app_name.data
         if hasattr(g, 'app_base_url'): g.app_base_url = form.app_base_url.data.rstrip('/')
         if hasattr(g, 'app_local_url'): g.app_local_url = app_local_url

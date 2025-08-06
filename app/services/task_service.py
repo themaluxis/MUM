@@ -309,14 +309,18 @@ def schedule_all_tasks():
 
     # Get the session monitoring interval from settings
     try:
-        interval_str = Setting.get('SESSION_MONITOR_INTERVAL', '30')
+        # Get session monitoring interval from settings (matches the key used in settings.py)
+        interval_str = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', '30')
+        current_app.logger.info(f"TASK SERVICE: Raw session monitoring setting from DB: '{interval_str}' (type: {type(interval_str)})")
         session_interval_seconds = int(interval_str)
+        current_app.logger.info(f"TASK SERVICE: Converted to int: {session_interval_seconds} seconds")
         if session_interval_seconds < 10: # Enforce minimum
-             current_app.logger.warning(f"Session monitoring interval '{session_interval_seconds}' too low, using 10s.")
+             current_app.logger.warning(f"TASK SERVICE: Session monitoring interval '{session_interval_seconds}' too low, using 10s.")
              session_interval_seconds = 10
-    except (ValueError, TypeError):
+        current_app.logger.info(f"TASK SERVICE: Final session monitoring interval: {session_interval_seconds} seconds")
+    except (ValueError, TypeError) as e:
         session_interval_seconds = 30
-        current_app.logger.warning(f"Invalid SESSION_MONITOR_INTERVAL. Defaulting to {session_interval_seconds}s.")
+        current_app.logger.warning(f"TASK SERVICE: Invalid SESSION_MONITORING_INTERVAL_SECONDS '{interval_str}': {e}. Defaulting to {session_interval_seconds}s.")
 
     # 1. Media Session Monitoring (Plex, Jellyfin, etc.)
     if _schedule_job_if_not_exists_or_reschedule(

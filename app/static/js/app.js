@@ -292,8 +292,33 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initial session count update
     updateSessionBadges();
 
-    // Set up periodic updates every 10 seconds
-    setInterval(updateSessionBadges, 10000);
+    // Set up periodic updates based on server setting
+    // Get the session monitoring interval from the server
+    console.log('FRONTEND: Fetching session monitoring interval from server...');
+    console.log('FRONTEND: Current timestamp:', new Date().toISOString());
+    
+    fetch('/api/session-monitoring-interval')
+        .then(response => {
+            console.log('FRONTEND: API response status:', response.status);
+            console.log('FRONTEND: API response ok:', response.ok);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('FRONTEND: API response data:', data);
+            const intervalSeconds = data.interval || 30;
+            const intervalMs = intervalSeconds * 1000; // Convert seconds to milliseconds
+            console.log(`FRONTEND: Setting session monitoring interval to ${intervalSeconds} seconds (${intervalMs}ms)`);
+            console.log('FRONTEND: Starting setInterval with updateSessionBadges');
+            setInterval(updateSessionBadges, intervalMs);
+        })
+        .catch(error => {
+            console.error('FRONTEND: Failed to get session monitoring interval:', error);
+            console.log('FRONTEND: Using fallback 30s interval');
+            setInterval(updateSessionBadges, 30000); // 30 second fallback
+        });
 
     // Update session count when returning to the page (visibility change)
     document.addEventListener('visibilitychange', function() {

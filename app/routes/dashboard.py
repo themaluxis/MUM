@@ -159,7 +159,7 @@ def settings_index():
 @permission_required('view_streaming')
 def streaming_sessions():
     # Fetch the session monitoring interval from settings
-    default_interval = current_app.config.get('SESSION_MONITORING_INTERVAL_SECONDS', 30) # Default fallback
+    default_interval = 30  # Default fallback - don't use config, get from database
     try:
         interval_seconds_str = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', str(default_interval))
         # Ensure it's a valid integer, otherwise use a sensible default for the template

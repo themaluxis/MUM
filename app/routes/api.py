@@ -21,6 +21,26 @@ def health_check():
     """
     return jsonify(status="ok"), 200
 
+@bp.route('/session-monitoring-interval')
+def session_monitoring_interval():
+    """Get the current session monitoring interval setting"""
+    from app.models import Setting
+    from flask import current_app
+    
+    # Add comprehensive logging
+    raw_setting = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', 30)
+    current_app.logger.info(f"API: Raw session monitoring setting from DB: '{raw_setting}' (type: {type(raw_setting)})")
+    
+    try:
+        interval = int(raw_setting)
+        current_app.logger.info(f"API: Successfully converted to int: {interval}")
+    except (ValueError, TypeError) as e:
+        current_app.logger.warning(f"API: Failed to convert '{raw_setting}' to int: {e}, using default 30")
+        interval = 30
+    
+    current_app.logger.info(f"API: Returning session monitoring interval: {interval} seconds")
+    return jsonify({'interval': interval})
+
 @bp.route('/check_server_status/<int:server_id>', methods=['POST'])
 @login_required
 @csrf.exempt # Assuming CSRF is handled or exempted appropriately for this API endpoint
