@@ -265,7 +265,7 @@ function syncLibraries(serverId) {
 }
 
 function syncUsers(serverId) {
-    fetch(`/admin/api/servers/${serverId}/sync/users`)
+    fetch(`/api/servers/${serverId}/sync/users`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
