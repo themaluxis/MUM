@@ -104,7 +104,7 @@ class PluginManager:
                     supported_features=plugin_info['supported_features'],
                     config_schema=plugin_info.get('config_schema', {}),
                     author='MUM Team',
-                    license='MIT'
+                    license='None'
                 )
                 db.session.add(plugin)
         

@@ -249,7 +249,9 @@ function toggleEventTypeCheckboxesDisabled(clearAllChecked) {
 
 // Plugin Info Modal Functions (for plugins tab)
 function showPluginInfo(pluginId) {
-    fetch(`/admin/plugins/${pluginId}/info`)
+    fetch(`/admin/plugins/${pluginId}/info?t=${Date.now()}`, {
+        cache: 'no-cache'
+    })
         .then(response => response.json())
         .then(data => {
             document.getElementById('pluginInfoTitle').textContent = data.name || 'Unknown Plugin';
@@ -269,8 +271,8 @@ function showPluginInfo(pluginId) {
                     
                     <div>
                         <strong>Status:</strong> 
-                        <span class="badge badge-${data.is_enabled ? 'success' : 'neutral'} badge-sm">
-                            ${data.is_enabled ? 'Enabled' : 'Disabled'}
+                        <span class="badge badge-${data.enabled ? 'success' : 'neutral'} badge-sm">
+                            ${data.enabled ? 'Enabled' : 'Disabled'}
                         </span>
                     </div>
                     

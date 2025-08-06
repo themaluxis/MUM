@@ -154,6 +154,10 @@ def plugin_info(plugin_id):
     if not plugin_info:
         return jsonify({'error': 'Plugin not found'}), 404
     
+    # Ensure we get fresh data from database
+    db.session.commit()  # Commit any pending changes
+    db.session.close()   # Close current session to force fresh data
+    
     # Get current state from database
     db_plugin = Plugin.query.filter_by(plugin_id=plugin_id).first()
     if db_plugin:
