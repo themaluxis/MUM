@@ -83,10 +83,11 @@ def index():
                 # Extract the actual server name BEFORE overriding the 'name' field
                 actual_server_name = status.get('name', server.name)
                 
-                # DEBUG: Log what we're getting from each service (remove these lines after testing)
-                # current_app.logger.info(f"DEBUG SERVER INFO - Server: {server.name} ({server.service_type.value})")
-                # current_app.logger.info(f"DEBUG SERVER INFO - Raw status: {status}")
-                # current_app.logger.info(f"DEBUG SERVER INFO - Extracted actual_server_name: '{actual_server_name}'")
+                # DEBUG: Log what we're getting from each service
+                current_app.logger.info(f"DEBUG SERVER INFO - Server: {server.name} ({server.service_type.value})")
+                current_app.logger.info(f"DEBUG SERVER INFO - Raw status keys: {list(status.keys()) if status else 'None'}")
+                current_app.logger.info(f"DEBUG SERVER INFO - Status name: '{status.get('name')}', version: '{status.get('version')}'")
+                current_app.logger.info(f"DEBUG SERVER INFO - Extracted actual_server_name: '{actual_server_name}'")
                 
                 status['server_id'] = server.id
                 status['custom_name'] = server.name  # Custom nickname from app

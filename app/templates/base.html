@@ -135,7 +135,7 @@
     {% block modals %}{% endblock modals %}
 
     <div id="toast-container" class="toast toast-bottom toast-center sm:toast-end z-1100 space-y-2"></div>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20250102-session-fix&t={{ moment().timestamp() if moment else '12345' }}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js"
         integrity="sha512-2kIcAizYXhIn8TzUvqzEDZNuDZ+aW7yE/+f1HJHXFjQcGNfv1kqzJSTBRBSlOgp6B/KZsz1K0a3ZTqP9dnxioQ=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>

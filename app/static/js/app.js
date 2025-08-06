@@ -229,15 +229,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Session Count Badge Monitoring ---
     function updateSessionBadges() {
-        // Only update if user is authenticated (badges exist)
-        const desktopBadge = document.getElementById('streaming-badge-desktop');
-        const mobileBadge = document.getElementById('streaming-badge-mobile');
-        
-        if (!desktopBadge && !mobileBadge) {
-            return; // No badges found, user might not be logged in
-        }
+        // Check if navbar stream badge is enabled first
+        fetch('/api/navbar-stream-badge-status')
+            .then(response => response.json())
+            .then(statusData => {
+                const desktopBadge = document.getElementById('streaming-badge-desktop');
+                const mobileBadge = document.getElementById('streaming-badge-mobile');
+                
+                if (!desktopBadge && !mobileBadge) {
+                    return; // No badges found, user might not be logged in
+                }
 
-        fetch('/api/session-count', {
+                if (!statusData.enabled) {
+                    // Hide badges when feature is disabled
+                    if (desktopBadge) desktopBadge.style.display = 'none';
+                    if (mobileBadge) mobileBadge.style.display = 'none';
+                    console.debug('FRONTEND: Navbar stream badge disabled - hiding badges');
+                    return;
+                }
+
+                console.debug('FRONTEND: Requesting session count (navbar badge enabled)');
+
+                // Fetch session count
+                fetch('/api/session-count', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -248,6 +262,13 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(data => {
             if (data.success) {
                 const count = data.count;
+                
+                // Log server-side throttling info
+                if (data.cached) {
+                    console.debug(`FRONTEND: Using cached session data (${data.time_since_last_check}s old)`);
+                } else {
+                    console.debug(`FRONTEND: Fresh session data fetched`);
+                }
                 
                 // Update both desktop and mobile badges
                 [desktopBadge, mobileBadge].forEach(badge => {
@@ -283,47 +304,55 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
         })
-        .catch(error => {
-            console.debug('Session count update failed:', error);
-            // Silently fail - don't show errors for this background task
-        });
+                .catch(error => {
+                    console.debug('Session count update failed:', error);
+                    // Silently fail - don't show errors for this background task
+                });
+            })
+            .catch(error => {
+                console.debug('Error checking navbar badge status:', error);
+            });
     }
 
     // Initial session count update
     updateSessionBadges();
 
-    // Set up periodic updates based on server setting
-    // Get the session monitoring interval from the server
-    console.log('FRONTEND: Fetching session monitoring interval from server...');
-    console.log('FRONTEND: Current timestamp:', new Date().toISOString());
+    // Set up periodic updates - check if navbar stream badge is enabled
+    console.log('FRONTEND: Setting up session monitoring...');
     
-    fetch('/api/session-monitoring-interval')
-        .then(response => {
-            console.log('FRONTEND: API response status:', response.status);
-            console.log('FRONTEND: API response ok:', response.ok);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
+    // Check if navbar stream badge is enabled
+    fetch('/api/navbar-stream-badge-status')
+        .then(response => response.json())
         .then(data => {
-            console.log('FRONTEND: API response data:', data);
-            const intervalSeconds = data.interval || 30;
-            const intervalMs = intervalSeconds * 1000; // Convert seconds to milliseconds
-            console.log(`FRONTEND: Setting session monitoring interval to ${intervalSeconds} seconds (${intervalMs}ms)`);
-            console.log('FRONTEND: Starting setInterval with updateSessionBadges');
-            setInterval(updateSessionBadges, intervalMs);
+            if (data.enabled) {
+                console.log('FRONTEND: Navbar stream badge enabled - using 5s updates');
+                setInterval(updateSessionBadges, 5000); // 5 seconds for responsive navbar
+            } else {
+                console.log('FRONTEND: Navbar stream badge disabled - using configured interval');
+                // Get the configured session monitoring interval
+                fetch('/api/session-monitoring-interval')
+                    .then(response => response.json())
+                    .then(intervalData => {
+                        const intervalSeconds = intervalData.interval || 30;
+                        const intervalMs = intervalSeconds * 1000;
+                        console.log(`FRONTEND: Setting timer interval to ${intervalSeconds} seconds`);
+                        setInterval(updateSessionBadges, intervalMs);
+                    })
+                    .catch(error => {
+                        console.error('FRONTEND: Failed to get interval, using 30s fallback:', error);
+                        setInterval(updateSessionBadges, 30000);
+                    });
+            }
         })
         .catch(error => {
-            console.error('FRONTEND: Failed to get session monitoring interval:', error);
-            console.log('FRONTEND: Using fallback 30s interval');
-            setInterval(updateSessionBadges, 30000); // 30 second fallback
+            console.error('FRONTEND: Failed to check navbar badge status, using 30s fallback:', error);
+            setInterval(updateSessionBadges, 30000);
         });
 
-    // Update session count when returning to the page (visibility change)
+    // Update session count when returning to the page (visibility change) - respects throttling
     document.addEventListener('visibilitychange', function() {
         if (!document.hidden) {
-            updateSessionBadges();
+            updateSessionBadges(); // Will be throttled automatically
         }
     });
 

@@ -54,6 +54,7 @@ def view_user(user_id):
     
     # Populate dynamic choices for the form - only show libraries from servers this user has access to
     from app.models_media_services import UserMediaAccess
+    from app.services.media_service_factory import MediaServiceFactory
     user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
     
     available_libraries = {}
@@ -90,21 +91,51 @@ def view_user(user_id):
                     user.access_expires_at = new_expiry_datetime
                     access_expiration_changed = True
             
-            original_library_ids = set(user.allowed_library_ids or [])
+            # Get current library IDs from UserMediaAccess records
+            current_library_ids = []
+            for access in user_access_records:
+                current_library_ids.extend(access.allowed_library_ids or [])
+            
+            original_library_ids = set(current_library_ids)
             new_library_ids_from_form = set(form.libraries.data or [])
             libraries_changed = (original_library_ids != new_library_ids_from_form)
 
-            update_data = {
-                'notes': form.notes.data,
-                'is_discord_bot_whitelisted': form.is_discord_bot_whitelisted.data,
-                'is_purge_whitelisted': form.is_purge_whitelisted.data,
-                'admin_id': current_user.id,
-                'new_library_ids': list(new_library_ids_from_form) if libraries_changed else None,
-                'allow_downloads': form.allow_downloads.data,
-                'allow_4k_transcode': form.allow_4k_transcode.data
-            }
+            # Update user fields directly (not library-related)
+            user.notes = form.notes.data
+            user.is_discord_bot_whitelisted = form.is_discord_bot_whitelisted.data
+            user.is_purge_whitelisted = form.is_purge_whitelisted.data
+            user.allow_4k_transcode = form.allow_4k_transcode.data
             
-            user_service.update_user_details(user_id=user.id, **update_data)
+            # Update library access in UserMediaAccess records if changed
+            if libraries_changed:
+                for access in user_access_records:
+                    try:
+                        # Get the service for this server
+                        service = MediaServiceFactory.create_service_from_db(access.server)
+                        if service:
+                            # Get libraries available on this server
+                            server_libraries = service.get_libraries()
+                            server_lib_ids = [lib.get('external_id') or lib.get('id') for lib in server_libraries]
+                            
+                            # Filter the new library IDs to only include ones available on this server
+                            new_libs_for_this_server = [lib_id for lib_id in new_library_ids_from_form if lib_id in server_lib_ids]
+                            
+                            # Update the access record
+                            access.allowed_library_ids = new_libs_for_this_server
+                            access.updated_at = datetime.utcnow()
+                            
+                            # Update the media service if it supports user access updates
+                            if hasattr(service, 'update_user_access'):
+                                # For Plex users, use plex_user_id; for others, use the external_user_id
+                                user_identifier = user.plex_user_id if user.plex_user_id else access.external_user_id
+                                if user_identifier:
+                                    service.update_user_access(user_identifier, new_libs_for_this_server)
+                    except Exception as e:
+                        current_app.logger.error(f"Error updating library access for server {access.server.name}: {e}")
+                
+                log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' library access updated", user_id=user.id, admin_id=current_user.id)
+            
+            user.updated_at = datetime.utcnow()
             
             if access_expiration_changed:
                 if user.access_expires_at is None:
@@ -122,7 +153,13 @@ def view_user(user_id):
                 
                 # Re-populate the dynamic choices and data for the re-rendered form
                 form_after_save.libraries.choices = list(available_libraries.items())
-                form_after_save.libraries.data = list(user.allowed_library_ids or [])
+                
+                # Get current library IDs from UserMediaAccess records for the re-rendered form
+                current_library_ids_after_save = []
+                updated_user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
+                for access in updated_user_access_records:
+                    current_library_ids_after_save.extend(access.allowed_library_ids or [])
+                form_after_save.libraries.data = list(set(current_library_ids_after_save))
 
                 # OOB-SWAP LOGIC
                 # 1. Render the updated form for the modal (the primary target)
@@ -131,15 +168,33 @@ def view_user(user_id):
                 # 2. Render the updated user card for the OOB swap
                 # We need the same context that the main user list uses for a card
                 from app.models_media_services import UserMediaAccess
-                user_library_access = UserMediaAccess.query.filter_by(user_id=user.id).first()
+                
+                # Get all user access records for proper library display
+                all_user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
                 user_sorted_libraries = {}
-                if user_library_access:
-                    # Handle special case for Jellyfin users with '*' (all libraries access)
-                    if user_library_access.allowed_library_ids == ['*']:
-                        lib_names = ['All Libraries']
-                    else:
-                        lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in user_library_access.allowed_library_ids]
-                    user_sorted_libraries[user.id] = sorted(lib_names, key=str.lower)
+                user_service_types = {}
+                user_server_names = {}
+                
+                # Collect library IDs from all access records
+                all_library_ids = []
+                user_service_types[user.id] = []
+                user_server_names[user.id] = []
+                
+                for access in all_user_access_records:
+                    all_library_ids.extend(access.allowed_library_ids or [])
+                    # Track service types
+                    if access.server.service_type not in user_service_types[user.id]:
+                        user_service_types[user.id].append(access.server.service_type)
+                    # Track server names
+                    if access.server.name not in user_server_names[user.id]:
+                        user_server_names[user.id].append(access.server.name)
+                
+                # Handle special case for Jellyfin users with '*' (all libraries access)
+                if all_library_ids == ['*']:
+                    lib_names = ['All Libraries']
+                else:
+                    lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in all_library_ids]
+                user_sorted_libraries[user.id] = sorted(lib_names, key=str.lower)
                 
                 admins_by_uuid = {admin.plex_uuid: admin for admin in AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()}
 
@@ -147,6 +202,8 @@ def view_user(user_id):
                     'users/partials/_single_user_card.html',
                     user=user,
                     user_sorted_libraries=user_sorted_libraries,
+                    user_service_types=user_service_types,
+                    user_server_names=user_server_names,
                     admins_by_uuid=admins_by_uuid,
                     current_user=current_user 
                 )
@@ -184,7 +241,12 @@ def view_user(user_id):
             return render_template('users/partials/settings_tab.html', form=form, user=user), 422
 
     if request.method == 'GET':
-        form.libraries.data = list(user.allowed_library_ids or [])
+        # Get current library IDs from UserMediaAccess records (same as quick edit form)
+        current_library_ids = []
+        for access in user_access_records:
+            current_library_ids.extend(access.allowed_library_ids or [])
+        
+        form.libraries.data = list(set(current_library_ids))  # Remove duplicates
         # Remove the old access_expires_in_days logic since we're now using DateField
         # The form will automatically populate access_expires_at from the user object via obj=user
 

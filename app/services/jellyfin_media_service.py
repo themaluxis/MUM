@@ -179,8 +179,8 @@ class JellyfinMediaService(BaseMediaService):
             # Get system info from System/Info endpoint (this contains the version)
             info = self._make_request('System/Info')
             
-            # Use the MUM server nickname instead of Jellyfin's internal server name
-            server_name = self.name  # This is the nickname from MUM database
+            # Use the actual Jellyfin server name from System/Info
+            server_name = info.get('ServerName', self.name)
             
             # Get version from System/Info - try different possible field names
             version = (info.get('Version') or 
@@ -191,7 +191,7 @@ class JellyfinMediaService(BaseMediaService):
             
             # Debug logging to see what's available
             self.log_info(f"Jellyfin system info keys: {list(info.keys())}")
-            self.log_info(f"Jellyfin version found: {version}")
+            self.log_info(f"Jellyfin server name: '{server_name}', version: '{version}'")
             
             return True, f"Connected to {server_name} (v{version})"
         except Exception as e:
@@ -511,70 +511,41 @@ class JellyfinMediaService(BaseMediaService):
     def get_server_info(self) -> Dict[str, Any]:
         """Get Jellyfin server information"""
         try:
-            client = self._get_client()
+            # Use the same method as plugin management for consistency
+            info = self._make_request('System/Info')
             
-            # Try to use official client methods if available
-            if hasattr(client, 'jellyfin') and hasattr(client.jellyfin, 'get_system_info'):
-                info = client.jellyfin.get_system_info()
-            else:
-                info = self._make_request('System/Info')
+            # Extract actual server name from System/Info (same as plugin management)
+            actual_server_name = info.get('ServerName', self.name)
             
-            # Try multiple endpoints to find the server name
-            try:
-                # Try System/Configuration
-                config_info = self._make_request('System/Configuration')
-                self.log_info(f"DEBUG JELLYFIN CONFIG - ServerName from config: '{config_info.get('ServerName', 'NOT_FOUND')}'")
-                
-                # Try Branding/Configuration which might have display name
-                branding_info = self._make_request('Branding/Configuration')
-                self.log_info(f"DEBUG JELLYFIN BRANDING - CustomCss: '{branding_info.get('CustomCss', 'NOT_FOUND')}'")
-                self.log_info(f"DEBUG JELLYFIN BRANDING - LoginDisclaimer: '{branding_info.get('LoginDisclaimer', 'NOT_FOUND')}'")
-                
-                # Try System/Configuration/MetadataOptions
-                try:
-                    metadata_info = self._make_request('System/Configuration/MetadataOptions')
-                    self.log_info(f"DEBUG JELLYFIN METADATA - Response type: {type(metadata_info)}")
-                except:
-                    pass
-                
-                # Check if ServerName is in config_info
-                if not info.get('ServerName') and config_info.get('ServerName'):
-                    info['ServerName'] = config_info.get('ServerName')
-                    self.log_info(f"DEBUG JELLYFIN CONFIG - Using ServerName from config: '{config_info.get('ServerName')}'")
-                    
-            except Exception as e:
-                self.log_info(f"DEBUG JELLYFIN CONFIG - Could not fetch additional config: {e}")
+            # Get version from System/Info - try different possible field names
+            version = (info.get('Version') or 
+                      info.get('ServerVersion') or 
+                      info.get('ApplicationVersion') or 
+                      info.get('ProductVersion') or 
+                      'Unknown')
             
-            # Extract server name and handle empty values
-            # Try multiple possible fields for server name
-            server_name = (info.get('ServerName') or 
-                          info.get('Name') or 
-                          info.get('LocalAddress') or 
-                          self.name)
-            
-            # Handle empty values
-            if not server_name or server_name.strip() == '':
-                server_name = self.name
-            
-            # DEBUG: Log what fields are available to find the server name
-            self.log_info(f"DEBUG JELLYFIN SERVER NAME - Available fields: ServerName='{info.get('ServerName')}', Name='{info.get('Name')}', LocalAddress='{info.get('LocalAddress')}'")
-            self.log_info(f"DEBUG JELLYFIN SERVER NAME - Using: '{server_name}'")
+            self.log_info(f"Jellyfin server info - ServerName: '{actual_server_name}', Version: '{version}'")
             
             return {
-                'name': server_name,
+                'name': actual_server_name,  # Use actual server name from API
                 'url': self.url,
                 'service_type': self.service_type.value,
                 'online': True,
-                'version': info.get('Version', 'Unknown'),
-                'server_id': info.get('Id', '')
+                'version': version,
+                'server_id': info.get('Id', ''),
+                'actual_server_name': actual_server_name,  # Also provide as separate field for consistency
+                'error_message': None
             }
-        except:
+        except Exception as e:
+            self.log_error(f"Error getting server info: {e}")
             return {
                 'name': self.name,
                 'url': self.url,
                 'service_type': self.service_type.value,
                 'online': False,
-                'version': 'Unknown'
+                'version': 'Unknown',
+                'actual_server_name': self.name,
+                'error_message': str(e)
             }
     
     def get_jellyfin_client(self) -> JellyfinClient:

@@ -41,6 +41,14 @@ def session_monitoring_interval():
     current_app.logger.info(f"API: Returning session monitoring interval: {interval} seconds")
     return jsonify({'interval': interval})
 
+@bp.route('/navbar-stream-badge-status')
+def navbar_stream_badge_status():
+    """Get the current navbar stream badge setting"""
+    from app.models import Setting
+    
+    enabled = Setting.get_bool('ENABLE_NAVBAR_STREAM_BADGE', False)
+    return jsonify({'enabled': enabled})
+
 @bp.route('/check_server_status/<int:server_id>', methods=['POST'])
 @login_required
 @csrf.exempt # Assuming CSRF is handled or exempted appropriately for this API endpoint
@@ -330,19 +338,61 @@ def geoip_lookup(ip_address):
 @login_required
 def session_count():
     """
-    API endpoint to get the current count of active streaming sessions.
+    API endpoint to get the current count of active streaming sessions with server-side throttling.
     Returns JSON with the total session count.
     """
     try:
-        # Get active sessions from all services
-        active_sessions_data = MediaServiceManager.get_all_active_sessions()
+        from app.models import Setting
+        import time
         
-        # Count total sessions
-        total_sessions = len(active_sessions_data)
+        # Check if navbar stream badge is enabled
+        navbar_badge_enabled = Setting.get_bool('ENABLE_NAVBAR_STREAM_BADGE', False)
+        
+        if navbar_badge_enabled:
+            # When navbar badge is enabled, use 5-second interval and always fetch fresh data
+            interval_seconds = 5
+            current_app.logger.debug(f"API: Navbar stream badge enabled, using 5s interval")
+        else:
+            # Use configured session monitoring interval
+            interval_str = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', '30')
+            try:
+                interval_seconds = int(interval_str)
+            except (ValueError, TypeError):
+                interval_seconds = 30
+            current_app.logger.debug(f"API: Using configured interval: {interval_seconds}s")
+        
+        # Check if we have cached session data that's still fresh
+        cache_key = 'last_session_check'
+        last_check_time = getattr(session_count, cache_key, 0)
+        current_time = time.time()
+        time_since_last_check = current_time - last_check_time
+        
+        current_app.logger.debug(f"API: Session count requested, {time_since_last_check:.1f}s since last check (interval: {interval_seconds}s)")
+        
+        # Only fetch fresh data if enough time has passed
+        if time_since_last_check >= interval_seconds:
+            current_app.logger.info(f"API: Fetching fresh session data ({time_since_last_check:.1f}s >= {interval_seconds}s)")
+            
+            # Get active sessions from all services
+            active_sessions_data = MediaServiceManager.get_all_active_sessions()
+            
+            # Count total sessions
+            total_sessions = len(active_sessions_data)
+            
+            # Cache the result and timestamp
+            setattr(session_count, cache_key, current_time)
+            setattr(session_count, 'cached_count', total_sessions)
+            
+        else:
+            # Use cached data
+            total_sessions = getattr(session_count, 'cached_count', 0)
+            current_app.logger.debug(f"API: Using cached session data: {total_sessions} sessions")
         
         return jsonify({
             'success': True,
-            'count': total_sessions
+            'count': total_sessions,
+            'cached': time_since_last_check < interval_seconds,
+            'time_since_last_check': round(time_since_last_check, 1)
         })
     except Exception as e:
         current_app.logger.error(f"Error getting session count: {e}")

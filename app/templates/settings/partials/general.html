@@ -35,8 +35,24 @@
         </div>
 
         <div class="form-control">
+            <label class="label cursor-pointer justify-start">
+                {{ form.enable_navbar_stream_badge(class="toggle toggle-primary mr-3", id="enable_navbar_stream_badge") }}
+                <span class="label-text font-medium">{{ form.enable_navbar_stream_badge.label.text }}</span>
+            </label>
+            <label class="label">
+                <span class="label-text-alt whitespace-normal">{{ form.enable_navbar_stream_badge.description }}</span>
+            </label>
+            <div class="alert alert-warning mt-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                <span class="text-sm">
+                    <strong>Performance Warning:</strong> Enabling this feature checks for streams every 5 seconds, which may cause rate limiting from your media servers and increased load on the MUM server. Only enable if you need real-time stream count updates.
+                </span>
+            </div>
+        </div>
+
+        <div class="form-control">
             {{ form.session_monitoring_interval.label(class="label whitespace-normal") }}
-            {{ form.session_monitoring_interval(class="input input-bordered w-full " + ("input-error" if form.session_monitoring_interval.errors else "")) }}
+            {{ form.session_monitoring_interval(class="input input-bordered w-full " + ("input-error" if form.session_monitoring_interval.errors else ""), id="session_monitoring_interval") }}
             {% if form.session_monitoring_interval.errors %}
                 <span class="label-text-alt text-error mt-1">{{ form.session_monitoring_interval.errors[0] }}</span>
             {% else %}
@@ -59,3 +75,30 @@
         </div>
     </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const navbarToggle = document.getElementById('enable_navbar_stream_badge');
+    const intervalInput = document.getElementById('session_monitoring_interval');
+    
+    function updateIntervalField() {
+        if (navbarToggle.checked) {
+            intervalInput.disabled = true;
+            intervalInput.classList.add('input-disabled');
+            intervalInput.parentElement.querySelector('.label-text-alt').textContent = 
+                'Disabled when Nav Bar Stream Badge is enabled. Badge updates every 5 seconds.';
+        } else {
+            intervalInput.disabled = false;
+            intervalInput.classList.remove('input-disabled');
+            intervalInput.parentElement.querySelector('.label-text-alt').textContent = 
+                'How often to check for new media sessions (in seconds). Disabled when Nav Bar Stream Badge is enabled.';
+        }
+    }
+    
+    // Initial state
+    updateIntervalField();
+    
+    // Listen for toggle changes
+    navbarToggle.addEventListener('change', updateIntervalField);
+});
+</script>

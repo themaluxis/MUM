@@ -145,11 +145,27 @@ def disable_plugin(plugin_id):
 @setup_required
 @permission_required('manage_plugins')
 def plugin_info(plugin_id):
-    """Get detailed plugin information"""
+    """Get detailed plugin information with current database state"""
+    from app.models_plugins import Plugin
+    
+    # Get plugin info from manager
     plugin_info = plugin_manager.get_plugin_info(plugin_id)
     
     if not plugin_info:
         return jsonify({'error': 'Plugin not found'}), 404
+    
+    # Get current state from database
+    db_plugin = Plugin.query.filter_by(plugin_id=plugin_id).first()
+    if db_plugin:
+        # Override the enabled state with actual database state
+        plugin_info['enabled'] = db_plugin.is_enabled
+        plugin_info['servers_count'] = db_plugin.servers_count
+        current_app.logger.debug(f"Plugin {plugin_id} - DB state: enabled={db_plugin.is_enabled}, servers={db_plugin.servers_count}")
+    else:
+        # Plugin not in database, so it's not enabled
+        plugin_info['enabled'] = False
+        plugin_info['servers_count'] = 0
+        current_app.logger.debug(f"Plugin {plugin_id} - Not in database, setting enabled=False")
     
     return jsonify(plugin_info)
 
