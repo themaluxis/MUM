@@ -84,7 +84,7 @@
                 {% set service_color = "#6b7280" %}
                 {% set service_bg_class = "gray" %}
             {% endif %}
-            <tr id="user-row-{{ user.id }}" class="hover:bg-base-300 user-row" data-user-id="{{ user.id }}" data-service-color="{{ service_color }}" data-service-class="{{ service_bg_class }}">
+            <tr id="user-row-{{ user.id }}" class="hover:bg-base-300 user-row user-row-clickable cursor-pointer" data-user-id="{{ user.id }}" data-service-color="{{ service_color }}" data-service-class="{{ service_bg_class }}">
                 <td class="text-center">
                     <input type="checkbox" class="checkbox checkbox-xs sm:checkbox-sm user-select-checkbox" data-user-id="{{ user.id }}" style="--input-color: {{ service_color }}; --chkfg: white;">
                 </td>
@@ -365,6 +365,27 @@
                 }
             });
         });
+    });
+    
+    // Add click-to-select functionality for table rows
+    document.body.addEventListener('click', function(event) {
+        // Check if the clicked element is within a user row
+        const row = event.target.closest('.user-row-clickable');
+        if (!row) return;
+        
+        // Don't trigger if clicking on interactive elements
+        if (event.target.closest('input, button, a, .btn, .checkbox, .link')) {
+            return;
+        }
+        
+        // Find the checkbox for this row
+        const checkbox = row.querySelector('.user-select-checkbox');
+        if (checkbox) {
+            // Toggle the checkbox
+            checkbox.checked = !checkbox.checked;
+            // Trigger the change event to update everything
+            checkbox.dispatchEvent(new Event('change'));
+        }
     });
     
     function updateRowSelection(checkbox) {
