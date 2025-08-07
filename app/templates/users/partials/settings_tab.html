@@ -18,7 +18,9 @@
                 <div class="form-control w-full">
                     <label class="label cursor-pointer justify-start">
                         {{ form.is_discord_bot_whitelisted(class="toggle toggle-primary mr-3") }}
-                        <span class="label-text font-medium">{{ form.is_discord_bot_whitelisted.label.text }}</span>
+                        <span class="label-text font-medium">
+                            <i class="fa-brands fa-discord mr-2 text-primary"></i>{{ form.is_discord_bot_whitelisted.label.text }}
+                        </span>
                     </label>
                     <p class="text-xs text-base-content/60 pl-16">{{ form.is_discord_bot_whitelisted.description }}</p>
                 </div>
@@ -26,7 +28,9 @@
                 <div class="form-control w-full">
                     <label class="label cursor-pointer justify-start">
                         {{ form.is_purge_whitelisted(class="toggle toggle-accent mr-3") }}
-                        <span class="label-text font-medium">{{ form.is_purge_whitelisted.label.text }}</span>
+                        <span class="label-text font-medium">
+                            <i class="fa-solid fa-shield-halved mr-2 text-accent"></i>{{ form.is_purge_whitelisted.label.text }}
+                        </span>
                     </label>
                     <p class="text-xs text-base-content/60 pl-16">{{ form.is_purge_whitelisted.description }}</p>
                 </div>
@@ -41,7 +45,9 @@
                         <label class="label cursor-not-allowed justify-start">
                             {# The 'disabled' attribute is still correctly applied here #}
                             {{ form.allow_downloads(class="toggle toggle-primary mr-3", disabled=True) }}
-                            <span class="label-text font-medium">{{ form.allow_downloads.label.text }}</span>
+                            <span class="label-text font-medium">
+                                <i class="fa-solid fa-download mr-2 text-accent opacity-50"></i>{{ form.allow_downloads.label.text }}
+                            </span>
                         </label>
                         <p class="text-xs text-base-content/60 pl-16">{{ form.allow_downloads.description }}</p>
                     </div>
@@ -49,7 +55,9 @@
                 <div class="form-control w-full mb-4">
                     <label class="label cursor-pointer justify-start">
                         {{ form.allow_4k_transcode(class="toggle toggle-primary mr-3") }}
-                        <span class="label-text font-medium">{{ form.allow_4k_transcode.label.text }}</span>
+                        <span class="label-text font-medium">
+                            <i class="fa-solid fa-film mr-2 text-primary"></i>{{ form.allow_4k_transcode.label.text }}
+                        </span>
                     </label>
                     <p class="text-xs text-base-content/60 pl-16">{{ form.allow_4k_transcode.description }}</p>
                 </div>
