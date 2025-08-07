@@ -15,15 +15,15 @@
         <!-- Simple Layout for Single Server -->
         <div class="card bg-base-200 shadow-xl">
             <div class="card-body">
-                <div class="overflow-x-auto">
-                    <table class="table table-zebra w-full">
+                <div class="overflow-x-auto w-full">
+                    <table class="table table-zebra w-full min-w-max">
                         <thead>
                             <tr>
-                                <th>Library Name</th>
-                                <th>Server</th>
-                                <th>Library Type</th>
-                                <th>Total Items</th>
-                                <th>Actions</th>
+                                <th class="min-w-32">Library Name</th>
+                                <th class="min-w-32">Server</th>
+                                <th class="min-w-24">Library Type</th>
+                                <th class="min-w-20">Total Items</th>
+                                <th class="min-w-16">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -98,7 +98,7 @@
                             <span class="badge badge-secondary badge-sm">{{ service_data.servers|length }} server{{ 's' if service_data.servers|length != 1 else '' }}</span>
                         </div>
                     </div>
-                    <div class="collapse-content">
+                    <div class="collapse-content overflow-auto">
                         {% for server_name, server_data in service_data.servers.items() %}
                         <div class="mb-4">
                             <!-- Server Header -->
@@ -127,14 +127,14 @@
 
                             <!-- Libraries Table for this Server -->
                             {% if server_data.libraries %}
-                            <div class="overflow-x-auto">
-                                <table class="table table-zebra w-full">
+                            <div class="overflow-x-auto w-full">
+                                <table class="table table-zebra w-full min-w-max">
                                     <thead>
                                         <tr>
-                                            <th>Library Name</th>
-                                            <th>Library Type</th>
-                                            <th>Total Items</th>
-                                            <th>Actions</th>
+                                            <th class="min-w-32">Library Name</th>
+                                            <th class="min-w-24">Library Type</th>
+                                            <th class="min-w-20">Total Items</th>
+                                            <th class="min-w-16">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>

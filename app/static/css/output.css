@@ -3663,6 +3663,18 @@
   .min-w-0 {
     min-width: calc(var(--spacing) * 0);
   }
+  .min-w-16 {
+    min-width: calc(var(--spacing) * 16);
+  }
+  .min-w-20 {
+    min-width: calc(var(--spacing) * 20);
+  }
+  .min-w-24 {
+    min-width: calc(var(--spacing) * 24);
+  }
+  .min-w-32 {
+    min-width: calc(var(--spacing) * 32);
+  }
   .min-w-\[100px\] {
     min-width: 100px;
   }
