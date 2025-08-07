@@ -727,6 +727,26 @@ def mass_edit_users():
             lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
         user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
     
+    # Build user_service_types for template context
+    user_service_types = {}  # Track which services each user belongs to
+    user_server_names = {}   # Track server names for each user
+    
+    # Get all user access records to determine service types
+    all_user_access = UserMediaAccess.query.filter(
+        UserMediaAccess.user_id.in_([user.id for user in users_pagination.items])
+    ).all()
+    
+    for access in all_user_access:
+        if access.user_id not in user_service_types:
+            user_service_types[access.user_id] = []
+            user_server_names[access.user_id] = []
+        
+        if access.server.service_type not in user_service_types[access.user_id]:
+            user_service_types[access.user_id].append(access.server.service_type)
+        
+        if access.server.name not in user_server_names[access.user_id]:
+            user_server_names[access.user_id].append(access.server.name)
+
     response_html = render_template('users/partials/user_list_content.html',
                                     users=users_pagination,
                                     users_count=users_count,
@@ -737,7 +757,9 @@ def mass_edit_users():
                                     current_per_page=items_per_page,
                                     stream_stats=stream_stats,
                                     last_ips=last_ips,
-                                    admins_by_uuid=admins_by_uuid)
+                                    admins_by_uuid=admins_by_uuid,
+                                    user_service_types=user_service_types,
+                                    user_server_names=user_server_names)
     
     response = make_response(response_html)
     toast_payload = {"showToastEvent": {"message": toast_message, "category": toast_category}}

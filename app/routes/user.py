@@ -217,7 +217,7 @@ def view_user(user_id):
                 # Create the toast message payload
                 toast_payload = {
                     "showToastEvent": {
-                        "message": f"User '{user.plex_username}' updated successfully.",
+                        "message": f"User '{user.get_display_name()}' updated successfully.",
                         "category": "success"
                     }
                 }
@@ -228,12 +228,12 @@ def view_user(user_id):
                 return response
             else:
                 # Fallback for standard form submissions remains the same
-                flash(f"User '{user.plex_username}' updated successfully.", "success")
+                flash(f"User '{user.get_display_name()}' updated successfully.", "success")
                 return redirect(url_for('user.view_user', user_id=user.id, tab='settings'))
             
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f"Error updating user {user.plex_username}: {e}", exc_info=True)
+            current_app.logger.error(f"Error updating user {user.get_display_name()}: {e}", exc_info=True)
             flash(f"Error updating user: {e}", "danger")
 
     if request.method == 'POST' and form.errors:

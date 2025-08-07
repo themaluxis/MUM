@@ -4375,6 +4375,9 @@
   .p-8 {
     padding: calc(var(--spacing) * 8);
   }
+  .p-16 {
+    padding: calc(var(--spacing) * 16);
+  }
   .menu-title {
     padding-inline: calc(0.25rem * 3);
     padding-block: calc(0.25rem * 2);

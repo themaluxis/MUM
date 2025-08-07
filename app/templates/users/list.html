@@ -10,6 +10,8 @@
                     hx-post="{{ url_for('users.sync_all_users') }}"
                     hx-target="#sync-noop-target"
                     hx-swap="innerHTML"
+                    hx-on::before-request="showSyncLoading()"
+                    hx-on::after-request="hideSyncLoading()"
                     title="Refresh user list from all enabled services"> 
                 <span class="sync-loader htmx-indicator loading loading-spinner loading-xs mr-2"></span>
                 <span class="sync-icon default-icon-state"><i class="fa-solid fa-sync mr-2"></i></span>
@@ -169,6 +171,10 @@
                 <span class="hidden sm:inline-block">Mass Edit (<span id="selected-users-count" class="contents">0</span> selected)</span>
                 <span class="inline-block sm:hidden">(<span id="selected-users-count-mobile" class="contents">0</span>)</span>
             </button>
+            <button type="button" class="btn btn-error" id="delete-selected-users-button" title="Delete selected users">
+                <i class="fa-solid fa-trash mr-0 sm:mr-2"></i>
+                <span class="hidden sm:inline-block">Delete Selected</span>
+            </button>
             <button type="button" class="btn btn-secondary" id="select_all_visible_button" title="Select all users currently visible">
                 <i class="fa-solid fa-check-square mr-0 sm:mr-2"></i>
                 <span class="hidden sm:inline-block">Select All</span>
@@ -177,6 +183,15 @@
                 <i class="fa-solid fa-square mr-0 sm:mr-2"></i>
                 <span class="hidden sm:inline-block">Deselect All</span>
             </button>
+        </div>
+    </div>
+
+    <!-- Sync Loading State (hidden by default) -->
+    <div id="sync-loading-state" class="hidden">
+        <div class="text-center p-16">
+            <span class="loading loading-lg loading-spinner text-primary"></span>
+            <p class="mt-4 text-lg font-medium">Syncing users from all services...</p>
+            <p class="text-sm text-base-content/70">This may take a few moments</p>
         </div>
     </div>
 
@@ -275,6 +290,15 @@
                 <input type="checkbox" id="show_user_notes_toggle" class="toggle toggle-primary" />
             </label>
         </div>
+        <div class="form-control">
+            <label class="label cursor-pointer">
+                <span class="label-text">Auto-sync Users on Page Load</span>
+                <input type="checkbox" id="auto_sync_users_toggle" class="toggle toggle-secondary" />
+            </label>
+            <div class="label">
+                <span class="label-text-alt whitespace-normal">If enabled, users will be automatically synced from all services when visiting this page</span>
+            </div>
+        </div>
         <div class="form-control w-full max-w-xs">
             <label class="label">
                 <span class="label-text">Preferred Default View</span>
@@ -345,6 +369,9 @@
         const showNotes = localStorage.getItem('showUserNotes') === 'true';
         showUserNotesToggle.checked = showNotes;
 
+        const autoSync = localStorage.getItem('autoSyncUsers') === 'true';
+        document.getElementById('auto_sync_users_toggle').checked = autoSync;
+
         const preferredView = localStorage.getItem('userListView') || 'cards';
         preferredViewSelect.value = preferredView;
     }
@@ -358,10 +385,12 @@
     saveSettingsBtn.addEventListener('click', function() {
         // 1. Get the chosen values from the modal inputs.
         const showNotes = showUserNotesToggle.checked;
+        const autoSync = document.getElementById('auto_sync_users_toggle').checked;
         const preferredView = preferredViewSelect.value;
 
         // 2. Save them to localStorage for immediate UI updates.
         localStorage.setItem('showUserNotes', showNotes);
+        localStorage.setItem('autoSyncUsers', autoSync);
         localStorage.setItem('userListView', preferredView);
 
         // 3. Visually apply the notes preference right away.
@@ -476,7 +505,49 @@
         updateMassEditUI();
     }
 
+    // Functions to show/hide sync loading state
+    function showSyncLoading() {
+        console.log('Showing sync loading state...');
+        const userListContainer = document.getElementById('user-list-container');
+        const syncLoadingState = document.getElementById('sync-loading-state');
+        
+        if (userListContainer && syncLoadingState) {
+            userListContainer.classList.add('hidden');
+            syncLoadingState.classList.remove('hidden');
+        }
+    }
+
+    function hideSyncLoading() {
+        console.log('Hiding sync loading state...');
+        const userListContainer = document.getElementById('user-list-container');
+        const syncLoadingState = document.getElementById('sync-loading-state');
+        
+        if (userListContainer && syncLoadingState) {
+            syncLoadingState.classList.add('hidden');
+            userListContainer.classList.remove('hidden');
+            
+            // Refresh the user list after sync
+            htmx.ajax('GET', '{{ url_for("users.list_users", **request.args.to_dict()) }}', {
+                target: '#user-list-container',
+                swap: 'innerHTML'
+            });
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
+        // Check if auto-sync is enabled and trigger sync on page load
+        const autoSyncEnabled = localStorage.getItem('autoSyncUsers') === 'true';
+        if (autoSyncEnabled) {
+            console.log('Auto-sync enabled, triggering user sync on page load...');
+            // Trigger the sync button click after a short delay to ensure page is fully loaded
+            setTimeout(() => {
+                const syncButton = document.querySelector('button[hx-post="{{ url_for("users.sync_all_users") }}"]');
+                if (syncButton && !syncButton.disabled) {
+                    syncButton.click();
+                }
+            }, 1000);
+        }
+
         htmx.on('#user-list-container', 'htmx:afterSwap', function() {
             selectedUserIds.clear();
             reinitializeUserListFeatures();
@@ -547,6 +618,72 @@
                         cb.dispatchEvent(new Event('change', { bubbles: true }));
                     }
                 });
+            };
+        }
+
+        // Delete selected users button
+        const deleteSelectedUsersBtn = document.getElementById('delete-selected-users-button');
+        if (deleteSelectedUsersBtn) {
+            deleteSelectedUsersBtn.onclick = function() {
+                if (selectedUserIds.size === 0) return;
+                
+                const userCount = selectedUserIds.size;
+                const confirmMessage = `Are you sure you want to delete ${userCount} user(s)? This will remove them from MUM AND all media servers. This action cannot be undone.`;
+                
+                if (confirm(confirmMessage)) {
+                    // Create form data
+                    const formData = new FormData();
+                    formData.append('action', 'delete_users');
+                    formData.append('confirm_delete', 'true');
+                    
+                    // Add user IDs as a comma-separated string (matching the modal form)
+                    const userIdsString = Array.from(selectedUserIds).join(',');
+                    formData.append('user_ids', userIdsString);
+                    
+                    console.log('Deleting users with IDs:', userIdsString);
+                    
+                    // Add CSRF token
+                    const csrfToken = document.querySelector('meta[name=csrf-token]');
+                    if (csrfToken) {
+                        formData.append('csrf_token', csrfToken.getAttribute('content'));
+                    }
+                    
+                    // Send delete request
+                    fetch('{{ url_for("users.mass_edit_users", **request.args.to_dict(flat=False)) }}', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Refresh the user list by triggering HTMX reload
+                            const userListContainer = document.getElementById('user-list-container');
+                            if (userListContainer) {
+                                htmx.ajax('GET', '{{ url_for("users.list_users", **request.args.to_dict()) }}', {
+                                    target: '#user-list-container',
+                                    swap: 'innerHTML'
+                                });
+                            }
+                            selectedUserIds.clear();
+                            updateMassEditUI();
+                            if(typeof window.showToast === 'function') {
+                                showToast(`Successfully deleted ${userCount} user(s)`, 'success');
+                            }
+                        } else {
+                            response.text().then(errorText => {
+                                console.error('Delete request failed:', errorText);
+                                if(typeof window.showToast === 'function') {
+                                    showToast('Error deleting users: ' + response.statusText, 'error');
+                                }
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        if(typeof window.showToast === 'function') {
+                            showToast('Error deleting users', 'error');
+                        }
+                    });
+                }
             };
         }
 
