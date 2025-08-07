@@ -60,15 +60,19 @@ class MediaServiceManager:
             return {'success': False, 'message': 'Service type not supported'}
         
         try:
+            current_app.logger.info(f"Starting library sync for server {server_id} ({server.name})")
             libraries_data = service.get_libraries()
+            current_app.logger.info(f"Retrieved {len(libraries_data)} libraries from {server.name}")
             
             # Update database
             existing_libs = {lib.external_id: lib for lib in server.libraries}
+            current_app.logger.info(f"Found {len(existing_libs)} existing libraries in database")
             updated_count = 0
             added_count = 0
             
             for lib_data in libraries_data:
                 external_id = lib_data['external_id']
+                current_app.logger.debug(f"Processing library: {lib_data['name']} (ID: {external_id})")
                 
                 if external_id in existing_libs:
                     # Update existing library
@@ -78,6 +82,7 @@ class MediaServiceManager:
                     lib.item_count = lib_data.get('item_count')
                     lib.updated_at = datetime.utcnow()
                     updated_count += 1
+                    current_app.logger.debug(f"Updated existing library: {lib_data['name']}")
                 else:
                     # Add new library
                     lib = MediaLibrary(
@@ -89,9 +94,11 @@ class MediaServiceManager:
                     )
                     db.session.add(lib)
                     added_count += 1
+                    current_app.logger.debug(f"Added new library: {lib_data['name']}")
             
             server.last_sync_at = datetime.utcnow()
             db.session.commit()
+            current_app.logger.info(f"Library sync completed: {added_count} added, {updated_count} updated")
             
             return {
                 'success': True,
@@ -102,7 +109,7 @@ class MediaServiceManager:
             
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f"Error syncing libraries for server {server_id}: {e}")
+            current_app.logger.error(f"Error syncing libraries for server {server_id} ({server.name}): {e}", exc_info=True)
             return {'success': False, 'message': f'Sync failed: {str(e)}'}
     
     @staticmethod
