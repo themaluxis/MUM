@@ -502,15 +502,30 @@ class JellyfinMediaService(BaseMediaService):
         """Update Jellyfin user's library access"""
         try:
             if library_ids is not None:
-                policy_data = {
-                    'EnabledFolders': library_ids,
-                    'EnableAllFolders': len(library_ids) == 0
-                }
-                self._make_request(f'Users/{user_id}/Policy', method='POST', data=policy_data)
+                # Get the current user data which includes the policy
+                self.log_info(f"Getting current user data for user {user_id}")
+                user_data = self._make_request(f'Users/{user_id}')
+                current_policy = user_data.get('Policy', {})
+                self.log_info(f"Current policy retrieved from user data: {current_policy}")
+                
+                # Update only the library access fields
+                if library_ids == ['*']:
+                    current_policy['EnabledFolders'] = []
+                    current_policy['EnableAllFolders'] = True
+                    self.log_info(f"Setting user {user_id} to have access to ALL libraries")
+                else:
+                    current_policy['EnabledFolders'] = library_ids
+                    current_policy['EnableAllFolders'] = False
+                    self.log_info(f"Setting user {user_id} to have access to specific libraries: {library_ids}")
+                
+                # Send the complete policy back to Jellyfin
+                self.log_info(f"Sending updated policy: {current_policy}")
+                self._make_request(f'Users/{user_id}/Policy', method='POST', data=current_policy)
+                self.log_info(f"Successfully updated Jellyfin user {user_id} library access")
             
             return True
         except Exception as e:
-            self.log_error(f"Error updating user access: {e}")
+            self.log_error(f"Error updating user access for user {user_id}: {e}")
             return False
     
     def delete_user(self, user_id: str) -> bool:
