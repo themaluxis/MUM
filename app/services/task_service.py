@@ -40,10 +40,24 @@ def monitor_media_sessions_task():
             # Handle both Plex and Jellyfin session formats
             current_sessions_dict = {}
             for session in active_sessions:
-                # Plex sessions have sessionKey, Jellyfin sessions have Id
-                session_key = getattr(session, 'sessionKey', None) or getattr(session, 'Id', None) or session.get('Id', None) if isinstance(session, dict) else None
+                # Debug logging to understand session structure
+                session_type = "dict" if isinstance(session, dict) else "object"
+                current_app.logger.debug(f"Processing {session_type} session: {type(session)}")
+                
+                if isinstance(session, dict):
+                    # Jellyfin session (dict format)
+                    session_key = session.get('Id')
+                    current_app.logger.debug(f"Jellyfin session key: {session_key}")
+                else:
+                    # Plex session (object format)
+                    session_key = getattr(session, 'sessionKey', None)
+                    current_app.logger.debug(f"Plex session key: {session_key}")
+                    current_app.logger.debug(f"Plex session attributes: {[attr for attr in dir(session) if not attr.startswith('_')]}")
+                
                 if session_key:
                     current_sessions_dict[session_key] = session
+                else:
+                    current_app.logger.warning(f"Session missing key: {session_type} - {type(session)}")
             
             current_session_keys = set(current_sessions_dict.keys())
             
@@ -73,21 +87,10 @@ def monitor_media_sessions_task():
                 current_app.logger.info(f"Processing {len(current_sessions_dict)} new or ongoing sessions...")
 
             for session_key, session in current_sessions_dict.items():
-                user_id_from_session = None
-                if hasattr(session, 'user') and session.user and hasattr(session.user, 'id'):
-                    user_id_from_session = session.user.id
-                elif hasattr(session, 'userId'):
-                    user_id_from_session = session.userId
-
                 # Handle different session formats for user lookup
                 mum_user = None
-                if hasattr(session, 'user') and session.user and hasattr(session.user, 'id'):
-                    # Plex session - look up by plex_user_id
-                    mum_user = User.query.filter_by(plex_user_id=user_id_from_session).first()
-                    if not mum_user:
-                        current_app.logger.warning(f"Could not find MUM user for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
-                        continue
-                elif isinstance(session, dict) and session.get('UserId'):
+                
+                if isinstance(session, dict):
                     # Jellyfin session - look up by primary_username
                     jellyfin_username = session.get('UserName')
                     if jellyfin_username:
@@ -101,8 +104,29 @@ def monitor_media_sessions_task():
                         current_app.logger.warning(f"Jellyfin session {session_key} is missing UserName. Skipping.")
                         continue
                 else:
-                    current_app.logger.warning(f"Session {session_key} is missing a user ID. Skipping.")
-                    continue
+                    # Plex session - look up by plex_user_id
+                    user_id_from_session = None
+                    
+                    # Try different ways to get user ID from Plex session
+                    if hasattr(session, 'user') and session.user:
+                        if hasattr(session.user, 'id'):
+                            user_id_from_session = session.user.id
+                        else:
+                            current_app.logger.warning(f"Plex session {session_key} user object has no 'id' attribute")
+                    elif hasattr(session, 'userId'):
+                        user_id_from_session = session.userId
+                    else:
+                        current_app.logger.warning(f"Plex session {session_key} has no user information. Available attributes: {[attr for attr in dir(session) if not attr.startswith('_')]}")
+                        continue
+                    
+                    if user_id_from_session:
+                        mum_user = User.query.filter_by(plex_user_id=user_id_from_session).first()
+                        if not mum_user:
+                            current_app.logger.warning(f"Could not find MUM user for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
+                            continue
+                    else:
+                        current_app.logger.warning(f"Could not extract user ID from Plex session {session_key}. Skipping.")
+                        continue
                 
                 # Log session type for debugging
                 session_type = "Plex" if hasattr(session, 'player') else "Jellyfin"
