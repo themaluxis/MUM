@@ -223,27 +223,63 @@ class JellyfinMediaService(BaseMediaService):
                 # If no ItemId, try to use the Name as a fallback identifier
                 external_id = lib_id if lib_id else lib_name
                 
-                # Try to get actual item count for this library
+                # Try to get actual item count for this library using multiple approaches
                 item_count = 0
                 try:
-                    # Get the actual library folder to find its ID
-                    libraries_endpoint = self._make_request('Library/MediaFolders')
-                    matching_folder = None
-                    for folder in libraries_endpoint:
-                        if folder.get('Name') == lib_name:
-                            matching_folder = folder
-                            break
+                    # Method 1: Try using the ItemId from VirtualFolders if available
+                    if lib_id:
+                        try:
+                            items_response = self._make_request(f'Items?ParentId={lib_id}&Recursive=true&Fields=BasicSyncInfo&Limit=1')
+                            item_count = items_response.get('TotalRecordCount', 0)
+                            self.log_info(f"Library '{lib_name}' (Method 1 - VirtualFolder ID): {item_count} items")
+                        except Exception as method1_error:
+                            self.log_warning(f"Method 1 failed for library '{lib_name}': {method1_error}")
                     
-                    if matching_folder and matching_folder.get('Id'):
-                        folder_id = matching_folder.get('Id')
-                        # Get item count for this specific library
-                        items_response = self._make_request(f'Items?ParentId={folder_id}&Recursive=true&Fields=BasicSyncInfo&Limit=1')
-                        item_count = items_response.get('TotalRecordCount', 0)
-                        self.log_info(f"Library '{lib_name}' has {item_count} items")
-                    else:
-                        self.log_warning(f"Could not find matching MediaFolder for library '{lib_name}'")
+                    # Method 2: If Method 1 failed or no ItemId, try MediaFolders approach
+                    if item_count == 0:
+                        try:
+                            libraries_endpoint = self._make_request('Library/MediaFolders')
+                            matching_folder = None
+                            for folder in libraries_endpoint:
+                                if folder.get('Name') == lib_name:
+                                    matching_folder = folder
+                                    break
+                            
+                            if matching_folder and matching_folder.get('Id'):
+                                folder_id = matching_folder.get('Id')
+                                items_response = self._make_request(f'Items?ParentId={folder_id}&Recursive=true&Fields=BasicSyncInfo&Limit=1')
+                                item_count = items_response.get('TotalRecordCount', 0)
+                                self.log_info(f"Library '{lib_name}' (Method 2 - MediaFolder): {item_count} items")
+                            else:
+                                self.log_warning(f"Could not find matching MediaFolder for library '{lib_name}'")
+                        except Exception as method2_error:
+                            self.log_warning(f"Method 2 failed for library '{lib_name}': {method2_error}")
+                    
+                    # Method 3: If both failed, try the Views endpoint which sometimes has different IDs
+                    if item_count == 0:
+                        try:
+                            views_response = self._make_request('UserViews')
+                            matching_view = None
+                            for view in views_response.get('Items', []):
+                                if view.get('Name') == lib_name:
+                                    matching_view = view
+                                    break
+                            
+                            if matching_view and matching_view.get('Id'):
+                                view_id = matching_view.get('Id')
+                                items_response = self._make_request(f'Items?ParentId={view_id}&Recursive=true&Fields=BasicSyncInfo&Limit=1')
+                                item_count = items_response.get('TotalRecordCount', 0)
+                                self.log_info(f"Library '{lib_name}' (Method 3 - UserViews): {item_count} items")
+                            else:
+                                self.log_warning(f"Could not find matching UserView for library '{lib_name}'")
+                        except Exception as method3_error:
+                            self.log_warning(f"Method 3 failed for library '{lib_name}': {method3_error}")
+                    
+                    if item_count == 0:
+                        self.log_warning(f"All methods failed to get item count for library '{lib_name}'")
+                        
                 except Exception as count_error:
-                    self.log_warning(f"Could not get item count for library '{lib_name}': {count_error}")
+                    self.log_error(f"Error getting item count for library '{lib_name}': {count_error}")
                     item_count = 0
 
                 library_data = {
