@@ -230,10 +230,13 @@ def view_user(user_id):
                 # Fallback for standard form submissions remains the same
                 flash(f"User '{user.get_display_name()}' updated successfully.", "success")
                 back_param = request.args.get('back')
+                back_view_param = request.args.get('back_view')
+                redirect_params = {'user_id': user.id, 'tab': 'settings'}
                 if back_param:
-                    return redirect(url_for('user.view_user', user_id=user.id, tab='settings', back=back_param))
-                else:
-                    return redirect(url_for('user.view_user', user_id=user.id, tab='settings'))
+                    redirect_params['back'] = back_param
+                if back_view_param:
+                    redirect_params['back_view'] = back_view_param
+                return redirect(url_for('user.view_user', **redirect_params))
             
         except Exception as e:
             db.session.rollback()

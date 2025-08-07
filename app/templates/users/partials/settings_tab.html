@@ -1,8 +1,11 @@
 <!-- File: app/templates/users/partials/settings_tab.html -->
 {# Expects 'form' and 'user' in context #}
+{% set form_params = {'user_id': user.id, 'tab': 'settings'} %}
+{% if request.args.get('back') %}{% set _ = form_params.update({'back': request.args.get('back')}) %}{% endif %}
+{% if request.args.get('back_view') %}{% set _ = form_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
 <form method="POST"
       id="editUserForm"
-      hx-post="{{ url_for('user.view_user', user_id=user.id, tab='settings', back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='settings') }}"
+      hx-post="{{ url_for('user.view_user', **form_params) }}"
       hx-target="#editUserForm"
       hx-swap="outerHTML">
       

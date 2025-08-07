@@ -144,7 +144,10 @@
 {% if history_logs and history_logs.pages > 1 %}
     <div class="join my-8 flex justify-center">
         {% if history_logs.has_prev %}
-            <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.prev_num, back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.prev_num) }}"
+            {% set prev_params = {'user_id': user.id, 'tab': 'history', 'page': history_logs.prev_num} %}
+            {% if request.args.get('back') %}{% set _ = prev_params.update({'back': request.args.get('back')}) %}{% endif %}
+            {% if request.args.get('back_view') %}{% set _ = prev_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
+            <a hx-get="{{ url_for('user.view_user', **prev_params) }}"
                hx-target="#user-history-container"
                class="join-item btn">
                <i class="fa-solid fa-arrow-left"></i>
@@ -157,7 +160,10 @@
                 {% if history_logs.page == page_num %}
                     <button class="join-item btn btn-primary btn-active">{{ page_num }}</button>
                 {% else %}
-                    <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=page_num, back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='history', page=page_num) }}"
+                    {% set page_params = {'user_id': user.id, 'tab': 'history', 'page': page_num} %}
+                    {% if request.args.get('back') %}{% set _ = page_params.update({'back': request.args.get('back')}) %}{% endif %}
+                    {% if request.args.get('back_view') %}{% set _ = page_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
+                    <a hx-get="{{ url_for('user.view_user', **page_params) }}"
                        hx-target="#user-history-container"
                        class="join-item btn">
                        {{ page_num }}
@@ -168,7 +174,10 @@
             {% endif %}
         {% endfor %}
         {% if history_logs.has_next %}
-            <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.next_num, back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.next_num) }}"
+            {% set next_params = {'user_id': user.id, 'tab': 'history', 'page': history_logs.next_num} %}
+            {% if request.args.get('back') %}{% set _ = next_params.update({'back': request.args.get('back')}) %}{% endif %}
+            {% if request.args.get('back_view') %}{% set _ = next_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
+            <a hx-get="{{ url_for('user.view_user', **next_params) }}"
                hx-target="#user-history-container"
                class="join-item btn">
                <i class="fa-solid fa-arrow-right"></i>

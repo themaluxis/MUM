@@ -1,6 +1,9 @@
 <!-- File: app/templates/users/_history_tab.html -->
+{% set history_params = {'user_id': user.id, 'tab': 'history'} %}
+{% if request.args.get('back') %}{% set _ = history_params.update({'back': request.args.get('back')}) %}{% endif %}
+{% if request.args.get('back_view') %}{% set _ = history_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
 <div id="user-history-container"
-    hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='history') }}"
+    hx-get="{{ url_for('user.view_user', **history_params) }}"
     hx-trigger="load, refreshUserHistory from:body"
     hx-swap="innerHTML">
     <div class="text-center p-8"><span class="loading loading-lg loading-spinner"></span></div>
