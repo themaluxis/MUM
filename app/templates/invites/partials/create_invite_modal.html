@@ -105,6 +105,15 @@
                                             </label>
                                             <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_live_tv.description }}</p>
                                         </div>
+                                        <div class="form-control">
+                                            <label class="label cursor-pointer justify-start">
+                                                {{ form.allow_4k_transcode(class="toggle toggle-primary mr-3") }}
+                                                <span class="label-text font-medium">
+                                                    <i class="fa-solid fa-film mr-2 text-primary"></i>{{ form.allow_4k_transcode.label.text }}
+                                                </span>
+                                            </label>
+                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_4k_transcode.description }}</p>
+                                        </div>
                                         {% endif %}
                                     </div>
                                 </div>

@@ -87,7 +87,9 @@
                                         <div class="form-control">
                                             <label class="label cursor-pointer justify-start">
                                                 {{ form.allow_downloads(class="toggle toggle-accent mr-3") }}
-                                                <span class="label-text font-medium">{{ form.allow_downloads.label.text }}</span>
+                                                <span class="label-text font-medium">
+                                                    <i class="fa-solid fa-download mr-2 text-accent"></i>{{ form.allow_downloads.label.text }}
+                                                </span>
                                             </label>
                                         </div>
 
@@ -96,14 +98,27 @@
                                             <div class="form-control">
                                                 <label class="label cursor-pointer justify-start">
                                                     {{ form.invite_to_plex_home(class="toggle toggle-primary mr-3") }}
-                                                    <span class="label-text font-medium">{{ form.invite_to_plex_home.label.text }}</span>
+                                                    <span class="label-text font-medium">
+                                                        <i class="fa-solid fa-home mr-2 text-primary"></i>{{ form.invite_to_plex_home.label.text }}
+                                                    </span>
                                                 </label>
                                             </div>
                                             <div class="form-control">
                                                 <label class="label cursor-pointer justify-start">
                                                     {{ form.allow_live_tv(class="toggle toggle-secondary mr-3") }}
-                                                    <span class="label-text font-medium">{{ form.allow_live_tv.label.text }}</span>
+                                                    <span class="label-text font-medium">
+                                                        <i class="fa-solid fa-tv mr-2 text-secondary"></i>{{ form.allow_live_tv.label.text }}
+                                                    </span>
                                                 </label>
+                                            </div>
+                                            <div class="form-control">
+                                                <label class="label cursor-pointer justify-start">
+                                                    {{ form.allow_4k_transcode(class="toggle toggle-primary mr-3") }}
+                                                    <span class="label-text font-medium">
+                                                        <i class="fa-solid fa-film mr-2 text-primary"></i>{{ form.allow_4k_transcode.label.text }}
+                                                    </span>
+                                                </label>
+                                                <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_4k_transcode.description }}</p>
                                             </div>
                                         {% endif %}
                                     </div>
@@ -217,14 +232,18 @@
             <div class="form-control">
                 <label class="label cursor-pointer justify-start">
                     {{ form.require_discord_auth(class="toggle toggle-info mr-3", id="edit_modal_require_discord_auth") }}
-                    <span class="label-text font-medium">{{ form.require_discord_auth.label.text }}</span>
+                    <span class="label-text font-medium">
+                        <i class="fa-brands fa-discord mr-2 text-info"></i>{{ form.require_discord_auth.label.text }}
+                    </span>
                 </label>
             </div>
             {% if global_require_guild %}
             <div class="form-control">
                 <label class="label cursor-pointer justify-start">
                     {{ form.require_discord_guild_membership(class="toggle toggle-warning mr-3", id="edit_modal_require_guild") }}
-                    <span class="label-text font-medium">{{ form.require_discord_guild_membership.label.text }}</span>
+                    <span class="label-text font-medium">
+                        <i class="fa-solid fa-users mr-2 text-warning"></i>{{ form.require_discord_guild_membership.label.text }}
+                    </span>
                 </label>
             </div>
             {% endif %}
@@ -233,13 +252,17 @@
             <div class="form-control">
                 <label class="label cursor-pointer justify-start">
                     {{ form.grant_purge_whitelist(class="toggle toggle-accent mr-3") }}
-                    <span class="label-text font-medium">{{ form.grant_purge_whitelist.label.text }}</span>
+                    <span class="label-text font-medium">
+                        <i class="fa-solid fa-shield-halved mr-2 text-accent"></i>{{ form.grant_purge_whitelist.label.text }}
+                    </span>
                 </label>
             </div>
             <div class="form-control">
                 <label class="label cursor-pointer justify-start">
                     {{ form.grant_bot_whitelist(class="toggle toggle-info mr-3") }}
-                    <span class="label-text font-medium">{{ form.grant_bot_whitelist.label.text }}</span>
+                    <span class="label-text font-medium">
+                        <i class="fa-solid fa-robot mr-2 text-info"></i>{{ form.grant_bot_whitelist.label.text }}
+                    </span>
                 </label>
             </div>
         </div>
