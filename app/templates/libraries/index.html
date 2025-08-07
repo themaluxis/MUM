@@ -70,9 +70,9 @@
         <!-- Organized Layout for Multiple Servers -->
         {% for service_type, service_data in libraries_by_service.items() %}
         <div class="card bg-base-200 shadow-xl mb-6">
-            <div class="card-body">
+            <div>
                 <!-- Service Header with Collapse Toggle -->
-                <div class="collapse collapse-arrow bg-base-100 rounded-lg">
+                <div class="collapse collapse-arrow bg-base-200 rounded-lg">
                     <input type="checkbox" class="peer" checked />
                     <div class="collapse-title text-xl font-medium flex items-center justify-between">
                         <div class="flex items-center space-x-3">
@@ -102,7 +102,7 @@
                         {% for server_name, server_data in service_data.servers.items() %}
                         <div class="mb-4">
                             <!-- Server Header -->
-                            <div class="flex items-center justify-between mb-3 p-3 bg-base-200 rounded-lg">
+                            <div class="flex items-center justify-between mb-3 p-3 bg-base-100 rounded-lg">
                                 <div class="flex items-center space-x-3">
                                     <div class="flex items-center space-x-2">
                                         {% if server_data.online %}
