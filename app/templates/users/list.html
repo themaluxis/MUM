@@ -309,6 +309,20 @@
 
 {% block scripts %}
 {{ super() }}
+<style>
+/* Service-specific selection styling for user cards */
+.user-card.selected {
+    transition: all 0.2s ease-in-out;
+    outline: 2px solid;
+    outline-offset: 2px;
+}
+
+/* Show checkbox when selected */
+.user-card.selected .user-select-checkbox,
+.user-card:hover .user-select-checkbox {
+    opacity: 1 !important;
+}
+</style>
 <script>
     // User Display Settings Logic
     const userSettingsModal = document.getElementById('user_settings_modal');
@@ -475,8 +489,28 @@
                 const target = event.target;
                 if (target.matches('.user-select-checkbox') && target.dataset.userId) {
                     const userId = target.dataset.userId;
-                    if (target.checked) selectedUserIds.add(userId);
-                    else selectedUserIds.delete(userId);
+                    const card = target.closest('.user-card');
+                    
+                    if (target.checked) {
+                        selectedUserIds.add(userId);
+                        // Add selection styling with service color
+                        if (card) {
+                            card.classList.add('selected');
+                            const serviceColor = card.dataset.serviceColor;
+                            if (serviceColor) {
+                                card.style.outlineColor = serviceColor;
+                                card.style.backgroundColor = `color-mix(in srgb, ${serviceColor} 10%, transparent)`;
+                            }
+                        }
+                    } else {
+                        selectedUserIds.delete(userId);
+                        // Remove selection styling
+                        if (card) {
+                            card.classList.remove('selected');
+                            card.style.outlineColor = '';
+                            card.style.backgroundColor = '';
+                        }
+                    }
                     updateMassEditUI();
                 }
             });
