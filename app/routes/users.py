@@ -305,20 +305,37 @@ def sync_all_users():
             current_app.logger.error(f"User sync failed: {sync_result.get('message', 'Unknown error')}")
             raw_plex_users_with_access = None
         else:
-            # If using unified service, we can return early with the results
-            modal_html = render_template('users/partials/sync_results_modal.html',
-                                       sync_result=sync_result)
-            trigger_payload = {
-                "showToastEvent": {"message": sync_result.get('message', 'Sync completed'), "category": "success"},
-                "openSyncResultsModal": True,
-                "refreshUserList": True
-            }
-            headers = {
-                'HX-Retarget': '#syncResultModalContainer',
-                'HX-Reswap': 'innerHTML',
-                'HX-Trigger-After-Swap': json.dumps(trigger_payload)
-            }
-            return make_response(modal_html, 200, headers)
+            # Check if there are actual changes to determine whether to show modal or just toast
+            has_changes = (sync_result.get('added', 0) > 0 or 
+                          sync_result.get('updated', 0) > 0 or 
+                          sync_result.get('removed', 0) > 0 or 
+                          sync_result.get('errors', 0) > 0)
+            
+            if has_changes:
+                # Show modal for changes or errors
+                modal_html = render_template('users/partials/sync_results_modal.html',
+                                           sync_result=sync_result)
+                trigger_payload = {
+                    "showToastEvent": {"message": sync_result.get('message', 'Sync completed'), "category": "success"},
+                    "openSyncResultsModal": True,
+                    "refreshUserList": True
+                }
+                headers = {
+                    'HX-Retarget': '#syncResultModalContainer',
+                    'HX-Reswap': 'innerHTML',
+                    'HX-Trigger-After-Swap': json.dumps(trigger_payload)
+                }
+                return make_response(modal_html, 200, headers)
+            else:
+                # No changes - just show toast
+                trigger_payload = {
+                    "showToastEvent": {"message": "Sync complete. No changes were made.", "category": "success"},
+                    "refreshUserList": True
+                }
+                headers = {
+                    'HX-Trigger': json.dumps(trigger_payload)
+                }
+                return make_response("", 200, headers)
             
     except Exception as e:
         current_app.logger.error(f"Critical error during user synchronization: {e}", exc_info=True)

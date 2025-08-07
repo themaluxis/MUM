@@ -201,7 +201,7 @@
              hx-target="#user-list-container"
              hx-swap="innerHTML">
             
-            <div class="text-center p-8">
+            <div class="text-center p-8" id="initial-loading">
                 <span class="loading loading-lg loading-spinner"></span>
                 <p>Loading users...</p>
             </div>
@@ -538,14 +538,24 @@
         // Check if auto-sync is enabled and trigger sync on page load
         const autoSyncEnabled = localStorage.getItem('autoSyncUsers') === 'true';
         if (autoSyncEnabled) {
-            console.log('Auto-sync enabled, triggering user sync on page load...');
-            // Trigger the sync button click after a short delay to ensure page is fully loaded
+            console.log('Auto-sync enabled, skipping initial load and going directly to sync...');
+            
+            // Cancel the initial HTMX load request
+            const initialLoader = document.querySelector('#user-list-container [hx-get]');
+            if (initialLoader) {
+                initialLoader.removeAttribute('hx-trigger');
+            }
+            
+            // Show sync loading immediately
+            showSyncLoading();
+            
+            // Trigger the sync button click after a short delay
             setTimeout(() => {
                 const syncButton = document.querySelector('button[hx-post="{{ url_for("users.sync_all_users") }}"]');
                 if (syncButton && !syncButton.disabled) {
                     syncButton.click();
                 }
-            }, 1000);
+            }, 500);
         }
 
         htmx.on('#user-list-container', 'htmx:afterSwap', function() {
