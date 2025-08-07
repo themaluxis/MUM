@@ -104,31 +104,72 @@ def monitor_media_sessions_task():
                     current_app.logger.warning(f"Session {session_key} is missing a user ID. Skipping.")
                     continue
                 
-                current_app.logger.debug(f"Processing session {session_key} for user '{mum_user.plex_username}' (MUM ID: {mum_user.id})")
+                # Log session type for debugging
+                session_type = "Plex" if hasattr(session, 'player') else "Jellyfin"
+                current_app.logger.debug(f"Processing {session_type} session {session_key} for user '{mum_user.plex_username}' (MUM ID: {mum_user.id})")
 
                 # If the session is new, create the history record
                 if session_key not in _active_stream_sessions:
                     current_app.logger.info(f"New session detected: {session_key}. Creating history record.")
                     
-                    media_duration_ms = getattr(session, 'duration', 0)
-                    media_duration_s = int(media_duration_ms / 1000) if media_duration_ms else 0
+                    # Handle different session formats (Plex vs Jellyfin)
+                    if hasattr(session, 'player'):
+                        # Plex session format
+                        media_duration_ms = getattr(session, 'duration', 0)
+                        media_duration_s = int(media_duration_ms / 1000) if media_duration_ms else 0
+                        
+                        platform = getattr(session.player, 'platform', 'N/A')
+                        product = getattr(session.player, 'product', 'N/A')
+                        player_title = getattr(session.player, 'title', 'N/A')
+                        ip_address = getattr(session.player, 'address', 'N/A')
+                        is_lan = getattr(session.player, 'local', False)
+                        media_title = getattr(session, 'title', "Unknown")
+                        media_type = getattr(session, 'type', "Unknown")
+                        grandparent_title = getattr(session, 'grandparentTitle', None)
+                        parent_title = getattr(session, 'parentTitle', None)
+                        rating_key = str(getattr(session, 'ratingKey', None))
+                        view_offset_ms = getattr(session, 'viewOffset', 0)
+                        view_offset_s = int(view_offset_ms / 1000) if view_offset_ms else 0
+                    else:
+                        # Jellyfin session format (dict)
+                        now_playing = session.get('NowPlayingItem', {})
+                        play_state = session.get('PlayState', {})
+                        
+                        # Duration in ticks (100ns units) for Jellyfin
+                        runtime_ticks = now_playing.get('RunTimeTicks', 0)
+                        media_duration_s = int(runtime_ticks / 10000000) if runtime_ticks else 0  # Convert ticks to seconds
+                        
+                        platform = session.get('Client', 'N/A')
+                        product = session.get('ApplicationVersion', 'N/A')
+                        player_title = session.get('DeviceName', 'N/A')
+                        ip_address = session.get('RemoteEndPoint', 'N/A')
+                        is_lan = session.get('IsLocal', True)  # Jellyfin uses IsLocal
+                        media_title = now_playing.get('Name', "Unknown")
+                        media_type = now_playing.get('Type', "Unknown")
+                        grandparent_title = now_playing.get('SeriesName', None)
+                        parent_title = now_playing.get('SeasonName', None)
+                        rating_key = str(now_playing.get('Id', None))
+                        
+                        # Position in ticks for Jellyfin
+                        position_ticks = play_state.get('PositionTicks', 0)
+                        view_offset_s = int(position_ticks / 10000000) if position_ticks else 0  # Convert ticks to seconds
 
                     new_history_record = StreamHistory(
                         user_id=mum_user.id,
                         session_key=str(session_key),
-                        rating_key=str(getattr(session, 'ratingKey', None)),
+                        rating_key=rating_key,
                         started_at=now_utc,
-                        platform=getattr(session.player, 'platform', 'N/A') if hasattr(session, 'player') else 'N/A',
-                        product=getattr(session.player, 'product', 'N/A') if hasattr(session, 'player') else 'N/A',
-                        player=getattr(session.player, 'title', 'N/A') if hasattr(session, 'player') else 'N/A',
-                        ip_address=getattr(session.player, 'address', 'N/A') if hasattr(session, 'player') else 'N/A',
-                        is_lan=getattr(session.player, 'local', False) if hasattr(session, 'player') else False,
-                        media_title=getattr(session, 'media_title', None) or getattr(session, 'title', "Unknown"),
-                        media_type=getattr(session, 'type', "Unknown"),
-                        grandparent_title=getattr(session, 'grandparentTitle', None),
-                        parent_title=getattr(session, 'parentTitle', None),
+                        platform=platform,
+                        product=product,
+                        player=player_title,
+                        ip_address=ip_address,
+                        is_lan=is_lan,
+                        media_title=media_title,
+                        media_type=media_type,
+                        grandparent_title=grandparent_title,
+                        parent_title=parent_title,
                         media_duration_seconds=media_duration_s,
-                        view_offset_at_end_seconds=int(getattr(session, 'viewOffset', 0) / 1000)
+                        view_offset_at_end_seconds=view_offset_s
                     )
                     db.session.add(new_history_record)
                     db.session.flush() # Flush to get the ID
@@ -141,7 +182,17 @@ def monitor_media_sessions_task():
                     if history_record_id:
                         history_record = db.session.get(StreamHistory, history_record_id)
                         if history_record:
-                            current_offset_s = int(getattr(session, 'viewOffset', 0) / 1000)
+                            # Handle different session formats for progress updates
+                            if hasattr(session, 'player'):
+                                # Plex session format
+                                view_offset_ms = getattr(session, 'viewOffset', 0)
+                                current_offset_s = int(view_offset_ms / 1000) if view_offset_ms else 0
+                            else:
+                                # Jellyfin session format (dict)
+                                play_state = session.get('PlayState', {})
+                                position_ticks = play_state.get('PositionTicks', 0)
+                                current_offset_s = int(position_ticks / 10000000) if position_ticks else 0  # Convert ticks to seconds
+                            
                             history_record.view_offset_at_end_seconds = current_offset_s
                             current_app.logger.debug(f"Updated progress for ongoing session {session_key} to {current_offset_s}s.")
                         else:
