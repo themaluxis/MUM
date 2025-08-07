@@ -59,9 +59,30 @@ def list_users():
             session[session_per_page_key] = items_per_page
 
     query = User.query
+    
+    # Handle separate search fields
+    search_username = request.args.get('search_username', '').strip()
+    search_email = request.args.get('search_email', '').strip()
+    search_notes = request.args.get('search_notes', '').strip()
+    
+    # Legacy search field for backward compatibility with the main search bar
     search_term = request.args.get('search', '').strip()
+    
+    # Build search filters
+    search_filters = []
+    if search_username:
+        search_filters.append(User.plex_username.ilike(f"%{search_username}%"))
+    if search_email:
+        search_filters.append(User.plex_email.ilike(f"%{search_email}%"))
+    if search_notes:
+        search_filters.append(User.notes.ilike(f"%{search_notes}%"))
     if search_term:
-        query = query.filter(or_(User.plex_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
+        # Legacy search - search both username and email
+        search_filters.append(or_(User.plex_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
+    
+    # Apply search filters if any exist
+    if search_filters:
+        query = query.filter(or_(*search_filters))
 
     server_filter_id = request.args.get('server_id', 'all')
     if server_filter_id != 'all':
