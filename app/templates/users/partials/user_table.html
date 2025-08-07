@@ -143,7 +143,7 @@
                             {% endif %}
                             
                             {% if current_user.has_permission('view_user') %}
-                            <a href="{{ url_for('user.view_user', user_id=user.id, view='table', page=users.page, per_page=current_per_page) }}" title="User Profile" class="link link-hover">
+                            <a href="{{ url_for('user.view_user', user_id=user.id, view='table', page=users.page, per_page=current_per_page, back='users') }}" title="User Profile" class="link link-hover">
                                 <div class="font-bold truncate max-w-[150px] sm:max-w-xs {{ username_class }}" title="{{ user.get_display_name() }}">{{ user.get_display_name() }}</div>
                             </a>
                             {% else %}
@@ -278,7 +278,7 @@
                 <td class="text-center" data-col="actions">
                     <div class="flex items-center justify-center space-x-1">
                         {% if current_user.has_permission('view_user') %}
-                        <a href="{{ url_for('user.view_user', user_id=user.id, view='table', page=users.page, per_page=current_per_page) }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-eye"></i></a>
+                        <a href="{{ url_for('user.view_user', user_id=user.id, view='table', page=users.page, per_page=current_per_page, back='users') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-eye"></i></a>
                         {% endif %}
                         {% if current_user.has_permission('edit_user') %}
                         <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 card-action-button"

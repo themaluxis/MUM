@@ -203,7 +203,7 @@
                 <i class="fa-solid fa-info"></i>
             </button>
             {% if current_user.has_permission('view_user') %}
-            <a href="{{ url_for('user.view_user', user_id=user.id) }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+            <a href="{{ url_for('user.view_user', user_id=user.id, back='users') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
                 <i class="fa-solid fa-eye"></i>
             </a>
             {% endif %}

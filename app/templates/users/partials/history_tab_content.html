@@ -144,7 +144,7 @@
 {% if history_logs and history_logs.pages > 1 %}
     <div class="join my-8 flex justify-center">
         {% if history_logs.has_prev %}
-            <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.prev_num) }}"
+            <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.prev_num, back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.prev_num) }}"
                hx-target="#user-history-container"
                class="join-item btn">
                <i class="fa-solid fa-arrow-left"></i>
@@ -157,7 +157,7 @@
                 {% if history_logs.page == page_num %}
                     <button class="join-item btn btn-primary btn-active">{{ page_num }}</button>
                 {% else %}
-                    <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=page_num) }}"
+                    <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=page_num, back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='history', page=page_num) }}"
                        hx-target="#user-history-container"
                        class="join-item btn">
                        {{ page_num }}
@@ -168,7 +168,7 @@
             {% endif %}
         {% endfor %}
         {% if history_logs.has_next %}
-            <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.next_num) }}"
+            <a hx-get="{{ url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.next_num, back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='history', page=history_logs.next_num) }}"
                hx-target="#user-history-container"
                class="join-item btn">
                <i class="fa-solid fa-arrow-right"></i>

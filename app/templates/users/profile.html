@@ -6,9 +6,20 @@
 {% block content %}
 <div class="container mx-auto px-4 py-2 max-w-5xl">
     <div class="flex items-center mb-2">
-        <a href="{{ url_for('users.list_users') }}" class="btn btn-ghost btn-sm mr-4">
-            <i class="fa-solid fa-arrow-left"></i> Back to Users
-        </a>
+        {% set back_url = request.args.get('back') %}
+        {% if back_url == 'streaming' %}
+            <a href="{{ url_for('streaming.index') }}" class="btn btn-ghost btn-sm mr-4">
+                <i class="fa-solid fa-arrow-left"></i> Back to Streaming
+            </a>
+        {% elif back_url == 'users' %}
+            <a href="{{ url_for('users.list_users') }}" class="btn btn-ghost btn-sm mr-4">
+                <i class="fa-solid fa-arrow-left"></i> Back to Users
+            </a>
+        {% else %}
+            <a href="{{ url_for('users.list_users') }}" class="btn btn-ghost btn-sm mr-4">
+                <i class="fa-solid fa-arrow-left"></i> Back to Users
+            </a>
+        {% endif %}
     </div>
 
     {# --- User Header section --- #}
@@ -50,9 +61,9 @@
 
     <div class="overflow-x-auto">
         <div role="tablist" class="tabs tabs-border mt-2 whitespace-nowrap flex-nowrap">
-            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='profile') }}" class="tab {{ 'tab-active' if active_tab == 'profile' else '' }}">Profile</a>
-            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='history') }}" class="tab {{ 'tab-active' if active_tab == 'history' else '' }}">History</a>
-            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='settings') }}" class="tab {{ 'tab-active' if active_tab == 'settings' else '' }}">Settings</a>
+            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='profile', back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='profile') }}" class="tab {{ 'tab-active' if active_tab == 'profile' else '' }}">Profile</a>
+            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='history', back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='history') }}" class="tab {{ 'tab-active' if active_tab == 'history' else '' }}">History</a>
+            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='settings', back=request.args.get('back')) if request.args.get('back') else url_for('user.view_user', user_id=user.id, tab='settings') }}" class="tab {{ 'tab-active' if active_tab == 'settings' else '' }}">Settings</a>
         </div>
     </div>
 
