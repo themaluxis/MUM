@@ -3,8 +3,13 @@
 {% if invites and invites.items %}
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
     {% for invite in invites.items %}
-    <div class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow duration-200 ease-in-out relative group" id="invite-row-{{ invite.id }}">
-        <div class="card-body p-4">
+    <div class="invite-card card bg-base-200 shadow-lg hover:shadow-xl transition-shadow duration-200 ease-in-out relative group cursor-pointer" id="invite-row-{{ invite.id }}" data-invite-id="{{ invite.id }}">
+        <!-- Selection Checkbox - only visible on hover or when checked -->
+        <div class="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <input type="checkbox" class="invite-checkbox checkbox checkbox-primary" value="{{ invite.id }}" onclick="event.stopPropagation();">
+        </div>
+        
+        <div class="card-body p-4 invite-card-clickable">
             <div class="mb-3">
                 {# The link is now a button that triggers the copy function #}
                 <button class="font-semibold text-primary text-left link link-hover p-0"
@@ -138,7 +143,7 @@
                 </div>
             </div>
             
-            <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">
+            <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90" onclick="event.stopPropagation();">
                 {% if current_user.has_permission('edit_invites') %}
                 <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10" title="Edit Invite"
                         hx-get="{{ url_for('invites.get_edit_invite_form', invite_id=invite.id) }}"

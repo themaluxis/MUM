@@ -244,11 +244,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Hide badges when feature is disabled
                     if (desktopBadge) desktopBadge.style.display = 'none';
                     if (mobileBadge) mobileBadge.style.display = 'none';
-                    console.debug('FRONTEND: Navbar stream badge disabled - hiding badges');
                     return;
                 }
 
-                console.debug('FRONTEND: Requesting session count (navbar badge enabled)');
 
                 // Fetch session count
                 fetch('/api/streaming/sessions/count', {
@@ -265,9 +263,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 // Log server-side throttling info
                 if (data.cached) {
-                    console.debug(`FRONTEND: Using cached session data (${data.time_since_last_check}s old)`);
                 } else {
-                    console.debug(`FRONTEND: Fresh session data fetched`);
                 }
                 
                 // Update both desktop and mobile badges
@@ -318,34 +314,28 @@ document.addEventListener('DOMContentLoaded', function () {
     updateSessionBadges();
 
     // Set up periodic updates - check if navbar stream badge is enabled
-    console.log('FRONTEND: Setting up session monitoring...');
     
     // Check if navbar stream badge is enabled
     fetch('/api/settings/navbar-stream-badge-status')
         .then(response => response.json())
         .then(data => {
             if (data.enabled) {
-                console.log('FRONTEND: Navbar stream badge enabled - using 5s updates');
                 setInterval(updateSessionBadges, 5000); // 5 seconds for responsive navbar
             } else {
-                console.log('FRONTEND: Navbar stream badge disabled - using configured interval');
                 // Get the configured session monitoring interval
                 fetch('/api/settings/session-monitoring-interval')
                     .then(response => response.json())
                     .then(intervalData => {
                         const intervalSeconds = intervalData.interval || 30;
                         const intervalMs = intervalSeconds * 1000;
-                        console.log(`FRONTEND: Setting timer interval to ${intervalSeconds} seconds`);
                         setInterval(updateSessionBadges, intervalMs);
                     })
                     .catch(error => {
-                        console.error('FRONTEND: Failed to get interval, using 30s fallback:', error);
                         setInterval(updateSessionBadges, 30000);
                     });
             }
         })
         .catch(error => {
-            console.error('FRONTEND: Failed to check navbar badge status, using 30s fallback:', error);
             setInterval(updateSessionBadges, 30000);
         });
 

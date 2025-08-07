@@ -1,182 +1,147 @@
-{# File: app/templates/invites/partials/single_invite_card.html #}
-{# Template for rendering a single invite card - used for HTMX updates #}
-<div class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow duration-200 ease-in-out relative group" id="invite-row-{{ invite.id }}">
-    <div class="card-body p-4">
-        <div class="mb-3">
-            {# The link is now a button that triggers the copy function #}
-            <button class="font-semibold text-primary text-left link link-hover p-0"
-                    title="Click to copy invite link"
-                    onclick="copyToClipboard('{{ invite.get_full_url(g.app_base_url) }}', 'Invite link copied!')">
-                {{ invite.custom_path or invite.token[:12] }}
-            </button>
-            <a href="{{ invite.get_full_url(g.app_base_url) }}" target="_blank" class="btn btn-xs btn-ghost p-1" title="Open link in new tab">
-                <i class="fa-solid fa-external-link-alt fa-xs"></i>
-            </a>
-        </div>
-
-        <div class="text-xs space-y-1 mb-3">
-            <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Created: {{ invite.created_at | format_datetime_user if invite.created_at else 'N/A' }}</p>
-            <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-error' if invite.is_expired else 'text-success' }}"></i> Expires: {{ invite.expires_at | format_datetime_user if invite.expires_at else 'Never' }}</p>
-            <p><i class="fa-solid fa-users-line fa-fw mr-1 text-info"></i> Uses: {{ invite.current_uses }} / {{ invite.max_uses or '∞' }}</p>
-            <p><i class="fa-solid fa-circle-question text-violet-600"></i> Status: 
-                {% if not invite.is_active %} <span class="badge badge-error badge-xs">Deactivated</span>
-                {% elif invite.is_expired %} <span class="badge badge-warning badge-xs">Expired</span>
-                {% elif invite.has_reached_max_uses %} <span class="badge badge-warning badge-xs">Max Uses</span>
-                {% else %} <span class="badge badge-success badge-xs">Active</span>
-                {% endif %}</p>
-        </div>
-        
-        <div class="mb-3">
-            <p class="text-xs font-semibold mb-1">Servers:</p>
-            <div class="flex flex-wrap gap-1 mb-2">
-                {% if invite.servers %}
-                    {% for server in invite.servers %}
-                        {% if server.service_type.value == 'plex' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-plex);">
-                                <svg class="w-4 h-4 inline-block mr-1" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="transparent" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>{{ server.name }}
-                            </span>
-                        {% elif server.service_type.value == 'jellyfin' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-jellyfin);">
-                                <i class="fa-solid fa-cube mr-1"></i>{{ server.name }}
-                            </span>
-                        {% elif server.service_type.value == 'emby' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-emby);">
-                                <i class="fa-solid fa-play-circle mr-1"></i>{{ server.name }}
-                            </span>
-                        {% elif server.service_type.value == 'audiobookshelf' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-audiobookshelf);">
-                                <i class="fa-solid fa-headphones mr-1"></i>{{ server.name }}
-                            </span>
-                        {% elif server.service_type.value == 'kavita' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-kavita);">
-                                <i class="fa-solid fa-book mr-1"></i>{{ server.name }}
-                            </span>
-                        {% elif server.service_type.value == 'komga' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-komga);">
-                                <i class="fa-solid fa-book-open mr-1"></i>{{ server.name }}
-                            </span>
-                        {% elif server.service_type.value == 'romm' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-romm);">
-                                <i class="fa-solid fa-gamepad mr-1"></i>{{ server.name }}
-                            </span>
-                        {% else %}
-                            <span class="badge badge-sm badge-neutral">
-                                <i class="fa-solid fa-server mr-1"></i>{{ server.name }}
-                            </span>
-                        {% endif %}
-                    {% endfor %}
-                {% elif invite.server_id %}
-                    {# Fallback for legacy single server #}
-                    {% set legacy_server = invite.server %}
-                    {% if legacy_server %}
-                        {% if legacy_server.service_type.value == 'plex' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-plex);">
-                                <svg class="w-4 h-4 inline-block mr-1" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="transparent" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>{{ legacy_server.name }}
-                            </span>
-                        {% elif legacy_server.service_type.value == 'jellyfin' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-jellyfin);">
-                                <i class="fa-solid fa-cube mr-1"></i>{{ legacy_server.name }}
-                            </span>
-                        {% elif legacy_server.service_type.value == 'emby' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-emby);">
-                                <i class="fa-solid fa-play-circle mr-1"></i>{{ legacy_server.name }}
-                            </span>
-                        {% elif legacy_server.service_type.value == 'audiobookshelf' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-audiobookshelf);">
-                                <i class="fa-solid fa-headphones mr-1"></i>{{ legacy_server.name }}
-                            </span>
-                        {% elif legacy_server.service_type.value == 'kavita' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-kavita);">
-                                <i class="fa-solid fa-book mr-1"></i>{{ legacy_server.name }}
-                            </span>
-                        {% elif legacy_server.service_type.value == 'komga' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-komga);">
-                                <i class="fa-solid fa-book-open mr-1"></i>{{ legacy_server.name }}
-                            </span>
-                        {% elif legacy_server.service_type.value == 'romm' %}
-                            <span class="badge badge-sm text-white" style="background-color: var(--color-romm);">
-                                <i class="fa-solid fa-gamepad mr-1"></i>{{ legacy_server.name }}
-                            </span>
-                        {% else %}
-                            <span class="badge badge-sm badge-neutral">
-                                <i class="fa-solid fa-server mr-1"></i>{{ legacy_server.name }}
-                            </span>
-                        {% endif %}
+<!-- Single Invite Card with Selection -->
+<div class="invite-card bg-base-100 shadow-xl rounded-lg p-6 hover:shadow-2xl transition-shadow duration-300 cursor-pointer relative" data-invite-id="{{ invite.id }}">
+    <!-- Selection Checkbox -->
+    <div class="absolute top-4 left-4 z-10">
+        <input type="checkbox" class="invite-checkbox checkbox checkbox-primary" value="{{ invite.id }}" onclick="event.stopPropagation();">
+    </div>
+    
+    <!-- Clickable area for selection (everything except buttons) -->
+    <div class="invite-card-clickable pl-8">
+        <!-- Invite Status Badge -->
+        <div class="flex justify-between items-start mb-4">
+            <div class="flex items-center space-x-2">
+                {% if invite.is_active %}
+                    {% if invite.expires_at and invite.expires_at < now %}
+                        <span class="badge badge-warning">Expired</span>
+                    {% elif invite.max_uses and invite.current_uses >= invite.max_uses %}
+                        <span class="badge badge-error">Used Up</span>
+                    {% else %}
+                        <span class="badge badge-success">Active</span>
                     {% endif %}
                 {% else %}
-                    <span class="badge badge-sm badge-ghost">No servers attached</span>
+                    <span class="badge badge-neutral">Inactive</span>
+                {% endif %}
+                
+                {% if invite.custom_path %}
+                    <span class="badge badge-info badge-outline">Custom Path</span>
                 {% endif %}
             </div>
             
-            <p class="text-xs font-semibold mb-1">Access:</p>
-            <div class="flex flex-wrap gap-1">
-                {% set granted_ids = invite.grant_library_ids or [] %}
-                {% if granted_ids|length == 0 %}
-                    <span class="badge badge-sm badge-outline badge-success">All Libraries</span>
-                {% else %}
-                    <span class="badge badge-sm badge-outline">{{ granted_ids|length }} Specific Libraries</span>
-                {% endif %}
+            <!-- Action Buttons (non-clickable for selection) -->
+            <div class="flex space-x-2" onclick="event.stopPropagation();">
+                <button class="btn btn-sm btn-ghost" 
+                        hx-get="{{ url_for('invites.usage_details', invite_id=invite.id) }}"
+                        hx-target="#usage-modal-content"
+                        onclick="usage_modal.showModal()"
+                        title="View Usage">
+                    <i class="fa-solid fa-chart-line"></i>
+                </button>
                 
-                {% if invite.allow_downloads %}
-                    <span class="badge badge-sm badge-outline badge-accent">Downloads</span>
-                {% endif %}
-
-                {% if invite.invite_to_plex_home %}
-                    <span class="badge badge-sm badge-outline badge-primary">Plex Home</span>
-                {% endif %}
-
-                {% if invite.allow_live_tv %}
-                    <span class="badge badge-sm badge-outline badge-secondary">Live TV</span>
-                {% endif %}
+                <button class="btn btn-sm btn-ghost" 
+                        hx-get="{{ url_for('invites.edit_invite', invite_id=invite.id) }}"
+                        hx-target="#edit-invite-modal-content"
+                        onclick="edit_invite_modal.showModal()"
+                        title="Edit">
+                    <i class="fa-solid fa-edit"></i>
+                </button>
                 
-                {% if invite.membership_duration_days %}
-                    <span class="badge badge-sm badge-outline badge-warning" title="Membership Duration">{{ invite.membership_duration_days }}-day access</span>
-                {% endif %}
+                <button class="btn btn-sm btn-error" 
+                        hx-delete="{{ url_for('invites.delete_invite', invite_id=invite.id) }}"
+                        hx-confirm="Are you sure you want to delete this invite?"
+                        hx-target="#invite-list-content"
+                        hx-swap="innerHTML"
+                        title="Delete">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
             </div>
         </div>
-        
-        <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">
-            {% if current_user.has_permission('edit_invites') %}
-            <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10" title="Edit Invite"
-                    hx-get="{{ url_for('invites.get_edit_invite_form', invite_id=invite.id) }}"
-                    hx-target="#edit_invite_modal_content_div"
-                    hx-swap="innerHTML"
-                    onclick="edit_invite_modal.showModal()">
-                <i class="fa-solid fa-pen-to-square"></i>
-            </button>
+
+        <!-- Invite Details -->
+        <div class="space-y-3">
+            <!-- Invite Link -->
+            <div>
+                <label class="text-sm font-medium text-base-content/70">Invite Link:</label>
+                <div class="flex items-center space-x-2 mt-1">
+                    {% if invite.custom_path %}
+                        <code class="bg-base-200 px-2 py-1 rounded text-sm flex-1">{{ request.url_root }}invite/{{ invite.custom_path }}</code>
+                    {% else %}
+                        <code class="bg-base-200 px-2 py-1 rounded text-sm flex-1">{{ request.url_root }}invite/{{ invite.token }}</code>
+                    {% endif %}
+                    <button class="btn btn-xs btn-ghost" 
+                            onclick="event.stopPropagation(); copyToClipboard('{% if invite.custom_path %}{{ request.url_root }}invite/{{ invite.custom_path }}{% else %}{{ request.url_root }}invite/{{ invite.token }}{% endif %}')"
+                            title="Copy Link">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Usage Information -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-sm font-medium text-base-content/70">Uses:</label>
+                    <p class="text-sm">
+                        {{ invite.current_uses }}{% if invite.max_uses %} / {{ invite.max_uses }}{% else %} / ∞{% endif %}
+                    </p>
+                </div>
+                
+                <div>
+                    <label class="text-sm font-medium text-base-content/70">Expires:</label>
+                    <p class="text-sm">
+                        {% if invite.expires_at %}
+                            {{ invite.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Created Information -->
+            <div>
+                <label class="text-sm font-medium text-base-content/70">Created:</label>
+                <p class="text-sm">{{ invite.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            </div>
+
+            <!-- Server Access -->
+            {% if invite.invite_servers %}
+            <div>
+                <label class="text-sm font-medium text-base-content/70">Server Access:</label>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {% for invite_server in invite.invite_servers %}
+                        <span class="badge badge-outline badge-sm">{{ invite_server.server.name }}</span>
+                    {% endfor %}
+                </div>
+            </div>
             {% endif %}
-            <button class="btn btn-xs btn-ghost text-info hover:bg-info/10" title="View Usages" hx-get="{{ url_for('invites.view_invite_usages', invite_id=invite.id) }}" hx-target="#invite_usages_modal_content_div" hx-swap="innerHTML" onclick="invite_usages_modal.showModal(); document.getElementById('invite_usages_modal_content_div').innerHTML = '<div class=text-center p-8><span class=loading loading-lg loading-spinner></span></div>';">
-                <i class="fa-solid fa-eye"></i>
-            </button>
-            {% if current_user.has_permission('edit_invites') %}
-            {% if invite.is_active %}
-            <button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" title="Disable Invite" 
-                    hx-confirm="Are you sure you want to disable this invite? It will no longer be usable."
-                    hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
-                    hx-target="#invite-row-{{ invite.id }}"
-                    hx-swap="outerHTML"
-                    hx-indicator="this">
-                <i class="fa-solid fa-ban htmx-indicator-hide"></i>
-                <span class="htmx-indicator loading loading-spinner loading-xs"></span>
-            </button>
-            {% else %}
-            <button class="btn btn-xs btn-ghost text-success hover:bg-success/10" title="Enable Invite"
-                    hx-confirm="Are you sure you want to enable this invite?"
-                    hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
-                    hx-target="#invite-row-{{ invite.id }}"
-                    hx-swap="outerHTML"
-                    hx-indicator="this">
-                <i class="fa-solid fa-check htmx-indicator-hide"></i>
-                <span class="htmx-indicator loading loading-spinner loading-xs"></span>
-            </button>
+
+            <!-- Role Assignment -->
+            {% if invite.role %}
+            <div>
+                <label class="text-sm font-medium text-base-content/70">Assigned Role:</label>
+                <span class="badge badge-primary badge-sm">{{ invite.role.name }}</span>
+            </div>
             {% endif %}
-            {% endif %}
-            {% if current_user.has_permission('delete_invites') %}
-            <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Delete Invite" hx-confirm="Are you sure you want to delete this invite?" hx-delete="{{ url_for('invites.delete_invite', invite_id=invite.id) }}" hx-target="#invite-row-{{ invite.id }}" hx-swap="outerHTML swap:0.5s" hx-indicator="this">
-                <i class="fa-solid fa-trash-can htmx-indicator-hide"></i>
-                <span class="htmx-indicator loading loading-spinner loading-xs"></span>
-            </button>
+
+            <!-- Discord Guild Requirement -->
+            {% if invite.force_guild_membership is not none %}
+            <div>
+                <label class="text-sm font-medium text-base-content/70">Discord Guild Required:</label>
+                <span class="badge badge-{{ 'success' if invite.force_guild_membership else 'neutral' }} badge-sm">
+                    {{ 'Yes' if invite.force_guild_membership else 'No' }}
+                </span>
+            </div>
             {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        // You could add a toast notification here
+        console.log('Copied to clipboard: ' + text);
+    }, function(err) {
+        console.error('Could not copy text: ', err);
+    });
+}
+</script>
