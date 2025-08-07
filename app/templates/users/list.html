@@ -165,10 +165,18 @@
     <div id="mass-edit-container" class="mb-4 hidden">
         <div class="flex items-center space-x-2">
             <button type="button" class="btn btn-accent" id="mass-edit-open-button">
-                <i class="fa-solid fa-pen-to-square mr-2"></i> Mass Edit (<span id="selected-users-count" class="contents">0</span> selected)
+                <i class="fa-solid fa-pen-to-square mr-0 sm:mr-2"></i> 
+                <span class="hidden sm:inline-block">Mass Edit (<span id="selected-users-count" class="contents">0</span> selected)</span>
+                <span class="inline-block sm:hidden">(<span id="selected-users-count-mobile" class="contents">0</span>)</span>
             </button>
-            <button type="button" class="btn btn-secondary" id="select_all_visible_button" title="Select all users currently visible">Select All</button>
-            <button type="button" class="btn btn-secondary" id="deselect_all_visible_button" title="Deselect all users">Deselect All</button>
+            <button type="button" class="btn btn-secondary" id="select_all_visible_button" title="Select all users currently visible">
+                <i class="fa-solid fa-check-square mr-0 sm:mr-2"></i>
+                <span class="hidden sm:inline-block">Select All</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="deselect_all_visible_button" title="Deselect all users">
+                <i class="fa-solid fa-square mr-0 sm:mr-2"></i>
+                <span class="hidden sm:inline-block">Deselect All</span>
+            </button>
         </div>
     </div>
 

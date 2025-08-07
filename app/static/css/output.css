@@ -3016,6 +3016,9 @@
       }
     }
   }
+  .mr-0 {
+    margin-right: calc(var(--spacing) * 0);
+  }
   .mr-1 {
     margin-right: calc(var(--spacing) * 1);
   }
@@ -5277,6 +5280,16 @@
   .sm\:hidden {
     @media (width >= 40rem) {
       display: none;
+    }
+  }
+  .sm\:inline {
+    @media (width >= 40rem) {
+      display: inline;
+    }
+  }
+  .sm\:inline-block {
+    @media (width >= 40rem) {
+      display: inline-block;
     }
   }
   .sm\:table-cell {

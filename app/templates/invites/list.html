@@ -64,13 +64,22 @@
     <div id="mass-actions-container" class="mb-4 p-4 bg-base-200 rounded-lg shadow hidden">
         <div class="flex items-center space-x-2">
             <button type="button" class="btn btn-error" id="delete-selected-button">
-                <i class="fa-solid fa-trash mr-2"></i> Delete (<span id="selected-invites-count" class="contents">0</span> selected)
+                <i class="fa-solid fa-trash mr-0 sm:mr-2"></i> 
+                <span class="hidden sm:inline-block">Delete (<span id="selected-invites-count" class="contents">0</span> selected)</span>
+                <span class="inline-block sm:hidden">(<span id="selected-invites-count-mobile" class="contents">0</span>)</span>
             </button>
             <button type="button" class="btn btn-warning" id="disable-selected-button">
-                <i class="fa-solid fa-ban mr-2"></i> Disable Selected
+                <i class="fa-solid fa-ban mr-0 sm:mr-2"></i> 
+                <span class="hidden sm:inline-block">Disable Selected</span>
             </button>
-            <button type="button" class="btn btn-secondary" id="select_all_visible_button" title="Select all invites currently visible">Select All</button>
-            <button type="button" class="btn btn-secondary" id="deselect_all_visible_button" title="Deselect All">Deselect All</button>
+            <button type="button" class="btn btn-secondary" id="select_all_visible_button" title="Select all invites currently visible">
+                <i class="fa-solid fa-check-square mr-0 sm:mr-2"></i>
+                <span class="hidden sm:inline-block">Select All</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="deselect_all_visible_button" title="Deselect All">
+                <i class="fa-solid fa-square mr-0 sm:mr-2"></i>
+                <span class="hidden sm:inline-block">Deselect All</span>
+            </button>
         </div>
     </div>
 
@@ -150,15 +159,16 @@
 {% block scripts %}
 {{ super() }}
 <style>
-/* Show checkbox on hover or when checked */
-.invite-card .invite-checkbox:checked + * {
+/* Show checkbox on hover or when selected */
+.invite-card:hover > div:first-child,
+.invite-card.selected > div:first-child {
     opacity: 1 !important;
 }
-.invite-card:has(.invite-checkbox:checked) .invite-checkbox {
-    opacity: 1 !important;
-}
-/* Alternative for browsers that don't support :has() */
-.invite-card.selected .invite-checkbox {
+
+/* Also target the checkbox directly */
+.invite-card:hover .invite-checkbox,
+.invite-card.selected .invite-checkbox,
+.invite-card .invite-checkbox:checked {
     opacity: 1 !important;
 }
 </style>
@@ -218,6 +228,7 @@ function updateMassActions() {
     
     const massActionsContainer = document.getElementById('mass-actions-container');
     const selectedCountSpan = document.getElementById('selected-invites-count');
+    const selectedCountSpanMobile = document.getElementById('selected-invites-count-mobile');
     const selectedCheckboxes = document.querySelectorAll('.invite-checkbox:checked');
     const allCheckboxes = document.querySelectorAll('.invite-checkbox');
     const selectedCount = selectedCheckboxes.length;
@@ -225,6 +236,7 @@ function updateMassActions() {
     console.log('📊 Debug info:', {
         massActionsContainer: massActionsContainer ? 'Found' : 'NOT FOUND',
         selectedCountSpan: selectedCountSpan ? 'Found' : 'NOT FOUND',
+        selectedCountSpanMobile: selectedCountSpanMobile ? 'Found' : 'NOT FOUND',
         allCheckboxes: allCheckboxes.length,
         selectedCheckboxes: selectedCheckboxes.length,
         selectedCount: selectedCount
@@ -235,6 +247,11 @@ function updateMassActions() {
         console.log('✅ Updated count span to:', selectedCount);
     } else {
         console.log('❌ selectedCountSpan not found');
+    }
+    
+    if (selectedCountSpanMobile) {
+        selectedCountSpanMobile.textContent = selectedCount;
+        console.log('✅ Updated mobile count span to:', selectedCount);
     }
     
     if (massActionsContainer) {
