@@ -223,15 +223,44 @@ class JellyfinMediaService(BaseMediaService):
                 # If no ItemId, try to use the Name as a fallback identifier
                 external_id = lib_id if lib_id else lib_name
                 
+                # Try to get actual item count for this library
+                item_count = 0
+                try:
+                    # Get the actual library folder to find its ID
+                    libraries_endpoint = self._make_request('Library/MediaFolders')
+                    matching_folder = None
+                    for folder in libraries_endpoint:
+                        if folder.get('Name') == lib_name:
+                            matching_folder = folder
+                            break
+                    
+                    if matching_folder and matching_folder.get('Id'):
+                        folder_id = matching_folder.get('Id')
+                        # Get item count for this specific library
+                        items_response = self._make_request(f'Items?ParentId={folder_id}&Recursive=true&Fields=BasicSyncInfo&Limit=1')
+                        item_count = items_response.get('TotalRecordCount', 0)
+                        self.log_info(f"Library '{lib_name}' has {item_count} items")
+                    else:
+                        self.log_warning(f"Could not find matching MediaFolder for library '{lib_name}'")
+                except Exception as count_error:
+                    self.log_warning(f"Could not get item count for library '{lib_name}': {count_error}")
+                    item_count = 0
+
                 library_data = {
                     'id': external_id,
                     'name': lib_name,
                     'type': collection_type.lower() if collection_type else 'mixed',
-                    'item_count': 0,  # Jellyfin VirtualFolders doesn't provide this
-                    'external_id': external_id
+                    'item_count': item_count,
+                    'external_id': external_id,
+                    'raw_data': lib  # Store the complete VirtualFolders response for the info modal
                 }
                 
                 self.log_info(f"Processed library data: {library_data}")
+                self.log_info(f"Library data keys: {list(library_data.keys())}")
+                self.log_info(f"Raw data present: {'raw_data' in library_data}")
+                if 'raw_data' in library_data:
+                    self.log_info(f"Raw data type: {type(library_data['raw_data'])}")
+                    self.log_info(f"Raw data keys: {list(library_data['raw_data'].keys()) if isinstance(library_data['raw_data'], dict) else 'Not a dict'}")
                 result.append(library_data)
             
             self.log_info(f"Successfully processed {len(result)} libraries from Jellyfin")

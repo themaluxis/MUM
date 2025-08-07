@@ -20,10 +20,31 @@ def index():
         if service:
             try:
                 libs = service.get_libraries()
+                current_app.logger.debug(f"Libraries from {server.name}: {libs}")
                 for lib in libs:
-                    lib['server_name'] = server.name
-                    lib['service_type'] = server.service_type.value
-                    lib['server_id'] = server.id
+                    # Create a copy to avoid modifying the original library data
+                    lib_copy = lib.copy()
+                    if 'raw_data' in lib_copy:
+                        lib_copy['raw_data'] = lib_copy['raw_data'].copy() if isinstance(lib_copy['raw_data'], dict) else lib_copy['raw_data']
+                    
+                    lib_copy['server_name'] = server.name
+                    lib_copy['service_type'] = server.service_type.value
+                    lib_copy['server_id'] = server.id
+                    current_app.logger.debug(f"Library {lib_copy['name']} from {server.name} ({server.service_type.value}) raw_data present: {'raw_data' in lib_copy}")
+                    if 'raw_data' in lib_copy:
+                        raw_data_keys = list(lib_copy['raw_data'].keys()) if isinstance(lib_copy['raw_data'], dict) else 'Not a dict'
+                        current_app.logger.debug(f"Library {lib_copy['name']} from {server.name} raw_data keys: {raw_data_keys}")
+                        # Log a sample of the raw data to identify the source
+                        if isinstance(lib_copy['raw_data'], dict):
+                            if 'Name' in lib_copy['raw_data']:  # Jellyfin style
+                                current_app.logger.debug(f"Library {lib_copy['name']} appears to be Jellyfin data (has 'Name' key)")
+                            elif 'title' in lib_copy['raw_data']:  # Plex style
+                                current_app.logger.debug(f"Library {lib_copy['name']} appears to be Plex data (has 'title' key)")
+                            else:
+                                current_app.logger.debug(f"Library {lib_copy['name']} has unknown raw_data format")
+                    
+                    # Use the copy instead of the original
+                    lib = lib_copy
                 
                 # Group by service type
                 service_type = server.service_type.value.upper()
@@ -74,6 +95,7 @@ def index():
         for service_data in libraries_by_service.values():
             for server_data in service_data['servers'].values():
                 for lib in server_data['libraries']:
+                    current_app.logger.debug(f"Simple layout - Library {lib['name']} from {lib.get('server_name', 'unknown')} raw_data present: {'raw_data' in lib}")
                     simple_libraries.append(lib)
 
     return render_template(

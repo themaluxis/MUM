@@ -76,13 +76,77 @@ class PlexMediaService(BaseMediaService):
         libraries = []
         try:
             for lib in server.library.sections():
-                libraries.append({
-                    'id': str(lib.key),
-                    'name': lib.title,
-                    'type': lib.type,
-                    'item_count': lib.totalSize,
-                    'external_id': str(lib.key)
-                })
+                try:
+                    # Store raw library data for the info modal - with safe attribute access
+                    raw_lib_data = {
+                        'key': getattr(lib, 'key', None),
+                        'title': getattr(lib, 'title', None),
+                        'type': getattr(lib, 'type', None),
+                        'totalSize': getattr(lib, 'totalSize', None),
+                        'uuid': getattr(lib, 'uuid', None),
+                        'agent': getattr(lib, 'agent', None),
+                        'scanner': getattr(lib, 'scanner', None),
+                        'language': getattr(lib, 'language', None),
+                        'refreshing': getattr(lib, 'refreshing', None),
+                        'updatedAt': str(getattr(lib, 'updatedAt', None)) if getattr(lib, 'updatedAt', None) else None,
+                        'createdAt': str(getattr(lib, 'createdAt', None)) if getattr(lib, 'createdAt', None) else None,
+                        'scannedAt': str(getattr(lib, 'scannedAt', None)) if getattr(lib, 'scannedAt', None) else None,
+                        'thumb': getattr(lib, 'thumb', None),
+                        'art': getattr(lib, 'art', None),
+                        'composite': getattr(lib, 'composite', None),
+                        'filters': getattr(lib, 'filters', None),
+                        'sorts': getattr(lib, 'sorts', None),
+                        'fields': getattr(lib, 'fields', None)
+                    }
+                    
+                    # Safely get locations
+                    try:
+                        locations = getattr(lib, 'locations', [])
+                        raw_lib_data['locations'] = [getattr(loc, 'path', str(loc)) for loc in locations] if locations else []
+                    except Exception as loc_error:
+                        self.log_warning(f"Error getting locations for library {lib.title}: {loc_error}")
+                        raw_lib_data['locations'] = []
+                    
+                    # Safely get all attributes
+                    try:
+                        safe_attrs = {}
+                        for attr in dir(lib):
+                            if not attr.startswith('_'):
+                                try:
+                                    value = getattr(lib, attr, None)
+                                    if not callable(value):
+                                        # Convert datetime objects to strings for JSON serialization
+                                        if hasattr(value, 'strftime'):
+                                            value = str(value)
+                                        safe_attrs[attr] = value
+                                except Exception:
+                                    safe_attrs[attr] = f"<Error accessing {attr}>"
+                        raw_lib_data['all_attributes'] = safe_attrs
+                    except Exception as attr_error:
+                        self.log_warning(f"Error getting attributes for library {lib.title}: {attr_error}")
+                        raw_lib_data['all_attributes'] = {}
+                    
+                    libraries.append({
+                        'id': str(lib.key),
+                        'name': lib.title,
+                        'type': lib.type,
+                        'item_count': lib.totalSize,
+                        'external_id': str(lib.key),
+                        'raw_data': raw_lib_data  # Store the complete Plex library data for the info modal
+                    })
+                    
+                except Exception as lib_error:
+                    self.log_error(f"Error processing individual library {getattr(lib, 'title', 'Unknown')}: {lib_error}")
+                    # Add basic library info even if raw_data fails
+                    libraries.append({
+                        'id': str(getattr(lib, 'key', 'unknown')),
+                        'name': getattr(lib, 'title', 'Unknown Library'),
+                        'type': getattr(lib, 'type', 'unknown'),
+                        'item_count': getattr(lib, 'totalSize', 0),
+                        'external_id': str(getattr(lib, 'key', 'unknown')),
+                        'raw_data': {'error': f'Could not fetch raw data: {str(lib_error)}'}
+                    })
+                    
         except Exception as e:
             self.log_error(f"Error fetching libraries: {e}")
         
