@@ -943,7 +943,12 @@ def get_quick_edit_form(user_id):
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
     
     # Pre-populate the fields with the user's current settings from all their servers
-    form.libraries.data = list(set(current_library_ids))  # Remove duplicates
+    # Handle special case for Jellyfin users with '*' (all libraries access)
+    if current_library_ids == ['*']:
+        # If user has "All Libraries" access, check all available library checkboxes
+        form.libraries.data = list(available_libraries.keys())
+    else:
+        form.libraries.data = list(set(current_library_ids))  # Remove duplicates
     form.allow_downloads.data = user.allow_downloads
     form.allow_4k_transcode.data = user.allow_4k_transcode
     form.is_discord_bot_whitelisted.data = user.is_discord_bot_whitelisted

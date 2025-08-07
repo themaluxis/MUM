@@ -120,6 +120,12 @@ def view_user(user_id):
                             # Filter the new library IDs to only include ones available on this server
                             new_libs_for_this_server = [lib_id for lib_id in new_library_ids_from_form if lib_id in server_lib_ids]
                             
+                            # Special handling for Jellyfin: if all libraries are selected, use '*' wildcard
+                            if (access.server.service_type == ServiceType.JELLYFIN and 
+                                set(new_libs_for_this_server) == set(server_lib_ids) and 
+                                len(server_lib_ids) > 0):
+                                new_libs_for_this_server = ['*']
+                            
                             # Update the access record
                             access.allowed_library_ids = new_libs_for_this_server
                             access.updated_at = datetime.utcnow()
@@ -159,7 +165,13 @@ def view_user(user_id):
                 updated_user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
                 for access in updated_user_access_records:
                     current_library_ids_after_save.extend(access.allowed_library_ids or [])
-                form_after_save.libraries.data = list(set(current_library_ids_after_save))
+                
+                # Handle special case for Jellyfin users with '*' (all libraries access)
+                if current_library_ids_after_save == ['*']:
+                    # If user has "All Libraries" access, check all available library checkboxes
+                    form_after_save.libraries.data = list(available_libraries.keys())
+                else:
+                    form_after_save.libraries.data = list(set(current_library_ids_after_save))
 
                 # OOB-SWAP LOGIC
                 # 1. Render the updated form for the modal (the primary target)
@@ -253,7 +265,12 @@ def view_user(user_id):
         for access in user_access_records:
             current_library_ids.extend(access.allowed_library_ids or [])
         
-        form.libraries.data = list(set(current_library_ids))  # Remove duplicates
+        # Handle special case for Jellyfin users with '*' (all libraries access)
+        if current_library_ids == ['*']:
+            # If user has "All Libraries" access, check all available library checkboxes
+            form.libraries.data = list(available_libraries.keys())
+        else:
+            form.libraries.data = list(set(current_library_ids))  # Remove duplicates
         # Remove the old access_expires_in_days logic since we're now using DateField
         # The form will automatically populate access_expires_at from the user object via obj=user
 
