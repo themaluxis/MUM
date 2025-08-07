@@ -454,15 +454,42 @@ def update_user_last_streamed(plex_user_id_or_uuid, last_streamed_at_datetime: d
             user.updated_at = datetime.utcnow().replace(tzinfo=None)
             try: 
                 db.session.commit()
-                current_app.logger.info(f"User_Service.py - update_user_last_streamed(): Updated last_streamed_at for {user.plex_username} to {user.last_streamed_at}")
+                current_app.logger.info(f"User_Service.py - update_user_last_streamed(): Updated last_streamed_at for {user.get_display_name()} to {user.last_streamed_at}")
                 return True
             except Exception as e: 
                 db.session.rollback()
-                current_app.logger.error(f"User_Service.py - update_user_last_streamed(): DB Commit Error for user {user.plex_username} (Plex ID/UUID: {plex_user_id_or_uuid}): {e}", exc_info=True)
+                current_app.logger.error(f"User_Service.py - update_user_last_streamed(): DB Commit Error for user {user.get_display_name()} (Plex ID/UUID: {plex_user_id_or_uuid}): {e}", exc_info=True)
         # else:
-            # current_app.logger.debug(f"User_Service.py - update_user_last_streamed(): No update needed for {user.plex_username}. DB: {db_last_streamed_at_aware}, Current: {last_streamed_at_datetime}")
+            # current_app.logger.debug(f"User_Service.py - update_user_last_streamed(): No update needed for {user.get_display_name()}. DB: {db_last_streamed_at_aware}, Current: {last_streamed_at_datetime}")
     # else:
         # current_app.logger.warning(f"User_Service.py - update_user_last_streamed(): User not found in MUM with Plex ID/UUID: {plex_user_id_or_uuid}.")
+    return False
+
+def update_user_last_streamed_by_id(user_id: int, last_streamed_at_datetime: datetime):
+    """Universal function to update last_streamed_at for any user by their MUM user ID"""
+    user = User.query.get(user_id)
+    if not user:
+        current_app.logger.warning(f"User_Service.py - update_user_last_streamed_by_id(): User not found with ID: {user_id}")
+        return False
+
+    if last_streamed_at_datetime.tzinfo is None: 
+        last_streamed_at_datetime = last_streamed_at_datetime.replace(tzinfo=timezone.utc)
+    
+    db_last_streamed_at_naive = user.last_streamed_at 
+    db_last_streamed_at_aware = None
+    if db_last_streamed_at_naive:
+        db_last_streamed_at_aware = db_last_streamed_at_naive.replace(tzinfo=timezone.utc)
+    
+    if db_last_streamed_at_aware is None or last_streamed_at_datetime > db_last_streamed_at_aware:
+        user.last_streamed_at = last_streamed_at_datetime.replace(tzinfo=None) 
+        user.updated_at = datetime.utcnow().replace(tzinfo=None)
+        try: 
+            db.session.commit()
+            current_app.logger.info(f"User_Service.py - update_user_last_streamed_by_id(): Updated last_streamed_at for {user.get_display_name()} to {user.last_streamed_at}")
+            return True
+        except Exception as e: 
+            db.session.rollback()
+            current_app.logger.error(f"User_Service.py - update_user_last_streamed_by_id(): DB Commit Error for user {user.get_display_name()} (ID: {user_id}): {e}", exc_info=True)
     return False
 
 def purge_inactive_users(user_ids_to_purge: list[int], admin_id: int, inactive_days_threshold: int, exclude_sharers: bool, exclude_whitelisted: bool, ignore_creation_date_for_never_streamed: bool):

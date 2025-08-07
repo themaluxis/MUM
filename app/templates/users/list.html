@@ -46,55 +46,137 @@
         </div>
     </div>
     
-    <form method="GET" action="{{ url_for('users.list_users') }}" class="mb-6 p-4 bg-base-200 rounded-lg shadow" id="userFilterForm">
-        <input type="hidden" name="view" value="{{ current_view }}">
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
-            <div class="form-control">
-                <label class="label"><span class="label-text">Server</span></label>
-                <select name="server_id" class="select select-sm select-bordered">
-                    {% for server in server_dropdown_options %}
-                    <option value="{{ server.id }}" {% if request.args.get('server_id', 'all') == server.id %}selected{% endif %}>{{ server.name }}</option>
-                    {% endfor %}
-                </select>
+    <!-- Simple Search Bar with Filter Button -->
+    <form method="GET" action="{{ url_for('users.list_users') }}" class="p-4 bg-base-200 rounded-lg shadow">
+        <div class="flex gap-2">
+            <div class="form-control flex-1">
+                <input type="text" name="search" placeholder="Search by username or email..." 
+                       class="input input-bordered w-full" value="{{ request.args.get('search', '') }}">
+                <!-- Hidden inputs to preserve current filters -->
+                <input type="hidden" name="server_id" value="{{ request.args.get('server_id', 'all') }}">
+                <input type="hidden" name="filter_type" value="{{ request.args.get('filter_type', '') }}">
+                <input type="hidden" name="sort_by" value="{{ request.args.get('sort_by', 'username_asc') }}">
+                <input type="hidden" name="per_page" value="{{ current_per_page }}">
+                <input type="hidden" name="view" value="{{ current_view }}">
             </div>
-            <div class="form-control">
-                <label class="label"><span class="label-text">Search User</span></label>
-                <input type="text" name="search" placeholder="Username or Email" class="input input-sm input-bordered" value="{{ request.args.get('search', '') }}">
-            </div>
-            <div class="form-control">
-                <label class="label"><span class="label-text">Filter by</span></label>
-                <select name="filter_type" class="select select-sm select-bordered">
-                    <option value="" {% if not request.args.get('filter_type') %}selected{% endif %}>All Users</option>
-                    <option value="home_user" {% if request.args.get('filter_type')=='home_user' %}selected{% endif %}>Home Users</option>
-                    <option value="shares_back" {% if request.args.get('filter_type')=='shares_back' %}selected{% endif %}>Shares Back</option>
-                    <option value="has_discord" {% if request.args.get('filter_type')=='has_discord' %}selected{% endif %}>Discord Linked</option>
-                    <option value="no_discord" {% if request.args.get('filter_type')=='no_discord' %}selected{% endif %}>No Discord Linked</option>
-                </select>
-            </div>
-            <div class="form-control">
-                <label class="label"><span class="label-text">Sort by</span></label>
-                <select name="sort_by" class="select select-sm select-bordered">
-                    <option value="username_asc" {% if request.args.get('sort_by', 'username_asc' )=='username_asc' %}selected{% endif %}>Username (A-Z)</option>
-                    <option value="username_desc" {% if request.args.get('sort_by')=='username_desc' %}selected{% endif %}>Username (Z-A)</option>
-                    <option value="last_streamed_desc" {% if request.args.get('sort_by')=='last_streamed_desc' %}selected{% endif %}>Last Streamed (Newest)</option>
-                    <option value="last_streamed_asc" {% if request.args.get('sort_by')=='last_streamed_asc' %}selected{% endif %}>Last Streamed (Oldest)</option>
-                    <option value="created_at_desc" {% if request.args.get('sort_by')=='created_at_desc' %}selected{% endif %}>Date Added (Newest)</option>
-                    <option value="created_at_asc" {% if request.args.get('sort_by')=='created_at_asc' %}selected{% endif %}>Date Added (Oldest)</option>
-                </select>
-            </div>
-            <div class="form-control">
-                <label class="label"><span class="label-text">Per Page</span></label>
-                <select name="per_page" class="select select-sm select-bordered" onchange="this.form.submit()">
-                    {% for count in [12, 24, 48, 96] %}
-                    <option value="{{ count }}" {% if current_per_page==count %}selected{% endif %}>{{ count }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-control">
-                <button type="submit" class="btn btn-sm btn-primary w-full"><i class="fa-solid fa-filter mr-2"></i> Apply</button>
-            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-search"></i>
+            </button>
+            <label for="sort-filter-drawer" class="btn btn-secondary drawer-button">
+                <i class="fa-solid fa-filter mr-2"></i>
+                <span class="hidden sm:inline">Sort & Filter</span>
+            </label>
         </div>
     </form>
+
+    <!-- Sort and Filter Drawer -->
+    <div class="drawer drawer-end">
+        <input id="sort-filter-drawer" type="checkbox" class="drawer-toggle" />
+        <div class="drawer-content">
+            <!-- Page content here -->
+        </div>
+        <div class="drawer-side z-50">
+            <label for="sort-filter-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+            <div class="menu bg-base-200 text-base-content min-h-full w-80 p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold">
+                        <i class="fa-solid fa-filter mr-2"></i>Sort & Filter Options
+                    </h3>
+                    <label for="sort-filter-drawer" class="btn btn-sm btn-circle btn-ghost">
+                        <i class="fa-solid fa-times"></i>
+                    </label>
+                </div>
+                
+                <form method="GET" action="{{ url_for('users.list_users') }}" id="drawerFilterForm">
+                    <!-- Preserve current view -->
+                    <input type="hidden" name="view" value="{{ current_view }}">
+                    
+                    <div class="space-y-4">
+                        <!-- Server Filter -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium">
+                                    <i class="fa-solid fa-server mr-2"></i>Server
+                                </span>
+                            </label>
+                            <select name="server_id" class="select select-bordered">
+                                {% for server in server_dropdown_options %}
+                                <option value="{{ server.id }}" {% if request.args.get('server_id', 'all') == server.id %}selected{% endif %}>{{ server.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Search User -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium">
+                                    <i class="fa-solid fa-search mr-2"></i>Search User
+                                </span>
+                            </label>
+                            <input type="text" name="search" placeholder="Username or Email" class="input input-bordered" value="{{ request.args.get('search', '') }}">
+                        </div>
+                        
+                        <!-- Filter Type -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium">
+                                    <i class="fa-solid fa-filter mr-2"></i>Filter by
+                                </span>
+                            </label>
+                            <select name="filter_type" class="select select-bordered">
+                                <option value="" {% if not request.args.get('filter_type') %}selected{% endif %}>All Users</option>
+                                <option value="home_user" {% if request.args.get('filter_type')=='home_user' %}selected{% endif %}>Home Users</option>
+                                <option value="shares_back" {% if request.args.get('filter_type')=='shares_back' %}selected{% endif %}>Shares Back</option>
+                                <option value="has_discord" {% if request.args.get('filter_type')=='has_discord' %}selected{% endif %}>Discord Linked</option>
+                                <option value="no_discord" {% if request.args.get('filter_type')=='no_discord' %}selected{% endif %}>No Discord Linked</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Sort Options -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium">
+                                    <i class="fa-solid fa-sort mr-2"></i>Sort by
+                                </span>
+                            </label>
+                            <select name="sort_by" class="select select-bordered">
+                                <option value="username_asc" {% if request.args.get('sort_by', 'username_asc' )=='username_asc' %}selected{% endif %}>Username (A-Z)</option>
+                                <option value="username_desc" {% if request.args.get('sort_by')=='username_desc' %}selected{% endif %}>Username (Z-A)</option>
+                                <option value="email_asc" {% if request.args.get('sort_by')=='email_asc' %}selected{% endif %}>Email (A-Z)</option>
+                                <option value="email_desc" {% if request.args.get('sort_by')=='email_desc' %}selected{% endif %}>Email (Z-A)</option>
+                                <option value="created_at_desc" {% if request.args.get('sort_by')=='created_at_desc' %}selected{% endif %}>Date Added (Newest)</option>
+                                <option value="created_at_asc" {% if request.args.get('sort_by')=='created_at_asc' %}selected{% endif %}>Date Added (Oldest)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Per Page -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium">
+                                    <i class="fa-solid fa-list mr-2"></i>Items per Page
+                                </span>
+                            </label>
+                            <select name="per_page" class="select select-bordered">
+                                {% for count in [12, 24, 48, 96] %}
+                                <option value="{{ count }}" {% if current_per_page==count %}selected{% endif %}>{{ count }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col gap-2 pt-4">
+                            <button type="submit" class="btn btn-primary" onclick="document.getElementById('sort-filter-drawer').checked = false;">
+                                <i class="fa-solid fa-check mr-2"></i>Apply Filters
+                            </button>
+                            <a href="{{ url_for('users.list_users') }}" class="btn btn-outline">
+                                <i class="fa-solid fa-refresh mr-2"></i>Clear All
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     {% if current_user.has_permission('purge_users') %}
     <div class="card bg-base-200 shadow-lg my-6">

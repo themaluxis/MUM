@@ -442,7 +442,14 @@ class PlexMediaService(BaseMediaService):
                 
                 # Transcoding info
                 transcode_session = raw_session.transcodeSession
-                is_transcoding = transcode_session is not None
+                
+                # Determine if actually transcoding based on decisions, not just presence of transcode session
+                is_transcoding = False
+                if transcode_session:
+                    video_decision = getattr(transcode_session, 'videoDecision', None)
+                    audio_decision = getattr(transcode_session, 'audioDecision', None)
+                    # Only consider it transcoding if video or audio is actually being transcoded
+                    is_transcoding = (video_decision == 'transcode') or (audio_decision == 'transcode')
                 
                 # Location info
                 location_ip = getattr(player, 'address', 'N/A')
@@ -465,10 +472,18 @@ class PlexMediaService(BaseMediaService):
                             user_avatar_url = None
                 
                 # Media details
-                original_media = next((m for m in raw_session.media if not m.selected), raw_session.media[0])
-                original_media_part = original_media.parts[0]
-                original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
-                original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
+                original_media = None
+                original_media_part = None
+                original_video_stream = None
+                original_audio_stream = None
+                
+                if raw_session.media:
+                    original_media = next((m for m in raw_session.media if not m.selected), raw_session.media[0])
+                    if original_media and original_media.parts:
+                        original_media_part = original_media.parts[0]
+                        if original_media_part and original_media_part.streams:
+                            original_video_stream = next((s for s in original_media_part.streams if s.streamType == 1), None)
+                            original_audio_stream = next((s for s in original_media_part.streams if s.streamType == 2), None)
                 
                 # Initialize details
                 quality_detail = ""
@@ -485,30 +500,37 @@ class PlexMediaService(BaseMediaService):
                     stream_details = f"Transcode {status} {speed}".strip()
                     
                     # Container
-                    original_container = original_media_part.container.upper() if original_media_part else 'N/A'
-                    transcoded_container = transcode_session.container.upper() if transcode_session else 'N/A'
+                    original_container = original_media_part.container.upper() if original_media_part and hasattr(original_media_part, 'container') and original_media_part.container else 'N/A'
+                    transcoded_container = transcode_session.container.upper() if transcode_session and hasattr(transcode_session, 'container') and transcode_session.container else 'N/A'
                     container_detail = f"Converting ({original_container} → {transcoded_container})"
 
                     # Video
                     original_res = get_standard_resolution(original_video_stream.height) if original_video_stream else "Unknown"
                     transcoded_res = get_standard_resolution(transcode_session.height) if transcode_session else "Unknown"
                     if transcode_session and transcode_session.videoDecision == "copy":
-                        video_detail = f"Direct Stream ({original_video_stream.codec.upper()} {original_res})"
+                        original_codec = original_video_stream.codec.upper() if original_video_stream and hasattr(original_video_stream, 'codec') and original_video_stream.codec else 'Unknown'
+                        video_detail = f"Direct Stream ({original_codec} {original_res})"
                     else:
-                        video_detail = f"Transcode ({original_video_stream.codec.upper()} {original_res} → {transcode_session.videoCodec.upper() if transcode_session else 'N/A'} {transcoded_res})"
+                        original_codec = original_video_stream.codec.upper() if original_video_stream and hasattr(original_video_stream, 'codec') and original_video_stream.codec else 'Unknown'
+                        transcoded_codec = transcode_session.videoCodec.upper() if transcode_session and hasattr(transcode_session, 'videoCodec') and transcode_session.videoCodec else 'N/A'
+                        video_detail = f"Transcode ({original_codec} {original_res} → {transcoded_codec} {transcoded_res})"
 
                     # Audio
                     if transcode_session and transcode_session.audioDecision == "copy":
-                        audio_detail = f"Direct Stream ({original_audio_stream.displayTitle})"
+                        original_audio_display = original_audio_stream.displayTitle if original_audio_stream and hasattr(original_audio_stream, 'displayTitle') else "Unknown"
+                        audio_detail = f"Direct Stream ({original_audio_display})"
                     else:
-                        original_audio_display = original_audio_stream.displayTitle if original_audio_stream else "Unknown"
+                        original_audio_display = original_audio_stream.displayTitle if original_audio_stream and hasattr(original_audio_stream, 'displayTitle') else "Unknown"
                         audio_channel_layout_map = {1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1"}
-                        transcoded_channel_layout = audio_channel_layout_map.get(transcode_session.audioChannels, f"{transcode_session.audioChannels}ch") if transcode_session else "N/A"
-                        transcoded_audio_display = f"{transcode_session.audioCodec.upper() if transcode_session else 'N/A'} {transcoded_channel_layout}"
+                        transcoded_channel_layout = audio_channel_layout_map.get(transcode_session.audioChannels, f"{transcode_session.audioChannels}ch") if transcode_session and hasattr(transcode_session, 'audioChannels') and transcode_session.audioChannels else "N/A"
+                        transcoded_audio_codec = transcode_session.audioCodec.upper() if transcode_session and hasattr(transcode_session, 'audioCodec') and transcode_session.audioCodec else 'N/A'
+                        transcoded_audio_display = f"{transcoded_audio_codec} {transcoded_channel_layout}"
                         audio_detail = f"Transcode ({original_audio_display} → {transcoded_audio_display})"
 
                     # Subtitle
-                    selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
+                    selected_subtitle_stream = None
+                    if raw_session.media:
+                        selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if p and s.streamType == 3 and s.selected), None)
                     if transcode_session and transcode_session.subtitleDecision == "transcode":
                         if selected_subtitle_stream:
                             lang = selected_subtitle_stream.language or "Unknown"
@@ -527,26 +549,49 @@ class PlexMediaService(BaseMediaService):
                         subtitle_detail = f"Direct Stream ({selected_subtitle_stream.displayTitle})" if selected_subtitle_stream else "Direct Stream (Unknown)"
 
                     # Quality
-                    transcoded_media = next((m for m in raw_session.media if m.selected), None)
+                    transcoded_media = next((m for m in raw_session.media if m.selected), None) if raw_session.media else None
                     quality_res = get_standard_resolution(getattr(transcoded_media, 'height', transcode_session.height if transcode_session else 0))
-                    quality_detail = f"{quality_res} ({transcoded_media.bitrate / 1000:.1f} Mbps)" if transcoded_media else f"{quality_res} (Bitrate N/A)"
+                    if transcoded_media and hasattr(transcoded_media, 'bitrate') and transcoded_media.bitrate:
+                        quality_detail = f"{quality_res} ({transcoded_media.bitrate / 1000:.1f} Mbps)"
+                    else:
+                        quality_detail = f"{quality_res} (Bitrate N/A)"
 
                 else:
-                    # Direct Play
+                    # Direct Play/Stream - determine based on transcode session decisions
                     stream_details = "Direct Play"
-                    if any(p.decision == 'transcode' for m in raw_session.media for p in m.parts):
+                    
+                    # Check if it's actually direct stream (remuxing container but not transcoding content)
+                    if transcode_session:
+                        video_decision = getattr(transcode_session, 'videoDecision', None)
+                        audio_decision = getattr(transcode_session, 'audioDecision', None)
+                        if video_decision == 'copy' or audio_decision == 'copy':
+                            stream_details = "Direct Stream"
+                    elif raw_session.media and any(p.decision == 'transcode' for m in raw_session.media for p in m.parts if p):
                         stream_details = "Direct Stream"
 
                     original_res = get_standard_resolution(original_video_stream.height) if original_video_stream else "Unknown"
-                    container_detail = original_media_part.container.upper()
-                    video_detail = f"Direct Play ({original_video_stream.codec.upper()} {original_res})" if original_video_stream else "Direct Play (Unknown Video)"
-                    audio_detail = f"Direct Play ({original_audio_stream.displayTitle})" if original_audio_stream else "Direct Play (Unknown Audio)"
+                    container_detail = original_media_part.container.upper() if original_media_part and hasattr(original_media_part, 'container') and original_media_part.container else "Unknown"
                     
-                    selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if s.streamType == 3 and s.selected), None)
+                    # Use the determined stream type (Direct Play or Direct Stream) for details
+                    stream_type = "Direct Stream" if stream_details == "Direct Stream" else "Direct Play"
+                    
+                    if original_video_stream and hasattr(original_video_stream, 'codec') and original_video_stream.codec:
+                        video_detail = f"{stream_type} ({original_video_stream.codec.upper()} {original_res})"
+                    else:
+                        video_detail = f"{stream_type} (Unknown Video)"
+                    
+                    if original_audio_stream and hasattr(original_audio_stream, 'displayTitle') and original_audio_stream.displayTitle:
+                        audio_detail = f"{stream_type} ({original_audio_stream.displayTitle})"
+                    else:
+                        audio_detail = f"{stream_type} (Unknown Audio)"
+                    
+                    selected_subtitle_stream = None
+                    if raw_session.media:
+                        selected_subtitle_stream = next((s for m in raw_session.media for p in m.parts for s in p.streams if p and s.streamType == 3 and s.selected), None)
                     if selected_subtitle_stream:
-                        subtitle_detail = f"Direct Play ({selected_subtitle_stream.displayTitle})"
+                        subtitle_detail = f"{stream_type} ({selected_subtitle_stream.displayTitle})"
 
-                    quality_detail = f"Original ({original_media.bitrate / 1000:.1f} Mbps)"
+                    quality_detail = f"Original ({original_media.bitrate / 1000:.1f} Mbps)" if original_media and hasattr(original_media, 'bitrate') and original_media.bitrate else "Original (Bitrate N/A)"
 
                 # Raw data for modal
                 raw_session_dict = {}
@@ -559,7 +604,7 @@ class PlexMediaService(BaseMediaService):
                 grandparent_title = getattr(raw_session, 'grandparentTitle', None)
                 parent_title = getattr(raw_session, 'parentTitle', None)
                 player_state = getattr(raw_session.player, 'state', 'N/A').capitalize()
-                bitrate_calc = raw_session.media[0].bitrate if raw_session.media else 0
+                bitrate_calc = raw_session.media[0].bitrate if raw_session.media and raw_session.media[0] and hasattr(raw_session.media[0], 'bitrate') else 0
 
                 session_details = {
                     'user': user_name,
@@ -599,7 +644,9 @@ class PlexMediaService(BaseMediaService):
                 formatted_sessions.append(session_details)
                 
             except Exception as e:
-                self.log_error(f"Error formatting Plex session: {e}")
+                # Enhanced error logging for debugging
+                session_info = f"Session: {getattr(raw_session, 'title', 'Unknown')} - User: {getattr(getattr(raw_session, 'user', None), 'title', 'Unknown')}"
+                self.log_error(f"Error formatting Plex session - {session_info}: {type(e).__name__}: {e}", exc_info=True)
                 continue
         
         return formatted_sessions

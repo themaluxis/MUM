@@ -123,7 +123,7 @@ def monitor_media_sessions_task():
                         player=getattr(session.player, 'title', 'N/A') if hasattr(session, 'player') else 'N/A',
                         ip_address=getattr(session.player, 'address', 'N/A') if hasattr(session, 'player') else 'N/A',
                         is_lan=getattr(session.player, 'local', False) if hasattr(session, 'player') else False,
-                        media_title=getattr(session, 'title', "Unknown"),
+                        media_title=getattr(session, 'media_title', None) or getattr(session, 'title', "Unknown"),
                         media_type=getattr(session, 'type', "Unknown"),
                         grandparent_title=getattr(session, 'grandparentTitle', None),
                         parent_title=getattr(session, 'parentTitle', None),
@@ -150,7 +150,13 @@ def monitor_media_sessions_task():
                         current_app.logger.error(f"CRITICAL: Session {session_key} was in tracked keys but had no DB ID!")
 
                 # Update the user's main 'last_streamed_at' field
-                user_service.update_user_last_streamed(mum_user.plex_user_id, now_utc)
+                # Update last streamed for all users (Plex, Jellyfin, etc.)
+                if mum_user.plex_user_id:
+                    # Use existing Plex-specific function for Plex users
+                    user_service.update_user_last_streamed(mum_user.plex_user_id, now_utc)
+                else:
+                    # Use universal function for non-Plex users (Jellyfin, Emby, etc.)
+                    user_service.update_user_last_streamed_by_id(mum_user.id, now_utc)
 
             # Commit all changes for this cycle
             db.session.commit()
