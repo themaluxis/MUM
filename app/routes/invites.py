@@ -1,6 +1,6 @@
 # File: app/routes/invites.py
 import uuid
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, session, g, make_response
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, session, g, make_response, jsonify
 from markupsafe import Markup # Import Markup from markupsafefrom flask_login import login_required, current_user 
 from datetime import datetime, timezone
 from app.utils.timezone_utils import utcnow
@@ -246,8 +246,8 @@ def create_invite():
             allow_live_tv=form.allow_live_tv.data,
             membership_duration_days=membership_duration, created_by_admin_id=current_user.id,
             require_discord_auth=form.require_discord_auth.data,
-            require_discord_guild_membership=form.require_discord_guild_membership.data,
-            server_id=selected_server_ids[0] if selected_server_ids else None  # Keep for backward compatibility
+            require_discord_guild_membership=form.require_discord_guild_membership.data
+            # Removed server_id assignment - now using many-to-many servers relationship
         )
         try:
             db.session.add(new_invite)
@@ -257,7 +257,7 @@ def create_invite():
             if selected_server_ids:
                 for server_id in selected_server_ids:
                     server = media_service_manager.get_server_by_id(server_id)
-                    if server:
+                    if server and server not in new_invite.servers:
                         new_invite.servers.append(server)
             
             db.session.commit()
