@@ -591,9 +591,13 @@
     function updateMassEditUI() {
         const massEditContainer = document.getElementById('mass-edit-container');
         const selectedUsersCountSpan = document.getElementById('selected-users-count');
+        const selectedUsersCountMobileSpan = document.getElementById('selected-users-count-mobile');
         if (!massEditContainer || !selectedUsersCountSpan) return;
         const count = selectedUserIds.size;
         selectedUsersCountSpan.textContent = count;
+        if (selectedUsersCountMobileSpan) {
+            selectedUsersCountMobileSpan.textContent = count;
+        }
         massEditContainer.classList.toggle('hidden', count === 0);
     }
 
