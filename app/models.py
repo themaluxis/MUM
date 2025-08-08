@@ -210,7 +210,7 @@ class User(db.Model, UserMixin):
     is_purge_whitelisted = db.Column(db.Boolean, default=False, nullable=False)
     
     # Raw data storage
-    raw_plex_data = db.Column(db.Text, nullable=True)  # Store raw XML/JSON data from Plex API
+    raw_service_data = db.Column(db.Text, nullable=True)  # Store raw XML/JSON data from media service APIs
     
     # User account authentication (for user accounts created via invites)
     password_hash = db.Column(db.String(256), nullable=True)  # For user account login

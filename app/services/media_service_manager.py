@@ -253,18 +253,27 @@ class MediaServiceManager:
                 # Store raw Jellyfin data for debugging purposes
                 if user_data.get('raw_data'):
                     import json
-                    user.raw_plex_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
+                    user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
                     current_app.logger.info(f"Stored raw Jellyfin data for user '{username}'")
             
+            # Set Kavita-specific fields if this is a Kavita server
+            elif server.service_type == ServiceType.KAVITA:
+                current_app.logger.info(f"Setting Kavita-specific fields for user '{username}'")
+                # Store raw Kavita data for debugging purposes
+                if user_data.get('raw_data'):
+                    import json
+                    user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
+                    current_app.logger.info(f"Stored raw Kavita data for user '{username}'")
+            
             # Set Plex-specific fields if this is a Plex server
-            if server.service_type == ServiceType.PLEX:
+            elif server.service_type == ServiceType.PLEX:
                 user.plex_user_id = user_data.get('id')
                 user.plex_username = username
                 user.plex_email = email
                 user.plex_uuid = user_data.get('uuid')
                 user.plex_thumb_url = user_data.get('thumb')
                 user.is_home_user = user_data.get('is_home_user', False)
-                user.raw_plex_data = user_data.get('raw_data')  # Store raw data for new users
+                user.raw_service_data = user_data.get('raw_data')  # Store raw data for new users
                 
                 # Parse and set plex_join_date from acceptedAt timestamp
                 accepted_at_str = user_data.get('accepted_at')
@@ -287,7 +296,7 @@ class MediaServiceManager:
             
             # Update raw data based on server type
             if server.service_type == ServiceType.PLEX and user_data.get('raw_data'):
-                user.raw_plex_data = user_data.get('raw_data')
+                user.raw_service_data = user_data.get('raw_data')
                 
                 # Update plex_join_date if we have acceptedAt data
                 accepted_at_str = user_data.get('accepted_at')
@@ -305,8 +314,14 @@ class MediaServiceManager:
             elif server.service_type == ServiceType.JELLYFIN and user_data.get('raw_data'):
                 # Update raw Jellyfin data for existing users
                 import json
-                user.raw_plex_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
+                user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
                 current_app.logger.info(f"Updated raw Jellyfin data for existing user '{user.get_display_name()}'")
+            
+            elif server.service_type == ServiceType.KAVITA and user_data.get('raw_data'):
+                # Update raw Kavita data for existing users
+                import json
+                user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
+                current_app.logger.info(f"Updated raw Kavita data for existing user '{user.get_display_name()}'")
 
         return user
     

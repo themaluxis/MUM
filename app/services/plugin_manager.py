@@ -448,6 +448,43 @@ class PluginManager:
             'installed_at': plugin.installed_at,
             'last_updated': plugin.last_updated
         }
+    
+    def refresh_servers_count(self):
+        """Refresh plugin servers count to ensure accuracy"""
+        try:
+            from app.models_media_services import MediaServer, ServiceType
+            
+            plugins = Plugin.query.all()
+            for plugin in plugins:
+                try:
+                    # Find the corresponding ServiceType enum value
+                    service_type = None
+                    for st in ServiceType:
+                        if st.value == plugin.plugin_id:
+                            service_type = st
+                            break
+                    
+                    if service_type:
+                        # Count actual servers
+                        actual_count = MediaServer.query.filter_by(service_type=service_type).count()
+                        if plugin.servers_count != actual_count:
+                            plugin.servers_count = actual_count
+                            db.session.add(plugin)
+                            current_app.logger.debug(f"Updated plugin {plugin.plugin_id} servers_count from {plugin.servers_count} to {actual_count}")
+                    else:
+                        # For plugins without corresponding ServiceType, set to 0
+                        if plugin.servers_count != 0:
+                            current_app.logger.debug(f"Setting plugin {plugin.plugin_id} servers_count to 0 (no ServiceType)")
+                            plugin.servers_count = 0
+                            db.session.add(plugin)
+                except Exception as e:
+                    current_app.logger.error(f"Error updating servers_count for plugin {plugin.plugin_id}: {e}")
+            
+            db.session.commit()
+            current_app.logger.info("Plugin servers count refresh completed")
+        except Exception as e:
+            current_app.logger.error(f"Error refreshing plugin servers count: {e}")
+            db.session.rollback()
 
 # Global plugin manager instance
 plugin_manager = PluginManager()

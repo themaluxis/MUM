@@ -96,9 +96,9 @@
                             {% set primary_service = service_types[0] if service_types else None %}
                             
                             {# Check if this is a Jellyfin user and try to get their avatar #}
-                            {% if primary_service and primary_service.value == 'jellyfin' and user.raw_plex_data and user.raw_plex_data.startswith('{') %}
+                            {% if primary_service and primary_service.value == 'jellyfin' and user.raw_service_data and user.raw_service_data.startswith('{') %}
                                 {# Extract Jellyfin user info using the custom filter #}
-                                {% set jellyfin_info = user.raw_plex_data | extract_jellyfin_user_info %}
+                                {% set jellyfin_info = user.raw_service_data | extract_jellyfin_user_info %}
                                 {% if jellyfin_info[0] and jellyfin_info[1] %}
                                     {% set jellyfin_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_info[0]) %}
                                     <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 

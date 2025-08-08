@@ -441,9 +441,9 @@ def sync_all_users():
             if mum_user.plex_uuid != plex_uuid_from_sync: changes.append("Plex UUID updated"); mum_user.plex_uuid = plex_uuid_from_sync
             if mum_user.plex_username != plex_username_from_sync: changes.append(f"Username changed"); mum_user.plex_username = plex_username_from_sync
             if set(mum_user.allowed_library_ids or []) != set(new_library_ids): changes.append("Libraries updated"); mum_user.allowed_library_ids = new_library_ids
-            # Update raw Plex data if available
+            # Update raw service data if available
             if plex_user_data.get('raw_data'): 
-                changes.append("Raw data updated"); mum_user.raw_plex_data = plex_user_data.get('raw_data')
+                changes.append("Raw data updated"); mum_user.raw_service_data = plex_user_data.get('raw_data')
             if plex_join_date_dt and (mum_user.plex_join_date is None or mum_user.plex_join_date != plex_join_date_dt.replace(tzinfo=None)):
                 current_app.logger.debug(f"User sync - {mum_user.plex_username}: Updating plex_join_date from {mum_user.plex_join_date} to {plex_join_date_dt.replace(tzinfo=None)}")
                 changes.append("Plex join date updated"); mum_user.plex_join_date = plex_join_date_dt.replace(tzinfo=None)
@@ -464,7 +464,7 @@ def sync_all_users():
                     shares_back=plex_user_data.get('shares_back', False), is_plex_friend=plex_user_data.get('is_friend', False),
                     plex_join_date=plex_join_date_dt.replace(tzinfo=None) if plex_join_date_dt else None,
                     last_synced_with_plex=datetime.utcnow(),
-                    raw_plex_data=plex_user_data.get('raw_data')  # Store raw data for new users
+                    raw_service_data=plex_user_data.get('raw_data')  # Store raw data for new users
                 )
                 db.session.add(new_user)
                 added_users_details.append({'username': plex_username_from_sync, 'plex_id': plex_id})
@@ -892,15 +892,27 @@ def preview_purge_inactive_users():
 @bp.route('/debug_info/<int:user_id>')
 @login_required
 def get_user_debug_info(user_id):
-    """Get raw Plex data for a user for debugging purposes - ONLY uses stored data, NO API calls"""
+    """Get raw user data for debugging purposes - ONLY uses stored data, NO API calls"""
     user = User.query.get_or_404(user_id)
     
     try:
-        # Log whether we have stored data or not
-        if user.raw_plex_data:
-            current_app.logger.info(f"Using stored raw data for user {user.plex_username} - NO API call made")
+        # Enhanced debugging for raw service data
+        current_app.logger.info(f"=== DEBUG INFO REQUEST FOR USER {user_id} ===")
+        current_app.logger.info(f"Username: {user.plex_username}")
+        current_app.logger.info(f"Raw service data exists: {user.raw_service_data is not None}")
+        current_app.logger.info(f"Raw service data type: {type(user.raw_service_data)}")
+        if user.raw_service_data:
+            current_app.logger.info(f"Raw service data length: {len(str(user.raw_service_data))}")
+            current_app.logger.info(f"Raw service data preview: {str(user.raw_service_data)[:100]}...")
         else:
             current_app.logger.warning(f"No stored raw data for user {user.plex_username} - user needs to sync")
+            
+        # Check which services this user belongs to
+        from app.models_media_services import UserMediaAccess
+        user_access = UserMediaAccess.query.filter_by(user_id=user.id).all()
+        current_app.logger.info(f"User has access to {len(user_access)} servers:")
+        for access in user_access:
+            current_app.logger.info(f"  - Server: {access.server.name} (Type: {access.server.service_type.value})")
         
         # Render the template with the user data
         return render_template('users/partials/user_debug_info_modal.html', user=user)

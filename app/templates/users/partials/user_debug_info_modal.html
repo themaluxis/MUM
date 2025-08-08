@@ -2,7 +2,7 @@
 {# Template for displaying user debug information in the modal #}
 
 <div class="space-y-4">
-    {% if user.raw_plex_data %}
+    {% if user.raw_service_data %}
         <div class="flex justify-between items-center mb-4">
             <h4 class="font-semibold">Raw User Data</h4>
             <button class="btn btn-sm btn-outline" onclick="copyUserRawData('{{ user.id }}')">
@@ -10,7 +10,7 @@
             </button>
         </div>
         <div class="mockup-code" id="userRawDataContent-{{ user.id }}">
-            <pre><code>{% if user.raw_plex_data.startswith('{') %}{{ user.raw_plex_data | format_json }}{% else %}{{ user.raw_plex_data }}{% endif %}</code></pre>
+            <pre><code>{% if user.raw_service_data.startswith('{') %}{{ user.raw_service_data | format_json }}{% else %}{{ user.raw_service_data }}{% endif %}</code></pre>
         </div>
     {% else %}
         <div class="alert alert-warning">
