@@ -128,8 +128,10 @@ class KavitaMediaService(BaseMediaService):
             
             response.raise_for_status()
             
-            # Debug logging for Health and Users endpoints
-            if endpoint.lower() in ['health', 'users']:
+            # Debug logging for Health, Users, and server info endpoints
+            server_info_endpoints = ['health', 'users', 'server/server-info', 'server/server-info-slim', 
+                                   'server-info', 'server', 'Server/server-info', 'Server/server-info-slim']
+            if endpoint.lower() in [ep.lower() for ep in server_info_endpoints]:
                 self.log_info(f"{endpoint} endpoint request headers: {headers}")
                 self.log_info(f"{endpoint} endpoint response status: {response.status_code}")
                 self.log_info(f"{endpoint} endpoint response headers: {dict(response.headers)}")
@@ -152,6 +154,19 @@ class KavitaMediaService(BaseMediaService):
                         return {"status": "healthy", "raw_response": response.text}
                     else:
                         raise ValueError(f"Health endpoint returned non-200 status: {response.status_code}")
+            # For Server/server-info endpoint, handle potential non-JSON responses
+            elif endpoint.lower() == 'server/server-info':
+                try:
+                    return response.json()
+                except ValueError:
+                    # If JSON parsing fails, return the raw response for debugging
+                    self.log_warning(f"Server/server-info endpoint returned non-JSON response: '{response.text[:200]}...'")
+                    return {
+                        "error": "Non-JSON response from server-info endpoint",
+                        "raw_response": response.text,
+                        "content_type": response.headers.get('Content-Type', 'Unknown'),
+                        "status_code": response.status_code
+                    }
             else:
                 return response.json()
                 
@@ -314,13 +329,16 @@ class KavitaMediaService(BaseMediaService):
     def get_server_info(self) -> Dict[str, Any]:
         """Get Kavita server information"""
         try:
-            health = self._make_request('Health')
+            server_info = self._make_request('Server/server-info-slim')
+            actual_server_name = server_info.get('installId', self.name)
+            version = server_info.get('kavitaVersion', 'Unknown')
+            
             return {
-                'name': self.name,
+                'name': f"Kavita ({actual_server_name})",
                 'url': self.url,
                 'service_type': self.service_type.value,
                 'online': True,
-                'version': 'Unknown'  # Health endpoint doesn't provide version info
+                'version': version
             }
         except:
             return {

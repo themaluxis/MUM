@@ -501,6 +501,15 @@ def get_raw_server_info(plugin_id, server_id):
                 raw_info = service._make_request('System/Info')
             else:
                 raw_info = {'error': 'Jellyfin service does not support API requests'}
+        elif plugin_id.lower() == 'kavita':
+            # For Kavita, use the Server/server-info-slim API
+            if hasattr(service, '_make_request'):
+                try:
+                    raw_info = service._make_request('Server/server-info-slim')
+                except Exception as e:
+                    raw_info = {'error': f'Could not fetch Kavita server info: {str(e)}'}
+            else:
+                raw_info = {'error': 'Kavita service does not support API requests'}
         else:
             # For other services, try to get some basic info
             raw_info = {'message': f'Raw info not implemented for {plugin_id}'}
