@@ -202,7 +202,8 @@ class User(db.Model, UserMixin):
     last_synced_with_plex = db.Column(db.DateTime, nullable=True)  # Legacy
     last_activity_at = db.Column(db.DateTime, nullable=True)  # Last activity across all services
     last_streamed_at = db.Column(db.DateTime, nullable=True)  # Legacy
-    plex_join_date = db.Column(db.DateTime, nullable=True)  # Legacy
+    plex_join_date = db.Column(db.DateTime, nullable=True)  # Legacy - use service_join_date instead
+    service_join_date = db.Column(db.DateTime, nullable=True)  # Generic join date for any service
     
     # Access control
     access_expires_at = db.Column(db.DateTime, nullable=True, index=True)
@@ -231,6 +232,7 @@ class User(db.Model, UserMixin):
     
     def get_primary_email(self):
         """Get the primary email for this user"""
+        # Prioritize primary_email for all users, fallback to legacy fields for backward compatibility
         return self.primary_email or self.plex_email or self.discord_email
     
     def has_access_to_server(self, server_id: int) -> bool:

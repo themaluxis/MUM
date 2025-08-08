@@ -234,14 +234,14 @@ class MediaServiceManager:
             user = User.query.filter_by(primary_email=email).first()
         
         if not user:
-            # Create new user
+            # Create new user - use username as primary_username for all services
             primary_username_value = username or email or f"user_{user_data.get('id', 'unknown')}"
             current_app.logger.info(f"Creating new user with primary_username='{primary_username_value}', username='{username}', email='{email}'")
             
             user = User(
                 primary_username=primary_username_value,
                 primary_email=email,
-                avatar_url=user_data.get('thumb'),
+                avatar_url=user_data.get('thumb'),  # Use generic avatar_url for all services
                 shares_back=user_data.get('shares_back', False)
             )
             
@@ -268,20 +268,21 @@ class MediaServiceManager:
             # Set Plex-specific fields if this is a Plex server
             elif server.service_type == ServiceType.PLEX:
                 user.plex_user_id = user_data.get('id')
+                # Keep plex_username for API compatibility, but primary_username is already set above
                 user.plex_username = username
-                user.plex_email = email
                 user.plex_uuid = user_data.get('uuid')
-                user.plex_thumb_url = user_data.get('thumb')
                 user.is_home_user = user_data.get('is_home_user', False)
                 user.raw_service_data = user_data.get('raw_data')  # Store raw data for new users
                 
-                # Parse and set plex_join_date from acceptedAt timestamp
+                # Parse and set service_join_date from acceptedAt timestamp (unified field)
                 accepted_at_str = user_data.get('accepted_at')
                 if accepted_at_str and str(accepted_at_str).isdigit():
                     try:
                         from datetime import timezone
-                        plex_join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
-                        user.plex_join_date = plex_join_date_dt.replace(tzinfo=None)
+                        join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
+                        user.service_join_date = join_date_dt.replace(tzinfo=None)
+                        # Also set legacy field for backward compatibility
+                        user.plex_join_date = join_date_dt.replace(tzinfo=None)
                         current_app.logger.debug(f"Set plex_join_date for new user {username}: {user.plex_join_date}")
                     except (ValueError, TypeError) as e:
                         current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {username}: {e}")
@@ -298,16 +299,41 @@ class MediaServiceManager:
             if server.service_type == ServiceType.PLEX and user_data.get('raw_data'):
                 user.raw_service_data = user_data.get('raw_data')
                 
-                # Update plex_join_date if we have acceptedAt data
+                # Migrate plex_email to primary_email for existing users
+                email = user_data.get('email')
+                if email and not user.primary_email and user.plex_email == email:
+                    user.primary_email = email
+                    current_app.logger.info(f"Migrated plex_email to primary_email for user {user.get_display_name()}")
+                elif email and not user.primary_email:
+                    user.primary_email = email
+                
+                # Migrate plex_thumb_url to avatar_url for existing users
+                thumb_url = user_data.get('thumb')
+                if thumb_url and not user.avatar_url and user.plex_thumb_url == thumb_url:
+                    user.avatar_url = thumb_url
+                    current_app.logger.info(f"Migrated plex_thumb_url to avatar_url for user {user.get_display_name()}")
+                elif thumb_url and not user.avatar_url:
+                    user.avatar_url = thumb_url
+                
+                # Migrate and update join date (unified field)
                 accepted_at_str = user_data.get('accepted_at')
                 if accepted_at_str and str(accepted_at_str).isdigit():
                     try:
                         from datetime import timezone
-                        plex_join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
-                        new_join_date = plex_join_date_dt.replace(tzinfo=None)
-                        if user.plex_join_date != new_join_date:
+                        join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
+                        new_join_date = join_date_dt.replace(tzinfo=None)
+                        
+                        # Migrate plex_join_date to service_join_date for existing users
+                        if not user.service_join_date and user.plex_join_date:
+                            user.service_join_date = user.plex_join_date
+                            current_app.logger.info(f"Migrated plex_join_date to service_join_date for user {user.get_display_name()}")
+                        
+                        # Update service_join_date if different
+                        if user.service_join_date != new_join_date:
+                            user.service_join_date = new_join_date
+                            # Also update legacy field for backward compatibility
                             user.plex_join_date = new_join_date
-                            current_app.logger.debug(f"Updated plex_join_date for user {user.get_display_name()}: {user.plex_join_date}")
+                            current_app.logger.debug(f"Updated service_join_date for user {user.get_display_name()}: {user.service_join_date}")
                     except (ValueError, TypeError) as e:
                         current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {user.get_display_name()}: {e}")
             

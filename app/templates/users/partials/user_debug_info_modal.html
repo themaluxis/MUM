@@ -4,7 +4,6 @@
 <div class="space-y-4">
     {% if user.raw_service_data %}
         <div class="flex justify-between items-center mb-4">
-            <h4 class="font-semibold">Raw User Data</h4>
             <button class="btn btn-sm btn-outline" onclick="copyUserRawData('{{ user.id }}')">
                 <i class="fa-solid fa-copy mr-1"></i> Copy
             </button>

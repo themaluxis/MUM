@@ -153,9 +153,9 @@
                 <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}</p>
             </div>
             <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
-            {% if user.plex_join_date %}
-            <div class="tooltip tooltip-top" data-tip="Full join date: {{ user.plex_join_date | format_datetime_user }} - When {{ user.get_display_name() }} joined your Plex server">
-                <p><i class="fa-solid fa-server fa-fw mr-1 text-info"></i> Plex Join Date: {{ user.plex_join_date | format_datetime_user(include_time=False) }}</p>
+            {% if user.service_join_date or user.plex_join_date %}
+            <div class="tooltip tooltip-top" data-tip="Full join date: {{ (user.service_join_date or user.plex_join_date) | format_datetime_user }} - When {{ user.get_display_name() }} joined the service">
+                <p><i class="fa-solid fa-server fa-fw mr-1 text-info"></i> Service Join Date: {{ (user.service_join_date or user.plex_join_date) | format_datetime_user(include_time=False) }}</p>
             </div>
             {% endif %}
             {% if user.access_expires_at %}
