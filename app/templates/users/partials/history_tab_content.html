@@ -67,8 +67,15 @@
                                 {% set total_elapsed = (entry.stopped_at - entry.started_at).total_seconds() %}
                                 {% set paused_seconds = total_elapsed - entry.duration_seconds %}
                                 {{ paused_seconds | format_duration if paused_seconds > 0 else '0m' }}
+                            {% elif entry.view_offset_at_end_seconds is not none %}
+                                {# For active sessions, calculate paused time based on current time #}
+                                {% set now = datetime.utcnow() %}
+                                {% set total_elapsed = (now - entry.started_at).total_seconds() %}
+                                {% set watch_time = entry.view_offset_at_end_seconds %}
+                                {% set paused_seconds = total_elapsed - watch_time %}
+                                {{ paused_seconds | format_duration if paused_seconds > 0 else '0m' }}
                             {% else %}
-                                {# For sessions without stopped_at, they should not be "Active" unless actually streaming #}
+                                {# For sessions without stopped_at or view_offset, show N/A #}
                                 <span class="text-xs italic opacity-60">N/A</span>
                             {% endif %}
                         </td>

@@ -200,6 +200,9 @@ def create_app(config_name=None):
     app.jinja_env.filters['format_json'] = helpers.format_json
     app.jinja_env.filters['extract_jellyfin_user_info'] = helpers.extract_jellyfin_user_info
     app.jinja_env.globals['EventType'] = EventType
+    
+    # Make datetime functions available in templates
+    app.jinja_env.globals['datetime'] = datetime
 
     @app.context_processor
     def inject_current_year():
