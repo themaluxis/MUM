@@ -58,15 +58,9 @@ def list_invites():
     all_servers = media_service_manager.get_all_servers(active_only=True)
 
     # For now, populate libraries from the first available server for the form
+    # Don't pre-load libraries - they will be loaded dynamically based on server selection
     available_libraries = {}
-    if all_servers:
-        first_server_service = MediaServiceFactory.create_service_from_db(all_servers[0])
-        try:
-            available_libraries = {lib['id']: lib['name'] for lib in first_server_service.get_libraries()}
-        except Exception as e:
-            current_app.logger.error(f"Could not fetch libraries for server {all_servers[0].name}: {e}")
-
-    form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
+    form.libraries.choices = []
     
     # Discord settings
     discord_oauth_enabled = Setting.get_bool('DISCORD_OAUTH_ENABLED', False)
