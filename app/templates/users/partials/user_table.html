@@ -113,6 +113,12 @@
                                         {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
                                     </div>
                                 {% endif %}
+                            {# Check if this is a Kavita user and show fallback avatar #}
+                            {% elif primary_service and primary_service.value == 'kavita' %}
+                                {# Kavita users don't have avatars, show fallback with Kavita theme color #}
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white" style="background-color: var(--color-kavita);">
+                                    {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
+                                </div>
                             {% else %}
                                 <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
                                      onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}';"/>
@@ -393,24 +399,15 @@
         const serviceClass = row.getAttribute('data-service-class');
         
         if (checkbox.checked) {
-            // Add service-specific background tint when selected
+            // Add service-specific background tint when selected using CSS variables
             row.classList.add('selected-row');
-            if (serviceClass === 'plex') {
-                row.style.backgroundColor = 'rgba(255, 193, 7, 0.1)'; // plex color with opacity
-            } else if (serviceClass === 'jellyfin') {
-                row.style.backgroundColor = 'rgba(168, 85, 247, 0.1)'; // jellyfin purple with opacity
-            } else if (serviceClass === 'emby') {
-                row.style.backgroundColor = 'rgba(34, 197, 94, 0.1)'; // emby green with opacity
-            } else if (serviceClass === 'kavita') {
-                row.style.backgroundColor = 'rgba(249, 115, 22, 0.1)'; // kavita orange with opacity
-            } else if (serviceClass === 'audiobookshelf') {
-                row.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'; // audiobookshelf blue with opacity
-            } else if (serviceClass === 'komga') {
-                row.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'; // komga red with opacity
-            } else if (serviceClass === 'romm') {
-                row.style.backgroundColor = 'rgba(99, 102, 241, 0.1)'; // romm indigo with opacity
+            const serviceColor = row.dataset.serviceColor;
+            if (serviceColor && serviceColor !== '#6b7280') {
+                // Use the CSS variable with opacity for dynamic service colors
+                row.style.backgroundColor = `color-mix(in srgb, ${serviceColor} 10%, transparent)`;
             } else {
-                row.style.backgroundColor = 'rgba(107, 114, 128, 0.1)'; // gray fallback
+                // Fallback for gray/unknown services
+                row.style.backgroundColor = 'rgba(107, 114, 128, 0.1)';
             }
         } else {
             // Remove selection styling
