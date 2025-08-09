@@ -195,24 +195,108 @@
 </div>
 
 <!-- Raw Server Info Modal -->
-<div id="rawServerInfoModal" class="modal">
-    <div class="modal-box max-w-4xl">
-        <h3 class="font-bold text-lg">Raw Server Information</h3>
-        <p class="py-2">Server: <span id="rawServerInfoName" class="font-semibold"></span></p>
-        
-        <div class="py-4">
-            <div class="loading loading-spinner loading-lg mx-auto" id="rawServerInfoLoading"></div>
-            <pre id="rawServerInfoContent" class="bg-base-200 p-4 rounded-lg text-xs overflow-auto max-h-96 hidden"></pre>
-            <div id="rawServerInfoError" class="alert alert-error hidden">
-                <span id="rawServerInfoErrorMessage"></span>
+<dialog id="rawServerInfoModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-5xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
+                    <i class="fa-solid fa-server text-secondary text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Raw Server Information</h3>
+                    <p class="text-sm text-base-content/60">Debug data from <span id="rawServerInfoName" class="font-mono"></span></p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200" onclick="closeRawServerInfoModal()">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <!-- Loading State -->
+            <div id="rawServerInfoLoading" class="text-center p-8">
+                <span class="loading loading-lg loading-spinner"></span>
+                <p class="text-sm text-base-content/60 mt-4">Fetching server information...</p>
+            </div>
+
+            <!-- Content Container -->
+            <div id="rawServerInfoContentContainer" class="hidden">
+                <!-- Server Info Card -->
+                <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300/50">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-database text-info text-sm"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-medium text-base-content mb-1">Server Debug Information</h4>
+                            <p class="text-sm text-base-content/70 leading-relaxed">
+                                Raw API response data (structured in JSON format) from the media server API. This information is useful for debugging connection issues and understanding server capabilities.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Raw Data Section -->
+                <div class="space-y-4 mb-6">
+
+                    <!-- Code Display -->
+                    <div class="bg-base-200/30 rounded-lg border border-base-300/30">
+                        <div class="flex items-center justify-between p-3 border-b border-base-300/30 bg-base-200/50">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-brackets-curly text-secondary text-sm"></i>
+                                <span class="font-medium text-sm">Server Response Data</span>
+                            </div>
+                            <div class="text-xs text-base-content/60" id="rawServerInfoSize">
+                                <!-- Size will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="mockup-code bg-base-300/50 border border-base-300/50">
+                                <pre id="rawServerInfoContent" class="text-xs max-h-96 overflow-auto"><code></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                    <button type="button" class="btn btn-ghost" onclick="closeRawServerInfoModal()">
+                        Close
+                    </button>
+                    <button type="button" class="btn btn-secondary gap-2" onclick="copyRawServerInfo()">
+                        <i class="fa-solid fa-copy"></i>
+                        Copy to Clipboard
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div id="rawServerInfoError" class="hidden">
+                <div class="bg-error/10 rounded-lg p-8 border border-error/30 text-center">
+                    <div class="w-16 h-16 rounded-full bg-error/20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-solid fa-exclamation-triangle text-error text-2xl"></i>
+                    </div>
+                    <h5 class="font-medium text-base-content mb-2">Failed to Fetch Server Information</h5>
+                    <p id="rawServerInfoErrorMessage" class="text-sm text-base-content/70 mb-4">
+                        <!-- Error message will be populated by JavaScript -->
+                    </p>
+                </div>
+                
+                <!-- Action Buttons for Error State -->
+                <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                    <button type="button" class="btn btn-ghost" onclick="closeRawServerInfoModal()">
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
-        
-        <div class="modal-action">
-            <button type="button" class="btn" onclick="closeRawServerInfoModal()">Close</button>
-        </div>
     </div>
-</div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 <script>
 function showMoreLibraries(serverId, libraries) {
@@ -335,11 +419,11 @@ function closeDeleteModal() {
 function showRawServerInfo(serverId, serverName) {
     // Show modal and set server name
     document.getElementById('rawServerInfoName').textContent = serverName;
-    document.getElementById('rawServerInfoModal').classList.add('modal-open');
+    document.getElementById('rawServerInfoModal').showModal();
     
     // Show loading state
     document.getElementById('rawServerInfoLoading').classList.remove('hidden');
-    document.getElementById('rawServerInfoContent').classList.add('hidden');
+    document.getElementById('rawServerInfoContentContainer').classList.add('hidden');
     document.getElementById('rawServerInfoError').classList.add('hidden');
     
     // Fetch raw server info
@@ -355,8 +439,10 @@ function showRawServerInfo(serverId, serverName) {
         document.getElementById('rawServerInfoLoading').classList.add('hidden');
         
         if (data.success) {
-            document.getElementById('rawServerInfoContent').textContent = JSON.stringify(data.info, null, 2);
-            document.getElementById('rawServerInfoContent').classList.remove('hidden');
+            const jsonString = JSON.stringify(data.info, null, 2);
+            document.getElementById('rawServerInfoContent').querySelector('code').textContent = jsonString;
+            document.getElementById('rawServerInfoSize').textContent = `Size: ${jsonString.length} characters`;
+            document.getElementById('rawServerInfoContentContainer').classList.remove('hidden');
         } else {
             document.getElementById('rawServerInfoErrorMessage').textContent = data.message || 'Failed to fetch server information';
             document.getElementById('rawServerInfoError').classList.remove('hidden');
@@ -370,7 +456,19 @@ function showRawServerInfo(serverId, serverName) {
 }
 
 function closeRawServerInfoModal() {
-    document.getElementById('rawServerInfoModal').classList.remove('modal-open');
+    document.getElementById('rawServerInfoModal').close();
+}
+
+function copyRawServerInfo() {
+    const content = document.getElementById('rawServerInfoContent').querySelector('code');
+    if (content && content.textContent) {
+        navigator.clipboard.writeText(content.textContent).then(function() {
+            // You could add a toast notification here
+            console.log('Raw server info copied to clipboard');
+        }, function(err) {
+            console.error('Could not copy text: ', err);
+        });
+    }
 }
 
 </script>
