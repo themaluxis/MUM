@@ -4116,6 +4116,15 @@
   .border-transparent {
     border-color: transparent;
   }
+  .border-warning {
+    border-color: var(--color-warning);
+  }
+  .border-warning\/30 {
+    border-color: var(--color-warning);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-warning) 30%, transparent);
+    }
+  }
   .table-zebra {
     tbody {
       tr {
@@ -4221,6 +4230,9 @@
   .bg-black {
     background-color: var(--color-black);
   }
+  .bg-blue-500 {
+    background-color: var(--color-blue-500);
+  }
   .bg-blue-500\/20 {
     background-color: color-mix(in srgb, oklch(62.3% 0.214 259.815) 20%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -4281,6 +4293,9 @@
   .bg-komga {
     background-color: var(--color-komga);
   }
+  .bg-orange-400 {
+    background-color: var(--color-orange-400);
+  }
   .bg-orange-400\/20 {
     background-color: color-mix(in srgb, oklch(75% 0.183 55.934) 20%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -4334,6 +4349,12 @@
   }
   .bg-warning {
     background-color: var(--color-warning);
+  }
+  .bg-warning\/10 {
+    background-color: var(--color-warning);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-warning) 10%, transparent);
+    }
   }
   .bg-warning\/20 {
     background-color: var(--color-warning);
@@ -5291,6 +5312,13 @@
     &:hover {
       @media (hover: hover) {
         border-color: #c4880b;
+      }
+    }
+  }
+  .hover\:border-base-300 {
+    &:hover {
+      @media (hover: hover) {
+        border-color: var(--color-base-300);
       }
     }
   }
