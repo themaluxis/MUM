@@ -47,7 +47,7 @@
     </div>
     
     <!-- Simple Search Bar with Filter Button -->
-    <form method="GET" action="{{ url_for('users.list_users') }}" class="p-4 bg-base-200 rounded-lg shadow">
+    <form method="GET" action="{{ url_for('users.list_users') }}" class="p-4 bg-base-200 rounded-lg shadow mb-6">
         <div class="flex gap-2">
             <div class="form-control flex-1">
                 <input type="text" name="search" placeholder="Search by username or email..." 
@@ -69,6 +69,12 @@
                 <i class="fa-solid fa-filter mr-2"></i>
                 <span class="hidden sm:inline">Sort & Filter</span>
             </label>
+            {% if current_user.has_permission('purge_users') %}
+            <button type="button" class="btn btn-warning" onclick="purge_modal.showModal()">
+                <i class="fa-solid fa-user-clock mr-2"></i>
+                <span class="hidden sm:inline">Purge</span>
+            </button>
+            {% endif %}
         </div>
     </form>
 
@@ -201,73 +207,6 @@
         </div>
     </div>
 
-    {% if current_user.has_permission('purge_users') %}
-    <div class="card bg-base-200 shadow-lg my-6">
-        <div class="card-body">
-            <h2 class="card-title text-lg"><i class="fa-solid fa-user-clock mr-2 text-warning"></i> Purge Inactive Users</h2>
-            <p class="text-xs text-base-content/70 mb-4">
-                Automatically remove users from MUM and your Plex server if they haven't streamed content
-                for a specified period. Plex Home users are always excluded from purging.
-            </p>
-            <form id="previewPurgeForm"
-                  hx-post="{{ url_for('users.preview_purge_inactive_users') }}"
-                  hx-target="#confirm_purge_modal_content_div"
-                  hx-swap="innerHTML"
-                  hx-indicator="#preview-purge-loader"
-                  hx-on::after-request="if(event.detail.successful && event.detail.xhr.status !== 400) confirm_purge_modal.showModal();">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <div class="form-control md:col-span-1">
-                        <label class="label" for="inactive_days_main_form">
-                            <span class="label-text font-medium">Inactive for at least (days):</span>
-                        </label>
-                        <input type="number" id="inactive_days_main_form" name="inactive_days" 
-                               class="input input-bordered input-primary" 
-                               value="{{ purge_settings.inactive_days }}" min="7" required>
-                        <label class="label"><span class="label-text-alt">Minimum 7 days.</span></label>
-                    </div>
-
-                    <div class="form-control md:col-span-1">
-                        <label class="label cursor-pointer justify-start">
-                            <input type="checkbox" id="exclude_sharers_main_form" name="exclude_sharers" value="true"
-                                   class="checkbox checkbox-primary mr-2" 
-                                   {% if purge_settings.exclude_sharers %}checked{% endif %}>
-                            <span class="label-text font-medium">Exclude sharers?</span>
-                        </label>
-                         <label class="label"><span class="label-text-alt whitespace-normal">If checked, users marked "Shares Back" are safe.</span></label>
-                    </div>
-                    
-                    <div class="form-control md:col-span-1">
-                        <label class="label cursor-pointer justify-start">
-                            <input type="checkbox" id="exclude_purge_whitelisted_main_form" name="exclude_purge_whitelisted" value="true"
-                                   class="checkbox checkbox-primary mr-2" checked>
-                            <span class="label-text font-medium">Exclude Whitelisted?</span>
-                        </label>
-                         <label class="label"><span class="label-text-alt whitespace-normal">If checked, users on Purge Whitelist are safe.</span></label>
-                    </div>
-                    
-                    {# --- NEW CHECKBOX --- #}
-                    <div class="form-control md:col-span-1">
-                        <label class="label cursor-pointer justify-start">
-                            <input type="checkbox" id="ignore_creation_date_main_form" name="ignore_creation_date" value="true"
-                                   class="checkbox checkbox-primary mr-2">
-                            <span class="label-text font-medium">Ignore Creation Date?</span>
-                        </label>
-                         <label class="label"><span class="label-text-alt whitespace-normal">If checked, users who never streamed are purged regardless of when user was added to MUM.</span></label>
-                    </div>
-
-                    <div class="form-control md:col-span-1">
-                        <button type="submit" class="btn btn-info w-full">
-                            <span id="preview-purge-loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
-                            <i class="fa-solid fa-list-check mr-2"></i> Preview Purge
-                        </button>
-                    </div>
-                </div>
-            </form>
-            <div id="purge-status-message" class="mt-4 min-h-[2rem]"></div>
-        </div>
-    </div>
-    {% endif %}
 
     <div id="mass-edit-container" class="mb-4 hidden">
         <div class="flex items-center space-x-2">
@@ -382,6 +321,151 @@
         <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button></form>
         <div id="quick_edit_modal_content_div">
              <div class="text-center p-8"><span class="loading loading-lg loading-spinner"></span></div>
+        </div>
+    </div>
+</dialog>
+
+<dialog id="purge_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-5xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+                    <i class="fa-solid fa-user-clock text-warning text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Purge Inactive Users</h3>
+                    <p class="text-sm text-base-content/60">Manage inactive user cleanup</p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <!-- Description Card -->
+            <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300/50">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-info text-info text-sm"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-base-content mb-1">How it works</h4>
+                        <p class="text-sm text-base-content/70 leading-relaxed">
+                            Automatically remove users from MUM and your media servers if they haven't streamed content
+                            for a specified period. Plex Home users are always excluded from purging.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <form id="previewPurgeForm"
+                  hx-post="{{ url_for('users.preview_purge_inactive_users') }}"
+                  hx-target="#confirm_purge_modal_content_div"
+                  hx-swap="innerHTML"
+                  hx-indicator="#preview-purge-loader"
+                  hx-on::after-request="if(event.detail.successful && event.detail.xhr.status !== 400) confirm_purge_modal.showModal();">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <!-- Settings Grid -->
+                <div class="space-y-4">
+                    <!-- Inactive Days Setting -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between mb-1">
+                                    <h4 class="font-medium text-base-content mb-1">Inactivity Threshold</h4>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" id="inactive_days_modal_form" name="inactive_days" 
+                                            class="input input-bordered input-sm w-20 text-center" 
+                                            value="{{ purge_settings.inactive_days }}" min="7" required>
+                                        <span class="text-sm text-base-content/60">days</span>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-base-content/60">Users inactive for this many days will be eligible for purging</p>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <span class="text-xs text-base-content/50">Minimum: 7 days</span>
+                        </div>
+                    </div>
+
+                    <!-- Protection Settings -->
+                    <div class="space-y-3">
+                        <h4 class="font-medium text-base-content text-lg mb-3">Protection Settings</h4>
+                        
+                        <!-- Exclude Sharers -->
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex justify-between mb-1">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fa-solid fa-share text-success text-sm"></i>
+                                            <h5 class="font-medium text-base-content">Protect Sharers</h5>
+                                        </div>
+                                        <input type="checkbox" id="exclude_sharers_modal_form" name="exclude_sharers" value="true"
+                                        class="toggle toggle-success" 
+                                        {% if purge_settings.exclude_sharers %}checked{% endif %}>
+                                    </div>
+                                    <p class="text-sm text-base-content/60">Exclude users marked as "Shares Back" from purging</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Exclude Whitelisted -->
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex justify-between mb-1">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fa-solid fa-shield-halved text-primary text-sm"></i>
+                                            <h5 class="font-medium text-base-content">Protect Whitelisted Users</h5>
+                                        </div>
+                                        <input type="checkbox" id="exclude_purge_whitelisted_modal_form" name="exclude_purge_whitelisted" value="true"
+                                        class="toggle toggle-primary" checked>
+                                    </div>
+                                    <p class="text-sm text-base-content/60">Exclude users on the Purge Whitelist from purging</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ignore Creation Date -->
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex justify-between mb-1">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fa-solid fa-calendar-xmark text-warning text-sm"></i>
+                                            <h5 class="font-medium text-base-content">Ignore Creation Date</h5>
+                                        </div>
+                                        <input type="checkbox" id="ignore_creation_date_modal_form" name="ignore_creation_date" value="true"
+                                        class="toggle toggle-warning">
+                                    </div>
+                                    <p class="text-sm text-base-content/60">Purge users who never streamed, regardless of when they were added</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                    <button type="button" class="btn btn-ghost" onclick="purge_modal.close()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-warning gap-2">
+                        <span id="preview-purge-loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
+                        <i class="fa-solid fa-list-check"></i>
+                        Preview Purge
+                    </button>
+                </div>
+            </form>
+            
+            <div id="purge-status-message" class="mt-4 min-h-[2rem]"></div>
         </div>
     </div>
 </dialog>
