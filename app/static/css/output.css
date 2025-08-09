@@ -4104,6 +4104,12 @@
       border-color: color-mix(in oklab, var(--color-error) 20%, transparent);
     }
   }
+  .border-error\/30 {
+    border-color: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-error) 30%, transparent);
+    }
+  }
   .border-info\/30 {
     border-color: var(--color-info);
     @supports (color: color-mix(in lab, red, red)) {
@@ -4750,6 +4756,9 @@
   }
   .break-words {
     overflow-wrap: break-word;
+  }
+  .break-all {
+    word-break: break-all;
   }
   .whitespace-normal {
     white-space: normal;

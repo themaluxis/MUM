@@ -275,77 +275,154 @@ function showPluginInfo(pluginId) {
         .then(data => {
             document.getElementById('pluginInfoTitle').textContent = data.name || 'Unknown Plugin';
             document.getElementById('pluginInfoContent').innerHTML = `
-                <div class="space-y-3">
-                    <div>
-                        <strong>Description:</strong> ${data.description || 'No description available'}
+                <!-- Plugin Overview Card -->
+                <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300/50">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-info text-accent text-sm"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-medium text-base-content mb-1">Plugin Overview</h4>
+                            <p class="text-sm text-base-content/70 leading-relaxed">
+                                ${data.description || 'No description available for this plugin.'}
+                            </p>
+                            <div class="flex items-center gap-3 mt-3">
+                                <span class="badge badge-${data.enabled ? 'success' : 'neutral'} badge-sm gap-1">
+                                    <i class="fa-solid fa-${data.enabled ? 'check-circle' : 'circle'}"></i>
+                                    ${data.enabled ? 'Enabled' : 'Disabled'}
+                                </span>
+                                ${data.plugin_type ? `<span class="badge badge-outline badge-sm">${data.plugin_type}</span>` : ''}
+                            </div>
+                        </div>
                     </div>
+                </div>
+
+                <!-- Plugin Details Section -->
+                <div class="space-y-4 mb-6">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-cog text-primary text-sm mr-2"></i>
+                        Plugin Details
+                    </h4>
                     
-                    <div>
-                        <strong>Version:</strong> ${data.version || 'Unknown'}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Version Card -->
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-tag text-primary text-sm"></i>
+                                <h5 class="font-medium text-base-content">Version</h5>
+                            </div>
+                            <p class="text-sm text-base-content/80 font-mono">${data.version || 'Unknown'}</p>
+                        </div>
+
+                        <!-- Servers Card -->
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-server text-info text-sm"></i>
+                                <h5 class="font-medium text-base-content">Active Servers</h5>
+                            </div>
+                            <p class="text-sm text-base-content/80">
+                                ${data.servers_count > 0 ? `${data.servers_count} server(s) configured` : 'No servers configured'}
+                            </p>
+                        </div>
                     </div>
-                    
-                    <div>
-                        <strong>Type:</strong> ${data.plugin_type || 'Unknown'}
-                    </div>
-                    
-                    <div>
-                        <strong>Status:</strong> 
-                        <span class="badge badge-${data.enabled ? 'success' : 'neutral'} badge-sm">
-                            ${data.enabled ? 'Enabled' : 'Disabled'}
-                        </span>
-                    </div>
-                    
-                    ${data.servers_count > 0 ? `
-                    <div>
-                        <strong>Servers:</strong> ${data.servers_count} server(s) using this plugin
-                    </div>
-                    ` : ''}
-                    
+
                     ${data.supported_features && data.supported_features.length > 0 ? `
-                    <div>
-                        <strong>Features:</strong>
-                        <div class="flex flex-wrap gap-1 mt-1">
+                    <!-- Features Card -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fa-solid fa-star text-warning text-sm"></i>
+                            <h5 class="font-medium text-base-content">Supported Features</h5>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
                             ${data.supported_features.map(feature => 
-                                `<span class="badge badge-outline badge-xs">${feature.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>`
+                                `<span class="badge badge-outline badge-sm">${feature.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>`
                             ).join('')}
                         </div>
                     </div>
                     ` : ''}
+                </div>
+
+                ${(data.author || data.license || data.homepage) ? `
+                <!-- Developer Information Section -->
+                <div class="space-y-4 mb-6">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-code text-secondary text-sm mr-2"></i>
+                        Developer Information
+                    </h4>
                     
-                    ${data.author ? `
-                    <div>
-                        <strong>Author:</strong> ${data.author}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        ${data.author ? `
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-users text-secondary text-sm"></i>
+                                <h5 class="font-medium text-base-content">Author</h5>
+                            </div>
+                            <p class="text-sm text-base-content/80">${data.author}</p>
+                        </div>
+                        ` : ''}
+
+                        ${data.license ? `
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-certificate text-secondary text-sm"></i>
+                                <h5 class="font-medium text-base-content">License</h5>
+                            </div>
+                            <p class="text-sm text-base-content/80">${data.license}</p>
+                        </div>
+                        ` : ''}
+
+                        ${data.homepage ? `
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors md:col-span-2">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-globe text-secondary text-sm"></i>
+                                <h5 class="font-medium text-base-content">Homepage</h5>
+                            </div>
+                            <a href="${data.homepage}" target="_blank" class="link link-primary text-sm break-all">${data.homepage}</a>
+                        </div>
+                        ` : ''}
                     </div>
-                    ` : ''}
+                </div>
+                ` : ''}
+
+                ${data.last_error ? `
+                <!-- Error Information -->
+                <div class="space-y-4 mb-6">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-exclamation-triangle text-error text-sm mr-2"></i>
+                        Error Information
+                    </h4>
                     
-                    ${data.license ? `
-                    <div>
-                        <strong>License:</strong> ${data.license}
+                    <div class="bg-error/10 rounded-lg p-4 border border-error/30">
+                        <div class="flex items-start gap-3">
+                            <i class="fa-solid fa-exclamation-triangle text-error text-sm mt-0.5"></i>
+                            <div>
+                                <h5 class="font-medium text-base-content mb-1">Last Error</h5>
+                                <p class="text-sm text-base-content/80">${data.last_error}</p>
+                            </div>
+                        </div>
                     </div>
-                    ` : ''}
-                    
-                    ${data.homepage ? `
-                    <div>
-                        <strong>Homepage:</strong> 
-                        <a href="${data.homepage}" target="_blank" class="link">${data.homepage}</a>
+                </div>
+                ` : ''}
+
+                ${data.installed_at ? `
+                <!-- Installation Information -->
+                <div class="bg-base-200/30 rounded-lg p-3 border border-base-300/30 mb-6">
+                    <div class="flex items-center gap-2 text-sm text-base-content/60">
+                        <i class="fa-solid fa-calendar text-sm"></i>
+                        <span>Installed: ${new Date(data.installed_at).toLocaleString()}</span>
                     </div>
-                    ` : ''}
-                    
-                    ${data.last_error ? `
-                    <div class="alert alert-error">
-                        <strong>Last Error:</strong> ${data.last_error}
-                    </div>
-                    ` : ''}
-                    
-                    ${data.installed_at ? `
-                    <div class="text-xs text-gray-500">
-                        Installed: ${new Date(data.installed_at).toLocaleString()}
-                    </div>
-                    ` : ''}
+                </div>
+                ` : ''}
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                    <button type="button" class="btn btn-ghost" onclick="closePluginInfoModal()">
+                        Close
+                    </button>
                 </div>
             `;
             
-            document.getElementById('pluginInfoModal').classList.add('modal-open');
+            document.getElementById('pluginInfoModal').showModal();
         })
         .catch(error => {
             console.error('Error loading plugin info:', error);
@@ -354,7 +431,7 @@ function showPluginInfo(pluginId) {
 }
 
 function closePluginInfoModal() {
-    document.getElementById('pluginInfoModal').classList.remove('modal-open');
+    document.getElementById('pluginInfoModal').close();
 }
 
 // Check if at least one plugin is enabled
@@ -493,17 +570,35 @@ function reloadPlugins() {
 </script>
 
 <!-- Plugin Info Modal -->
-<div id="pluginInfoModal" class="modal">
-    <div class="modal-box">
-        <h3 id="pluginInfoTitle" class="font-bold text-lg mb-4">Plugin Information</h3>
-        <div id="pluginInfoContent">
-            <!-- Content will be populated by JavaScript -->
+<dialog id="pluginInfoModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-4xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+                    <i class="fa-solid fa-puzzle-piece text-accent text-lg"></i>
+                </div>
+                <div>
+                    <h3 id="pluginInfoTitle" class="text-xl font-semibold text-base-content">Plugin Information</h3>
+                    <p class="text-sm text-base-content/60">Details and configuration information</p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200" onclick="closePluginInfoModal()">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
         </div>
-        <div class="modal-action">
-            <button class="btn" onclick="closePluginInfoModal()">Close</button>
+
+        <!-- Content -->
+        <div class="p-6">
+            <div id="pluginInfoContent">
+                <!-- Content will be populated by JavaScript -->
+                <div class="text-center p-8"><span class="loading loading-lg loading-spinner"></span></div>
+            </div>
         </div>
     </div>
-    <div class="modal-backdrop" onclick="closePluginInfoModal()"></div>
-</div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 {% endblock %}
