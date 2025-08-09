@@ -4,24 +4,64 @@
 <div id="create-invite-form-fields-wrapper">
     {{ form.hidden_tag() }}
 
-    {# --- Basic, Always-Visible Options --- #}
-    <div class="form-control mb-3">
-        {{ form.custom_path.label(class="label text-base-content font-bold mb-1") }} <div class="badge badge-xs badge-outline badge-warning mb-1">Optional</div>
-        {{ form.custom_path(class="input input-bordered w-full " + ("input-error" if form.custom_path.errors else ""), placeholder="e.g., 'besties' or 'vip_access'") }}
-        {% if form.custom_path.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.custom_path.errors[0] }}</span>{% else %}<span class="label-text-alt text-xs block">{{ form.custom_path.description }}</span>{% endif %}
+    <!-- Description Card -->
+    <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300/50">
+        <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-info text-info text-sm"></i>
+            </div>
+            <div>
+                <h4 class="font-medium text-base-content mb-1">Invitation Setup</h4>
+                <p class="text-sm text-base-content/70 leading-relaxed">
+                    Configure invite settings, select servers, and set permissions for new users.
+                </p>
+            </div>
+        </div>
     </div>
 
-    <div class="form-control mb-4">
-        {{ form.expires_at.label(class="label inline-block font-bold mb-1") }}
-        {{ form.expires_at(class="input input-bordered w-full " + ("input-error" if form.expires_at.errors else ""), type="date") }}
-        {% if form.expires_at.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.expires_at.errors[0] }}</span>{% else %}<span class="label-text-alt text-xs block">{{ form.expires_at.description }}</span>{% endif %}
+    <!-- Basic Settings Section -->
+    <div class="space-y-4 mb-6">
+        <h4 class="font-medium text-base-content text-lg mb-3">Basic Settings</h4>
+        
+        <!-- Custom Path -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-link text-primary text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.custom_path.label.text }}</h5>
+                    <div class="badge badge-xs badge-outline badge-warning">Optional</div>
+                </div>
+            </div>
+            {{ form.custom_path(class="input input-bordered w-full " + ("input-error" if form.custom_path.errors else ""), placeholder="e.g., 'besties' or 'vip_access'") }}
+            {% if form.custom_path.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.custom_path.errors[0] }}</span>
+            {% else %}
+                <span class="text-base-content/60 text-xs mt-1 block">{{ form.custom_path.description }}</span>
+            {% endif %}
+        </div>
+
+        <!-- Expiration Date -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-calendar text-warning text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.expires_at.label.text }}</h5>
+                </div>
+            </div>
+            {{ form.expires_at(class="input input-bordered w-full " + ("input-error" if form.expires_at.errors else ""), type="date") }}
+            {% if form.expires_at.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.expires_at.errors[0] }}</span>
+            {% else %}
+                <span class="text-base-content/60 text-xs mt-1 block">{{ form.expires_at.description }}</span>
+            {% endif %}
+        </div>
     </div>
 
-    {# Server Selection #}
-    <div class="divider text-xs">Select Server & Grant Access</div>
-    <div class="form-control mb-4 space-y-2">
+    <!-- Server Selection Section -->
+    <div class="space-y-4 mb-6">
+        <h4 class="font-medium text-base-content text-lg mb-3">Server & Access Configuration</h4>
         <input type="hidden" name="server_ids" id="selected_server_ids">
-        <div id="server_selection_error" class="text-error text-sm hidden">
+        <div id="server_selection_error" class="text-error text-sm hidden bg-error/10 border border-error/20 rounded-lg p-3">
             <i class="fa-solid fa-exclamation-triangle mr-1"></i>
             Please select at least one server to grant access to.
         </div>
@@ -76,43 +116,43 @@
                                         
                                         {# Allow Downloads #}
                                         <div class="form-control">
-                                            <label class="label cursor-pointer justify-start">
-                                                {{ form.allow_downloads(class="toggle toggle-accent mr-3") }}
+                                            <label class="label cursor-pointer flex justify-between">
                                                 <span class="label-text font-medium">
                                                     <i class="fa-solid fa-download mr-2 text-accent"></i>{{ form.allow_downloads.label.text }}
                                                 </span>
+                                                {{ form.allow_downloads(class="toggle toggle-accent") }}
                                             </label>
-                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_downloads.description }}</p>
+                                            <p class="text-xs text-base-content/60 mt-0.5">{{ form.allow_downloads.description }}</p>
                                         </div>
 
                                         {# Plex-specific options #}
                                         {% if server.service_type.value == 'plex' %}
                                         <div class="form-control">
-                                            <label class="label cursor-pointer justify-start">
-                                                {{ form.invite_to_plex_home(class="toggle toggle-primary mr-3") }}
+                                            <label class="label cursor-pointer flex justify-between">
                                                 <span class="label-text font-medium">
                                                     <i class="fa-solid fa-home mr-2 text-primary"></i>{{ form.invite_to_plex_home.label.text }}
                                                 </span>
+                                                {{ form.invite_to_plex_home(class="toggle toggle-primary") }}
                                             </label>
-                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.invite_to_plex_home.description }}</p>
+                                            <p class="text-xs text-base-content/60 mt-0.5">{{ form.invite_to_plex_home.description }}</p>
                                         </div>
                                         <div class="form-control">
-                                            <label class="label cursor-pointer justify-start">
-                                                {{ form.allow_live_tv(class="toggle toggle-secondary mr-3") }}
+                                            <label class="label cursor-pointer flex justify-between">
                                                 <span class="label-text font-medium">
                                                     <i class="fa-solid fa-tv mr-2 text-secondary"></i>{{ form.allow_live_tv.label.text }}
                                                 </span>
+                                                {{ form.allow_live_tv(class="toggle toggle-secondary") }}
                                             </label>
-                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_live_tv.description }}</p>
+                                            <p class="text-xs text-base-content/60 mt-0.5">{{ form.allow_live_tv.description }}</p>
                                         </div>
                                         <div class="form-control">
-                                            <label class="label cursor-pointer justify-start">
-                                                {{ form.allow_4k_transcode(class="toggle toggle-primary mr-3") }}
+                                            <label class="label cursor-pointer flex justify-between">
                                                 <span class="label-text font-medium">
                                                     <i class="fa-solid fa-film mr-2 text-primary"></i>{{ form.allow_4k_transcode.label.text }}
                                                 </span>
+                                                {{ form.allow_4k_transcode(class="toggle toggle-primary") }}
                                             </label>
-                                            <p class="text-xs text-base-content/60 mt-0.5 pl-12">{{ form.allow_4k_transcode.description }}</p>
+                                            <p class="text-xs text-base-content/60 mt-0.5">{{ form.allow_4k_transcode.description }}</p>
                                         </div>
                                         {% endif %}
                                     </div>
@@ -125,83 +165,145 @@
         {% endfor %}
     </div>
 
-    {# --- NEW: Advanced Options Collapsible Section --- #}
-    <details class="collapse collapse-arrow bg-base-100/50 border border-base-300 rounded-md">
-        <summary class="collapse-title text-md font-medium">
-            Advanced Options
-        </summary>
-        <div class="collapse-content space-y-4">
-            
-            {# Number of Uses #}
-            <div class="form-control">
-                {{ form.number_of_uses.label(class="label") }}
-                {{ form.number_of_uses(class="input input-bordered " + ("input-error" if form.number_of_uses.errors else ""), type="number", min="0") }}
-                {% if form.number_of_uses.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.number_of_uses.errors[0] }}</span>{% else %}<span class="label-text-alt text-xs block">{{ form.number_of_uses.description }}</span>{% endif %}
-            </div>
+    <!-- Advanced Options Section -->
+    <div class="space-y-4 mb-6">
+        <details class="collapse collapse-arrow bg-base-200/30 border border-base-300/30 rounded-lg hover:border-base-300/60 transition-colors">
+            <summary class="collapse-title text-lg font-medium text-base-content">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-cog text-secondary text-sm"></i>
+                    Advanced Options
+                </div>
+            </summary>
+            <div class="collapse-content space-y-4 pt-2">
+                
+                <!-- Usage & Duration Limits -->
+                <div class="space-y-3">
+                    <h5 class="font-medium text-base-content text-base mb-3">Usage & Duration Limits</h5>
+                    
+                    <!-- Number of Uses -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-hashtag text-primary text-sm"></i>
+                                <h6 class="font-medium text-base-content">{{ form.number_of_uses.label.text }}</h6>
+                            </div>
+                        </div>
+                        {{ form.number_of_uses(class="input input-bordered w-full " + ("input-error" if form.number_of_uses.errors else ""), type="number", min="0") }}
+                        {% if form.number_of_uses.errors %}
+                            <span class="text-error text-xs mt-1 block">{{ form.number_of_uses.errors[0] }}</span>
+                        {% else %}
+                            <span class="text-base-content/60 text-xs mt-1 block">{{ form.number_of_uses.description }}</span>
+                        {% endif %}
+                    </div>
 
-            {# Membership Duration #}
-            <div class="form-control">
-                {{ form.membership_expires_at.label(class="label") }}
-                {{ form.membership_expires_at(class="input input-bordered " + ("input-error" if form.membership_expires_at.errors else ""), type="date") }} 
-                {% if form.membership_expires_at.errors %}<label class="label py-0 mt-1"><span class="label-text-alt text-error whitespace-normal">{{ form.membership_expires_at.errors[0] }}</span></label>{% endif %}
-                <label class="label pt-1"><span class="label-text-alt whitespace-normal text-xs">{{ form.membership_expires_at.description }}</span></label>
-            </div>
-            
-            {# Discord Settings - Only show if Discord OAuth is enabled #}
-            {% if discord_oauth_enabled %}
-            <div class="divider text-xs">Discord Settings</div>
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.require_discord_auth(class="toggle toggle-info mr-3", id="modal_require_discord_auth") }}
-                    <span class="label-text font-medium">
-                        <i class="fa-brands fa-discord mr-2 text-info"></i>{{ form.require_discord_auth.label.text }}
-                    </span>
-                </label>
-                <p class="text-xs text-base-content/60 mt-0.5 pl-14">{{ form.require_discord_auth.description }}</p>
-            </div>
-            
-            <div id="require_guild_membership_container" class="form-control">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.require_discord_guild_membership(class="toggle toggle-warning mr-3", id="modal_require_guild_membership") }}
-                    <span class="label-text font-medium">
-                        <i class="fa-solid fa-users mr-2 text-warning"></i>{{ form.require_discord_guild_membership.label.text }}
-                    </span>
-                </label>
-                <p class="text-xs text-base-content/60 mt-0.5 pl-14">{{ form.require_discord_guild_membership.description }}</p>
-            </div>
-            {% endif %}
+                    <!-- Membership Duration -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-clock text-warning text-sm"></i>
+                                <h6 class="font-medium text-base-content">{{ form.membership_expires_at.label.text }}</h6>
+                            </div>
+                        </div>
+                        {{ form.membership_expires_at(class="input input-bordered w-full " + ("input-error" if form.membership_expires_at.errors else ""), type="date") }}
+                        {% if form.membership_expires_at.errors %}
+                            <span class="text-error text-xs mt-1 block">{{ form.membership_expires_at.errors[0] }}</span>
+                        {% else %}
+                            <span class="text-base-content/60 text-xs mt-1 block">{{ form.membership_expires_at.description }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Discord Integration - Only show if Discord OAuth is enabled -->
+                {% if discord_oauth_enabled %}
+                <div class="space-y-3">
+                    <h5 class="font-medium text-base-content text-base mb-3">Discord Integration</h5>
+                    
+                    <!-- Require Discord Auth -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-brands fa-discord text-info text-sm"></i>
+                                        <h6 class="font-medium text-base-content">{{ form.require_discord_auth.label.text }}</h6>
+                                    </div>
+                                    {{ form.require_discord_auth(class="toggle toggle-info", id="modal_require_discord_auth") }}
+                                </div>
+                                <p class="text-sm text-base-content/60">{{ form.require_discord_auth.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Guild Membership Requirement -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors" id="require_guild_membership_container">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-users text-warning text-sm"></i>
+                                        <h6 class="font-medium text-base-content">{{ form.require_discord_guild_membership.label.text }}</h6>
+                                    </div>
+                                    {{ form.require_discord_guild_membership(class="toggle toggle-warning", id="modal_require_guild_membership") }}
+                                </div>
+                                <p class="text-sm text-base-content/60">{{ form.require_discord_guild_membership.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
-            <div class="divider text-xs">Whitelist Grants</div>
-            
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.grant_purge_whitelist(class="toggle toggle-accent mr-3") }}
-                    <span class="label-text font-medium">
-                        <i class="fa-solid fa-shield-halved mr-2 text-accent"></i>{{ form.grant_purge_whitelist.label.text }}
-                    </span>
-                </label>
-                <p class="text-xs text-base-content/60 mt-0.5 pl-14">{{ form.grant_purge_whitelist.description }}</p>
+                <!-- Protection Grants -->
+                <div class="space-y-3">
+                    <h5 class="font-medium text-base-content text-base mb-3">Protection Grants</h5>
+                    
+                    <!-- Grant Purge Whitelist -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-shield-halved text-accent text-sm"></i>
+                                        <h6 class="font-medium text-base-content">{{ form.grant_purge_whitelist.label.text }}</h6>
+                                    </div>
+                                    {{ form.grant_purge_whitelist(class="toggle toggle-accent") }}
+                                </div>
+                                <p class="text-sm text-base-content/60">{{ form.grant_purge_whitelist.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Grant Bot Whitelist -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-robot text-info text-sm"></i>
+                                        <h6 class="font-medium text-base-content">{{ form.grant_bot_whitelist.label.text }}</h6>
+                                    </div>
+                                    {{ form.grant_bot_whitelist(class="toggle toggle-info") }}
+                                </div>
+                                <p class="text-sm text-base-content/60">{{ form.grant_bot_whitelist.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.grant_bot_whitelist(class="toggle toggle-info mr-3") }}
-                    <span class="label-text font-medium">
-                        <i class="fa-solid fa-robot mr-2 text-info"></i>{{ form.grant_bot_whitelist.label.text }}
-                    </span>
-                </label>
-                <p class="text-xs text-base-content/60 mt-0.5 pl-14">{{ form.grant_bot_whitelist.description }}</p>
-            </div>
-
-        </div>
-    </details>
+        </details>
+    </div>
     {# --- END Advanced Options --- #}
 
     {# Submit actions are unchanged #}
-    <div class="modal-action mt-6">
-        <button type="button" class="btn btn-ghost" onclick="const modal = document.getElementById('create_invite_modal'); if(modal) modal.close();">Cancel</button>
-        {{ form.submit(class="btn btn-primary") }}
-        <span id="create_invite_loader_span" class="htmx-indicator loading loading-spinner loading-md"></span>
+    <!-- Action Buttons -->
+    <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+        <button type="button" class="btn btn-ghost" onclick="const modal = document.getElementById('create_invite_modal'); if(modal) modal.close();">
+            Cancel
+        </button>
+        <button type="submit" class="btn btn-success gap-2">
+            <span id="create_invite_loader_span" class="htmx-indicator loading loading-spinner loading-xs"></span>
+            <i class="fa-solid fa-ticket-simple"></i>
+            {{ form.submit.label.text }}
+        </button>
     </div>
 
 </div>

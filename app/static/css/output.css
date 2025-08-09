@@ -4095,6 +4095,12 @@
   .border-error {
     border-color: var(--color-error);
   }
+  .border-error\/20 {
+    border-color: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-error) 20%, transparent);
+    }
+  }
   .border-primary {
     border-color: var(--color-primary);
   }
@@ -4205,6 +4211,12 @@
   }
   .bg-error {
     background-color: var(--color-error);
+  }
+  .bg-error\/10 {
+    background-color: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-error) 10%, transparent);
+    }
   }
   .bg-error\/20 {
     background-color: var(--color-error);
