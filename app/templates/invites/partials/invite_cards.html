@@ -153,8 +153,8 @@
                     <i class="fa-solid fa-pen-to-square"></i>
                 </button>
                 {% endif %}
-                <button class="btn btn-xs btn-ghost text-info hover:bg-info/10" title="View Usages" hx-get="{{ url_for('invites.view_invite_usages', invite_id=invite.id) }}" hx-target="#invite_usages_modal_content_div" hx-swap="innerHTML" onclick="invite_usages_modal.showModal(); document.getElementById('invite_usages_modal_content_div').innerHTML = '<div class=text-center p-8><span class=loading loading-lg loading-spinner></span></div>';">
-                    <i class="fa-solid fa-eye"></i>
+                <button class="btn btn-xs btn-ghost text-info hover:bg-info/10" title="View Usages" hx-get="{{ url_for('invites.view_invite_usages', invite_id=invite.id) }}" hx-target="#usage-modal-content" hx-swap="innerHTML" onclick="usage_modal.showModal(); document.getElementById('usage-modal-content').innerHTML = '<div class=text-center p-8><span class=loading loading-lg loading-spinner></span></div>';">
+                    <i class="fa-solid fa-chart-line"></i>
                 </button>
                 {% if current_user.has_permission('edit_invites') %}
                 {% if invite.is_active %}

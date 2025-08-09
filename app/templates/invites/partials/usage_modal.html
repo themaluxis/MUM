@@ -1,92 +1,146 @@
-<!-- File: app/templates/invites/_invite_usages_modal_content.html -->
 {# Expects 'invite' and 'usages' (list of InviteUsage objects) in context #}
-<h3 class="font-bold text-lg mb-1">Invite Usages</h3>
-<p class="text-sm text-base-content/80 mb-4">
-    For Invite:
-    <a href="{{ invite.get_full_url(g.app_base_url) }}" target="_blank" class="link link-hover link-primary font-mono text-xs">
-        {{ invite.custom_path or invite.token }}
-    </a>
-</p>
 
-{% if usages and usages|length > 0 %}
-<div class="overflow-x-auto max-h-[60vh]">
-    <table class="table table-sm w-full">
-        <thead>
-            <tr>
-                <th>Timestamp</th>
-                <th>User</th>
-                <th>Status</th>
-                <th class="hidden sm:table-cell">IP Address</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for usage in usages %}
-            <tr class="hover">
-                <td title="{{ usage.used_at | format_datetime_user }}">
-                    {{ usage.used_at | time_ago }}
-                </td>
-                <td>
+<!-- Info Card -->
+<div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300/50">
+    <div class="flex items-start gap-3">
+        <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i class="fa-solid fa-link text-info text-sm"></i>
+        </div>
+        <div class="flex-1">
+            <h4 class="font-medium text-base-content mb-1">Invite Link</h4>
+            <div class="flex items-center gap-2">
+                <a href="{{ invite.get_full_url(g.app_base_url) }}" target="_blank" class="link link-hover link-primary font-mono text-sm">
+                    {{ invite.custom_path or invite.token }}
+                </a>
+                <button class="btn btn-xs btn-ghost" 
+                        onclick="copyToClipboard('{{ invite.get_full_url(g.app_base_url) }}')"
+                        title="Copy Link">
+                    <i class="fa-solid fa-copy"></i>
+                </button>
+            </div>
+            <p class="text-xs text-base-content/60 mt-1">
+                Uses: {{ invite.current_uses }}{% if invite.max_uses %}/{{ invite.max_uses }}{% else %}/∞{% endif %}
+                {% if invite.expires_at %} • Expires: {{ invite.expires_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Usage History Section -->
+<div class="space-y-4 mb-6">
+    <h4 class="font-medium text-base-content text-lg mb-3">
+        <i class="fa-solid fa-history text-info text-sm mr-2"></i>
+        Usage History
+    </h4>
+    
+    {% if usages and usages|length > 0 %}
+    <div class="space-y-3 max-h-[60vh] overflow-y-auto">
+        {% for usage in usages %}
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+            <div class="flex items-start justify-between gap-4">
+                <!-- User Info -->
+                <div class="flex items-center gap-3 flex-1">
                     {% if usage.plex_username %}
-                        <div class="flex items-center space-x-2">
-                            {% if usage.plex_thumb %}
-                            <div class="avatar avatar-xs">
-                                <div class="w-6 rounded-full">
-                                    <img src="{{ usage.plex_thumb }}" alt="{{ usage.plex_username }} avatar" />
-                                </div>
+                        {% if usage.plex_thumb %}
+                        <div class="avatar">
+                            <div class="w-8 rounded-full">
+                                <img src="{{ usage.plex_thumb }}" alt="{{ usage.plex_username }} avatar" />
                             </div>
-                            {% else %}
-                            <i class="fa-brands fa-plex fa-fw text-orange-400"></i>
+                        </div>
+                        {% else %}
+                        <div class="w-8 h-8 rounded-full bg-orange-400/20 flex items-center justify-center">
+                            <i class="fa-brands fa-plex text-orange-400 text-sm"></i>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <div class="font-medium text-base-content">{{ usage.plex_username }}</div>
+                            {% if usage.plex_email %}
+                            <div class="text-xs text-base-content/60">{{ usage.plex_email }}</div>
                             {% endif %}
-                            <div>
-                                <span class="font-semibold" title="Plex: {{ usage.plex_username }}">{{ usage.plex_username | truncate(20) }}</span>
-                                {% if usage.plex_email %}<div class="text-xs opacity-60" title="{{usage.plex_email}}">{{ usage.plex_email | truncate(20) }}</div>{% endif %}
-                            </div>
                         </div>
                     {% elif usage.discord_username %}
-                         <div class="flex items-center space-x-2">
-                            <i class="fa-brands fa-discord fa-fw text-blue-500"></i>
-                            <div>
-                                <span class="font-semibold" title="Discord: {{ usage.discord_username }}"> {{ usage.discord_username | truncate(20) }}</span>
-                                <div class="text-xs opacity-60">ID: {{ usage.discord_user_id | truncate(10) }}...</div>
-                            </div>
+                        <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                            <i class="fa-brands fa-discord text-blue-500 text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium text-base-content">{{ usage.discord_username }}</div>
+                            <div class="text-xs text-base-content/60">ID: {{ usage.discord_user_id }}</div>
                         </div>
                     {% else %}
-                        <span class="text-base-content/60">Anonymous</span>
+                        <div class="w-8 h-8 rounded-full bg-base-300/50 flex items-center justify-center">
+                            <i class="fa-solid fa-user text-base-content/40 text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium text-base-content/60">Anonymous User</div>
+                        </div>
                     {% endif %}
-                </td>
-                <td>
-                    {% if usage.accepted_invite and usage.mum_user %}
-                        <span class="badge badge-success badge-sm inline whitespace-normal">
-                            <i class="fa-solid fa-check-circle mr-1"></i> Accepted by {{ usage.mum_user.plex_username }}
-                        </span>
-                    {% elif usage.plex_auth_successful and usage.discord_auth_successful %}
-                        <span class="badge badge-info badge-sm inline whitespace-normal">Plex & Discord Linked</span>
-                    {% elif usage.plex_auth_successful %}
-                        <span class="badge badge-info badge-sm inline whitespace-normal">Plex Authenticated</span>
-                    {% elif usage.discord_auth_successful %}
-                         <span class="badge badge-info badge-sm inline whitespace-normal">Discord Authenticated</span>
-                    {% else %}
-                        <span class="badge badge-warning badge-sm inline whitespace-normal">Attempted</span>
+                </div>
+                
+                <!-- Status and Time -->
+                <div class="text-right">
+                    <div class="mb-2">
+                        {% if usage.accepted_invite and usage.mum_user %}
+                            <span class="badge badge-success badge-sm gap-1">
+                                <i class="fa-solid fa-check-circle"></i>
+                                Accepted
+                            </span>
+                        {% elif usage.plex_auth_successful and usage.discord_auth_successful %}
+                            <span class="badge badge-info badge-sm">Fully Linked</span>
+                        {% elif usage.plex_auth_successful %}
+                            <span class="badge badge-info badge-sm">Plex Auth</span>
+                        {% elif usage.discord_auth_successful %}
+                            <span class="badge badge-info badge-sm">Discord Auth</span>
+                        {% else %}
+                            <span class="badge badge-warning badge-sm">Attempted</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-xs text-base-content/60" title="{{ usage.used_at | format_datetime_user }}">
+                        {{ usage.used_at | time_ago }}
+                    </div>
+                    {% if usage.ip_address %}
+                    <div class="text-xs text-base-content/40 mt-1">
+                        {{ usage.ip_address }}
+                    </div>
                     {% endif %}
-                    {% if usage.status_message %}
-                        <p class="text-xs text-error mt-1">{{ usage.status_message }}</p>
-                    {% endif %}
-                </td>
-                <td class="hidden sm:table-cell text-xs opacity-70">{{ usage.ip_address or 'N/A' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                </div>
+            </div>
+            
+            {% if usage.status_message %}
+            <div class="mt-3 pt-3 border-t border-base-300/30">
+                <div class="flex items-start gap-2">
+                    <i class="fa-solid fa-exclamation-triangle text-error text-sm mt-0.5"></i>
+                    <p class="text-sm text-error">{{ usage.status_message }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-base-200/30 rounded-lg p-8 border border-base-300/30 text-center">
+        <div class="w-16 h-16 rounded-full bg-base-300/50 flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-chart-line text-base-content/40 text-2xl"></i>
+        </div>
+        <h5 class="font-medium text-base-content mb-2">No Usage Yet</h5>
+        <p class="text-sm text-base-content/60">This invite hasn't been used by anyone yet. Share the link to start seeing usage data here.</p>
+    </div>
+    {% endif %}
 </div>
-{% else %}
-<div class="text-center py-8">
-    <i class="fa-solid fa-list-ul fa-3x text-base-content/30 mb-4"></i>
-    <p class="text-lg text-base-content/70">No one has used this invite yet.</p>
-</div>
-{% endif %}
 
-<div class="modal-action mt-6">
-    <form method="dialog">
-        <button class="btn btn-sm">Close</button>
-    </form>
+<!-- Action Buttons -->
+<div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+    <button type="button" class="btn btn-ghost" onclick="usage_modal.close()">
+        Close
+    </button>
 </div>
+
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        // You could add a toast notification here
+        console.log('Copied to clipboard: ' + text);
+    }, function(err) {
+        console.error('Could not copy text: ', err);
+    });
+}
+</script>

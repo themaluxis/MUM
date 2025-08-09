@@ -30,7 +30,7 @@
             <!-- Action Buttons (non-clickable for selection) -->
             <div class="flex space-x-2" onclick="event.stopPropagation();">
                 <button class="btn btn-sm btn-ghost" 
-                        hx-get="{{ url_for('invites.usage_details', invite_id=invite.id) }}"
+                        hx-get="{{ url_for('invites.view_invite_usages', invite_id=invite.id) }}"
                         hx-target="#usage-modal-content"
                         onclick="usage_modal.showModal()"
                         title="View Usage">
