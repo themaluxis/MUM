@@ -245,6 +245,21 @@ class KavitaMediaService(BaseMediaService):
                             library_ids.append(lib_id)
                             library_names.append(lib_name)
                 
+                # Extract join date from created field
+                join_date = None
+                if 'created' in user:
+                    try:
+                        from datetime import datetime
+                        # Parse the ISO format datetime string
+                        join_date_str = user['created']
+                        if join_date_str:
+                            # Remove timezone info and parse
+                            if '.' in join_date_str:
+                                join_date_str = join_date_str.split('.')[0]  # Remove microseconds
+                            join_date = datetime.fromisoformat(join_date_str.replace('Z', ''))
+                    except (ValueError, TypeError) as e:
+                        self.log_warning(f"Could not parse created date '{user.get('created')}' for user {user.get('username')}: {e}")
+                
                 result.append({
                     'id': str(user_id),
                     'uuid': str(user_id),
@@ -254,6 +269,7 @@ class KavitaMediaService(BaseMediaService):
                     'is_home_user': False,
                     'library_ids': library_ids,
                     'library_names': library_names,  # Include library names from Kavita
+                    'join_date': join_date,  # Include join date from created field
                     'is_admin': user.get('isAdmin', False),
                     'raw_data': user  # Store raw data for debugging
                 })

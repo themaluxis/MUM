@@ -277,6 +277,16 @@ class MediaServiceManager:
             # Set Kavita-specific fields if this is a Kavita server
             elif server.service_type == ServiceType.KAVITA:
                 current_app.logger.info(f"Setting Kavita-specific fields for user '{username}'")
+                
+                # Parse and set service_join_date from join_date field (unified field)
+                if user_data.get('join_date'):
+                    try:
+                        join_date = user_data.get('join_date')
+                        user.service_join_date = join_date
+                        current_app.logger.debug(f"Set service_join_date for Kavita user {username}: {user.service_join_date}")
+                    except Exception as e:
+                        current_app.logger.warning(f"Failed to set join date for Kavita user {username}: {e}")
+                
                 # Store raw Kavita data for debugging purposes
                 if user_data.get('raw_data'):
                     import json
@@ -366,6 +376,15 @@ class MediaServiceManager:
                 import json
                 user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
                 current_app.logger.info(f"Updated raw Kavita data for existing user '{user.get_display_name()}'")
+                
+                # Parse and set service_join_date from join_date field for existing users
+                if user_data.get('join_date') and not user.service_join_date:
+                    try:
+                        join_date = user_data.get('join_date')
+                        user.service_join_date = join_date
+                        current_app.logger.info(f"Set service_join_date for existing Kavita user {user.get_display_name()}: {user.service_join_date}")
+                    except Exception as e:
+                        current_app.logger.warning(f"Failed to set join date for existing Kavita user {user.get_display_name()}: {e}")
 
         return user
     
