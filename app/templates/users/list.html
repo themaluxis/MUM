@@ -469,40 +469,119 @@
         </div>
     </div>
 </dialog>
-<dialog id="user_settings_modal" class="modal">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg">User Display Settings</h3>
-    <div class="py-4">
-        <div class="form-control">
-            <label class="label cursor-pointer">
-                <span class="label-text">Show User Notes on Cards</span>
-                <input type="checkbox" id="show_user_notes_toggle" class="toggle toggle-primary" />
-            </label>
+<dialog id="user_settings_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-3xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <i class="fa-solid fa-cog text-primary text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">User Display Settings</h3>
+                    <p class="text-sm text-base-content/60">Customize how users are displayed</p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
         </div>
-        <div class="form-control">
-            <label class="label cursor-pointer">
-                <span class="label-text">Auto-sync Users on Page Load</span>
-                <input type="checkbox" id="auto_sync_users_toggle" class="toggle toggle-secondary" />
-            </label>
-            <div class="label">
-                <span class="label-text-alt whitespace-normal">If enabled, users will be automatically synced from all services when visiting this page</span>
+
+        <!-- Content -->
+        <div class="p-6">
+            <!-- Description Card -->
+            <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300/50">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-info text-info text-sm"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-base-content mb-1">Personalization</h4>
+                        <p class="text-sm text-base-content/70 leading-relaxed">
+                            Configure how the user interface displays information and behaves to match your preferences.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Grid -->
+            <div class="space-y-4">
+                <!-- Display Settings Section -->
+                <div class="space-y-3">
+                    <h4 class="font-medium text-base-content text-lg mb-3">Display Options</h4>
+                    
+                    <!-- Show User Notes -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-sticky-note text-warning text-sm"></i>
+                                        <h5 class="font-medium text-base-content">Show User Notes on Cards</h5>
+                                    </div>
+                                    <input type="checkbox" id="show_user_notes_toggle" class="toggle toggle-warning" />
+                                </div>
+                                <p class="text-sm text-base-content/60">Display user notes directly on user cards for quick reference</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preferred View -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-layout text-secondary text-sm"></i>
+                                        <h5 class="font-medium text-base-content">Preferred Default View</h5>
+                                    </div>
+                                    <select id="preferred_view_select" class="select select-bordered select-sm max-w-fit">
+                                        <option value="cards">Cards</option>
+                                        <option value="table">Table</option>
+                                    </select>
+                                </div>
+                                <p class="text-sm text-base-content/60">Choose how users are displayed by default when loading the page</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Behavior Settings Section -->
+                <div class="space-y-3">
+                    <h4 class="font-medium text-base-content text-lg mb-3">Behavior Settings</h4>
+                    
+                    <!-- Auto-sync -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-sync text-success text-sm"></i>
+                                        <h5 class="font-medium text-base-content">Auto-sync Users on Page Load</h5>
+                                    </div>
+                                    <input type="checkbox" id="auto_sync_users_toggle" class="toggle toggle-success" />
+                                </div>
+                                <p class="text-sm text-base-content/60">Automatically sync users from all services when visiting this page</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                <button type="button" class="btn btn-ghost" onclick="user_settings_modal.close()">
+                    Cancel
+                </button>
+                <button id="save_user_settings_btn" class="btn btn-primary gap-2">
+                    <i class="fa-solid fa-save"></i>
+                    Save Settings
+                </button>
             </div>
         </div>
-        <div class="form-control w-full max-w-xs">
-            <label class="label">
-                <span class="label-text">Preferred Default View</span>
-            </label>
-            <select id="preferred_view_select" class="select select-bordered">
-                <option value="cards">Cards</option>
-                <option value="table">Table</option>
-            </select>
-        </div>
     </div>
-    <div class="modal-action">
-      <button type="button" class="btn btn-ghost" onclick="user_settings_modal.close()">Cancel</button>
-      <button id="save_user_settings_btn" class="btn btn-primary">Save</button>
-    </div>
-  </div>
 </dialog>
 
 <!-- User Debug Info Modal -->
