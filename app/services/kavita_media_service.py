@@ -315,17 +315,57 @@ class KavitaMediaService(BaseMediaService):
             raise
     
     def update_user_access(self, user_id: str, library_ids: List[str] = None, **kwargs) -> bool:
-        """Update Kavita user's library access"""
+        """Update Kavita user's library access using /api/Account/update"""
         try:
             if library_ids is not None:
-                # Remove all current access
-                self._make_request(f'Account/revoke-all-library-access', method='POST', 
-                                 data={'userId': int(user_id)})
+                # First, get the current user data to preserve other settings
+                users = self._make_request('Users')
+                target_user = None
+                for user in users:
+                    if str(user.get('id')) == str(user_id):
+                        target_user = user
+                        break
                 
-                # Grant new access
+                if not target_user:
+                    self.log_error(f"User with ID {user_id} not found")
+                    return False
+                
+                # Extract library IDs from compound format (e.g., "2_Books" -> 2)
+                numeric_library_ids = []
                 for lib_id in library_ids:
-                    self._make_request(f'Account/grant-library-access', method='POST',
-                                     data={'userId': int(user_id), 'libraryId': int(lib_id)})
+                    if '_' in str(lib_id):
+                        # Extract numeric ID from compound format
+                        numeric_id = str(lib_id).split('_')[0]
+                        try:
+                            numeric_library_ids.append(int(numeric_id))
+                        except ValueError:
+                            self.log_warning(f"Could not extract numeric ID from: {lib_id}")
+                    else:
+                        try:
+                            numeric_library_ids.append(int(lib_id))
+                        except ValueError:
+                            self.log_warning(f"Invalid library ID format: {lib_id}")
+                
+                # Prepare the update payload
+                update_data = {
+                    "userId": int(user_id),
+                    "username": target_user.get('username', ''),
+                    "roles": target_user.get('roles', []),
+                    "libraries": numeric_library_ids,
+                    "ageRestriction": target_user.get('ageRestriction', {
+                        "ageRating": 0,
+                        "includeUnknowns": True
+                    }),
+                    "email": target_user.get('email', ''),
+                    "identityProvider": target_user.get('identityProvider', 0)
+                }
+                
+                self.log_info(f"Updating Kavita user {user_id} with library access: {numeric_library_ids}")
+                self.log_info(f"Update payload: {update_data}")
+                
+                # Update the user
+                self._make_request('Account/update', method='POST', data=update_data)
+                self.log_info(f"Successfully updated library access for user {user_id}")
             
             return True
         except Exception as e:
