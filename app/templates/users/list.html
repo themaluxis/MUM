@@ -254,48 +254,107 @@
 </div>
 
 <dialog id="mass_edit_modal" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box max-w-2xl">
-        <form method="dialog"> <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button> </form>
-        <h3 class="font-bold text-lg mb-4"><i class="fa-solid fa-users-cog mr-2"></i>Mass Edit Users</h3>
-        <form id="massEditForm" method="POST"
-              hx-post="{{ url_for('users.mass_edit_users', **request.args.to_dict(flat=False)) }}"
-              hx-target="#user-list-container"
-              hx-swap="innerHTML"
-              hx-indicator="#mass_edit_loader"
-              hx-on::after-request="if (event.detail.successful) { mass_edit_modal.close(); }">
-            {{ mass_edit_form.hidden_tag() }}
-            <input type="hidden" name="user_ids" id="mass_edit_user_ids_input">
-            <div class="form-control mb-4">
-                {{ mass_edit_form.action.label(class="label") }}
-                {{ mass_edit_form.action(class="select select-bordered", id="mass_edit_action_select") }}
-            </div>
-            <div id="mass_edit_libraries_section" class="form-control mb-4 hidden">
-                <div id="mass_edit_libraries_content">
-                    <!-- Dynamic content will be loaded here -->
-                    <div class="text-center">
-                        <span class="loading loading-spinner"></span>
-                        <p>Loading libraries...</p>
-                    </div>
+    <div class="modal-box max-w-4xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <i class="fa-solid fa-users-cog text-primary text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Mass Edit Users</h3>
+                    <p class="text-sm text-base-content/60">Apply changes to multiple users at once</p>
                 </div>
             </div>
-            <div id="mass_edit_delete_confirmation_section" class="form-control mb-4 hidden">
-                <div class="alert alert-error"><i class="fa-solid fa-triangle-exclamation mr-2"></i>
-                    <div>
-                        <h3 class="font-bold">Confirm Deletion!</h3>
-                        <div class="text-xs">Removes users from MUM AND Plex server. Cannot be undone.</div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+
+            <form id="massEditForm" method="POST"
+                  hx-post="{{ url_for('users.mass_edit_users', **request.args.to_dict(flat=False)) }}"
+                  hx-target="#user-list-container"
+                  hx-swap="innerHTML"
+                  hx-indicator="#mass_edit_loader"
+                  hx-on::after-request="if (event.detail.successful) { mass_edit_modal.close(); }">
+                {{ mass_edit_form.hidden_tag() }}
+                <input type="hidden" name="user_ids" id="mass_edit_user_ids_input">
+                
+                <!-- Action Selection Section -->
+                <div class="space-y-4 mb-6">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-cog text-primary text-sm mr-2"></i>
+                        Select Action
+                    </h4>
+                    
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-list-check text-primary text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ mass_edit_form.action.label.text }}</h5>
+                        </div>
+                        {{ mass_edit_form.action(class="select select-bordered w-full", id="mass_edit_action_select") }}
+                        <p class="text-xs text-base-content/60 mt-2">Choose what action to perform on the selected users</p>
                     </div>
                 </div>
-                <label class="label cursor-pointer justify-start mt-2">
-                    {{ mass_edit_form.confirm_delete(class="checkbox checkbox-error mr-2", id="mass_edit_confirm_delete") }}
-                    <span class="label-text font-semibold">I understand...</span>
-                </label>
-            </div>
-            <div class="modal-action mt-6">
-                <button type="button" class="btn btn-ghost" onclick="mass_edit_modal.close()">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="mass_edit_submit_button">Apply Changes</button>
-                <span id="mass_edit_loader" class="htmx-indicator loading loading-spinner loading-md"></span>
-            </div>
-        </form>
+
+                <!-- Libraries Section (Dynamic Content) -->
+                <div id="mass_edit_libraries_section" class="space-y-4 mb-6 hidden">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-books text-accent text-sm mr-2"></i>
+                        Library Access
+                    </h4>
+                    
+                    <div id="mass_edit_libraries_content">
+                        <!-- Dynamic content will be loaded here -->
+                        <div class="bg-base-200/30 rounded-lg p-8 border border-base-300/30 text-center">
+                            <span class="loading loading-spinner loading-lg"></span>
+                            <p class="text-sm text-base-content/60 mt-4">Loading libraries...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delete Confirmation Section -->
+                <div id="mass_edit_delete_confirmation_section" class="space-y-4 mb-6 hidden">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-exclamation-triangle text-error text-sm mr-2"></i>
+                        Confirm Deletion
+                    </h4>
+                    
+                    <div class="bg-error/10 rounded-lg p-4 border border-error/30">
+                        <div class="flex items-start gap-3">
+                            <i class="fa-solid fa-triangle-exclamation text-error text-lg mt-0.5"></i>
+                            <div>
+                                <h5 class="font-medium text-base-content mb-1">Permanent Action Warning</h5>
+                                <p class="text-sm text-base-content/80 mb-3">
+                                    This will permanently remove the selected users from both MUM and all connected media servers. This action cannot be undone.
+                                </p>
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    {{ mass_edit_form.confirm_delete(class="checkbox checkbox-error", id="mass_edit_confirm_delete") }}
+                                    <span class="font-medium text-base-content">I understand this action is permanent and cannot be undone</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                    <button type="button" class="btn btn-ghost" onclick="mass_edit_modal.close()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary gap-2" id="mass_edit_submit_button">
+                        <span id="mass_edit_loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
+                        <i class="fa-solid fa-check"></i>
+                        Apply Changes
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </dialog>
 
