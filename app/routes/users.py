@@ -972,33 +972,84 @@ def get_quick_edit_form(user_id):
     
     available_libraries = {}
     current_library_ids = []
+    current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Building available libraries for user {user.id}")
     
     for access in user_access_records:
         try:
             service = MediaServiceFactory.create_service_from_db(access.server)
+            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Processing server {access.server.name} (type: {access.server.service_type.value})")
+            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: User access record allowed_library_ids: {access.allowed_library_ids}")
+            
             if service:
                 server_libraries = service.get_libraries()
+                current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Server libraries from API: {[{lib.get('id'): lib.get('name')} for lib in server_libraries]}")
+                
                 for lib in server_libraries:
                     lib_id = lib.get('external_id') or lib.get('id')
                     lib_name = lib.get('name', 'Unknown')
                     if lib_id:
-                        # Use just the library name since server name is now shown in a separate badge
-                        available_libraries[str(lib_id)] = lib_name
+                        # For Kavita, create compound IDs to match the format used in user access records
+                        if access.server.service_type.value == 'kavita':
+                            compound_lib_id = f"{lib_id}_{lib_name}"
+                            available_libraries[compound_lib_id] = lib_name
+                            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Added Kavita library: {compound_lib_id} -> {lib_name}")
+                        else:
+                            available_libraries[str(lib_id)] = lib_name
+                            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Added non-Kavita library: {lib_id} -> {lib_name}")
                 
                 # Collect current library IDs from this server
                 current_library_ids.extend(access.allowed_library_ids or [])
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {access.server.name}: {e}")
     
+    current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Final available_libraries: {available_libraries}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
+    current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Form choices set to: {form.libraries.choices}")
     
     # Pre-populate the fields with the user's current settings from all their servers
+    current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Current library IDs from access records: {current_library_ids}")
+    current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Available library keys: {list(available_libraries.keys())}")
+    
     # Handle special case for Jellyfin users with '*' (all libraries access)
     if current_library_ids == ['*']:
         # If user has "All Libraries" access, check all available library checkboxes
         form.libraries.data = list(available_libraries.keys())
+        current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Jellyfin wildcard case - setting form data to: {form.libraries.data}")
     else:
-        form.libraries.data = list(set(current_library_ids))  # Remove duplicates
+        # For Kavita users, ensure we're using the compound IDs that match the available_libraries keys
+        validated_library_ids = []
+        for lib_id in current_library_ids:
+            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Processing library ID: {lib_id}")
+            if str(lib_id) in available_libraries:
+                validated_library_ids.append(str(lib_id))
+                current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Direct match found for: {lib_id}")
+            else:
+                current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: No direct match for {lib_id}, searching for compound ID...")
+                # This might be a legacy ID format, try to find a matching compound ID
+                found_match = False
+                for available_id in available_libraries.keys():
+                    if '_' in available_id and available_id.startswith(f"{lib_id}_"):
+                        validated_library_ids.append(available_id)
+                        current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Found compound match: {lib_id} -> {available_id}")
+                        found_match = True
+                        break
+                
+                # If no compound match, try matching by library name (for Kavita ID changes)
+                if not found_match and '_' in str(lib_id):
+                    stored_lib_name = str(lib_id).split('_', 1)[1]  # Extract name from stored ID
+                    current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Trying name match for: {stored_lib_name}")
+                    for available_id, available_name in available_libraries.items():
+                        if available_name == stored_lib_name:
+                            validated_library_ids.append(available_id)
+                            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Found name match: {lib_id} -> {available_id} (name: {stored_lib_name})")
+                            found_match = True
+                            break
+                
+                if not found_match:
+                    current_app.logger.warning(f"DEBUG KAVITA QUICK EDIT: No match found for library ID: {lib_id}")
+        
+        form.libraries.data = list(set(validated_library_ids))  # Remove duplicates
+        current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Final form.libraries.data: {form.libraries.data}")
     form.allow_downloads.data = user.allow_downloads
     form.allow_4k_transcode.data = user.allow_4k_transcode
     form.is_discord_bot_whitelisted.data = user.is_discord_bot_whitelisted

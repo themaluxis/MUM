@@ -232,6 +232,11 @@ class KavitaMediaService(BaseMediaService):
                 if not user_id:
                     continue
                 
+                # Skip the owner account (ID 1) - this is the admin account and shouldn't be synced as a regular user
+                if user_id == 1:
+                    self.log_info(f"Skipping Kavita owner account (ID: {user_id}, username: {user.get('username', 'Unknown')})")
+                    continue
+                
                 # Extract library access from user data
                 library_ids = []
                 library_names = []

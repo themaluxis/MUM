@@ -13,14 +13,6 @@ from app.models import EventType
 
 bp = Blueprint('media_servers', __name__)
 
-@bp.route('/servers')
-@login_required
-@setup_required
-@permission_required('manage_media_servers')
-def list_servers():
-    """List all configured media servers"""
-    servers = MediaServiceManager.get_all_servers(active_only=False)
-    return render_template('media_servers/list.html', servers=servers)
 
 @bp.route('/setup/plugins/<string:plugin_id>/servers', methods=['GET'])
 @login_required
@@ -160,7 +152,7 @@ def edit_server(server_id):
     server = MediaServiceManager.get_server_by_id(server_id)
     if not server:
         flash('Server not found', 'danger')
-        return redirect(url_for('media_servers.list_servers'))
+        return redirect(url_for('plugin_management.index'))
     
     form = MediaServerForm(server_id=server.id, obj=server)
     form.service_type.data = server.service_type.value
@@ -248,7 +240,7 @@ def delete_server(server_id):
     server = MediaServiceManager.get_server_by_id(server_id)
     if not server:
         flash('Server not found', 'danger')
-        return redirect(url_for('media_servers.list_servers'))
+        return redirect(url_for('plugin_management.index'))
     
     try:
         server_name = server.name
@@ -305,7 +297,7 @@ def delete_server(server_id):
             plugin_id = plugin_match.group(1)
             return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
     
-    return redirect(url_for('media_servers.list_servers'))
+    return redirect(url_for('plugin_management.index'))
 
 
 

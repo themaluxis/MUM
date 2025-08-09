@@ -58,20 +58,36 @@ def view_user(user_id):
     user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
     
     available_libraries = {}
+    current_app.logger.info(f"DEBUG KAVITA FORM: Building available libraries for user {user.id}")
+    
     for access in user_access_records:
         try:
             service = MediaServiceFactory.create_service_from_db(access.server)
+            current_app.logger.info(f"DEBUG KAVITA FORM: Processing server {access.server.name} (type: {access.server.service_type.value})")
+            current_app.logger.info(f"DEBUG KAVITA FORM: User access record allowed_library_ids: {access.allowed_library_ids}")
+            
             if service:
                 server_libraries = service.get_libraries()
+                current_app.logger.info(f"DEBUG KAVITA FORM: Server libraries from API: {[{lib.get('id'): lib.get('name')} for lib in server_libraries]}")
+                
                 for lib in server_libraries:
                     lib_id = lib.get('external_id') or lib.get('id')
                     lib_name = lib.get('name', 'Unknown')
                     if lib_id:
-                        available_libraries[str(lib_id)] = lib_name
+                        # For Kavita, create compound IDs to match the format used in user access records
+                        if access.server.service_type.value == 'kavita':
+                            compound_lib_id = f"{lib_id}_{lib_name}"
+                            available_libraries[compound_lib_id] = lib_name
+                            current_app.logger.info(f"DEBUG KAVITA FORM: Added Kavita library: {compound_lib_id} -> {lib_name}")
+                        else:
+                            available_libraries[str(lib_id)] = lib_name
+                            current_app.logger.info(f"DEBUG KAVITA FORM: Added non-Kavita library: {lib_id} -> {lib_name}")
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {access.server.name}: {e}")
     
+    current_app.logger.info(f"DEBUG KAVITA FORM: Final available_libraries: {available_libraries}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
+    current_app.logger.info(f"DEBUG KAVITA FORM: Form choices set to: {form.libraries.choices}")
 
     # Handle form submission for the settings tab
     if form.validate_on_submit(): # This handles (if request.method == 'POST' and form.validate())
@@ -280,12 +296,49 @@ def view_user(user_id):
         for access in user_access_records:
             current_library_ids.extend(access.allowed_library_ids or [])
         
+        current_app.logger.info(f"DEBUG KAVITA FORM: Current library IDs from access records: {current_library_ids}")
+        current_app.logger.info(f"DEBUG KAVITA FORM: Available library keys: {list(available_libraries.keys())}")
+        
         # Handle special case for Jellyfin users with '*' (all libraries access)
         if current_library_ids == ['*']:
             # If user has "All Libraries" access, check all available library checkboxes
             form.libraries.data = list(available_libraries.keys())
+            current_app.logger.info(f"DEBUG KAVITA FORM: Jellyfin wildcard case - setting form data to: {form.libraries.data}")
         else:
-            form.libraries.data = list(set(current_library_ids))  # Remove duplicates
+            # For Kavita users, ensure we're using the compound IDs that match the available_libraries keys
+            validated_library_ids = []
+            for lib_id in current_library_ids:
+                current_app.logger.info(f"DEBUG KAVITA FORM: Processing library ID: {lib_id}")
+                if str(lib_id) in available_libraries:
+                    validated_library_ids.append(str(lib_id))
+                    current_app.logger.info(f"DEBUG KAVITA FORM: Direct match found for: {lib_id}")
+                else:
+                    current_app.logger.info(f"DEBUG KAVITA FORM: No direct match for {lib_id}, searching for compound ID...")
+                    # This might be a legacy ID format, try to find a matching compound ID
+                    found_match = False
+                    for available_id in available_libraries.keys():
+                        if '_' in available_id and available_id.startswith(f"{lib_id}_"):
+                            validated_library_ids.append(available_id)
+                            current_app.logger.info(f"DEBUG KAVITA FORM: Found compound match: {lib_id} -> {available_id}")
+                            found_match = True
+                            break
+                    
+                    # If no compound match, try matching by library name (for Kavita ID changes)
+                    if not found_match and '_' in str(lib_id):
+                        stored_lib_name = str(lib_id).split('_', 1)[1]  # Extract name from stored ID
+                        current_app.logger.info(f"DEBUG KAVITA FORM: Trying name match for: {stored_lib_name}")
+                        for available_id, available_name in available_libraries.items():
+                            if available_name == stored_lib_name:
+                                validated_library_ids.append(available_id)
+                                current_app.logger.info(f"DEBUG KAVITA FORM: Found name match: {lib_id} -> {available_id} (name: {stored_lib_name})")
+                                found_match = True
+                                break
+                    
+                    if not found_match:
+                        current_app.logger.warning(f"DEBUG KAVITA FORM: No match found for library ID: {lib_id}")
+            
+            form.libraries.data = list(set(validated_library_ids))  # Remove duplicates
+            current_app.logger.info(f"DEBUG KAVITA FORM: Final form.libraries.data: {form.libraries.data}")
         # Remove the old access_expires_in_days logic since we're now using DateField
         # The form will automatically populate access_expires_at from the user object via obj=user
 
