@@ -1,15 +1,13 @@
 {# File: app/templates/invites/partials/edit_invite_modal.html #}
 {# Expects form, invite, grouped_servers, invite_server, global_require_guild #}
 
-<h3 class="font-bold text-lg mb-4">
-    <i class="fa-solid fa-edit mr-2"></i>Edit Invite
-</h3>
-<p class="text-sm text-base-content/80 mb-4 -mt-2">
-    Path:
-    <a href="{{ invite.get_full_url(g.app_base_url) }}" target="_blank" class="link link-hover font-mono text-xs">
+<div class="bg-base-200/50 rounded p-2 border border-base-300 mb-6">
+    <span class="text-xs text-base-content/60">Current Path:</span>
+    <a href="{{ invite.get_full_url(g.app_base_url) }}" target="_blank" class="link link-hover font-mono text-xs ml-1">
         {{ invite.custom_path or invite.token }}
-    </a> (Path is not editable)
-</p>
+    </a>
+    <span class="text-xs text-base-content/50 ml-2">(not editable)</span>
+</div>
 
 <form id="editInviteForm-{{ invite.id }}"
       hx-post="{{ url_for('invites.update_invite', invite_id=invite.id) }}"
@@ -20,20 +18,33 @@
 
     {{ form.hidden_tag() }}
 
-    {# --- Basic, Always-Visible Options --- #}
-    <div class="form-control mb-4">
-        {{ form.expires_in_days.label(class="label inline-block font-bold mb-1") }} <div class="badge badge-xs badge-outline badge-warning mb-1">In Days</div>
-        <div class="join w-full">
-            {{ form.expires_in_days(class="input input-bordered join-item w-full " + ("input-error" if form.expires_in_days.errors else ""), type="number", min="0", id="edit_expires_in_days") }}
-            <label class="btn btn-warning join-item" title="Set expiry to never">
-                {{ form.clear_expiry(class="checkbox checkbox-xs mr-2", id="edit_clear_expiry") }} Clear
-            </label>
+    <!-- Basic Settings Section -->
+    <div class="space-y-4 mb-6">
+        <h4 class="font-medium text-base-content text-lg mb-3">Basic Settings</h4>
+        
+        <!-- Expiration -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-calendar text-warning text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.expires_in_days.label.text }}</h5>
+                    <div class="badge badge-xs badge-outline badge-warning">In Days</div>
+                </div>
+            </div>
+            <div class="join w-full">
+                {{ form.expires_in_days(class="input input-bordered join-item w-full " + ("input-error" if form.expires_in_days.errors else ""), type="number", min="0", id="edit_expires_in_days") }}
+                <label class="btn btn-warning join-item" title="Set expiry to never">
+                    {{ form.clear_expiry(class="checkbox checkbox-xs mr-2", id="edit_clear_expiry") }} Clear
+                </label>
+            </div>
+            {% if form.expires_in_days.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.expires_in_days.errors[0] }}</span>
+            {% endif %}
         </div>
-        {% if form.expires_in_days.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.expires_in_days.errors[0] }}</span>{% endif %}
     </div>
 
     {# Server Selection & Options (Display Only) #}
-    <div class="divider text-xs">Server & Access Options</div>
+    <h4 class="font-medium text-base-content text-lg mb-3">Server & Access Configuration</h4>
     <p class="text-xs text-base-content/70 -mt-2 mb-3">Server selection cannot be changed after an invite is created.</p>
     
     <div class="form-control mb-4 space-y-2">
@@ -202,76 +213,145 @@
         {% endif %}
     </div>
 
-    {# --- Advanced Options --- #}
-    <details class="collapse collapse-arrow bg-base-100/50 border border-base-300 rounded-md">
-        <summary class="collapse-title text-md font-medium">Advanced Options</summary>
-        <div class="collapse-content space-y-4 pt-4">
-            <div class="form-control">
-                {{ form.number_of_uses.label(class="label font-bold") }}
-                <div class="join w-full">
-                    {{ form.number_of_uses(class="input input-bordered join-item w-full " + ("input-error" if form.number_of_uses.errors else ""), type="number", min="0", id="edit_number_of_uses") }}
-                    <label class="btn btn-warning join-item" title="Set to unlimited uses">
-                        {{ form.clear_max_uses(class="checkbox checkbox-xs mr-2", id="edit_clear_max_uses") }} Clear
-                    </label>
+    <!-- Advanced Options Section -->
+    <div class="space-y-4 mb-6">
+        <details class="collapse collapse-arrow bg-base-200/30 border border-base-300 rounded-lg hover:border-base-300/60 transition-colors">
+            <summary class="collapse-title text-lg font-medium text-base-content">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-cog text-secondary text-sm"></i>
+                    Advanced Options
                 </div>
-                {% if form.number_of_uses.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.number_of_uses.errors[0] }}</span>{% endif %}
-            </div>
+            </summary>
+            <div class="collapse-content space-y-4 pt-2">
+                
+                <!-- Usage & Duration Limits -->
+                <div class="space-y-3">
+                    <h5 class="font-medium text-base-content text-base mb-3">Usage & Duration Limits</h5>
+                    
+                    <!-- Number of Uses -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-hashtag text-primary text-sm"></i>
+                                <h6 class="font-medium text-base-content">{{ form.number_of_uses.label.text }}</h6>
+                            </div>
+                        </div>
+                        <div class="join w-full">
+                            {{ form.number_of_uses(class="input input-bordered join-item w-full " + ("input-error" if form.number_of_uses.errors else ""), type="number", min="0", id="edit_number_of_uses") }}
+                            <label class="btn btn-warning join-item" title="Set to unlimited uses">
+                                {{ form.clear_max_uses(class="checkbox checkbox-xs mr-2", id="edit_clear_max_uses") }} Clear
+                            </label>
+                        </div>
+                        {% if form.number_of_uses.errors %}
+                            <span class="text-error text-xs mt-1 block">{{ form.number_of_uses.errors[0] }}</span>
+                        {% endif %}
+                    </div>
 
-            <div class="form-control">
-                {{ form.membership_duration_days.label(class="label font-bold") }}
-                <div class="join w-full">
-                    {{ form.membership_duration_days(class="input input-bordered join-item w-full " + ("input-error" if form.membership_duration_days.errors else ""), type="number", min="1", id="edit_membership_duration_days") }}
-                    <label class="btn btn-warning join-item" title="Set to permanent membership">
-                        {{ form.clear_membership_duration(class="checkbox checkbox-xs mr-2", id="edit_clear_membership_duration") }} Clear
-                    </label>
+                    <!-- Membership Duration -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-clock text-warning text-sm"></i>
+                                <h6 class="font-medium text-base-content">{{ form.membership_duration_days.label.text }}</h6>
+                            </div>
+                        </div>
+                        <div class="join w-full">
+                            {{ form.membership_duration_days(class="input input-bordered join-item w-full " + ("input-error" if form.membership_duration_days.errors else ""), type="number", min="1", id="edit_membership_duration_days") }}
+                            <label class="btn btn-warning join-item" title="Set to permanent membership">
+                                {{ form.clear_membership_duration(class="checkbox checkbox-xs mr-2", id="edit_clear_membership_duration") }} Clear
+                            </label>
+                        </div>
+                        {% if form.membership_duration_days.errors %}
+                            <span class="text-error text-xs mt-1 block">{{ form.membership_duration_days.errors[0] }}</span>
+                        {% endif %}
+                    </div>
                 </div>
-                {% if form.membership_duration_days.errors %}<span class="label-text-alt text-error mt-1 text-xs block">{{ form.membership_duration_days.errors[0] }}</span>{% endif %}
-            </div>
+                
+                <!-- Discord Integration -->
+                <div class="space-y-3">
+                    <h5 class="font-medium text-base-content text-base mb-3">Discord Integration</h5>
+                    
+                    <!-- Require Discord Auth -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-brands fa-discord text-info text-sm"></i>
+                                        <h6 class="font-medium text-base-content">{{ form.require_discord_auth.label.text }}</h6>
+                                    </div>
+                                    {{ form.require_discord_auth(class="toggle toggle-info", id="edit_modal_require_discord_auth") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="divider text-xs">Discord Overrides</div>
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.require_discord_auth(class="toggle toggle-info mr-3", id="edit_modal_require_discord_auth") }}
-                    <span class="label-text font-medium">
-                        <i class="fa-brands fa-discord mr-2 text-info"></i>{{ form.require_discord_auth.label.text }}
-                    </span>
-                </label>
-            </div>
-            {% if global_require_guild %}
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.require_discord_guild_membership(class="toggle toggle-warning mr-3", id="edit_modal_require_guild") }}
-                    <span class="label-text font-medium">
-                        <i class="fa-solid fa-users mr-2 text-warning"></i>{{ form.require_discord_guild_membership.label.text }}
-                    </span>
-                </label>
-            </div>
-            {% endif %}
+                    <!-- Guild Membership Requirement -->
+                    {% if global_require_guild %}
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-users text-warning text-sm"></i>
+                                        <h6 class="font-medium text-base-content">{{ form.require_discord_guild_membership.label.text }}</h6>
+                                    </div>
+                                    {{ form.require_discord_guild_membership(class="toggle toggle-warning", id="edit_modal_require_guild") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
 
-            <div class="divider text-xs">Whitelist Grants</div>
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.grant_purge_whitelist(class="toggle toggle-accent mr-3") }}
-                    <span class="label-text font-medium">
-                        <i class="fa-solid fa-shield-halved mr-2 text-accent"></i>{{ form.grant_purge_whitelist.label.text }}
-                    </span>
-                </label>
+                <!-- Protection Grants -->
+                <div class="space-y-3">
+                    <h5 class="font-medium text-base-content text-base mb-3">Protection Grants</h5>
+                    
+                    <!-- Grant Purge Whitelist -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-shield-halved text-accent text-sm"></i>
+                                        <h6 class="font-medium text-base-content">{{ form.grant_purge_whitelist.label.text }}</h6>
+                                    </div>
+                                    {{ form.grant_purge_whitelist(class="toggle toggle-accent") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Grant Bot Whitelist -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-robot text-info text-sm"></i>
+                                        <h6 class="font-medium text-base-content">{{ form.grant_bot_whitelist.label.text }}</h6>
+                                    </div>
+                                    {{ form.grant_bot_whitelist(class="toggle toggle-info") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.grant_bot_whitelist(class="toggle toggle-info mr-3") }}
-                    <span class="label-text font-medium">
-                        <i class="fa-solid fa-robot mr-2 text-info"></i>{{ form.grant_bot_whitelist.label.text }}
-                    </span>
-                </label>
-            </div>
-        </div>
-    </details>
+        </details>
+    </div>
 
-    <div class="modal-action mt-6">
-        <button type="button" class="btn btn-ghost" onclick="document.getElementById('edit_invite_modal').close()">Cancel</button>
-        {{ form.submit(class="btn btn-primary") }}
-        <span id="edit_invite_loader_span" class="htmx-indicator loading loading-spinner loading-md"></span>
+    <!-- Action Buttons -->
+    <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('edit_invite_modal').close()">
+            Cancel
+        </button>
+        <button type="submit" class="btn btn-warning gap-2">
+            <span id="edit_invite_loader_span" class="htmx-indicator loading loading-spinner loading-xs"></span>
+            <i class="fa-solid fa-save"></i>
+            {{ form.submit.label.text }}
+        </button>
     </div>
 </form>
 

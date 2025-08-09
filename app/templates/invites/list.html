@@ -150,10 +150,33 @@
     <form method="dialog" class="modal-backdrop">
         <button>close</button>
     </form>
-    <div class="modal-box max-w-2xl">
-        <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" type="button" onclick="edit_invite_modal.close()">✕</button></form>
-        <div id="edit_invite_modal_content_div">
-            <div class="text-center p-8"><span class="loading loading-lg loading-spinner"></span><p>Loading invite details...</p></div>
+    <div class="modal-box max-w-4xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+                    <i class="fa-solid fa-edit text-warning text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Edit Invite</h3>
+                    <p class="text-sm text-base-content/60">Modify invitation settings and permissions</p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <div id="edit_invite_modal_content_div">
+                <div class="text-center p-8">
+                    <span class="loading loading-lg loading-spinner"></span>
+                    <p class="mt-4 text-base-content/60">Loading invite details...</p>
+                </div>
+            </div>
         </div>
     </div>
 </dialog>
