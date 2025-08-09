@@ -1,24 +1,135 @@
-{# File: app/templates/users/partials/user_debug_info_modal.html #}
 {# Template for displaying user debug information in the modal #}
 
-<div class="space-y-4">
-    {% if user.raw_service_data %}
-        <div class="flex justify-between items-center mb-4">
-            <button class="btn btn-sm btn-outline" onclick="copyUserRawData('{{ user.id }}')">
-                <i class="fa-solid fa-copy mr-1"></i> Copy
-            </button>
+<!-- User Info Card -->
+<div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+    <div class="flex items-start gap-3">
+        <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i class="fa-solid fa-user text-info text-sm"></i>
         </div>
-        <div class="mockup-code" id="userRawDataContent-{{ user.id }}">
-            <pre><code>{% if user.raw_service_data.startswith('{') %}{{ user.raw_service_data | format_json }}{% else %}{{ user.raw_service_data }}{% endif %}</code></pre>
-        </div>
-    {% else %}
-        <div class="alert alert-warning">
-            <i class="fa-solid fa-exclamation-triangle"></i>
-            <div>
-                <strong>No Raw Data Available</strong><br>
-                This user doesn't have stored raw data yet.<br>
-                <em>Click "Sync Users" button to fetch and store the data.</em>
+        <div class="flex-1">
+            <h4 class="font-medium text-base-content mb-1">User Information</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                <div><span class="text-base-content/60">Username:</span> <span class="font-mono">{{ user.get_display_name() }}</span></div>
+                <div><span class="text-base-content/60">User ID:</span> <span class="font-mono">{{ user.id }}</span></div>
+                {% if user.plex_username %}
+                <div><span class="text-base-content/60">Plex Username:</span> <span class="font-mono">{{ user.plex_username }}</span></div>
+                {% endif %}
+                {% if user.plex_uuid %}
+                <div><span class="text-base-content/60">Plex UUID:</span> <span class="font-mono text-xs">{{ user.plex_uuid }}</span></div>
+                {% endif %}
             </div>
         </div>
-    {% endif %}
+    </div>
 </div>
+
+{% if user.raw_service_data %}
+<!-- Raw Data Section -->
+<div class="space-y-4 mb-6">
+    
+    <!-- Data Type Info -->
+    <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+        <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-info text-info text-sm"></i>
+            </div>
+
+            <div class="flex-1 text-sm">
+                <p class="text-base-content/80">
+                    <strong>Data Format:</strong> 
+                    {% if user.raw_service_data.startswith('{') %}
+                        JSON (Structured Data)
+                    {% else %}
+                        Plain Text
+                    {% endif %}
+                </p>
+                <p class="text-base-content/60 mt-1">
+                    This is the raw data received from the media service API. Use this for debugging user sync issues or service integration problems.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code Display -->
+    <div class="bg-base-200/30 rounded-lg border border-base-300">
+        <div class="flex items-center justify-between p-3 border-b border-base-300 bg-base-200/50">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-code text-secondary text-sm"></i>
+                <span class="font-medium text-sm">Raw Data Content</span>
+            </div>
+            <div class="text-xs text-base-content/60">
+                Size: {{ user.raw_service_data|length }} characters
+            </div>
+        </div>
+        <div class="p-4">
+            <div class="mockup-code bg-base-300/50 border border-base-300" id="userRawDataContent-{{ user.id }}">
+                <pre class="text-xs"><code>{% if user.raw_service_data.startswith('{') %}{{ user.raw_service_data | format_json }}{% else %}{{ user.raw_service_data }}{% endif %}</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+    <button type="button" class="btn btn-ghost" onclick="user_debug_modal.close()">
+        Close
+    </button>
+    <button type="button" class="btn btn-secondary gap-2" onclick="copyUserRawData('{{ user.id }}')">
+        <i class="fa-solid fa-copy"></i>
+        Copy to Clipboard
+    </button>
+</div>
+
+{% else %}
+<!-- No Data Available -->
+<div class="space-y-4">
+    <div class="bg-warning/10 rounded-lg p-8 border border-warning/30 text-center">
+        <div class="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-exclamation-triangle text-warning text-2xl"></i>
+        </div>
+        <h5 class="font-medium text-base-content mb-2">No Raw Data Available</h5>
+        <p class="text-sm text-base-content/70 mb-4">
+            This user doesn't have stored raw service data yet. This could happen if:
+        </p>
+        <ul class="text-sm text-base-content/60 text-left max-w-md mx-auto space-y-1">
+            <li>• The user hasn't been synced from the media service</li>
+            <li>• The user was created manually without service integration</li>
+            <li>• There was an error during the last sync operation</li>
+        </ul>
+    </div>
+    
+    <!-- Suggestion Card -->
+    <div class="bg-info/10 rounded-lg p-4 border border-info/30">
+        <div class="flex items-start gap-3">
+            <i class="fa-solid fa-lightbulb text-info text-sm mt-0.5"></i>
+            <div>
+                <h6 class="font-medium text-base-content mb-1">Suggestion</h6>
+                <p class="text-sm text-base-content/70">
+                    Try running a user sync operation to fetch and store the raw data from your media service.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+        <button type="button" class="btn btn-ghost" onclick="user_debug_modal.close()">
+            Close
+        </button>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function copyUserRawData(userId) {
+    const content = document.getElementById('userRawDataContent-' + userId);
+    if (content) {
+        const text = content.textContent || content.innerText;
+        navigator.clipboard.writeText(text).then(function() {
+            // You could add a toast notification here
+            console.log('Raw user data copied to clipboard');
+        }, function(err) {
+            console.error('Could not copy text: ', err);
+        });
+    }
+}
+</script>
