@@ -201,12 +201,31 @@ def list_users():
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
 
+    # Create a mapping of user_id to User object for easy lookup
+    users_by_id = {user.id: user for user in users_pagination.items}
+    
     for user_id, lib_ids in user_library_access.items():
         # Handle special case for Jellyfin users with '*' (all libraries access)
         if lib_ids == ['*']:
             lib_names = ['All Libraries']
         else:
-            lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
+            # Check if this user has library_names available (for services like Kavita)
+            user_obj = users_by_id.get(user_id)
+            if user_obj and hasattr(user_obj, 'library_names') and user_obj.library_names:
+                # Use library_names from the user object
+                lib_names = user_obj.library_names
+            else:
+                # Fallback to looking up in available_libraries
+                # For Kavita unique IDs (format: "0_Comics"), extract the name part
+                lib_names = []
+                for lib_id in lib_ids:
+                    if '_' in str(lib_id) and str(lib_id).split('_', 1)[0].isdigit():
+                        # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
+                        lib_name = str(lib_id).split('_', 1)[1]
+                        lib_names.append(lib_name)
+                    else:
+                        # Regular library ID lookup
+                        lib_names.append(available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}'))
         user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
 
     mass_edit_form = MassUserEditForm()  
@@ -757,12 +776,31 @@ def mass_edit_users():
     
     # Get sorted libraries
     user_sorted_libraries = {}
+    # Create a mapping of user_id to User object for easy lookup
+    users_by_id = {user.id: user for user in users_pagination.items}
+    
     for user_id, lib_ids in user_library_access.items():
         # Handle special case for Jellyfin users with '*' (all libraries access)
         if lib_ids == ['*']:
             lib_names = ['All Libraries']
         else:
-            lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in lib_ids]
+            # Check if this user has library_names available (for services like Kavita)
+            user_obj = users_by_id.get(user_id)
+            if user_obj and hasattr(user_obj, 'library_names') and user_obj.library_names:
+                # Use library_names from the user object
+                lib_names = user_obj.library_names
+            else:
+                # Fallback to looking up in available_libraries
+                # For Kavita unique IDs (format: "0_Comics"), extract the name part
+                lib_names = []
+                for lib_id in lib_ids:
+                    if '_' in str(lib_id) and str(lib_id).split('_', 1)[0].isdigit():
+                        # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
+                        lib_name = str(lib_id).split('_', 1)[1]
+                        lib_names.append(lib_name)
+                    else:
+                        # Regular library ID lookup
+                        lib_names.append(available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}'))
         user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
     
     # Build user_service_types for template context

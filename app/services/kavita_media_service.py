@@ -232,14 +232,18 @@ class KavitaMediaService(BaseMediaService):
                 if not user_id:
                     continue
                 
-                # For Kavita, users typically have access to all libraries
-                # Get all enabled libraries for this server
-                try:
-                    from app.models import Library
-                    libraries = Library.query.filter_by(server_id=self.id, enabled=True).all()
-                    library_ids = [str(lib.external_id) for lib in libraries]
-                except:
-                    library_ids = []
+                # Extract library access from user data
+                library_ids = []
+                library_names = []
+                
+                if 'libraries' in user and isinstance(user['libraries'], list):
+                    for lib in user['libraries']:
+                        if isinstance(lib, dict) and 'id' in lib:
+                            # For Kavita, create unique IDs by combining ID and name since IDs can be duplicated
+                            lib_id = f"{lib['id']}_{lib.get('name', 'Unknown')}"
+                            lib_name = lib.get('name', f"Library {lib['id']}")
+                            library_ids.append(lib_id)
+                            library_names.append(lib_name)
                 
                 result.append({
                     'id': str(user_id),
@@ -249,6 +253,7 @@ class KavitaMediaService(BaseMediaService):
                     'thumb': None,  # Kavita doesn't provide avatars
                     'is_home_user': False,
                     'library_ids': library_ids,
+                    'library_names': library_names,  # Include library names from Kavita
                     'is_admin': user.get('isAdmin', False),
                     'raw_data': user  # Store raw data for debugging
                 })
@@ -317,9 +322,7 @@ class KavitaMediaService(BaseMediaService):
             return False
     
     def get_active_sessions(self) -> List[Dict[str, Any]]:
-        """Get active Kavita sessions - Kavita doesn't have real-time sessions"""
-        # Kavita doesn't have active session tracking like media servers
-        # We could potentially get recent reading activity instead
+        """Get active Kavita sessions - Kavita doesn't have real-time session tracking"""
         return []
     
     def terminate_session(self, session_id: str, reason: str = None) -> bool:
@@ -350,8 +353,7 @@ class KavitaMediaService(BaseMediaService):
             }
 
     def get_formatted_sessions(self) -> List[Dict[str, Any]]:
-        """Get active Kavita sessions formatted for display"""
-        # Kavita doesn't have real-time sessions like media servers
+        """Get active Kavita sessions formatted for display - Kavita doesn't have real-time sessions"""
         return []
 
     def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:

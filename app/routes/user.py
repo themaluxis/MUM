@@ -205,7 +205,22 @@ def view_user(user_id):
                 if all_library_ids == ['*']:
                     lib_names = ['All Libraries']
                 else:
-                    lib_names = [available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}') for lib_id in all_library_ids]
+                    # Check if this user has library_names available (for services like Kavita)
+                    if hasattr(user, 'library_names') and user.library_names:
+                        # Use library_names from the user object
+                        lib_names = user.library_names
+                    else:
+                        # Fallback to looking up in available_libraries
+                        # For Kavita unique IDs (format: "0_Comics"), extract the name part
+                        lib_names = []
+                        for lib_id in all_library_ids:
+                            if '_' in str(lib_id) and str(lib_id).split('_', 1)[0].isdigit():
+                                # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
+                                lib_name = str(lib_id).split('_', 1)[1]
+                                lib_names.append(lib_name)
+                            else:
+                                # Regular library ID lookup
+                                lib_names.append(available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}'))
                 user_sorted_libraries[user.id] = sorted(lib_names, key=str.lower)
                 
                 admins_by_uuid = {admin.plex_uuid: admin for admin in AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()}

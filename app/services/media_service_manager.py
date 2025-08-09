@@ -165,16 +165,34 @@ class MediaServiceManager:
                     
                     old_library_ids = set(access.allowed_library_ids or [])
                     new_library_ids = set(user_data.get('library_ids', []))
+                    current_app.logger.info(f"DEBUG KAVITA SYNC: User {user_data.get('username', 'Unknown')} - Old IDs: {old_library_ids}, New IDs: {new_library_ids}")
                     if old_library_ids != new_library_ids:
                         added_ids = new_library_ids - old_library_ids
                         removed_ids = old_library_ids - new_library_ids
+                        current_app.logger.info(f"DEBUG KAVITA SYNC: Added: {added_ids}, Removed: {removed_ids}")
 
                         if added_ids:
-                            added_names = [server_libraries.get(id, f"Unknown Library (ID: {id})") for id in added_ids]
+                            # Use library_names from user_data if available (for services like Kavita)
+                            if 'library_names' in user_data:
+                                # Create a mapping from library_ids to library_names
+                                lib_ids = user_data.get('library_ids', [])
+                                lib_names = user_data.get('library_names', [])
+                                id_to_name = dict(zip(lib_ids, lib_names)) if len(lib_ids) == len(lib_names) else {}
+                                added_names = [id_to_name.get(id, server_libraries.get(id, f"Unknown Library (ID: {id})")) for id in added_ids]
+                            else:
+                                added_names = [server_libraries.get(id, f"Unknown Library (ID: {id})") for id in added_ids]
                             changes.append(f"Gained access to: {', '.join(added_names)}")
                         
                         if removed_ids:
-                            removed_names = [server_libraries.get(id, f"Unknown Library (ID: {id})") for id in removed_ids]
+                            # Use library_names from user_data if available (for services like Kavita)
+                            if 'library_names' in user_data:
+                                # Create a mapping from library_ids to library_names
+                                lib_ids = user_data.get('library_ids', [])
+                                lib_names = user_data.get('library_names', [])
+                                id_to_name = dict(zip(lib_ids, lib_names)) if len(lib_ids) == len(lib_names) else {}
+                                removed_names = [id_to_name.get(id, server_libraries.get(id, f"Unknown Library (ID: {id})")) for id in removed_ids]
+                            else:
+                                removed_names = [server_libraries.get(id, f"Unknown Library (ID: {id})") for id in removed_ids]
                             changes.append(f"Lost access to: {', '.join(removed_names)}")
 
                         access.allowed_library_ids = user_data.get('library_ids', [])
