@@ -4875,6 +4875,9 @@
     --size: calc(var(--size-field, 0.25rem) * 8);
     font-size: 0.75rem;
   }
+  .text-\[0\.5rem\] {
+    font-size: 0.5rem;
+  }
   .leading-relaxed {
     --tw-leading: var(--leading-relaxed);
     line-height: var(--leading-relaxed);

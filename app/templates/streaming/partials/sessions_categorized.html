@@ -97,10 +97,13 @@
                                             <div class="avatar avatar-xs mr-2">
                                                 <div class="w-4 h-4 rounded-full">
                                                     <img src="{{ session.user_avatar_url }}" alt="{{ session.user }} avatar" 
-                                                         onerror="this.parentElement.parentElement.style.display='none'; this.parentElement.parentElement.nextElementSibling.style.display='inline';" />
+                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                                    {# Jellyfin fallback avatar with service color #}
+                                                    <div class="bg-purple-500 text-white w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold" style="display: none;">
+                                                        {{ session.user[0]|upper if session.user else 'U' }}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <i class="fa-solid fa-user fa-fw mr-1 text-info" style="display:none;"></i>
                                         {% else %}
                                             <i class="fa-solid fa-user fa-fw mr-1 text-info"></i>
                                         {% endif %}
