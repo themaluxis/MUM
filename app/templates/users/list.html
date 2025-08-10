@@ -1155,6 +1155,39 @@
         addClickOutsideToClose('quick_edit_user_modal');
     });
 
+    // Button state management for sync users
+    function showUserSyncLoading() {
+        const btn = document.getElementById('sync-users-btn');
+        if (btn) {
+            btn.disabled = true;
+            const spinner = btn.querySelector('#user-sync-spinner');
+            const icon = btn.querySelector('.fa-sync');
+            const text = btn.lastChild;
+            
+            if (spinner) spinner.style.display = 'inline-block';
+            if (icon) icon.style.display = 'none';
+            if (text && text.nodeType === Node.TEXT_NODE) {
+                text.textContent = ' Syncing...';
+            }
+        }
+    }
+
+    function hideUserSyncLoading() {
+        const btn = document.getElementById('sync-users-btn');
+        if (btn) {
+            btn.disabled = false;
+            const spinner = btn.querySelector('#user-sync-spinner');
+            const icon = btn.querySelector('.fa-sync');
+            const text = btn.lastChild;
+            
+            if (spinner) spinner.style.display = 'none';
+            if (icon) icon.style.display = 'inline';
+            if (text && text.nodeType === Node.TEXT_NODE) {
+                text.textContent = ' Sync Users';
+            }
+        }
+    }
+
     // Global function for copying user raw data
     function copyUserRawData(userId) {
         const contentElement = document.querySelector(`#userRawDataContent-${userId} pre code`);
