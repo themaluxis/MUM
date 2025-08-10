@@ -188,29 +188,79 @@
         </div>
 
         <!-- Raw Data Modal -->
-        <dialog id="rawDataModal-{{ session.session_key }}" class="modal">
-            <div class="modal-box w-11/12 max-w-5xl">
-                <h3 class="font-bold text-lg">Raw Session Data: {{ session.user }} - {{ session.media_title }}</h3>
-                
-                <div class="py-4 overflow-auto max-h-[60vh] bg-base-200 rounded-lg mt-4">
-                    <div class="font-mono text-xs p-4" style="counter-reset: line;">
-                        {% for line in session.raw_data_json_lines %}
-                        <div class="flex items-start leading-tight">
-                            <span class="text-right w-10 pr-4 text-base-content/40 select-none" style="counter-increment: line; content: counter(line);"></span>
-                            <span class="flex-1 whitespace-pre-wrap">{{ line if line.strip() else ' ' }}</span>
+        <dialog id="rawDataModal-{{ session.session_key }}" class="modal modal-bottom sm:modal-middle">
+            <div class="modal-box max-w-5xl bg-base-100 border border-base-300 shadow-2xl p-0">
+                <!-- Header -->
+                <div class="flex items-center justify-between p-6 border-b border-base-300">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
+                            <i class="fa-solid fa-code text-secondary text-lg"></i>
                         </div>
-                        {% endfor %}
+                        <div>
+                            <h3 class="text-xl font-semibold text-base-content">Raw Session Data</h3>
+                            <p class="text-sm text-base-content/60">Debug information and raw service data</p>
+                        </div>
+                    </div>
+                    <form method="dialog">
+                        <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Content -->
+                <div class="p-6">
+                    <!-- Session Info Card -->
+                    <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <i class="fa-solid fa-play text-info text-sm"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="font-medium text-base-content mb-1">Session Information</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                    <div><span class="text-base-content/60">User:</span> <span class="font-mono">{{ session.user }}</span></div>
+                                    <div><span class="text-base-content/60">Media:</span> <span class="font-mono">{{ session.media_title }}</span></div>
+                                    <div><span class="text-base-content/60">Session Key:</span> <span class="font-mono text-xs">{{ session.session_key }}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Raw Data Section -->
+                    <div class="space-y-4 mb-6">
+                        
+                        <div class="bg-base-200/30 rounded-lg border border-base-300/30 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center justify-between p-3 border-b border-base-300/30 bg-base-200/50">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-code text-secondary text-sm"></i>
+                                    <span class="font-medium text-sm">Raw Data Output</span>
+                                </div>
+                                <div class="text-xs text-base-content/60">
+                                    Size: {{ session.raw_data_json|length }} characters
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <div class="bg-base-100 rounded-lg p-4 max-h-96 overflow-auto border border-base-300/30">
+                                    <pre class="text-xs whitespace-pre-wrap break-words font-mono text-base-content"><code>{{ session.raw_data_json }}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                        <button type="button" class="btn btn-ghost" onclick="document.getElementById('rawDataModal-{{ session.session_key }}').close()">
+                            Close
+                        </button>
+                        <button type="button" class="btn btn-secondary gap-2" onclick="copyRawData('rawData-{{ session.session_key }}', this)">
+                            <i class="fa-solid fa-copy"></i>
+                            Copy to Clipboard
+                        </button>
                     </div>
                 </div>
                 
                 <textarea id="rawData-{{ session.session_key }}" class="hidden">{{ session.raw_data_json }}</textarea>
-
-                <div class="modal-action">
-                    <button class="btn btn-primary" onclick="copyRawData('rawData-{{ session.session_key }}', this)">Copy</button>
-                    <form method="dialog">
-                        <button class="btn">Close</button>
-                    </form>
-                </div>
             </div>
         </dialog>
         {% endfor %}

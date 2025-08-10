@@ -143,71 +143,79 @@
 
                 {# Raw Data Modal for this session #}
                 <dialog id="rawDataModal-{{ session.session_key }}" class="modal modal-bottom sm:modal-middle">
-                    <div class="modal-box max-w-4xl bg-[#313338] border border-[#1e1f22] shadow-2xl">
+                    <div class="modal-box max-w-5xl bg-base-100 border border-base-300 shadow-2xl p-0">
                         <!-- Header -->
-                        <div class="flex items-center justify-between mb-4 pb-3 border-b border-[#3f4147]">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
-                                    <i class="fa-solid fa-code text-blue-400 text-sm"></i>
+                        <div class="flex items-center justify-between p-6 border-b border-base-300">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
+                                    <i class="fa-solid fa-code text-secondary text-lg"></i>
                                 </div>
-                                <h3 class="text-lg font-semibold text-[#f2f3f5]">Raw Session Data</h3>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-base-content">Raw Session Data</h3>
+                                    <p class="text-sm text-base-content/60">Debug information and raw service data</p>
+                                </div>
                             </div>
-                            <div class="flex items-center space-x-2">
-                                <button class="px-3 py-1.5 bg-[#5865f2] hover:bg-[#4752c4] text-white text-sm font-medium rounded-md transition-colors flex items-center space-x-2" 
-                                        onclick="copyRawData('rawDataModal-{{ session.session_key }}')">
-                                    <i class="fa-solid fa-copy text-xs"></i>
-                                    <span>Copy</span>
+                            <form method="dialog">
+                                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                                    <i class="fa-solid fa-times"></i>
                                 </button>
-                                <form method="dialog">
-                                    <button class="btn btn-sm btn-circle btn-ghost text-[#b5bac1] hover:text-[#f2f3f5] hover:bg-[#3f4147]">
-                                        <i class="fa-solid fa-times text-sm"></i>
-                                    </button>
-                                </form>
-                            </div>
+                            </form>
                         </div>
 
-                        <!-- Session Info Cards -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                            <div class="bg-[#2b2d31] border border-[#3f4147] rounded-lg p-3">
-                                <div class="flex items-center space-x-2 mb-2">
-                                    <i class="fa-solid fa-user text-green-400 text-sm"></i>
-                                    <span class="text-sm font-medium text-[#b5bac1]">User</span>
+                        <!-- Content -->
+                        <div class="p-6">
+                            <!-- Session Info Card -->
+                            <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <i class="fa-solid fa-play text-info text-sm"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-base-content mb-1">Session Information</h4>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                            <div><span class="text-base-content/60">User:</span> <span class="font-mono">{{ session.user }}</span></div>
+                                            <div><span class="text-base-content/60">Player:</span> <span class="font-mono">{{ session.player_title }}</span></div>
+                                            <div><span class="text-base-content/60">Media:</span> <span class="font-mono">{{ session.media_title }}</span></div>
+                                            <div><span class="text-base-content/60">Session Key:</span> <span class="font-mono text-xs">{{ session.session_key }}</span></div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p class="text-sm text-[#f2f3f5] font-mono">{{ session.user }}</p>
                             </div>
-                            <div class="bg-[#2b2d31] border border-[#3f4147] rounded-lg p-3">
-                                <div class="flex items-center space-x-2 mb-2">
-                                    <i class="fa-solid fa-tv text-purple-400 text-sm"></i>
-                                    <span class="text-sm font-medium text-[#b5bac1]">Player</span>
-                                </div>
-                                <p class="text-sm text-[#f2f3f5] font-mono">{{ session.player_title }}</p>
-                            </div>
-                            <div class="bg-[#2b2d31] border border-[#3f4147] rounded-lg p-3">
-                                <div class="flex items-center space-x-2 mb-2">
-                                    <i class="fa-solid fa-film text-yellow-400 text-sm"></i>
-                                    <span class="text-sm font-medium text-[#b5bac1]">Media</span>
-                                </div>
-                                <p class="text-sm text-[#f2f3f5] font-mono">{{ session.media_title }}</p>
-                            </div>
-                            <div class="bg-[#2b2d31] border border-[#3f4147] rounded-lg p-3">
-                                <div class="flex items-center space-x-2 mb-2">
-                                    <i class="fa-solid fa-key text-orange-400 text-sm"></i>
-                                    <span class="text-sm font-medium text-[#b5bac1]">Session Key</span>
-                                </div>
-                                <p class="text-sm text-[#f2f3f5] font-mono">{{ session.session_key }}</p>
-                            </div>
-                        </div>
 
-                        <!-- Raw Data Section -->
-                        <div class="space-y-3">
-                            <div class="flex items-center space-x-2">
-                                <i class="fa-solid fa-database text-[#b5bac1] text-sm"></i>
-                                <h4 class="text-sm font-medium text-[#b5bac1]">Raw JSON Data</h4>
-                            </div>
-                            <div class="bg-[#1e1f22] border border-[#3f4147] rounded-lg overflow-hidden">
-                                <div class="max-h-96 overflow-y-auto p-4" id="rawDataContent-{{ session.session_key }}">
-                                    <pre class="text-xs text-[#dbdee1] font-mono leading-relaxed"><code>{{ session.raw_data_json }}</code></pre>
+                            <!-- Raw Data Section -->
+                            <div class="space-y-4 mb-6">
+                                <h4 class="font-medium text-base-content text-lg mb-3">
+                                    <i class="fa-solid fa-code text-secondary text-sm mr-2"></i>
+                                    Raw Data Output
+                                </h4>
+                                
+                                <div class="bg-base-200/30 rounded-lg border border-base-300/30 hover:border-base-300/60 transition-colors">
+                                    <div class="flex items-center justify-between p-3 border-b border-base-300/30 bg-base-200/50">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fa-solid fa-file-code text-info text-sm"></i>
+                                            <span class="font-medium text-sm">JSON Data</span>
+                                        </div>
+                                        <div class="text-xs text-base-content/60">
+                                            Size: {{ session.raw_data_json|length }} characters
+                                        </div>
+                                    </div>
+                                    <div class="p-4">
+                                        <div class="bg-base-100 rounded-lg p-4 max-h-96 overflow-auto border border-base-300/30">
+                                            <pre id="rawDataContent-{{ session.session_key }}" class="text-xs whitespace-pre-wrap break-words font-mono text-base-content"><code>{{ session.raw_data_json }}</code></pre>
+                                        </div>
+                                    </div>
                                 </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                                <button type="button" class="btn btn-ghost" onclick="document.getElementById('rawDataModal-{{ session.session_key }}').close()">
+                                    Close
+                                </button>
+                                <button type="button" class="btn btn-secondary gap-2" onclick="copyRawData('rawDataModal-{{ session.session_key }}')">
+                                    <i class="fa-solid fa-copy"></i>
+                                    Copy to Clipboard
+                                </button>
                             </div>
                         </div>
                     </div>
