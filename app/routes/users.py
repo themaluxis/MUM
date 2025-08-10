@@ -18,10 +18,64 @@ from sqlalchemy.exc import IntegrityError
 
 bp = Blueprint('users', __name__)
 
+# Cache for library data to avoid expensive API calls on every page load
+_library_cache = {}
+_cache_timestamp = {}
+CACHE_DURATION = 300  # 5 minutes
+
+def get_cached_libraries_by_server(servers):
+    """Get library data from cache or fetch if expired"""
+    import time
+    current_time = time.time()
+    libraries_by_server = {}
+    
+    for server in servers:
+        cache_key = f"server_{server.id}_libraries"
+        
+        # Check if we have valid cached data
+        if (cache_key in _library_cache and 
+            cache_key in _cache_timestamp and 
+            current_time - _cache_timestamp[cache_key] < CACHE_DURATION):
+            # Use cached data
+            libraries_by_server[server.id] = _library_cache[cache_key]
+            current_app.logger.info(f"📦 Using cached libraries for {server.name}")
+        else:
+            # Cache expired or missing, fetch fresh data
+            try:
+                current_app.logger.info(f"🔄 Refreshing library cache for {server.name}")
+                service = MediaServiceFactory.create_service_from_db(server)
+                if service:
+                    server_libraries = service.get_libraries()
+                    server_lib_dict = {}
+                    for lib in server_libraries:
+                        lib_id = lib.get('external_id') or lib.get('id')
+                        lib_name = lib.get('name', 'Unknown')
+                        if lib_id:
+                            server_lib_dict[str(lib_id)] = lib_name
+                    
+                    # Update cache
+                    _library_cache[cache_key] = server_lib_dict
+                    _cache_timestamp[cache_key] = current_time
+                    libraries_by_server[server.id] = server_lib_dict
+                    current_app.logger.info(f"✅ Cached {len(server_lib_dict)} libraries for {server.name}")
+                else:
+                    libraries_by_server[server.id] = {}
+            except Exception as e:
+                current_app.logger.error(f"❌ Failed to fetch libraries for {server.name}: {e}")
+                # Use empty dict if fetch fails
+                libraries_by_server[server.id] = {}
+    
+    return libraries_by_server
+
 @bp.route('/')
 @login_required
 @setup_required
 def list_users():
+    import time
+    start_time = time.time()
+    current_app.logger.info(f"=== USER LIST PERFORMANCE DEBUG ===")
+    current_app.logger.info(f"Starting list_users() at {start_time}")
+    
     current_app.logger.debug(f"--- Entering list_users ---")
     current_app.logger.debug(f"Request args: {request.args}")
     current_app.logger.debug(f"Is HTMX request: {request.headers.get('HX-Request')}")
@@ -186,15 +240,25 @@ def list_users():
         # For simple queries, use the existing query
         users_count = query.count()
     
+    db_query_time = time.time()
+    current_app.logger.info(f"DB query setup took: {db_query_time - start_time:.3f}s")
+    
     users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
+    
+    pagination_time = time.time()
+    current_app.logger.info(f"Pagination query took: {pagination_time - db_query_time:.3f}s")
 
     # Extract users from pagination results (handling complex queries that return tuples)
     users_on_page = [item[0] if isinstance(item, tuple) else item for item in users_pagination.items]
     user_ids_on_page = [user.id for user in users_on_page]
 
     # Fetch additional data for the current page
+    stats_start = time.time()
     stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
     last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
+    
+    stats_time = time.time()
+    current_app.logger.info(f"User stats fetching took: {stats_time - stats_start:.3f}s")
 
     # Attach the additional data directly to each user object
     for user in users_on_page:
@@ -204,6 +268,7 @@ def list_users():
         user.last_known_ip = last_ips.get(user.id, 'N/A')
     
     # Get library access info for each user, organized by server to prevent ID collisions
+    access_start = time.time()
     user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
     user_sorted_libraries = {}
     user_service_types = {}  # Track which services each user belongs to
@@ -222,6 +287,9 @@ def list_users():
         # Track which server names this user has access to
         if access.server.name not in user_server_names[access.user_id]:
             user_server_names[access.user_id].append(access.server.name)
+    
+    access_time = time.time()
+    current_app.logger.info(f"User access records fetching took: {access_time - access_start:.3f}s")
 
     media_service_manager = MediaServiceManager()
     
@@ -231,21 +299,15 @@ def list_users():
     # Get all servers for library lookups
     all_servers = media_service_manager.get_all_servers(active_only=True)
     
-    # Get libraries from all active servers, organized by server to prevent ID collisions
-    libraries_by_server = {}  # server_id -> {lib_id: lib_name}
-    for server in all_servers:
-        try:
-            service = MediaServiceFactory.create_service_from_db(server)
-            if service:
-                server_libraries = service.get_libraries()
-                libraries_by_server[server.id] = {}
-                for lib in server_libraries:
-                    lib_id = lib.get('external_id') or lib.get('id')
-                    lib_name = lib.get('name', 'Unknown')
-                    if lib_id:
-                        libraries_by_server[server.id][str(lib_id)] = lib_name
-        except Exception as e:
-            current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
+    # Get cached library data instead of making live API calls
+    libraries_start = time.time()
+    current_app.logger.info(f"🚀 OPTIMIZATION: Using cached library data for {len(all_servers)} servers")
+    
+    libraries_by_server = get_cached_libraries_by_server(all_servers)
+    
+    libraries_time = time.time()
+    current_app.logger.info(f"✅ Library lookup completed in: {libraries_time - libraries_start:.3f}s")
+    current_app.logger.info(f"📊 Retrieved libraries for {len(libraries_by_server)} servers")
 
     
     for user_id, servers_access in user_library_access_by_server.items():
@@ -347,10 +409,21 @@ def list_users():
         'server_dropdown_options': server_dropdown_options
     }
 
+    template_start = time.time()
+    current_app.logger.info(f"Library processing took: {template_start - libraries_time:.3f}s")
+    
     if request.headers.get('HX-Request'):
-        return render_template('users/partials/user_list_content.html', **template_context)
-
-    return render_template('users/list.html', **template_context)
+        result = render_template('users/partials/user_list_content.html', **template_context)
+    else:
+        result = render_template('users/list.html', **template_context)
+    
+    end_time = time.time()
+    total_time = end_time - start_time
+    current_app.logger.info(f"Template rendering took: {end_time - template_start:.3f}s")
+    current_app.logger.info(f"🎯 TOTAL list_users() execution time: {total_time:.3f}s")
+    current_app.logger.info(f"=== END USER LIST PERFORMANCE DEBUG ===")
+    
+    return result
 
 @bp.route('/save_view_preference', methods=['POST'])
 @login_required
