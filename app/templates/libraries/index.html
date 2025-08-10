@@ -66,14 +66,25 @@ function hideSyncLoading() {
     const btn = document.getElementById('sync-libraries-btn');
     if (btn) {
         btn.disabled = false;
-        const spinner = btn.querySelector('#sync-spinner');
-        const icon = btn.querySelector('.fa-sync-alt');
-        const text = btn.lastChild;
         
-        if (spinner) spinner.style.display = 'none';
-        if (icon) icon.style.display = 'inline';
-        if (text && text.nodeType === Node.TEXT_NODE) {
-            text.textContent = ' Sync Libraries';
+        // Check if button content was cleared and rebuild if necessary
+        if (btn.innerHTML.trim() === '') {
+            btn.innerHTML = `
+                <span id="sync-spinner" class="loading loading-spinner loading-xs htmx-indicator"></span>
+                <i class="fa-solid fa-sync-alt htmx-indicator-hide"></i>
+                Sync Libraries
+            `;
+        } else {
+            // Normal restoration if content still exists
+            const spinner = btn.querySelector('#sync-spinner');
+            const icon = btn.querySelector('.fa-sync-alt');
+            const text = btn.lastChild;
+            
+            if (spinner) spinner.style.display = 'none';
+            if (icon) icon.style.display = 'inline';
+            if (text && text.nodeType === Node.TEXT_NODE) {
+                text.textContent = ' Sync Libraries';
+            }
         }
     }
 }
