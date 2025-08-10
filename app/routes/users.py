@@ -107,13 +107,6 @@ def list_users():
     sort_column = sort_parts[0]
     sort_direction = 'desc' if len(sort_parts) > 1 and sort_parts[1] == 'desc' else 'asc'
     
-    # DEBUG: Log sorting parameters
-    current_app.logger.info(f"=== SORTING DEBUG ===")
-    current_app.logger.info(f"Page: {page}")
-    current_app.logger.info(f"Items per page: {items_per_page}")
-    current_app.logger.info(f"Sort param: {sort_by_param}")
-    current_app.logger.info(f"Sort column: {sort_column}")
-    current_app.logger.info(f"Sort direction: {sort_direction}")
 
     # Handle sorting that requires joins and aggregation
     if sort_column in ['total_plays', 'total_duration']:
@@ -193,30 +186,11 @@ def list_users():
         # For simple queries, use the existing query
         users_count = query.count()
     
-    # DEBUG: Log the actual SQL query being executed
-    current_app.logger.info(f"SQL Query: {str(query.statement.compile(compile_kwargs={'literal_binds': True}))}")
-    
     users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
 
     # Extract users from pagination results (handling complex queries that return tuples)
     users_on_page = [item[0] if isinstance(item, tuple) else item for item in users_pagination.items]
     user_ids_on_page = [user.id for user in users_on_page]
-    
-    # DEBUG: Log the actual users returned on this page
-    current_app.logger.info(f"=== PAGINATION RESULTS ===")
-    current_app.logger.info(f"Total users found: {users_count}")
-    current_app.logger.info(f"Total pages: {users_pagination.pages}")
-    current_app.logger.info(f"Current page: {users_pagination.page}")
-    current_app.logger.info(f"Users on this page: {len(users_on_page)}")
-    
-    # Log the first few usernames to see the actual sorting
-    usernames_on_page = []
-    for user in users_on_page[:10]:  # Show first 10 users
-        display_name = user.get_display_name() if hasattr(user, 'get_display_name') else getattr(user, 'primary_username', 'Unknown')
-        usernames_on_page.append(f"{display_name} (ID: {user.id})")
-    
-    current_app.logger.info(f"First 10 users on page {page}: {usernames_on_page}")
-    current_app.logger.info(f"=== END SORTING DEBUG ===")
 
     # Fetch additional data for the current page
     stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
@@ -229,19 +203,19 @@ def list_users():
         user.total_duration = stats.get('total_duration', 0)
         user.last_known_ip = last_ips.get(user.id, 'N/A')
     
-    # Get library access info for each user, and sort it
-    user_library_access = {}
+    # Get library access info for each user, organized by server to prevent ID collisions
+    user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
     user_sorted_libraries = {}
     user_service_types = {}  # Track which services each user belongs to
     user_server_names = {}  # Track which server names each user belongs to
     from app.models_media_services import UserMediaAccess
     access_records = UserMediaAccess.query.filter(UserMediaAccess.user_id.in_(user_ids_on_page)).all()
     for access in access_records:
-        if access.user_id not in user_library_access:
-            user_library_access[access.user_id] = []
+        if access.user_id not in user_library_access_by_server:
+            user_library_access_by_server[access.user_id] = {}
             user_service_types[access.user_id] = []
             user_server_names[access.user_id] = []
-        user_library_access[access.user_id].extend(access.allowed_library_ids)
+        user_library_access_by_server[access.user_id][access.server_id] = access.allowed_library_ids
         # Track which service types this user has access to
         if access.server.service_type not in user_service_types[access.user_id]:
             user_service_types[access.user_id].append(access.server.service_type)
@@ -251,50 +225,59 @@ def list_users():
 
     media_service_manager = MediaServiceManager()
     
-    # Get libraries from all active servers, not just Plex
-    available_libraries = {}
+    # Create a mapping of user_id to User object for easy lookup
+    users_by_id = {user.id: user for user in users_pagination.items}
+    
+    # Get all servers for library lookups
     all_servers = media_service_manager.get_all_servers(active_only=True)
     
+    # Get libraries from all active servers, organized by server to prevent ID collisions
+    libraries_by_server = {}  # server_id -> {lib_id: lib_name}
     for server in all_servers:
         try:
             service = MediaServiceFactory.create_service_from_db(server)
             if service:
                 server_libraries = service.get_libraries()
+                libraries_by_server[server.id] = {}
                 for lib in server_libraries:
                     lib_id = lib.get('external_id') or lib.get('id')
                     lib_name = lib.get('name', 'Unknown')
                     if lib_id:
-                        # Use just the library name since server name is now shown in a separate badge
-                        available_libraries[str(lib_id)] = lib_name
+                        libraries_by_server[server.id][str(lib_id)] = lib_name
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
 
-    # Create a mapping of user_id to User object for easy lookup
-    users_by_id = {user.id: user for user in users_pagination.items}
     
-    for user_id, lib_ids in user_library_access.items():
-        # Handle special case for Jellyfin users with '*' (all libraries access)
-        if lib_ids == ['*']:
-            lib_names = ['All Libraries']
-        else:
-            # Check if this user has library_names available (for services like Kavita)
-            user_obj = users_by_id.get(user_id)
-            if user_obj and hasattr(user_obj, 'library_names') and user_obj.library_names:
-                # Use library_names from the user object
-                lib_names = user_obj.library_names
+    for user_id, servers_access in user_library_access_by_server.items():
+        user_obj = users_by_id.get(user_id)
+        all_lib_names = []
+        
+        for server_id, lib_ids in servers_access.items():
+            # Handle special case for Jellyfin users with '*' (all libraries access)
+            if lib_ids == ['*']:
+                lib_names = ['All Libraries']
             else:
-                # Fallback to looking up in available_libraries
-                # For Kavita unique IDs (format: "0_Comics"), extract the name part
-                lib_names = []
-                for lib_id in lib_ids:
-                    if '_' in str(lib_id) and str(lib_id).split('_', 1)[0].isdigit():
-                        # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
-                        lib_name = str(lib_id).split('_', 1)[1]
-                        lib_names.append(lib_name)
-                    else:
-                        # Regular library ID lookup
-                        lib_names.append(available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}'))
-        user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
+                # Check if this user has library_names available (for services like Kavita)
+                if user_obj and hasattr(user_obj, 'library_names') and user_obj.library_names:
+                    # Use library_names from the user object
+                    lib_names = user_obj.library_names
+                else:
+                    # Look up library names from the correct server to prevent ID collisions
+                    server_libraries = libraries_by_server.get(server_id, {})
+                    lib_names = []
+                    for lib_id in lib_ids:
+                        if '_' in str(lib_id) and str(lib_id).split('_', 1)[0].isdigit():
+                            # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
+                            lib_name = str(lib_id).split('_', 1)[1]
+                            lib_names.append(lib_name)
+                        else:
+                            # Regular library ID lookup from the correct server
+                            lib_name = server_libraries.get(str(lib_id), f'Unknown Lib {lib_id}')
+                            lib_names.append(lib_name)
+            
+            all_lib_names.extend(lib_names)
+        
+        user_sorted_libraries[user_id] = sorted(all_lib_names, key=str.lower)
 
     mass_edit_form = MassUserEditForm()  
 
@@ -347,13 +330,12 @@ def list_users():
         'users_count': users_count,
         'stream_stats': stream_stats,
         'last_ips': last_ips,
-        'user_library_access': user_library_access,
+        'user_library_access_by_server': user_library_access_by_server,
         'user_last_played': user_last_played,
         'user_sorted_libraries': user_sorted_libraries,
         'user_service_types': user_service_types,
         'user_server_names': user_server_names,
         'current_view': view_mode,
-        'available_libraries': available_libraries,
         'mass_edit_form': mass_edit_form,
         'selected_users_count': 0,
         'current_per_page': items_per_page,
@@ -827,14 +809,68 @@ def mass_edit_users():
     # Extract user IDs from pagination results
     user_ids_on_page = [user.id for user in users_pagination.items]
     
-    # Get library access info for each user
-    user_library_access = {}
+    # Get library access info for each user, organized by server to prevent ID collisions
+    user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
+    user_sorted_libraries = {}
     from app.models_media_services import UserMediaAccess
     access_records = UserMediaAccess.query.filter(UserMediaAccess.user_id.in_(user_ids_on_page)).all()
     for access in access_records:
-        if access.user_id not in user_library_access:
-            user_library_access[access.user_id] = []
-        user_library_access[access.user_id].extend(access.allowed_library_ids)
+        if access.user_id not in user_library_access_by_server:
+            user_library_access_by_server[access.user_id] = {}
+        user_library_access_by_server[access.user_id][access.server_id] = access.allowed_library_ids
+
+    # Get libraries from all active servers, organized by server to prevent ID collisions
+    libraries_by_server = {}  # server_id -> {lib_id: lib_name}
+    media_service_manager = MediaServiceManager()
+    all_servers = media_service_manager.get_all_servers(active_only=True)
+    
+    for server in all_servers:
+        try:
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service:
+                server_libraries = service.get_libraries()
+                libraries_by_server[server.id] = {}
+                for lib in server_libraries:
+                    lib_id = lib.get('external_id') or lib.get('id')
+                    lib_name = lib.get('name', 'Unknown')
+                    if lib_id:
+                        libraries_by_server[server.id][str(lib_id)] = lib_name
+        except Exception as e:
+            current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
+
+    # Create a mapping of user_id to User object for easy lookup
+    users_by_id = {user.id: user for user in users_pagination.items}
+    
+    for user_id, servers_access in user_library_access_by_server.items():
+        user_obj = users_by_id.get(user_id)
+        all_lib_names = []
+        
+        for server_id, lib_ids in servers_access.items():
+            # Handle special case for Jellyfin users with '*' (all libraries access)
+            if lib_ids == ['*']:
+                lib_names = ['All Libraries']
+            else:
+                # Check if this user has library_names available (for services like Kavita)
+                if user_obj and hasattr(user_obj, 'library_names') and user_obj.library_names:
+                    # Use library_names from the user object
+                    lib_names = user_obj.library_names
+                else:
+                    # Look up library names from the correct server to prevent ID collisions
+                    server_libraries = libraries_by_server.get(server_id, {})
+                    lib_names = []
+                    for lib_id in lib_ids:
+                        if '_' in str(lib_id) and str(lib_id).split('_', 1)[0].isdigit():
+                            # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
+                            lib_name = str(lib_id).split('_', 1)[1]
+                            lib_names.append(lib_name)
+                        else:
+                            # Regular library ID lookup from the correct server
+                            lib_name = server_libraries.get(str(lib_id), f'Unknown Lib {lib_id}')
+                            lib_names.append(lib_name)
+            
+            all_lib_names.extend(lib_names)
+        
+        user_sorted_libraries[user_id] = sorted(all_lib_names, key=str.lower)
 
     # Get additional required context data for the template
     admin_accounts = AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()
@@ -844,35 +880,6 @@ def mass_edit_users():
     user_ids_on_page = [user.id for user in users_pagination.items]
     stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
     last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
-    
-    # Get sorted libraries
-    user_sorted_libraries = {}
-    # Create a mapping of user_id to User object for easy lookup
-    users_by_id = {user.id: user for user in users_pagination.items}
-    
-    for user_id, lib_ids in user_library_access.items():
-        # Handle special case for Jellyfin users with '*' (all libraries access)
-        if lib_ids == ['*']:
-            lib_names = ['All Libraries']
-        else:
-            # Check if this user has library_names available (for services like Kavita)
-            user_obj = users_by_id.get(user_id)
-            if user_obj and hasattr(user_obj, 'library_names') and user_obj.library_names:
-                # Use library_names from the user object
-                lib_names = user_obj.library_names
-            else:
-                # Fallback to looking up in available_libraries
-                # For Kavita unique IDs (format: "0_Comics"), extract the name part
-                lib_names = []
-                for lib_id in lib_ids:
-                    if '_' in str(lib_id) and str(lib_id).split('_', 1)[0].isdigit():
-                        # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
-                        lib_name = str(lib_id).split('_', 1)[1]
-                        lib_names.append(lib_name)
-                    else:
-                        # Regular library ID lookup
-                        lib_names.append(available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}'))
-        user_sorted_libraries[user_id] = sorted(lib_names, key=str.lower)
     
     # Build user_service_types for template context
     user_service_types = {}  # Track which services each user belongs to
@@ -897,7 +904,7 @@ def mass_edit_users():
     response_html = render_template('users/partials/user_list_content.html',
                                     users=users_pagination,
                                     users_count=users_count,
-                                    user_library_access=user_library_access,
+                                    user_library_access_by_server=user_library_access_by_server,
                                     user_sorted_libraries=user_sorted_libraries,
                                     available_libraries=available_libraries,
                                     current_view=view_mode,

@@ -1,23 +1,6 @@
 {# File: app/templates/users/_users_list_content.html #}
 {# Expects users, available_libraries, mass_edit_form (if needed by cards/table), current_view, current_per_page, users_count #}
 
-<!-- DEBUG: Sorting Information -->
-<div class="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-4">
-    <div class="text-sm">
-        <strong>🐛 DEBUG INFO:</strong> 
-        Page {{ users.page }} of {{ users.pages }} | 
-        Sort: {{ request.args.get('sort_by', 'username_asc') }} | 
-        Total Users: {{ users_count }} | 
-        Per Page: {{ current_per_page }}
-    </div>
-    <div class="text-xs mt-1">
-        <strong>First 5 users on this page:</strong>
-        {% for user in users.items[:5] %}
-            {{ user.get_display_name() }}{% if not loop.last %}, {% endif %}
-        {% endfor %}
-    </div>
-</div>
-
 {% if users and users.items %}
     {% if current_view == 'table' %}
         {% include 'users/partials/user_table.html' with context %}
