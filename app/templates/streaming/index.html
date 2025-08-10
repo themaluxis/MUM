@@ -223,8 +223,35 @@ function openTerminateSessionModal(sessionKey, userName, mediaTitle, serviceType
                         window.showToast(responseJson.message || 'Session termination initiated!', 'success');
                     }
                     document.getElementById('terminate_session_modal').close();
-                    // Trigger a refresh of the streaming sessions list
-                    htmx.trigger('#streaming-sessions-container', 'load'); // Or target the manual refresh button's HTMX action
+                    
+                    // Force immediate refresh of streaming sessions (same as "Refresh Now" button)
+                    console.log('Attempting to refresh streaming sessions after termination...');
+                    
+                    // Method 1: Try to find and click the manual refresh button
+                    const refreshButton = document.getElementById('manual-refresh-button');
+                    if (refreshButton) {
+                        console.log('Found manual refresh button, triggering click...');
+                        refreshButton.click();
+                    } else {
+                        console.log('Manual refresh button not found, trying alternative methods...');
+                        
+                        // Method 2: Try to trigger HTMX request directly on container
+                        const container = document.getElementById('streaming-sessions-container');
+                        if (container) {
+                            console.log('Found container, triggering HTMX request...');
+                            const currentUrl = container.getAttribute('hx-get');
+                            if (currentUrl) {
+                                htmx.ajax('GET', currentUrl, {
+                                    target: '#streaming-sessions-container',
+                                    swap: 'innerHTML'
+                                });
+                            } else {
+                                console.log('No hx-get URL found on container');
+                            }
+                        } else {
+                            console.log('Container not found either');
+                        }
+                    }
                 } else {
                     const errorMsg = responseJson.error || 'Failed to terminate session. Please try again.';
                     if (targetDiv) {
