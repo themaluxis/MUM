@@ -531,10 +531,12 @@ class JellyfinMediaService(BaseMediaService):
     def delete_user(self, user_id: str) -> bool:
         """Delete Jellyfin user"""
         try:
-            self._make_request(f'Users/{user_id}', method='DELETE')
+            self.log_info(f"Attempting to delete Jellyfin user with ID: {user_id}")
+            response = self._make_request(f'Users/{user_id}', method='DELETE')
+            self.log_info(f"Successfully deleted Jellyfin user {user_id}")
             return True
         except Exception as e:
-            self.log_error(f"Error deleting user: {e}")
+            self.log_error(f"Error deleting Jellyfin user {user_id}: {e}")
             return False
     
     def get_active_sessions(self) -> List[Dict[str, Any]]:

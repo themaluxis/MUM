@@ -256,21 +256,79 @@ def update_user_details(user_id: int, notes=None, new_library_ids=None,
     return user
 
 def delete_user_from_mum_and_plex(user_id: int, admin_id: int = None):
-    user = User.query.get_or_404(user_id); username = user.get_display_name()
-    plex_servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX)
-    if not plex_servers:
-        raise Exception("Plex server not found in media_servers table.")
-    server = plex_servers[0]
-    plex_service = MediaServiceFactory.create_service_from_db(server)
-    if not plex_service:
-        raise Exception("Failed to create Plex service from server configuration.")
+    """Universal user deletion function that works with all media services"""
+    user = User.query.get_or_404(user_id)
+    username = user.get_display_name()
+    
+    # Determine which service this user belongs to based on their data
+    service_type = None
+    user_service_id = None
+    
+    if user.plex_user_id:
+        service_type = ServiceType.PLEX
+        user_service_id = user.plex_user_id
+    elif user.raw_service_data:
+        # Try to extract Jellyfin user info
+        try:
+            from app.utils.helpers import extract_jellyfin_user_info
+            jellyfin_info = extract_jellyfin_user_info(user.raw_service_data)
+            if jellyfin_info[0]:  # jellyfin_user_id exists
+                service_type = ServiceType.JELLYFIN
+                user_service_id = jellyfin_info[0]
+        except Exception as e:
+            current_app.logger.warning(f"Could not extract Jellyfin info for user {username}: {e}")
+    
+    if not service_type:
+        # Fallback: try to find any available service
+        current_app.logger.warning(f"Could not determine service type for user {username}, trying available services...")
+        for stype in [ServiceType.PLEX, ServiceType.JELLYFIN, ServiceType.EMBY]:
+            servers = MediaServiceManager.get_servers_by_type(stype)
+            if servers:
+                service_type = stype
+                break
+        
+        if not service_type:
+            raise Exception("No media servers found for user deletion.")
+    
+    # Get the appropriate service
+    servers = MediaServiceManager.get_servers_by_type(service_type)
+    if not servers:
+        raise Exception(f"{service_type.value} server not found in media_servers table.")
+    
+    server = servers[0]
+    service = MediaServiceFactory.create_service_from_db(server)
+    if not service:
+        raise Exception(f"Failed to create {service_type.value} service from server configuration.")
+    
     try:
-        plex_service.delete_user(user.plex_user_id) # Use username or ID if plex_service supports it
-        db.session.delete(user); db.session.commit()
-        log_event(EventType.MUM_USER_DELETED_FROM_MUM, f"User '{username}' removed from MUM and Plex server.", admin_id=admin_id, details={'deleted_username': username, 'deleted_user_id_in_mum': user_id, 'deleted_plex_user_id': user.plex_user_id})
+        current_app.logger.info(f"Attempting to delete user '{username}' from {service_type.value} server using ID: {user_service_id}")
+        
+        # Delete from the media service
+        if user_service_id:
+            success = service.delete_user(user_service_id)
+            if not success:
+                raise Exception(f"Service returned failure for user deletion")
+        else:
+            current_app.logger.warning(f"No service user ID found for {username}, skipping service deletion")
+        
+        # Delete from MUM database
+        db.session.delete(user)
+        db.session.commit()
+        
+        log_event(EventType.MUM_USER_DELETED_FROM_MUM, 
+                 f"User '{username}' removed from MUM and {service_type.value} server.", 
+                 admin_id=admin_id, 
+                 details={
+                     'deleted_username': username, 
+                     'deleted_user_id_in_mum': user_id, 
+                     'service_type': service_type.value,
+                     'service_user_id': user_service_id
+                 })
         return True
+        
     except Exception as e:
-        db.session.rollback(); current_app.logger.error(f"Failed to fully delete user {username}: {e}", exc_info=True);
+        db.session.rollback()
+        current_app.logger.error(f"Failed to fully delete user {username}: {e}", exc_info=True)
         # Log event for the failure as well
         log_event(EventType.ERROR_GENERAL, f"Failed to delete user {username}: {e}", admin_id=admin_id, user_id=user_id)
         raise Exception(f"Failed to remove user {username} from MUM: {e}")
