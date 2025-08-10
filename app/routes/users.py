@@ -556,7 +556,10 @@ def sync_all_users():
 @permission_required('delete_user')
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
-    username = user.plex_username
+    
+    # Use the universal display name method instead of legacy plex_username
+    username = user.get_display_name()
+    
     try:
         user_service.delete_user_from_mum_and_plex(user_id, admin_id=current_user.id)
         

@@ -403,11 +403,44 @@ class KavitaMediaService(BaseMediaService):
             return False
     
     def delete_user(self, user_id: str) -> bool:
-        """Delete Kavita user"""
+        """Delete Kavita user using the correct API endpoint"""
         try:
-            self._make_request(f'Account/delete-user', method='POST', 
-                             data={'userId': int(user_id)})
+            # First, get the user's username for the API call
+            users = self._make_request('Users')
+            target_user = None
+            for user in users:
+                if str(user.get('id')) == str(user_id):
+                    target_user = user
+                    break
+            
+            if not target_user:
+                self.log_error(f"User with ID {user_id} not found")
+                return False
+            
+            username = target_user.get('username')
+            if not username:
+                self.log_error(f"Username not found for user ID {user_id}")
+                return False
+            
+            # Use the correct Kavita API endpoint: /api/Users/delete-user with DELETE method
+            # and username as query parameter
+            url = f"{self.url.rstrip('/')}/api/Users/delete-user"
+            headers = self._get_headers()
+            params = {'username': username}
+            
+            self.log_info(f"Deleting Kavita user: {username} (ID: {user_id})")
+            self.log_info(f"DELETE request to: {url} with params: {params}")
+            
+            response = requests.delete(url, headers=headers, params=params, timeout=15)
+            
+            self.log_info(f"Delete response status: {response.status_code}")
+            self.log_info(f"Delete response content: {response.text}")
+            
+            response.raise_for_status()
+            
+            self.log_info(f"Successfully deleted Kavita user: {username}")
             return True
+            
         except Exception as e:
             self.log_error(f"Error deleting user: {e}")
             return False
