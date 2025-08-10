@@ -71,14 +71,14 @@ def list_users():
     # Build search filters
     search_filters = []
     if search_username:
-        search_filters.append(User.plex_username.ilike(f"%{search_username}%"))
+        search_filters.append(User.primary_username.ilike(f"%{search_username}%"))
     if search_email:
         search_filters.append(User.plex_email.ilike(f"%{search_email}%"))
     if search_notes:
         search_filters.append(User.notes.ilike(f"%{search_notes}%"))
     if search_term:
         # Legacy search - search both username and email
-        search_filters.append(or_(User.plex_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
+        search_filters.append(or_(User.primary_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
     
     # Apply search filters if any exist
     if search_filters:
@@ -123,7 +123,7 @@ def list_users():
     else:
         # Standard sorting on direct User model fields
         sort_map = {
-            'username': User.plex_username,
+            'username': User.primary_username,
             'email': User.plex_email,
             'last_streamed': User.last_streamed_at,
             'plex_join_date': User.plex_join_date,
@@ -131,7 +131,7 @@ def list_users():
         }
         
         # Default to sorting by username if the column is invalid
-        sort_field = sort_map.get(sort_column, User.plex_username)
+        sort_field = sort_map.get(sort_column, User.primary_username)
 
         if sort_direction == 'desc':
             # Use .nullslast() to ensure users with no data appear at the end
@@ -407,7 +407,7 @@ def sync_all_users():
     mum_users_all = User.query.all()
     mum_users_map_by_plex_id = {user.plex_user_id: user for user in mum_users_all if user.plex_user_id is not None}
     mum_users_map_by_plex_uuid = {user.plex_uuid: user for user in mum_users_all if user.plex_uuid}
-    mum_users_map_by_username = {user.plex_username.lower(): user for user in mum_users_all if user.plex_username}
+    mum_users_map_by_username = {user.primary_username.lower(): user for user in mum_users_all if user.primary_username}
 
     added_users_details = []
     updated_users_details = []
@@ -458,18 +458,18 @@ def sync_all_users():
             changes = []
             if mum_user.plex_user_id != plex_id: changes.append("Plex User ID updated"); mum_user.plex_user_id = plex_id
             if mum_user.plex_uuid != plex_uuid_from_sync: changes.append("Plex UUID updated"); mum_user.plex_uuid = plex_uuid_from_sync
-            if mum_user.plex_username != plex_username_from_sync: changes.append(f"Username changed"); mum_user.plex_username = plex_username_from_sync
+            if mum_user.primary_username != plex_username_from_sync: changes.append(f"Username changed"); mum_user.primary_username = plex_username_from_sync
             if set(mum_user.allowed_library_ids or []) != set(new_library_ids): changes.append("Libraries updated"); mum_user.allowed_library_ids = new_library_ids
             # Update raw service data if available
             if plex_user_data.get('raw_data'): 
                 changes.append("Raw data updated"); mum_user.raw_service_data = plex_user_data.get('raw_data')
             if plex_join_date_dt and (mum_user.plex_join_date is None or mum_user.plex_join_date != plex_join_date_dt.replace(tzinfo=None)):
-                current_app.logger.debug(f"User sync - {mum_user.plex_username}: Updating plex_join_date from {mum_user.plex_join_date} to {plex_join_date_dt.replace(tzinfo=None)}")
+                current_app.logger.debug(f"User sync - {mum_user.get_display_name()}: Updating plex_join_date from {mum_user.plex_join_date} to {plex_join_date_dt.replace(tzinfo=None)}")
                 changes.append("Plex join date updated"); mum_user.plex_join_date = plex_join_date_dt.replace(tzinfo=None)
             elif plex_join_date_dt:
-                current_app.logger.debug(f"User sync - {mum_user.plex_username}: plex_join_date already up to date: {mum_user.plex_join_date}")
+                current_app.logger.debug(f"User sync - {mum_user.get_display_name()}: plex_join_date already up to date: {mum_user.plex_join_date}")
             else:
-                current_app.logger.debug(f"User sync - {mum_user.plex_username}: No valid plex_join_date to set")
+                current_app.logger.debug(f"User sync - {mum_user.get_display_name()}: No valid plex_join_date to set")
 
             if changes:
                 mum_user.last_synced_with_plex = datetime.utcnow(); mum_user.updated_at = datetime.utcnow()
@@ -477,7 +477,7 @@ def sync_all_users():
         else:
             try:
                 new_user = User(
-                    plex_user_id=plex_id, plex_uuid=plex_uuid_from_sync, plex_username=plex_username_from_sync,
+                    plex_user_id=plex_id, plex_uuid=plex_uuid_from_sync, primary_username=plex_username_from_sync,
                     plex_email=plex_user_data.get('email'), plex_thumb_url=plex_user_data.get('thumb'),
                     allowed_library_ids=new_library_ids, is_home_user=plex_user_data.get('is_home_user', False),
                     shares_back=plex_user_data.get('shares_back', False), is_plex_friend=plex_user_data.get('is_friend', False),
@@ -495,7 +495,7 @@ def sync_all_users():
     # Process removals
     for user in mum_users_all:
         if user.plex_user_id not in current_plex_user_ids_on_server:
-            removed_users_details.append({'username': user.plex_username, 'mum_id': user.id, 'plex_id': user.plex_user_id})
+            removed_users_details.append({'username': user.get_display_name(), 'mum_id': user.id, 'plex_id': user.plex_user_id})
             db.session.delete(user)
 
     # Commit all session changes to the database
@@ -737,7 +737,7 @@ def mass_edit_users():
     
     query = User.query
     search_term = request.args.get('search', '').strip()
-    if search_term: query = query.filter(or_(User.plex_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
+    if search_term: query = query.filter(or_(User.primary_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
     
     filter_type = request.args.get('filter_type', '')
     if filter_type == 'home_user': query = query.filter(User.is_home_user == True)
@@ -746,12 +746,12 @@ def mass_edit_users():
     elif filter_type == 'no_discord': query = query.filter(User.discord_user_id == None)
     
     sort_by = request.args.get('sort_by', 'username_asc')
-    if sort_by == 'username_desc': query = query.order_by(User.plex_username.desc())
+    if sort_by == 'username_desc': query = query.order_by(User.primary_username.desc())
     elif sort_by == 'last_streamed_desc': query = query.order_by(User.last_streamed_at.desc().nullslast())
     elif sort_by == 'last_streamed_asc': query = query.order_by(User.last_streamed_at.asc().nullsfirst())
     elif sort_by == 'created_at_desc': query = query.order_by(User.created_at.desc())
     elif sort_by == 'created_at_asc': query = query.order_by(User.created_at.asc())
-    else: query = query.order_by(User.plex_username.asc())
+    else: query = query.order_by(User.primary_username.asc())
     
     users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
     users_count = query.count()
@@ -939,14 +939,14 @@ def get_user_debug_info(user_id):
     try:
         # Enhanced debugging for raw service data
         current_app.logger.info(f"=== DEBUG INFO REQUEST FOR USER {user_id} ===")
-        current_app.logger.info(f"Username: {user.plex_username}")
+        current_app.logger.info(f"Username: {user.get_display_name()}")
         current_app.logger.info(f"Raw service data exists: {user.raw_service_data is not None}")
         current_app.logger.info(f"Raw service data type: {type(user.raw_service_data)}")
         if user.raw_service_data:
             current_app.logger.info(f"Raw service data length: {len(str(user.raw_service_data))}")
             current_app.logger.info(f"Raw service data preview: {str(user.raw_service_data)[:100]}...")
         else:
-            current_app.logger.warning(f"No stored raw data for user {user.plex_username} - user needs to sync")
+            current_app.logger.warning(f"No stored raw data for user {user.get_display_name()} - user needs to sync")
             
         # Check which services this user belongs to
         from app.models_media_services import UserMediaAccess

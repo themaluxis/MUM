@@ -96,7 +96,7 @@
                             </td>
                             <td class="hidden md:table-cell text-sm whitespace-nowrap">
                                 {% if activity.admin %}<i class="fa-solid fa-user-shield fa-fw mr-1" title="Admin"></i>{{ activity.admin.username or activity.admin.plex_username }}
-                                {% elif activity.affected_user %}<i class="fa-solid fa-user fa-fw mr-1" title="Plex User"></i>{{ activity.affected_user.plex_username }}
+                                {% elif activity.affected_user %}<i class="fa-solid fa-user fa-fw mr-1" title="User"></i>{{ activity.affected_user.get_display_name() }}
                                 {% else %}N/A{% endif %}
                             </td>
                         </tr>

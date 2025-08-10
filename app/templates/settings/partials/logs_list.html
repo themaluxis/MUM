@@ -49,8 +49,8 @@
                                 <i class="fa-solid fa-user-shield fa-fw mr-1"></i> {{ log.admin.username or log.admin.plex_username | truncate(20) }}
                             </div>
                         {% elif log.affected_user %}
-                             <div title="Plex User: {{ log.affected_user.plex_username }}">
-                                <i class="fa-solid fa-user fa-fw mr-1"></i> {{ log.affected_user.plex_username | truncate(20) }}
+                             <div title="User: {{ log.affected_user.get_display_name() }}">
+                                <i class="fa-solid fa-user fa-fw mr-1"></i> {{ log.affected_user.get_display_name() | truncate(20) }}
                              </div>
                         {% elif log.related_invite %}
                             <div title="Invite: {{ log.related_invite.custom_path or log.related_invite.token }}">

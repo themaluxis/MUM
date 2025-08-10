@@ -256,7 +256,6 @@ class UnifiedUserService:
                 db.or_(
                     User.primary_username.ilike(search_term),
                     User.primary_email.ilike(search_term),
-                    User.plex_username.ilike(search_term),
                     User.plex_email.ilike(search_term)
                 )
             )

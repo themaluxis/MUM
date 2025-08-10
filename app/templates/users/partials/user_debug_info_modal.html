@@ -11,9 +11,6 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 <div><span class="text-base-content/60">Username:</span> <span class="font-mono">{{ user.get_display_name() }}</span></div>
                 <div><span class="text-base-content/60">User ID:</span> <span class="font-mono">{{ user.id }}</span></div>
-                {% if user.plex_username %}
-                <div><span class="text-base-content/60">Plex Username:</span> <span class="font-mono">{{ user.plex_username }}</span></div>
-                {% endif %}
                 {% if user.plex_uuid %}
                 <div><span class="text-base-content/60">Plex UUID:</span> <span class="font-mono text-xs">{{ user.plex_uuid }}</span></div>
                 {% endif %}

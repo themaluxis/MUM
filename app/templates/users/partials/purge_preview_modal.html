@@ -36,7 +36,7 @@
             <div class="p-1 rounded hover:bg-base-300/50 text-xs">
                 <label class="label cursor-pointer justify-start p-0">
                     <input type="checkbox" name="user_ids_to_purge" value="{{ user.id }}" class="checkbox checkbox-sm checkbox-secondary purge-user-checkbox" checked>
-                    <span class="font-semibold">{{ user.plex_username }}</span>
+                    <span class="font-semibold">{{ user.get_display_name() }}</span>
                     <span class="ml-2 text-base-content/70 truncate" title="{{user.plex_email}}">({{ user.plex_email or 'No Email' }})</span>
                     <span class="ml-auto text-base-content/60 text-right">
                         Added: {{ user.created_at | time_ago }}<br>

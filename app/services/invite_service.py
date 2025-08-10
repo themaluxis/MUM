@@ -205,7 +205,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
             
             # Update the existing user with Plex information
             new_user.plex_uuid = plex_user_uuid
-            new_user.plex_username = plex_username
+            new_user.primary_username = plex_username
             new_user.plex_email = plex_email
             new_user.plex_thumb_url = plex_thumb
             new_user.allowed_library_ids = list(invite.grant_library_ids)
@@ -232,7 +232,6 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                 primary_username=plex_username,  # Use Plex username as primary_username to satisfy NOT NULL constraint
                 primary_email=plex_email,  # Use Plex email as primary_email
                 plex_uuid=plex_user_uuid,
-                plex_username=plex_username,
                 plex_email=plex_email,
                 plex_thumb_url=plex_thumb,
                 allowed_library_ids=list(invite.grant_library_ids),

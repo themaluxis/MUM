@@ -181,7 +181,7 @@ class DiscordConfigForm(FlaskForm):
             raise ValidationError('Discord Bot Token is required when bot features are enabled.')
 
 class UserEditForm(FlaskForm): # As updated for whitelist fields
-    plex_username = StringField('Plex Username', render_kw={'readonly': True})
+    primary_username = StringField('Username', render_kw={'readonly': True})
     plex_email = StringField('Plex Email', render_kw={'readonly': True})
     is_home_user = BooleanField('Plex Home User', render_kw={'disabled': True})
     libraries = SelectMultipleField(

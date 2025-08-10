@@ -130,7 +130,7 @@ def monitor_media_sessions_task():
                 
                 # Log session type for debugging
                 session_type = "Plex" if hasattr(session, 'player') else "Jellyfin"
-                current_app.logger.debug(f"Processing {session_type} session {session_key} for user '{mum_user.plex_username}' (MUM ID: {mum_user.id})")
+                current_app.logger.debug(f"Processing {session_type} session {session_key} for user '{mum_user.get_display_name()}' (MUM ID: {mum_user.id})")
 
                 # If the session is new, create the history record
                 if session_key not in _active_stream_sessions:
@@ -261,7 +261,7 @@ def check_user_access_expirations_task():
             expiry_date = user.access_expires_at
             is_expired = expiry_date <= now_naive
             time_diff = (expiry_date - now_naive).total_seconds() if expiry_date else None
-            current_app.logger.info(f"  - User '{user.plex_username}' (ID: {user.id}): expires {expiry_date} | Expired: {is_expired} | Time diff: {time_diff}s")
+            current_app.logger.info(f"  - User '{user.get_display_name()}' (ID: {user.id}): expires {expiry_date} | Expired: {is_expired} | Time diff: {time_diff}s")
         
         # Now get actually expired users
         expired_users = User.query.filter(
@@ -289,7 +289,7 @@ def check_user_access_expirations_task():
 
         removal_count = 0
         for user in expired_users:
-            username_for_log = user.plex_username
+            username_for_log = user.get_display_name()
             mum_user_id_for_log = user.id
             original_expiry_for_log = user.access_expires_at
             

@@ -244,7 +244,7 @@ class UnifiedInviteService:
             # Set service-specific fields
             if plex_uuid:
                 user.plex_uuid = plex_uuid
-                user.plex_username = username
+                user.primary_username = username
                 user.plex_email = email
                 user.plex_thumb_url = user_data.get('plex_thumb_url')
             

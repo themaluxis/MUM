@@ -243,7 +243,7 @@ class MediaServiceManager:
             if uuid:
                 user = User.query.filter_by(plex_uuid=uuid).first()
             if not user and username:
-                user = User.query.filter_by(plex_username=username).first()
+                user = User.query.filter_by(primary_username=username).first()
         
         # Try to match by primary username or email
         if not user and username:
@@ -297,7 +297,7 @@ class MediaServiceManager:
             elif server.service_type == ServiceType.PLEX:
                 user.plex_user_id = user_data.get('id')
                 # Keep plex_username for API compatibility, but primary_username is already set above
-                user.plex_username = username
+                user.primary_username = username
                 user.plex_uuid = user_data.get('uuid')
                 user.is_home_user = user_data.get('is_home_user', False)
                 user.raw_service_data = user_data.get('raw_data')  # Store raw data for new users

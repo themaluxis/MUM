@@ -171,7 +171,6 @@ class User(db.Model, UserMixin):
     
     # Legacy Plex fields (kept for backward compatibility)
     plex_user_id = db.Column(db.Integer, unique=True, nullable=True, index=True)
-    plex_username = db.Column(db.String(255), unique=True, nullable=True, index=True)  # Made nullable
     plex_email = db.Column(db.String(255), nullable=True)
     plex_thumb_url = db.Column(db.String(512), nullable=True) 
     plex_uuid = db.Column(db.String(255), unique=True, nullable=True, index=True)  # Made nullable
@@ -228,7 +227,7 @@ class User(db.Model, UserMixin):
     
     def get_display_name(self):
         """Get the best display name for this user"""
-        return self.primary_username or self.plex_username or self.primary_email or 'Unknown User'
+        return self.primary_username or self.primary_email or 'Unknown User'
     
     def get_primary_email(self):
         """Get the primary email for this user"""
@@ -351,7 +350,7 @@ class StreamHistory(db.Model):
     view_offset_at_end_seconds = db.Column(db.Integer, nullable=True) # Final known progress in seconds
 
     def __repr__(self):
-        return f'<StreamHistory {self.id} by {self.user.plex_username}>'
+        return f'<StreamHistory {self.id} by {self.user.get_display_name()}>'
 
 class UserPreferences(db.Model):
     __tablename__ = 'user_preferences'

@@ -161,9 +161,9 @@ def view_user(user_id):
             
             if access_expiration_changed:
                 if user.access_expires_at is None:
-                    log_event(EventType.SETTING_CHANGE, f"User '{user.plex_username}' access expiration cleared.", user_id=user.id, admin_id=current_user.id)
+                    log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' access expiration cleared.", user_id=user.id, admin_id=current_user.id)
                 else:
-                    log_event(EventType.SETTING_CHANGE, f"User '{user.plex_username}' access expiration set to {user.access_expires_at.strftime('%Y-%m-%d')}.", user_id=user.id, admin_id=current_user.id)
+                    log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' access expiration set to {user.access_expires_at.strftime('%Y-%m-%d')}.", user_id=user.id, admin_id=current_user.id)
             
             # This commit saves all changes from user_service and the expiration date
             db.session.commit()
@@ -418,7 +418,7 @@ def view_user(user_id):
         
     return render_template(
         'users/profile.html',
-        title=f"User Profile: {user.plex_username}",
+        title=f"User Profile: {user.get_display_name()}",
         user=user,
         form=form,
         history_logs=stream_history_pagination,

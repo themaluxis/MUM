@@ -340,7 +340,7 @@ def _get_history_logs_query():
                      .filter(or_(
                          AdminAccount.username.ilike(f"%{related_user_filter}%"), 
                          AdminAccount.plex_username.ilike(f"%{related_user_filter}%"), 
-                         User.plex_username.ilike(f"%{related_user_filter}%"), 
+                         User.primary_username.ilike(f"%{related_user_filter}%"), 
                          HistoryLog.admin_id.cast(db.String).ilike(f"%{related_user_filter}%"), 
                          HistoryLog.user_id.cast(db.String).ilike(f"%{related_user_filter}%")
                      ))

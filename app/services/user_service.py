@@ -72,7 +72,7 @@ def sync_users_from_plex():
 
         if mum_user: # Existing user
             changes_for_this_user = []
-            original_username = mum_user.plex_username # For logging if username itself changes
+            original_username = mum_user.get_display_name() # For logging if username itself changes
 
             if plex_id is not None and mum_user.plex_user_id != plex_id:
                 changes_for_this_user.append(f"Plex User ID corrected from {mum_user.plex_user_id} to {plex_id}")
@@ -80,9 +80,9 @@ def sync_users_from_plex():
             if plex_uuid_from_sync and mum_user.plex_uuid != plex_uuid_from_sync:
                 changes_for_this_user.append(f"Plex UUID updated from {mum_user.plex_uuid} to {plex_uuid_from_sync}")
                 mum_user.plex_uuid = plex_uuid_from_sync
-            if mum_user.plex_username != plex_username_from_sync:
-                changes_for_this_user.append(f"Username changed from '{mum_user.plex_username}' to '{plex_username_from_sync}'")
-                mum_user.plex_username = plex_username_from_sync
+            if mum_user.primary_username != plex_username_from_sync:
+                changes_for_this_user.append(f"Username changed from '{mum_user.primary_username}' to '{plex_username_from_sync}'")
+                mum_user.primary_username = plex_username_from_sync
             if mum_user.plex_email != plex_email_from_sync:
                 changes_for_this_user.append(f"Email updated") # Don't log old/new email for privacy
                 mum_user.plex_email = plex_email_from_sync
@@ -112,7 +112,7 @@ def sync_users_from_plex():
             try:
                 new_user_obj = User( # Renamed to avoid conflict with User model
                     plex_user_id=plex_id, plex_uuid=plex_uuid_from_sync, 
-                    plex_username=plex_username_from_sync, plex_email=plex_email_from_sync,
+                    primary_username=plex_username_from_sync, plex_email=plex_email_from_sync,
                     plex_thumb_url=plex_thumb_from_sync, allowed_library_ids=new_library_ids_from_plex_list, 
                     is_home_user=is_home_user_from_sync, shares_back=shares_back_from_sync,
                     is_plex_friend=is_friend_from_sync, last_synced_with_plex=datetime.utcnow()
@@ -139,7 +139,7 @@ def sync_users_from_plex():
              is_on_server = True
 
         if not is_on_server:
-            removed_users_details.append({'username': mum_user_obj.plex_username, 'mum_id': mum_user_obj.id, 'plex_id': mum_user_obj.plex_user_id})
+            removed_users_details.append({'username': mum_user_obj.get_display_name(), 'mum_id': mum_user_obj.id, 'plex_id': mum_user_obj.plex_user_id})
             db.session.delete(mum_user_obj)
     
     if added_users_details or updated_users_details or removed_users_details or error_count > 0:
@@ -203,17 +203,17 @@ def update_user_details(user_id: int, notes=None, new_library_ids=None,
     if is_discord_bot_whitelisted is not None and user.is_discord_bot_whitelisted != is_discord_bot_whitelisted:
         user.is_discord_bot_whitelisted = is_discord_bot_whitelisted
         changes_made_to_mum = True
-        log_event(EventType.SETTING_CHANGE, f"User '{user.plex_username}' Discord Bot Whitelist set to {is_discord_bot_whitelisted}", user_id=user.id, admin_id=admin_id)
+        log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' Discord Bot Whitelist set to {is_discord_bot_whitelisted}", user_id=user.id, admin_id=admin_id)
 
     if is_purge_whitelisted is not None and user.is_purge_whitelisted != is_purge_whitelisted:
         user.is_purge_whitelisted = is_purge_whitelisted
         changes_made_to_mum = True
-        log_event(EventType.SETTING_CHANGE, f"User '{user.plex_username}' Purge Whitelist set to {is_purge_whitelisted}", user_id=user.id, admin_id=admin_id)
+        log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' Purge Whitelist set to {is_purge_whitelisted}", user_id=user.id, admin_id=admin_id)
         
     if allow_4k_transcode is not None and user.allow_4k_transcode != allow_4k_transcode:
         user.allow_4k_transcode = allow_4k_transcode
         changes_made_to_mum = True
-        log_event(EventType.SETTING_CHANGE, f"User '{user.plex_username}' Allow 4K Transcode set to {allow_4k_transcode}", user_id=user.id, admin_id=admin_id)
+        log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' Allow 4K Transcode set to {allow_4k_transcode}", user_id=user.id, admin_id=admin_id)
 
 
     # --- Plex-related settings ---
@@ -225,19 +225,19 @@ def update_user_details(user_id: int, notes=None, new_library_ids=None,
             libraries_changed = True
             user.allowed_library_ids = new_library_ids # Update MUM record
             changes_made_to_mum = True
-            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Manually updated libraries for '{user.plex_username}'.", user_id=user.id, admin_id=admin_id)
+            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Manually updated libraries for '{user.get_display_name()}'.", user_id=user.id, admin_id=admin_id)
 
     downloads_changed = False
     if allow_downloads is not None and user.allow_downloads != allow_downloads:
         downloads_changed = True
         user.allow_downloads = allow_downloads # Update MUM record
         changes_made_to_mum = True
-        log_event(EventType.SETTING_CHANGE, f"User '{user.plex_username}' Allow Downloads set to {allow_downloads}", user_id=user.id, admin_id=admin_id)
+        log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' Allow Downloads set to {allow_downloads}", user_id=user.id, admin_id=admin_id)
         
     # --- Make the API call to Plex ONLY IF a Plex-related setting changed ---
     if libraries_changed or downloads_changed:
         try:
-            current_app.logger.info(f"[DEBUG-USER_SVC] Preparing to call plex_service.update_user_access for user '{user.plex_username}'. State to send -> library_ids_to_share: {user.allowed_library_ids}, allow_sync: {user.allow_downloads}")
+            current_app.logger.info(f"[DEBUG-USER_SVC] Preparing to call plex_service.update_user_access for user '{user.get_display_name()}'. State to send -> library_ids_to_share: {user.allowed_library_ids}, allow_sync: {user.allow_downloads}")
             # **THE FIX**: We now pass the user's complete, final desired library and download state to the service.
             plex_service.update_user_access(
                 user_id=user.plex_user_id,
@@ -246,7 +246,7 @@ def update_user_details(user_id: int, notes=None, new_library_ids=None,
             )
         except Exception as e:
             # Re-raise the exception to be handled by the route, which can flash an error
-            raise Exception(f"Failed to update Plex permissions for {user.plex_username}: {e}")
+            raise Exception(f"Failed to update Plex permissions for {user.get_display_name()}: {e}")
 
     # If any MUM-only field changed, mark the record as updated
     if changes_made_to_mum:
@@ -256,7 +256,7 @@ def update_user_details(user_id: int, notes=None, new_library_ids=None,
     return user
 
 def delete_user_from_mum_and_plex(user_id: int, admin_id: int = None):
-    user = User.query.get_or_404(user_id); username = user.plex_username
+    user = User.query.get_or_404(user_id); username = user.get_display_name()
     plex_servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX)
     if not plex_servers:
         raise Exception("Plex server not found in media_servers table.")
@@ -298,7 +298,7 @@ def mass_update_user_libraries(user_ids: list[int], new_library_ids: list, admin
                 user.updated_at = datetime.utcnow()
             processed_count += 1
         except Exception as e:
-            current_app.logger.error(f"Mass Update Error: User {user.plex_username} (ID: {user.id}): {e}");
+            current_app.logger.error(f"Mass Update Error: User {user.get_display_name()} (ID: {user.id}): {e}");
             error_count += 1
     if processed_count > 0 or error_count > 0: 
         try:
@@ -350,7 +350,7 @@ def mass_update_user_libraries_by_server(user_ids: list[int], updates_by_server:
                 user.updated_at = datetime.utcnow()
                 processed_count += 1
             except Exception as e:
-                current_app.logger.error(f"Mass Update Error for user {user.plex_username} on server {server.name}: {e}")
+                current_app.logger.error(f"Mass Update Error for user {user.get_display_name()} on server {server.name}: {e}")
                 error_count += 1
 
     if processed_count > 0 or error_count > 0:
@@ -402,7 +402,7 @@ def mass_delete_users(user_ids: list[int], admin_id: int = None):
         raise Exception("Failed to create Plex service from server configuration.")
 
     for user in users_to_delete:
-        username_for_log = user.plex_username
+        username_for_log = user.get_display_name()
         try:
             plex_service.delete_user(user.plex_user_id); # or user.plex_user_id if service supports
             db.session.delete(user);
@@ -517,7 +517,7 @@ def purge_inactive_users(user_ids_to_purge: list[int], admin_id: int, inactive_d
             purged_count += 1
         except Exception as e:
             error_count += 1
-            current_app.logger.error(f"User_Service.py - purge_inactive_users(): Error purging user {user.plex_username} (ID: {user.id}): {e}")
+            current_app.logger.error(f"User_Service.py - purge_inactive_users(): Error purging user {user.get_display_name()} (ID: {user.id}): {e}")
 
     result_message = f"Purge complete: {purged_count} users removed."
     if len(final_ids_to_delete) != len(user_ids_to_purge):
@@ -569,7 +569,7 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
                 is_eligible_for_purge = True
         
         if is_eligible_for_purge:
-            eligible_users_list.append({ 'id': user.id, 'plex_username': user.plex_username, 'plex_email': user.plex_email, 'last_streamed_at': user.last_streamed_at, 'created_at': user.created_at })
+            eligible_users_list.append({ 'id': user.id, 'username': user.get_display_name(), 'plex_email': user.plex_email, 'last_streamed_at': user.last_streamed_at, 'created_at': user.created_at })
             
     return eligible_users_list
 

@@ -172,7 +172,7 @@ class UserMediaAccess(db.Model):
     __table_args__ = (db.UniqueConstraint('user_id', 'server_id', name='_user_server_uc'),)
     
     def __repr__(self):
-        return f'<UserMediaAccess {self.user.plex_username} on {self.server.name}>'
+        return f'<UserMediaAccess {self.user.get_display_name()} on {self.server.name}>'
 
 class MediaStreamHistory(db.Model):
     """Enhanced stream history that supports multiple services"""
@@ -218,4 +218,4 @@ class MediaStreamHistory(db.Model):
     server = db.relationship('MediaServer')
     
     def __repr__(self):
-        return f'<MediaStreamHistory {self.id} by {self.user.plex_username} on {self.server.name}>'
+        return f'<MediaStreamHistory {self.id} by {self.user.get_display_name()} on {self.server.name}>'
