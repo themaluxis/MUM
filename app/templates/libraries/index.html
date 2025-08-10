@@ -203,8 +203,9 @@ function showLibraryRawData(button) {
         const serverName = button.getAttribute('data-server-name');
         const libraryId = button.getAttribute('data-library-id');
         const serviceType = button.getAttribute('data-service-type');
+        const serverId = button.getAttribute('data-server-id');
         
-        console.log('Modal debug:', { libraryName, serverName, libraryId, serviceType });
+        console.log('Modal debug:', { libraryName, serverName, libraryId, serviceType, serverId });
         
         // Update modal with basic info
         document.getElementById('modal_library_name').textContent = libraryName || 'Unknown';
@@ -212,32 +213,42 @@ function showLibraryRawData(button) {
         
         // Show loading state
         const rawDataElement = document.getElementById('modal_raw_data');
-        rawDataElement.textContent = 'Loading raw library data...';
+        rawDataElement.textContent = 'Loading raw library data from API...';
         
         // Show the modal
         document.getElementById('library_raw_data_modal').showModal();
         
-        // For now, show the stored database information
-        const dbData = {
-            library_info: {
-                name: libraryName,
-                server_name: serverName,
-                library_id: libraryId,
-                service_type: serviceType
-            },
-            note: "Raw API data is not currently stored in the database.",
-            suggestion: "To view full raw data, check your media server's admin interface or API documentation.",
-            stored_fields: [
-                "name",
-                "library_type", 
-                "item_count",
-                "last_scanned",
-                "external_id",
-                "server_id"
-            ]
-        };
-        
-        rawDataElement.textContent = JSON.stringify(dbData, null, 2);
+        // Fetch raw data from API
+        fetch(`/library/${serverId}/${libraryId}/raw-data`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    rawDataElement.textContent = JSON.stringify(data.library_data, null, 2);
+                } else {
+                    rawDataElement.textContent = JSON.stringify({
+                        error: data.error || 'Failed to fetch library data',
+                        library_info: {
+                            name: libraryName,
+                            server_name: serverName,
+                            library_id: libraryId,
+                            service_type: serviceType
+                        }
+                    }, null, 2);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching library raw data:', error);
+                rawDataElement.textContent = JSON.stringify({
+                    error: 'Network error while fetching library data',
+                    details: error.message,
+                    library_info: {
+                        name: libraryName,
+                        server_name: serverName,
+                        library_id: libraryId,
+                        service_type: serviceType
+                    }
+                }, null, 2);
+            });
         
     } catch (error) {
         console.error('Error showing library raw data:', error);

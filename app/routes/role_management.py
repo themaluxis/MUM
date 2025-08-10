@@ -112,6 +112,13 @@ def edit(role_id):
                  'clear_logs': {'label': 'Clear Application Logs', 'description': 'Can erase the full "Application Logs".'},
             }
         },
+        'Libraries': {
+            'label': 'Libraries',
+            'children': {
+                'view_libraries': {'label': 'View Libraries', 'description': 'Can access the libraries page and view library information.'},
+                'sync_libraries': {'label': 'Sync Libraries', 'description': 'Can synchronize libraries from media servers.'},
+            }
+        },
         'AppSettings': {
             'label': 'App Settings',
             'children': {

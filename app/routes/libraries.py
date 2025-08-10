@@ -274,3 +274,46 @@ def sync_libraries():
         response = make_response("", 500)
         response.headers['HX-Trigger'] = json.dumps(toast_payload)
         return response
+
+@bp.route('/library/<int:server_id>/<library_id>/raw-data')
+@login_required
+@setup_required
+@permission_required('view_libraries')
+def get_library_raw_data(server_id, library_id):
+    """Get raw API data for a specific library"""
+    try:
+        # Get the server
+        server = MediaServer.query.get_or_404(server_id)
+        
+        # Create service instance
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service:
+            return {'error': 'Could not create service instance'}, 500
+        
+        # Get all libraries and find the specific one
+        libraries = service.get_libraries()
+        
+        # Find the library with matching external_id
+        target_library = None
+        for lib in libraries:
+            lib_external_id = lib.get('external_id') or lib.get('id')
+            if str(lib_external_id) == str(library_id):
+                target_library = lib
+                break
+        
+        if not target_library:
+            return {'error': f'Library with ID {library_id} not found on server'}, 404
+        
+        return {
+            'success': True,
+            'library_data': target_library,
+            'server_info': {
+                'name': server.name,
+                'service_type': server.service_type.value,
+                'url': server.url
+            }
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"Error fetching raw library data: {e}")
+        return {'error': str(e)}, 500

@@ -35,7 +35,8 @@
                                 <button class="btn btn-xs btn-outline btn-ghost" 
                                         data-library-name="{{ lib.name }}"
                                         data-server-name="{{ lib.server_name }}"
-                                        data-library-id="{{ loop.index0 }}"
+                                        data-library-id="{{ lib.external_id }}"
+                                        data-server-id="{{ lib.server_id }}"
                                         data-service-type="{{ lib.service_type | default('unknown') }}"
                                         onclick="showLibraryRawData(this)">
                                     <i class="fa-solid fa-info"></i>
@@ -98,7 +99,8 @@
                                     <button class="btn btn-xs btn-outline btn-ghost" 
                                             data-library-name="{{ lib.name }}"
                                             data-server-name="{{ lib.server_name }}"
-                                            data-library-id="{{ loop.index0 }}"
+                                            data-library-id="{{ lib.external_id }}"
+                                            data-server-id="{{ lib.server_id }}"
                                             data-service-type="{{ lib.service_type | default('unknown') }}"
                                             onclick="showLibraryRawData(this)">
                                         <i class="fa-solid fa-info"></i>
