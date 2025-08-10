@@ -106,6 +106,14 @@ def list_users():
     sort_parts = sort_by_param.rsplit('_', 1)
     sort_column = sort_parts[0]
     sort_direction = 'desc' if len(sort_parts) > 1 and sort_parts[1] == 'desc' else 'asc'
+    
+    # DEBUG: Log sorting parameters
+    current_app.logger.info(f"=== SORTING DEBUG ===")
+    current_app.logger.info(f"Page: {page}")
+    current_app.logger.info(f"Items per page: {items_per_page}")
+    current_app.logger.info(f"Sort param: {sort_by_param}")
+    current_app.logger.info(f"Sort column: {sort_column}")
+    current_app.logger.info(f"Sort direction: {sort_direction}")
 
     # Handle sorting that requires joins and aggregation
     if sort_column in ['total_plays', 'total_duration']:
@@ -117,9 +125,9 @@ def list_users():
         query = query.add_columns(sort_field.label('sort_value'))
         
         if sort_direction == 'desc':
-            query = query.order_by(db.desc('sort_value').nullslast())
+            query = query.order_by(db.desc('sort_value').nullslast(), User.id.asc())
         else:
-            query = query.order_by(db.asc('sort_value').nullsfirst())
+            query = query.order_by(db.asc('sort_value').nullsfirst(), User.id.asc())
     else:
         # Standard sorting on direct User model fields
         sort_map = {
@@ -133,22 +141,82 @@ def list_users():
         # Default to sorting by username if the column is invalid
         sort_field = sort_map.get(sort_column, User.primary_username)
 
-        if sort_direction == 'desc':
-            # Use .nullslast() to ensure users with no data appear at the end
-            query = query.order_by(sort_field.desc().nullslast())
+        # For string fields, use case-insensitive sorting to ensure consistent pagination
+        if sort_column in ['username', 'email']:
+            if sort_direction == 'desc':
+                # Use func.lower() for case-insensitive sorting, with nullslast() and secondary sort by ID
+                query = query.order_by(func.lower(sort_field).desc().nullslast(), User.id.asc())
+            else:
+                # Use func.lower() for case-insensitive sorting, with nullsfirst() and secondary sort by ID
+                query = query.order_by(func.lower(sort_field).asc().nullsfirst(), User.id.asc())
         else:
-            # Use .nullsfirst() to ensure users with no data appear at the beginning
-            query = query.order_by(sort_field.asc().nullsfirst())
+            # For non-string fields (dates, etc.), use regular sorting
+            if sort_direction == 'desc':
+                # Use .nullslast() to ensure users with no data appear at the end
+                # Add secondary sort by ID for consistent ordering
+                query = query.order_by(sort_field.desc().nullslast(), User.id.asc())
+            else:
+                # Use .nullsfirst() to ensure users with no data appear at the beginning  
+                # Add secondary sort by ID for consistent ordering
+                query = query.order_by(sort_field.asc().nullsfirst(), User.id.asc())
     # --- END OF ENHANCED SORTING LOGIC ---
 
     admin_accounts = AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()
     admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts}
+    
+    # Calculate count before pagination to ensure consistency
+    # For complex queries with joins/aggregations, we need to count differently
+    if sort_column in ['total_plays', 'total_duration']:
+        # For aggregated queries, count the distinct users
+        count_query = User.query
+        # Apply the same filters as the main query
+        if search_filters:
+            count_query = count_query.filter(or_(*search_filters))
+        if server_filter_id != 'all':
+            try:
+                server_filter_id_int = int(server_filter_id)
+                from app.models_media_services import UserMediaAccess
+                count_query = count_query.join(UserMediaAccess).filter(UserMediaAccess.server_id == server_filter_id_int)
+            except ValueError:
+                pass
+        if filter_type == 'home_user': 
+            count_query = count_query.filter(User.is_home_user == True)
+        elif filter_type == 'shares_back': 
+            count_query = count_query.filter(User.shares_back == True)
+        elif filter_type == 'has_discord': 
+            count_query = count_query.filter(User.discord_user_id != None)
+        elif filter_type == 'no_discord': 
+            count_query = count_query.filter(User.discord_user_id == None)
+        
+        users_count = count_query.count()
+    else:
+        # For simple queries, use the existing query
+        users_count = query.count()
+    
+    # DEBUG: Log the actual SQL query being executed
+    current_app.logger.info(f"SQL Query: {str(query.statement.compile(compile_kwargs={'literal_binds': True}))}")
+    
     users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
-    users_count = query.count()
 
     # Extract users from pagination results (handling complex queries that return tuples)
     users_on_page = [item[0] if isinstance(item, tuple) else item for item in users_pagination.items]
     user_ids_on_page = [user.id for user in users_on_page]
+    
+    # DEBUG: Log the actual users returned on this page
+    current_app.logger.info(f"=== PAGINATION RESULTS ===")
+    current_app.logger.info(f"Total users found: {users_count}")
+    current_app.logger.info(f"Total pages: {users_pagination.pages}")
+    current_app.logger.info(f"Current page: {users_pagination.page}")
+    current_app.logger.info(f"Users on this page: {len(users_on_page)}")
+    
+    # Log the first few usernames to see the actual sorting
+    usernames_on_page = []
+    for user in users_on_page[:10]:  # Show first 10 users
+        display_name = user.get_display_name() if hasattr(user, 'get_display_name') else getattr(user, 'primary_username', 'Unknown')
+        usernames_on_page.append(f"{display_name} (ID: {user.id})")
+    
+    current_app.logger.info(f"First 10 users on page {page}: {usernames_on_page}")
+    current_app.logger.info(f"=== END SORTING DEBUG ===")
 
     # Fetch additional data for the current page
     stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
@@ -746,12 +814,12 @@ def mass_edit_users():
     elif filter_type == 'no_discord': query = query.filter(User.discord_user_id == None)
     
     sort_by = request.args.get('sort_by', 'username_asc')
-    if sort_by == 'username_desc': query = query.order_by(User.primary_username.desc())
-    elif sort_by == 'last_streamed_desc': query = query.order_by(User.last_streamed_at.desc().nullslast())
-    elif sort_by == 'last_streamed_asc': query = query.order_by(User.last_streamed_at.asc().nullsfirst())
-    elif sort_by == 'created_at_desc': query = query.order_by(User.created_at.desc())
-    elif sort_by == 'created_at_asc': query = query.order_by(User.created_at.asc())
-    else: query = query.order_by(User.primary_username.asc())
+    if sort_by == 'username_desc': query = query.order_by(User.primary_username.desc().nullslast(), User.id.asc())
+    elif sort_by == 'last_streamed_desc': query = query.order_by(User.last_streamed_at.desc().nullslast(), User.id.asc())
+    elif sort_by == 'last_streamed_asc': query = query.order_by(User.last_streamed_at.asc().nullsfirst(), User.id.asc())
+    elif sort_by == 'created_at_desc': query = query.order_by(User.created_at.desc().nullslast(), User.id.asc())
+    elif sort_by == 'created_at_asc': query = query.order_by(User.created_at.asc().nullsfirst(), User.id.asc())
+    else: query = query.order_by(User.primary_username.asc().nullsfirst(), User.id.asc())
     
     users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
     users_count = query.count()
