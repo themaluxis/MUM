@@ -63,7 +63,7 @@
                         {% if current_user.has_permission('kill_stream') and session.session_key %}
                         <button class="btn btn-xs btn-circle btn-error"
                                 title="Terminate Session"
-                                onclick='openTerminateSessionModal({{ session.session_key | tojson }}, {{ session.user | tojson }}, {{ session.media_title | tojson }})'>
+                                onclick='openTerminateSessionModal({{ session.session_key | tojson }}, {{ session.user | tojson }}, {{ session.media_title | tojson }}, {{ session.service_type | tojson }}, {{ session.server_name | tojson }})'>
                             <i class="fa-solid fa-times"></i>
                         </button>
                         {% endif %}

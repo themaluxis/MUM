@@ -325,37 +325,84 @@ def jellyfin_user_avatar_proxy():
         current_app.logger.error(f"API jellyfin_user_avatar_proxy: Unexpected error for user {user_id}: {e}", exc_info=True)
         abort(500)
 
+@bp.route('/media/sessions/terminate', methods=['POST'])
+@login_required
+@csrf.exempt
+@permission_required('kill_stream')
+def terminate_session():
+    """Terminate a media session (Plex, Jellyfin, etc.)"""
+    session_key = request.form.get('session_key')
+    service_type = request.form.get('service_type')
+    server_name = request.form.get('server_name')
+    message = request.form.get('message', None)
+
+    if not session_key:
+        current_app.logger.error("API terminate_session: Missing 'session_key'.")
+        return jsonify(success=False, error="Session key is required."), 400
+
+    if not service_type:
+        current_app.logger.error("API terminate_session: Missing 'service_type'.")
+        return jsonify(success=False, error="Service type is required."), 400
+
+    try:
+        # Get the appropriate service based on service type
+        if service_type.lower() == 'plex':
+            servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX)
+        elif service_type.lower() == 'jellyfin':
+            servers = MediaServiceManager.get_servers_by_type(ServiceType.JELLYFIN)
+        else:
+            return jsonify(success=False, error=f"Unsupported service type: {service_type}"), 400
+        
+        if not servers:
+            return jsonify(success=False, error=f"{service_type} service not found."), 500
+        
+        # Find the specific server by name if provided, otherwise use the first one
+        target_server = None
+        if server_name:
+            target_server = next((s for s in servers if s.name == server_name), None)
+        if not target_server:
+            target_server = servers[0]  # Use first available server
+        
+        service = MediaServiceFactory.create_service_from_db(target_server)
+        if not service:
+            return jsonify(success=False, error=f"{service_type} service not available."), 500
+
+        current_app.logger.info(f"Terminating {service_type} session {session_key} on server {target_server.name}")
+        success = service.terminate_session(session_key, message)
+        
+        if success:
+            log_event(EventType.SETTING_CHANGE, 
+                     f"Terminated {service_type} session {session_key} on {target_server.name}",
+                     admin_id=current_user.id if hasattr(current_user, 'id') else None)
+            return jsonify(success=True, message=f"Termination command sent for {service_type} session {session_key}.")
+        else:
+            return jsonify(success=False, error=f"Failed to send termination command ({service_type} connection issue?)."), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"API terminate_session: Exception: {e}", exc_info=True)
+        return jsonify(success=False, error=str(e)), 500
+
 @bp.route('/media/plex/sessions/terminate', methods=['POST'])
 @login_required
 @csrf.exempt
 @permission_required('kill_stream')
 def terminate_plex_session():
-    """Terminate a Plex session"""
+    """Legacy endpoint for Plex session termination - redirects to universal endpoint"""
+    # Redirect to the new universal endpoint for backward compatibility
     session_key = request.form.get('session_key')
     message = request.form.get('message', None)
-
-    if not session_key:
-        current_app.logger.error("API terminate_plex_session: Missing 'session_key'.")
-        return jsonify(success=False, error="Session key is required."), 400
-
-    try:
-        plex_servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX)
-        if not plex_servers:
-            return jsonify(success=False, error="Plex service not found."), 500
-        
-        # Use the first active Plex server
-        plex_service = MediaServiceFactory.create_service_from_db(plex_servers[0])
-        if not plex_service:
-            return jsonify(success=False, error="Plex service not found."), 500
-
-        success = plex_service.terminate_session(session_key, message)
-        if success:
-            return jsonify(success=True, message=f"Termination command sent for session {session_key}.")
-        else:
-            return jsonify(success=False, error="Failed to send termination command (Plex connection issue?)."), 500
-    except Exception as e:
-        current_app.logger.error(f"API terminate_plex_session: Exception: {e}", exc_info=True)
-        return jsonify(success=False, error=str(e)), 500
+    
+    # Create new form data for the universal endpoint
+    from werkzeug.datastructures import ImmutableMultiDict
+    new_form_data = ImmutableMultiDict([
+        ('session_key', session_key),
+        ('service_type', 'plex'),
+        ('message', message)
+    ])
+    
+    # Replace the form data and call the universal endpoint
+    request.form = new_form_data
+    return terminate_session()
 
 # =============================================================================
 # STREAMING API

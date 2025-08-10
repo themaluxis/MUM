@@ -131,13 +131,15 @@
 
       <!-- Form -->
       <form id="confirmTerminateForm" 
-            hx-post="{{ url_for('api.terminate_plex_session') }}"
+            hx-post="{{ url_for('api.terminate_session') }}"
             hx-target="#terminate-status-message"
             hx-swap="innerHTML"
             hx-indicator="#terminate-session-loader"
             class="space-y-4">
             
         <input type="hidden" name="session_key" id="terminate_session_key_input">
+        <input type="hidden" name="service_type" id="terminate_service_type_input">
+        <input type="hidden" name="server_name" id="terminate_server_name_input">
 
         <!-- Message Input Section -->
         <div class="space-y-3">
@@ -198,9 +200,11 @@
 {{ super() }}
 <script>
 
-function openTerminateSessionModal(sessionKey, userName, mediaTitle) {
+function openTerminateSessionModal(sessionKey, userName, mediaTitle, serviceType, serverName) {
     const modal = document.getElementById('terminate_session_modal');
     const sessionKeyInput = document.getElementById('terminate_session_key_input');
+    const serviceTypeInput = document.getElementById('terminate_service_type_input');
+    const serverNameInput = document.getElementById('terminate_server_name_input');
     const userNameSpan = document.getElementById('terminate-user-name');
     const mediaTitleSpan = document.getElementById('terminate-media-title');
     const messageInput = document.getElementById('terminate_message_input');
@@ -239,8 +243,10 @@ function openTerminateSessionModal(sessionKey, userName, mediaTitle) {
         });
     }
 
-    if (modal && sessionKeyInput && userNameSpan && mediaTitleSpan && messageInput && statusMessageDiv) {
+    if (modal && sessionKeyInput && serviceTypeInput && serverNameInput && userNameSpan && mediaTitleSpan && messageInput && statusMessageDiv) {
         sessionKeyInput.value = sessionKey;
+        serviceTypeInput.value = serviceType || 'plex';
+        serverNameInput.value = serverName || '';
         userNameSpan.textContent = userName || 'Unknown User';
         mediaTitleSpan.textContent = mediaTitle || 'Unknown Media';
         messageInput.value = ''; // Clear previous message
