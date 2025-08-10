@@ -485,7 +485,7 @@ def update_user_last_streamed_by_id(user_id: int, last_streamed_at_datetime: dat
         user.updated_at = datetime.utcnow().replace(tzinfo=None)
         try: 
             db.session.commit()
-            current_app.logger.info(f"User_Service.py - update_user_last_streamed_by_id(): Updated last_streamed_at for {user.get_display_name()} to {user.last_streamed_at}")
+            # Updated user last streamed timestamp
             return True
         except Exception as e: 
             db.session.rollback()

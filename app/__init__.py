@@ -100,7 +100,7 @@ def create_app(config_name=None):
             except Exception as e_fh:
                 app.logger.error(f"Init.py - create_app(): Failed to configure file logging: {e_fh}")
     
-    app.logger.info(f'Init.py - create_app(): Multimedia User Manager starting with log level: {log_level_name}')
+    app.logger.info(f'Multimedia User Manager starting (log level: {log_level_name})')
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -147,25 +147,19 @@ def create_app(config_name=None):
             try:
                 scheduler.init_app(app)
                 scheduler.start(paused=app.config.get('SCHEDULER_PAUSED_ON_START', False))
-                app.logger.info("Init.py - create_app(): APScheduler successfully started.")
+                app.logger.info("APScheduler started successfully")
                 
                 is_werkzeug_main_process = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
                 should_schedule_tasks = False
 
                 if is_werkzeug_main_process:
                     should_schedule_tasks = True
-                    app.logger.debug("Init.py - Task Scheduling Check: Running with Flask reloader (WERKZEUG_RUN_MAIN=true). Will attempt to schedule.")
                 elif not app.testing: # Not Flask's reloader, and not testing (e.g., Gunicorn worker or direct python run.py)
                     should_schedule_tasks = True
-                    app.logger.debug("Init.py - Task Scheduling Check: Not Werkzeug main process and not testing. Will attempt to schedule.")
                 else: 
-                    app.logger.debug("Init.py - Task Scheduling Check: In testing mode or other non-scheduling context. Skipping task scheduling.")
-
-                app.logger.debug(f"Init.py - Task Scheduling Check - Values: WERKZEUG_RUN_MAIN='{os.environ.get('WERKZEUG_RUN_MAIN')}', app.debug={app.debug}, app.testing={app.testing}")
-                app.logger.debug(f"Init.py - Task Scheduling Check - Decision: should_schedule_tasks = {should_schedule_tasks}")
+                    should_schedule_tasks = False
 
                 if should_schedule_tasks:
-                    app.logger.info("Init.py - Task Scheduling Check: Condition MET. Attempting to schedule tasks.")
                     with app.app_context():
                         engine_conn_scheduler = None
                         try:
@@ -173,7 +167,7 @@ def create_app(config_name=None):
                             if db.engine.dialect.has_table(engine_conn_scheduler, Setting.__tablename__):
                                 from .services import task_service 
                                 task_service.schedule_all_tasks()
-                                app.logger.info("Init.py - Successfully called task_service.schedule_all_tasks().")
+                                app.logger.info("Scheduled background tasks successfully.")
                             else:
                                 app.logger.warning("Init.py - Settings table not found when trying to schedule tasks; task scheduling that depends on DB settings is skipped.")
                         except Exception as e_task_sched:
@@ -182,12 +176,12 @@ def create_app(config_name=None):
                             if engine_conn_scheduler:
                                 engine_conn_scheduler.close()
                 else:
-                    app.logger.info("Init.py - Task Scheduling Check: Condition NOT MET. Skipping call to task_service.schedule_plex_session_monitoring().")
+                    pass  # Task scheduling skipped for this worker
 
             except Exception as e_scheduler_init:
                 app.logger.error(f"Init.py - Failed to initialize/start APScheduler or prepare for task scheduling: {e_scheduler_init}", exc_info=True)
         else:
-            app.logger.info("Init.py - create_app(): APScheduler already running (or SCHEDULER_API_ENABLED is false).")
+            app.logger.info("APScheduler already running")
 
     app.jinja_env.filters['format_datetime_human'] = helpers.format_datetime_human
     app.jinja_env.filters['time_ago'] = helpers.time_ago
@@ -252,7 +246,7 @@ def create_app(config_name=None):
         g.plex_url = None; g.app_base_url = None
         g.discord_oauth_enabled_for_invite = False; g.setup_complete = False 
 
-        current_app.logger.debug(f"Init.py - before_request_tasks(): Endpoint: {request.endpoint}, Path: {request.path if request else 'No request object'}")
+        # Debug endpoint tracking removed for cleaner logs
 
         try:
             engine_conn_br = None; settings_table_exists = False; admin_table_exists = False
@@ -288,15 +282,15 @@ def create_app(config_name=None):
                         Plugin.servers_count > 0
                     ).all()
                     plugins_configured = len(enabled_plugins_with_servers) > 0
-                    current_app.logger.debug(f"Init.py - before_request_tasks(): Found {len(enabled_plugins_with_servers)} enabled plugins with servers")
+                    # Plugin count logging removed for cleaner logs
                 except Exception as e:
                     current_app.logger.warning(f"Could not check plugin status: {e}")
                     plugins_configured = False
                 
-                current_app.logger.debug(f"Init.py - before_request_tasks(): Setup status: admin={admin_account_present}, plugins={plugins_configured}, app={app_config_done} -> Overall setup_complete={g.setup_complete}")
+                # Setup status logging removed for cleaner logs
             else: 
                 g.setup_complete = False
-                current_app.logger.debug("Init.py - before_request_tasks(): Settings table not found. g.setup_complete forced to False.")
+                # Settings table status logging removed for cleaner logs
         except Exception as e_g_hydrate:
             current_app.logger.error(f"Init.py - before_request_tasks(): Error hydrating g values: {e_g_hydrate}", exc_info=True)
         
@@ -328,7 +322,7 @@ def create_app(config_name=None):
            not any(request.endpoint.startswith(prefix) or request.endpoint == prefix.rstrip('.') 
                   for prefix in setup_allowed_endpoints):
             
-            current_app.logger.debug(f"Init.py - before_request_tasks(): Setup not complete, current endpoint '{request.endpoint}' requires redirect to setup.")
+            # Setup redirect logging removed for cleaner logs
             try:
                 # Re-check table existence for redirection logic, as it's critical
                 engine_conn_sr, admin_table_exists_sr_redir, settings_table_exists_sr_redir = None, False, False
@@ -360,10 +354,7 @@ def create_app(config_name=None):
                 db.session.close()  # Close current session to ensure fresh data
                 enabled_plugins = Plugin.query.filter(Plugin.status == PluginStatus.ENABLED).all()
                 plugins_configured = len(enabled_plugins) > 0
-                current_app.logger.debug(f"Init.py - before_request_tasks(): Found {len(enabled_plugins)} enabled plugins, plugins_configured={plugins_configured}")
-                if enabled_plugins:
-                    for p in enabled_plugins:
-                        current_app.logger.debug(f"Init.py - before_request_tasks(): Plugin {p.plugin_id} is enabled with {p.servers_count} servers")
+                # Plugin status logging removed for cleaner logs
             except Exception as e:
                 current_app.logger.error(f"Init.py - before_request_tasks(): Error checking plugins configuration: {e}")
                 plugins_configured = False
@@ -389,7 +380,7 @@ def create_app(config_name=None):
                 # This prevents bypassing the lockdown via any route (users, invites, dashboard, etc.)
                 should_redirect = (not request.endpoint or request.endpoint not in allowed_endpoints)
                 
-                current_app.logger.debug(f"Init.py - before_request_tasks(): Endpoint '{request.endpoint}', should_redirect={should_redirect}")
+                # Plugin redirect logging removed for cleaner logs
                 
                 if should_redirect:
                     current_app.logger.info(f"Init.py - before_request_tasks(): No plugins enabled, blocking access to '{request.endpoint}', redirecting to plugins settings.")

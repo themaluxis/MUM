@@ -111,7 +111,7 @@ def log_event(event_type, message: str, details: dict = None, # Removed type hin
 
         db.session.add(log_entry)
         db.session.commit()
-        current_app.logger.info(f"Event logged: {event_type.name} - {message}")
+        # Event logged to database
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error logging event (original: {event_type.name} - {message}): {e}")

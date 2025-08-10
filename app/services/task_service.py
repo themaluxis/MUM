@@ -40,19 +40,13 @@ def monitor_media_sessions_task():
             # Handle both Plex and Jellyfin session formats
             current_sessions_dict = {}
             for session in active_sessions:
-                # Debug logging to understand session structure
-                session_type = "dict" if isinstance(session, dict) else "object"
-                current_app.logger.debug(f"Processing {session_type} session: {type(session)}")
-                
+                # Extract session key based on session type
                 if isinstance(session, dict):
                     # Jellyfin session (dict format)
                     session_key = session.get('Id')
-                    current_app.logger.debug(f"Jellyfin session key: {session_key}")
                 else:
                     # Plex session (object format)
                     session_key = getattr(session, 'sessionKey', None)
-                    current_app.logger.debug(f"Plex session key: {session_key}")
-                    current_app.logger.debug(f"Plex session attributes: {[attr for attr in dir(session) if not attr.startswith('_')]}")
                 
                 if session_key:
                     current_sessions_dict[session_key] = session
@@ -60,9 +54,6 @@ def monitor_media_sessions_task():
                     current_app.logger.warning(f"Session missing key: {session_type} - {type(session)}")
             
             current_session_keys = set(current_sessions_dict.keys())
-            
-            current_app.logger.debug(f"Current session keys: {list(current_session_keys)}")
-            current_app.logger.debug(f"Previously tracked session keys: {list(_active_stream_sessions.keys())}")
 
             # Step 1: Check for stopped streams
             stopped_session_keys = set(_active_stream_sessions.keys()) - current_session_keys
@@ -95,9 +86,7 @@ def monitor_media_sessions_task():
                     jellyfin_username = session.get('UserName')
                     if jellyfin_username:
                         mum_user = User.query.filter_by(primary_username=jellyfin_username).first()
-                        if mum_user:
-                            current_app.logger.debug(f"Found MUM user ID {mum_user.id} for Jellyfin user '{jellyfin_username}'")
-                        else:
+                        if not mum_user:
                             current_app.logger.warning(f"No MUM user found for Jellyfin username '{jellyfin_username}'. Skipping session.")
                             continue
                     else:
@@ -128,9 +117,7 @@ def monitor_media_sessions_task():
                         current_app.logger.warning(f"Could not extract user ID from Plex session {session_key}. Skipping.")
                         continue
                 
-                # Log session type for debugging
-                session_type = "Plex" if hasattr(session, 'player') else "Jellyfin"
-                current_app.logger.debug(f"Processing {session_type} session {session_key} for user '{mum_user.get_display_name()}' (MUM ID: {mum_user.id})")
+                # Process session for user
 
                 # If the session is new, create the history record
                 if session_key not in _active_stream_sessions:
@@ -218,7 +205,6 @@ def monitor_media_sessions_task():
                                 current_offset_s = int(position_ticks / 10000000) if position_ticks else 0  # Convert ticks to seconds
                             
                             history_record.view_offset_at_end_seconds = current_offset_s
-                            current_app.logger.debug(f"Updated progress for ongoing session {session_key} to {current_offset_s}s.")
                         else:
                             current_app.logger.warning(f"Could not find existing StreamHistory record with ID {history_record_id} for ongoing session {session_key}.")
                     else:
@@ -235,7 +221,7 @@ def monitor_media_sessions_task():
 
             # Commit all changes for this cycle
             db.session.commit()
-            current_app.logger.info("--- Plex Session Monitor Task Finished ---")
+            current_app.logger.info("--- Media Session Monitor Task Finished ---")
             
         except Exception as e:
             db.session.rollback()
@@ -247,35 +233,17 @@ def check_user_access_expirations_task():
     This version correctly compares naive datetimes to ensure accuracy.
     """
     with scheduler.app.app_context():
-        current_app.logger.info("Task_Service: Running check_user_access_expirations_task...")
-        
-        # Enhanced debugging
+        # Check for expired users
         now_naive = datetime.utcnow()
-        current_app.logger.info(f"Task_Service: Current UTC time (naive): {now_naive}")
-        
-        # First, let's see all users with expiration dates
-        all_users_with_expiry = User.query.filter(User.access_expires_at.isnot(None)).all()
-        current_app.logger.info(f"Task_Service: Found {len(all_users_with_expiry)} users with expiration dates:")
-        
-        for user in all_users_with_expiry:
-            expiry_date = user.access_expires_at
-            is_expired = expiry_date <= now_naive
-            time_diff = (expiry_date - now_naive).total_seconds() if expiry_date else None
-            current_app.logger.info(f"  - User '{user.get_display_name()}' (ID: {user.id}): expires {expiry_date} | Expired: {is_expired} | Time diff: {time_diff}s")
-        
-        # Now get actually expired users
         expired_users = User.query.filter(
             User.access_expires_at.isnot(None), 
             User.access_expires_at <= now_naive
         ).all()
-        
-        current_app.logger.info(f"Task_Service: Query returned {len(expired_users)} expired users")
 
         if not expired_users:
-            current_app.logger.info("Task_Service: No users found with expired access.")
             return
 
-        current_app.logger.info(f"Task_Service: Found {len(expired_users)} user(s) with expired access. Processing removals...")
+        current_app.logger.info(f"Found {len(expired_users)} expired users, processing removals...")
         
         system_admin_id = None
         try:
@@ -283,9 +251,9 @@ def check_user_access_expirations_task():
             admin = AdminAccount.query.first()
             if admin:
                 system_admin_id = admin.id
-            current_app.logger.debug(f"Task_Service: Using system_admin_id: {system_admin_id}")
+            pass
         except Exception as e_admin:
-            current_app.logger.warning(f"Task_Service: Could not fetch admin_id for logging expiration task: {e_admin}")
+            current_app.logger.warning(f"Could not fetch admin_id for logging expiration task: {e_admin}")
 
         removal_count = 0
         for user in expired_users:
@@ -294,11 +262,11 @@ def check_user_access_expirations_task():
             original_expiry_for_log = user.access_expires_at
             
             try:
-                current_app.logger.info(f"Task_Service: Processing expired user '{username_for_log}' (MUM ID: {mum_user_id_for_log}). Expiry: {original_expiry_for_log}. Removing...")
+                current_app.logger.info(f"Removing expired user '{username_for_log}' (expired: {original_expiry_for_log})")
                 
                 # Check if user_service.delete_user_from_mum_and_plex exists
                 if not hasattr(user_service, 'delete_user_from_mum_and_plex'):
-                    current_app.logger.error(f"Task_Service: user_service.delete_user_from_mum_and_plex method not found!")
+                    current_app.logger.error(f"user_service.delete_user_from_mum_and_plex method not found!")
                     continue
                 
                 user_service.delete_user_from_mum_and_plex(user_id=mum_user_id_for_log, admin_id=system_admin_id)
@@ -311,10 +279,10 @@ def check_user_access_expirations_task():
                     admin_id=system_admin_id, 
                     details={"reason": "Automated removal: invite access duration expired."}
                 )
-                current_app.logger.info(f"Task_Service: Successfully removed expired user '{username_for_log}'")
+                current_app.logger.info(f"Successfully removed expired user '{username_for_log}'")
                 
             except Exception as e:
-                current_app.logger.error(f"Task_Service: Error removing expired user '{username_for_log}' (MUM ID: {mum_user_id_for_log}): {e}", exc_info=True)
+                current_app.logger.error(f"Error removing expired user '{username_for_log}': {e}", exc_info=True)
                 log_event(
                     EventType.ERROR_GENERAL,
                     f"Task failed to remove expired user '{username_for_log}': {e}",
@@ -322,7 +290,7 @@ def check_user_access_expirations_task():
                     admin_id=system_admin_id
                 )
         
-        current_app.logger.info(f"Task_Service: User access expiration check complete. Removed: {removal_count}/{len(expired_users)} users.")
+        current_app.logger.info(f"User expiration check complete. Removed: {removal_count}/{len(expired_users)} users.")
 
 # Add this helper function to check scheduler status
 def debug_scheduler_status():
@@ -370,10 +338,10 @@ def _schedule_job_if_not_exists_or_reschedule(job_id, func, trigger_type, **trig
         if existing_job:
             # Simple reschedule, more complex trigger comparison might be needed if triggers vary widely
             scheduler.reschedule_job(job_id, trigger=trigger_type, **trigger_args)
-            current_app.logger.info(f"Task_Service: Rescheduled job '{job_id}' with trigger {trigger_type} and args {trigger_args}.")
+            current_app.logger.info(f"Rescheduled task: {job_id}")
         else:
             scheduler.add_job(id=job_id, func=func, trigger=trigger_type, **trigger_args)
-            current_app.logger.info(f"Task_Service: ADDED new job '{job_id}' with trigger {trigger_type} and args {trigger_args}.")
+            current_app.logger.info(f"Scheduled task: {job_id}")
         return True
     except Exception as e:
         current_app.logger.error(f"Task_Service: Error adding/rescheduling job '{job_id}': {e}", exc_info=True)
@@ -386,22 +354,15 @@ def _schedule_job_if_not_exists_or_reschedule(job_id, func, trigger_type, **trig
 
 def schedule_all_tasks():
     """Schedules all recurring tasks defined in the application."""
-    current_app.logger.info("Task_Service: Attempting to schedule all defined tasks...")
-
     # Get the session monitoring interval from settings
     try:
-        # Get session monitoring interval from settings (matches the key used in settings.py)
         interval_str = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', '30')
-        current_app.logger.info(f"TASK SERVICE: Raw session monitoring setting from DB: '{interval_str}' (type: {type(interval_str)})")
         session_interval_seconds = int(interval_str)
-        current_app.logger.info(f"TASK SERVICE: Converted to int: {session_interval_seconds} seconds")
         if session_interval_seconds < 10: # Enforce minimum
-             current_app.logger.warning(f"TASK SERVICE: Session monitoring interval '{session_interval_seconds}' too low, using 10s.")
              session_interval_seconds = 10
-        current_app.logger.info(f"TASK SERVICE: Final session monitoring interval: {session_interval_seconds} seconds")
     except (ValueError, TypeError) as e:
         session_interval_seconds = 30
-        current_app.logger.warning(f"TASK SERVICE: Invalid SESSION_MONITORING_INTERVAL_SECONDS '{interval_str}': {e}. Defaulting to {session_interval_seconds}s.")
+        current_app.logger.warning(f"Invalid session monitoring interval, using default: {session_interval_seconds}s")
 
     # 1. Media Session Monitoring (Plex, Jellyfin, etc.)
     if _schedule_job_if_not_exists_or_reschedule(
@@ -411,16 +372,14 @@ def schedule_all_tasks():
         seconds=session_interval_seconds,
         next_run_time=datetime.now(timezone.utc) + timedelta(seconds=10) # Start shortly after app start
     ):
-        log_event(EventType.APP_STARTUP, f"Media session monitoring task (re)scheduled (Interval: {session_interval_seconds}s).")
+        log_event(EventType.APP_STARTUP, f"Media session monitoring scheduled ({session_interval_seconds}s interval)")
 
-    # 2. User Access Expiration Check - NOW USES SAME INTERVAL AS SESSION MONITORING
+    # 2. User Access Expiration Check
     if _schedule_job_if_not_exists_or_reschedule(
         job_id='check_user_expirations',
         func=check_user_access_expirations_task,
         trigger_type='interval',
-        seconds=session_interval_seconds,  # CHANGED: Now uses same interval as session monitoring
-        next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30) # Start 30 seconds after app start (offset from session monitoring)
+        seconds=session_interval_seconds,
+        next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30)
     ):
-        log_event(EventType.APP_STARTUP, f"User access expiration check task (re)scheduled (Interval: {session_interval_seconds}s - same as session monitoring).")
-
-    current_app.logger.info("Task_Service: Finished attempting to schedule all tasks.")
+        log_event(EventType.APP_STARTUP, f"User expiration check scheduled ({session_interval_seconds}s interval)")

@@ -107,7 +107,7 @@ class BaseMediaService(ABC):
     
     def log_info(self, message: str):
         """Helper method for logging"""
-        current_app.logger.info(f"[{self.service_type.value.upper()}:{self.name}] {message}")
+        current_app.logger.debug(f"[{self.service_type.value.upper()}:{self.name}] {message}")
     
     def log_error(self, message: str, exc_info: bool = False):
         """Helper method for error logging"""

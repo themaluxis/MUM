@@ -434,7 +434,7 @@ class PlexMediaService(BaseMediaService):
 
                     # Convert XML to a dictionary
                     sessions_dict = xmltodict.parse(ET.tostring(raw_data))
-                    self.log_info(f"RAW_PLEX_SESSIONS_DATA: {json.dumps(sessions_dict, indent=2)}")
+                    # DON'T DELETE, USE FOR DEBUGGING self.log_info(f"RAW_PLEX_SESSIONS_DATA: {json.dumps(sessions_dict, indent=2)}")
 
             except Exception as log_e:
                 self.log_warning(f"Could not log raw session data: {log_e}")

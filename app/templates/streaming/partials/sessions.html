@@ -46,7 +46,7 @@
                 <div class="flex items-start space-x-3">
                     {# Poster Column #}
                     <div class="avatar flex-shrink-0">
-                        <div class="w-16 h-24 rounded">
+                        <div class="w-24 h-32 rounded">
                             {% if session.thumb_url %}
                                 <img src="{{ session.thumb_url }}" alt="{{ session.media_title }} Poster" 
                                      onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_media_thumb.png') }}';" 
