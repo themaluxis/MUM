@@ -91,40 +91,89 @@
 
 <!-- Terminate Session Modal -->
 <dialog id="terminate_session_modal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box">
-    <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" type="button" onclick="terminate_session_modal.close()">✕</button>
-    </form>
-    <h3 class="font-bold text-lg text-error"><i class="fa-solid fa-ban mr-2"></i>Terminate Session</h3>
-    <p class="py-2 text-sm">Are you sure you want to terminate the session for <strong id="terminate-user-name">user</strong> playing <strong id="terminate-media-title">media</strong>?</p>
-    
-    <form id="confirmTerminateForm" 
-          hx-post="{{ url_for('api.terminate_plex_session') }}"
-          hx-target="#terminate-status-message" {# For messages within the modal #}
-          hx-swap="innerHTML"
-          hx-indicator="#terminate-session-loader">
-          
-        <input type="hidden" name="session_key" id="terminate_session_key_input">
-        {# CSRF token will be added by app.js htmx:configRequest if not exempt #}
-        {# Or add <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> if API route is not exempt #}
+  <div class="modal-box max-w-lg bg-base-100 border border-base-300 shadow-2xl p-0">
+    <!-- Header -->
+    <div class="flex items-center justify-between p-6 border-b border-base-300">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center">
+          <i class="fa-solid fa-ban text-error text-lg"></i>
+        </div>
+        <div>
+          <h3 class="text-xl font-semibold text-base-content">Terminate Session</h3>
+          <p class="text-sm text-base-content/60">End an active streaming session</p>
+        </div>
+      </div>
+      <form method="dialog">
+        <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </form>
+    </div>
 
-        <div class="form-control mt-4">
-          <label class="label" for="terminate_message_input">
-            <span class="label-text">Optional message for user:</span>
-          </label>
-          <textarea id="terminate_message_input" name="message" class="textarea textarea-bordered h-20" placeholder="e.g., Server maintenance starting soon."></textarea>
+    <!-- Content -->
+    <div class="p-6">
+      <!-- Warning Info Card -->
+      <div class="bg-error/10 rounded-lg p-4 mb-6 border border-error/20">
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-full bg-error/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i class="fa-solid fa-exclamation-triangle text-error text-sm"></i>
+          </div>
+          <div>
+            <h4 class="font-medium text-base-content mb-1">Confirm Session Termination</h4>
+            <p class="text-sm text-base-content/70 leading-relaxed">
+              Are you sure you want to terminate the session for 
+              <strong id="terminate-user-name">user</strong> playing 
+              <strong id="terminate-media-title">media</strong>?
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <form id="confirmTerminateForm" 
+            hx-post="{{ url_for('api.terminate_plex_session') }}"
+            hx-target="#terminate-status-message"
+            hx-swap="innerHTML"
+            hx-indicator="#terminate-session-loader"
+            class="space-y-4">
+            
+        <input type="hidden" name="session_key" id="terminate_session_key_input">
+
+        <!-- Message Input Section -->
+        <div class="space-y-3">
+          <h4 class="font-medium text-base-content text-lg mb-3">Optional Message</h4>
+          
+          <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center gap-2 mb-2">
+              <i class="fa-solid fa-message text-info text-sm"></i>
+              <h5 class="font-medium text-base-content">Message for User</h5>
+            </div>
+            <textarea 
+              id="terminate_message_input" 
+              name="message" 
+              class="textarea textarea-bordered w-full resize-none"
+              rows="3"
+              placeholder="e.g., Server maintenance starting soon."></textarea>
+            <p class="text-sm text-base-content/60 mt-2">This message will be displayed to the user when their session is terminated</p>
+          </div>
         </div>
 
-        <div id="terminate-status-message" class="text-xs my-2 min-h-[1em]"></div>
+        <!-- Status Message -->
+        <div id="terminate-status-message" class="min-h-[1em]"></div>
 
-        <div class="modal-action mt-4">
-          <button type="button" class="btn btn-ghost" onclick="terminate_session_modal.close()">Cancel</button>
-          <button type="submit" class="btn btn-error">
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+          <button type="button" class="btn btn-ghost" onclick="terminate_session_modal.close()">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-error gap-2">
             <span id="terminate-session-loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
-            Confirm Termination
+            <i class="fa-solid fa-ban htmx-indicator-hide"></i>
+            <span class="htmx-indicator-hide">Terminate Session</span>
           </button>
         </div>
-    </form>
+      </form>
+    </div>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
