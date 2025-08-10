@@ -154,7 +154,7 @@ def monitor_media_sessions_task():
                         product = session.get('ApplicationVersion', 'N/A')
                         player_title = session.get('DeviceName', 'N/A')
                         ip_address = session.get('RemoteEndPoint', 'N/A')
-                        is_lan = session.get('IsLocal', True)  # Jellyfin uses IsLocal
+                        is_lan = session.get('IsLocal', True)  # Jellyfin's IsLocal field indicates local connection
                         media_title = now_playing.get('Name', "Unknown")
                         media_type = now_playing.get('Type', "Unknown")
                         grandparent_title = now_playing.get('SeriesName', None)

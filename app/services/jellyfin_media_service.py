@@ -634,8 +634,8 @@ class JellyfinMediaService(BaseMediaService):
                 is_transcoding = play_state.get('PlayMethod') == 'Transcode'
                 
                 location_ip = raw_session.get('RemoteEndPoint', 'N/A')
-                is_lan = not raw_session.get('IsLocal', True)  # Jellyfin logic might be inverted
-                location_lan_wan = "LAN" if is_lan else "WAN"
+                is_local = raw_session.get('IsLocal', True)  # Jellyfin's IsLocal field
+                location_lan_wan = "LAN" if is_local else "WAN"
                 
                 # Find MUM user by username for Jellyfin
                 mum_user = mum_users_map_by_username.get(user_name)
@@ -810,7 +810,7 @@ class JellyfinMediaService(BaseMediaService):
                     'audio_detail': audio_detail,
                     'subtitle_detail': subtitle_detail,
                     'location_detail': f"{location_lan_wan}: {location_ip}",
-                    'is_public_ip': not is_lan,
+                    'is_public_ip': not is_local,
                     'location_ip': location_ip,
                     'bandwidth_detail': f"Streaming via {location_lan_wan}",
                     'bitrate_calc': bitrate_calc,
