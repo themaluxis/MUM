@@ -3862,8 +3862,20 @@
       border-color: color-mix(in oklab, var(--color-primary) 30%, transparent);
     }
   }
+  .border-success\/20 {
+    border-color: var(--color-success);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-success) 20%, transparent);
+    }
+  }
   .border-transparent {
     border-color: transparent;
+  }
+  .border-warning\/20 {
+    border-color: var(--color-warning);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-warning) 20%, transparent);
+    }
   }
   .border-warning\/30 {
     border-color: var(--color-warning);
@@ -4069,6 +4081,12 @@
   .bg-success {
     background-color: var(--color-success);
   }
+  .bg-success\/10 {
+    background-color: var(--color-success);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-success) 10%, transparent);
+    }
+  }
   .bg-success\/20 {
     background-color: var(--color-success);
     @supports (color: color-mix(in lab, red, red)) {
@@ -4223,6 +4241,15 @@
     :where(th, td) {
       padding-inline: calc(0.25rem * 3);
       padding-block: calc(0.25rem * 2);
+    }
+  }
+  .table-xs {
+    :not(thead, tfoot) tr {
+      font-size: 0.6875rem;
+    }
+    :where(th, td) {
+      padding-inline: calc(0.25rem * 2);
+      padding-block: calc(0.25rem * 1);
     }
   }
   .badge-sm {
@@ -4947,6 +4974,11 @@
   .group-focus\:opacity-100 {
     &:is(:where(.group):focus *) {
       opacity: 100%;
+    }
+  }
+  .last\:mb-0 {
+    &:last-child {
+      margin-bottom: calc(var(--spacing) * 0);
     }
   }
   .hover\:border-\[\#4752C4\] {

@@ -1,0 +1,143 @@
+<!-- File: app/templates/libraries/partials/libraries_content.html -->
+{% if libraries_by_service %}
+    {% if use_simple_layout %}
+    <!-- Simple Layout for Single Server -->
+    <div class="card bg-base-200 shadow-xl">
+        <div class="card-body">
+            <div class="overflow-x-auto w-full">
+                <table class="table table-zebra w-full min-w-max">
+                    <thead>
+                        <tr>
+                            <th class="min-w-32">Library Name</th>
+                            <th class="min-w-32">Server</th>
+                            <th class="min-w-24">Library Type</th>
+                            <th class="min-w-20">Total Items</th>
+                            <th class="min-w-16">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lib in simple_libraries %}
+                        <tr class="hover">
+                            <td class="font-semibold">{{ lib.name }}</td>
+                            <td>
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-semibold">
+                                        <i class="fa-solid fa-server mr-2 text-base-content/60"></i>{{ lib.server_name }}
+                                    </span>
+                                    <span class="badge badge-ghost badge-sm">{{ lib.service_type }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge badge-outline badge-sm">{{ lib.type }}</span>
+                            </td>
+                            <td>{{ lib.item_count if lib.item_count else 'N/A' }}</td>
+                            <td>
+                                <button class="btn btn-xs btn-outline btn-ghost" 
+                                        data-library-name="{{ lib.name }}"
+                                        data-server-name="{{ lib.server_name }}"
+                                        data-library-id="{{ loop.index0 }}"
+                                        data-service-type="{{ lib.service_type | default('unknown') }}"
+                                        onclick="showLibraryRawData(this)">
+                                    <i class="fa-solid fa-info"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Multi-Server Layout -->
+    {% for service_type, service_data in libraries_by_service.items() %}
+    <div class="card bg-base-200 shadow-xl mb-6">
+        <div class="card-body">
+            <h2 class="card-title text-xl mb-4">
+                <i class="fa-solid fa-server mr-2"></i>
+                {{ service_data.service_display_name }} 
+                <span class="badge badge-primary">{{ service_data.total_libraries }} libraries</span>
+            </h2>
+            
+            {% for server_name, server_data in service_data.servers.items() %}
+            <div class="mb-6 last:mb-0">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-semibold flex items-center">
+                        <i class="fa-solid fa-database mr-2 text-base-content/60"></i>
+                        {{ server_name }}
+                        {% if server_data.needs_sync %}
+                        <span class="badge badge-warning badge-sm ml-2">Needs Sync</span>
+                        {% elif server_data.online %}
+                        <span class="badge badge-success badge-sm ml-2">{{ server_data.libraries|length }} libraries</span>
+                        {% else %}
+                        <span class="badge badge-error badge-sm ml-2">Offline</span>
+                        {% endif %}
+                    </h3>
+                </div>
+                
+                {% if server_data.libraries %}
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra table-sm">
+                        <thead>
+                            <tr>
+                                <th>Library Name</th>
+                                <th>Type</th>
+                                <th>Items</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lib in server_data.libraries %}
+                            <tr class="hover">
+                                <td class="font-semibold">{{ lib.name }}</td>
+                                <td>
+                                    <span class="badge badge-outline badge-xs">{{ lib.type or 'Unknown' }}</span>
+                                </td>
+                                <td>{{ lib.item_count if lib.item_count else 'N/A' }}</td>
+                                <td>
+                                    <button class="btn btn-xs btn-outline btn-ghost" 
+                                            data-library-name="{{ lib.name }}"
+                                            data-server-name="{{ lib.server_name }}"
+                                            data-library-id="{{ loop.index0 }}"
+                                            data-service-type="{{ lib.service_type | default('unknown') }}"
+                                            onclick="showLibraryRawData(this)">
+                                        <i class="fa-solid fa-info"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% elif server_data.needs_sync %}
+                <div class="alert alert-warning">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    <span>No library data available. Click "Sync Libraries" to fetch from this server.</span>
+                </div>
+                {% elif not server_data.online %}
+                <div class="alert alert-error">
+                    <i class="fa-solid fa-exclamation-circle"></i>
+                    <span>Server appears to be offline or unreachable.</span>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fa-solid fa-info-circle"></i>
+                    <span>No libraries found on this server.</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+{% else %}
+<div class="card bg-base-200 shadow-xl">
+    <div class="card-body">
+        <div class="text-center py-8">
+            <p class="text-lg">No libraries found on any connected servers.</p>
+            <p class="text-sm text-base-content/60 mt-2">Make sure your media servers are configured and online, then click "Sync Libraries".</p>
+        </div>
+    </div>
+</div>
+{% endif %}

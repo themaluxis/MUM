@@ -6,16 +6,16 @@
     <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">Managed Users ({{ users_count or 0 }})</h1>
         <div class="flex items-center space-x-2 mt-4 sm:mt-0">
-            <button class="btn btn-secondary" 
+            <button id="sync-users-btn" class="btn btn-secondary" 
                     hx-post="{{ url_for('users.sync_all_users') }}"
                     hx-target="#sync-noop-target"
                     hx-swap="innerHTML"
-                    hx-on::before-request="showSyncLoading()"
-                    hx-on::after-request="hideSyncLoading()"
+                    hx-on::before-request="showUserSyncLoading()"
+                    hx-on::after-request="hideUserSyncLoading()"
                     title="Refresh user list from all enabled services"> 
-                <span class="sync-loader htmx-indicator loading loading-spinner loading-xs mr-2"></span>
-                <span class="sync-icon default-icon-state"><i class="fa-solid fa-sync mr-2"></i></span>
-                <span class="sync-text">Sync Users</span>
+                <span id="user-sync-spinner" class="loading loading-spinner loading-xs mr-2 htmx-indicator"></span>
+                <i class="fa-solid fa-sync mr-2 htmx-indicator-hide"></i>
+                Sync Users
             </button>
             <span id="sync-noop-target"></span>
 
