@@ -65,7 +65,7 @@
         <!-- Content -->
         <div class="p-6">
             <!-- Info Card -->
-            <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300/50">
+            <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
                 <div class="flex items-start gap-3">
                     <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <i class="fa-solid fa-info text-info text-sm"></i>
@@ -206,27 +206,39 @@ function showLibraryRawData(button) {
         
         console.log('Modal debug:', { libraryName, serverName, libraryId, serviceType });
         
-        // Get the raw data from the JSON script tag
-        const dataScript = document.getElementById('library-data-' + libraryId);
-        let rawData = {};
-        
-        if (dataScript) {
-            try {
-                rawData = JSON.parse(dataScript.textContent);
-                console.log('Raw data keys:', Object.keys(rawData));
-                console.log('Raw data sample:', rawData);
-            } catch (parseError) {
-                console.error('Error parsing library data:', parseError);
-                rawData = { error: 'Could not parse library data', original: dataScript.textContent };
-            }
-        } else {
-            console.error('No data script found for library-data-' + libraryId);
-        }
-        
+        // Update modal with basic info
         document.getElementById('modal_library_name').textContent = libraryName || 'Unknown';
         document.getElementById('modal_server_name').textContent = serverName || 'Unknown';
-        document.getElementById('modal_raw_data').textContent = JSON.stringify(rawData, null, 2);
+        
+        // Show loading state
+        const rawDataElement = document.getElementById('modal_raw_data');
+        rawDataElement.textContent = 'Loading raw library data...';
+        
+        // Show the modal
         document.getElementById('library_raw_data_modal').showModal();
+        
+        // For now, show the stored database information
+        const dbData = {
+            library_info: {
+                name: libraryName,
+                server_name: serverName,
+                library_id: libraryId,
+                service_type: serviceType
+            },
+            note: "Raw API data is not currently stored in the database.",
+            suggestion: "To view full raw data, check your media server's admin interface or API documentation.",
+            stored_fields: [
+                "name",
+                "library_type", 
+                "item_count",
+                "last_scanned",
+                "external_id",
+                "server_id"
+            ]
+        };
+        
+        rawDataElement.textContent = JSON.stringify(dbData, null, 2);
+        
     } catch (error) {
         console.error('Error showing library raw data:', error);
         alert('Error displaying library data: ' + error.message);
