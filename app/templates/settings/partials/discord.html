@@ -99,10 +99,30 @@
             </div>
 
             <div id="discord_bot_dependent_fields" class="{{ '' if form.enable_discord_bot.data else 'hidden' }} space-y-4">
-                <div class="form-control w-full"> {{ form.discord_bot_token.label(class="label") }} {{ form.discord_bot_token(class="input input-bordered " + ("input-error" if form.discord_bot_token.errors else ""), placeholder="Enter new token or leave blank if already saved") }} <p class="text-xs text-base-content/60 mt-1">{{ form.discord_bot_token.description }}</p> {% if form.discord_bot_token.errors %}{% for e in form.discord_bot_token.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %} </div>
-                <div class="form-control w-full"> {{ form.discord_monitored_role_id.label(class="label whitespace-normal") }} {{ form.discord_monitored_role_id(class="input input-bordered " + ("input-error" if form.discord_monitored_role_id.errors else "")) }} <p class="text-xs text-base-content/60 mt-1">{{ form.discord_monitored_role_id.description }}</p> {% if form.discord_monitored_role_id.errors %}{% for e in form.discord_monitored_role_id.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %} </div>
-                <div class="form-control w-full"> {{ form.discord_thread_channel_id.label(class="label whitespace-normal") }} {{ form.discord_thread_channel_id(class="input input-bordered " + ("input-error" if form.discord_thread_channel_id.errors else "")) }} <p class="text-xs text-base-content/60 mt-1">{{ form.discord_thread_channel_id.description }}</p> {% if form.discord_thread_channel_id.errors %}{% for e in form.discord_thread_channel_id.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %} </div>
-                <div class="form-control w-full"> {{ form.discord_bot_log_channel_id.label(class="label whitespace-normal") }} {{ form.discord_bot_log_channel_id(class="input input-bordered " + ("input-error" if form.discord_bot_log_channel_id.errors else "")) }} <p class="text-xs text-base-content/60 mt-1">{{ form.discord_bot_log_channel_id.description }}</p> {% if form.discord_bot_log_channel_id.errors %}{% for e in form.discord_bot_log_channel_id.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %} </div>
+                <div class="form-control w-full">
+                    {{ form.discord_bot_token.label(class="label") }}
+                    {{ form.discord_bot_token(class="input input-bordered " + ("input-error" if form.discord_bot_token.errors else ""), placeholder="Enter new token or leave blank if already saved") }}
+                    <p class="text-xs text-base-content/60 mt-1">{{ form.discord_bot_token.description }}</p>
+                    {% if form.discord_bot_token.errors %}{% for e in form.discord_bot_token.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %}
+                </div>
+                <div class="form-control w-full">
+                    {{ form.discord_monitored_role_id.label(class="label whitespace-normal") }}
+                    {{ form.discord_monitored_role_id(class="input input-bordered " + ("input-error" if form.discord_monitored_role_id.errors else "")) }}
+                    <p class="text-xs text-base-content/60 mt-1">{{ form.discord_monitored_role_id.description }}</p>
+                    {% if form.discord_monitored_role_id.errors %}{% for e in form.discord_monitored_role_id.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %}
+                </div>
+                <div class="form-control w-full">
+                    {{ form.discord_thread_channel_id.label(class="label whitespace-normal") }}
+                    {{ form.discord_thread_channel_id(class="input input-bordered " + ("input-error" if form.discord_thread_channel_id.errors else "")) }}
+                    <p class="text-xs text-base-content/60 mt-1">{{ form.discord_thread_channel_id.description }}</p>
+                    {% if form.discord_thread_channel_id.errors %}{% for e in form.discord_thread_channel_id.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %}
+                </div>
+                <div class="form-control w-full">
+                    {{ form.discord_bot_log_channel_id.label(class="label whitespace-normal") }}
+                    {{ form.discord_bot_log_channel_id(class="input input-bordered " + ("input-error" if form.discord_bot_log_channel_id.errors else "")) }}
+                    <p class="text-xs text-base-content/60 mt-1">{{ form.discord_bot_log_channel_id.description }}</p>
+                    {% if form.discord_bot_log_channel_id.errors %}{% for e in form.discord_bot_log_channel_id.errors %}<p class="text-error text-xs mt-1">{{e}}</p>{% endfor %}{% endif %}
+                </div>
                 <div class="form-control w-full">
                     <label class="label cursor-pointer justify-start">
                         {{ form.discord_bot_whitelist_sharers(class="toggle toggle-info mr-3") }}

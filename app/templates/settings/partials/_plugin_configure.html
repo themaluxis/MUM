@@ -460,14 +460,88 @@ function closeRawServerInfoModal() {
 }
 
 function copyRawServerInfo() {
-    const content = document.getElementById('rawServerInfoContent').querySelector('code');
-    if (content && content.textContent) {
-        navigator.clipboard.writeText(content.textContent).then(function() {
-            // You could add a toast notification here
-            console.log('Raw server info copied to clipboard');
-        }, function(err) {
-            console.error('Could not copy text: ', err);
-        });
+    const contentElement = document.getElementById('rawServerInfoContent').querySelector('code');
+    if (contentElement && contentElement.textContent) {
+        const textToCopy = contentElement.textContent;
+        
+        // Try modern clipboard API first
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showServerInfoCopySuccess();
+            }).catch(err => {
+                console.error('Clipboard API failed:', err);
+                fallbackCopyServerInfo(textToCopy);
+            });
+        } else {
+            // Fallback for older browsers or non-secure contexts
+            fallbackCopyServerInfo(textToCopy);
+        }
+    }
+}
+
+function fallbackCopyServerInfo(text) {
+    try {
+        // Create a temporary textarea element
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        
+        // Select and copy the text
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+            showServerInfoCopySuccess();
+        } else {
+            showServerInfoCopyError();
+        }
+    } catch (err) {
+        console.error('Fallback copy failed:', err);
+        showServerInfoCopyError();
+    }
+}
+
+function showServerInfoCopySuccess() {
+    const copyButton = document.querySelector('button[onclick="copyRawServerInfo()"]');
+    if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+        copyButton.classList.add('btn-success');
+        copyButton.classList.remove('btn-secondary');
+        
+        setTimeout(() => {
+            copyButton.innerHTML = originalHTML;
+            copyButton.classList.remove('btn-success');
+            copyButton.classList.add('btn-secondary');
+        }, 2000);
+    }
+}
+
+function showServerInfoCopyError() {
+    const copyButton = document.querySelector('button[onclick="copyRawServerInfo()"]');
+    if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Copy Failed';
+        copyButton.classList.add('btn-error');
+        copyButton.classList.remove('btn-secondary');
+        
+        setTimeout(() => {
+            copyButton.innerHTML = originalHTML;
+            copyButton.classList.remove('btn-error');
+            copyButton.classList.add('btn-secondary');
+        }, 2000);
+        
+        // Also show the text in a prompt as a last resort
+        const contentElement = document.getElementById('rawServerInfoContent').querySelector('code');
+        if (contentElement && contentElement.textContent) {
+            prompt('Copy failed. Please manually copy this text:', contentElement.textContent);
+        }
     }
 }
 

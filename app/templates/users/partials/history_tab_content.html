@@ -1,4 +1,13 @@
 <!-- File: app/templates/users/_history_tab_content.html -->
+{% set user_services = user_service_types.get(user.id, []) if user_service_types else [] %}
+{% set service_values = [] %}
+{% for st in user_services %}
+    {% set _ = service_values.append(st.value) %}
+{% endfor %}
+{% set is_kavita_user = user_service_types and user_service_types.get(user.id) and 'kavita' in service_values %}
+
+{# Use the same table format for all users, but with different headers for Kavita users #}
+    <!-- Regular Stream History for non-Kavita users -->
 {# Expects 'user' and 'history_logs' (pagination object) in context #}
 
 <form id="history-delete-form"
@@ -20,14 +29,25 @@
                     <th class="w-10 text-center">
                         <input type="checkbox" id="history-select-all" class="checkbox checkbox-sm" title="Select All">
                     </th>
-                    <th>Media Title</th>
-                    <th>Player / Platform</th>
-                    <th>IP Address</th>
-                    <th>Started</th>
-                    <th>Paused</th>
-                    <th>Stopped</th>
-                    <th>Duration</th>
-                    <th>Progress</th>
+                    {% if is_kavita_user %}
+                        <th>Book / Chapter</th>
+                        <th>Reader / Platform</th>
+                        <th>IP Address</th>
+                        <th>Started Reading</th>
+                        <th>Paused</th>
+                        <th>Stopped Reading</th>
+                        <th>Reading Time</th>
+                        <th>Progress</th>
+                    {% else %}
+                        <th>Media Title</th>
+                        <th>Player / Platform</th>
+                        <th>IP Address</th>
+                        <th>Started</th>
+                        <th>Paused</th>
+                        <th>Stopped</th>
+                        <th>Duration</th>
+                        <th>Progress</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>

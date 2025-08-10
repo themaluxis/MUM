@@ -351,14 +351,53 @@ def view_user(user_id):
     user.last_known_ip = last_ip if last_ip else 'N/A'
     
     stream_history_pagination = None
+    kavita_reading_stats = None
+    kavita_reading_history = None
+    
     if tab == 'history':
         page = request.args.get('page', 1, type=int)
-        # The session monitor now handles logging active streams directly to the DB.
-        # We can just query the table and order by started_at to see the latest,
-        # which will include any active streams (where stopped_at is NULL).
-        stream_history_pagination = StreamHistory.query.filter_by(user_id=user.id)\
-            .order_by(StreamHistory.started_at.desc())\
-            .paginate(page=page, per_page=15, error_out=False)
+        
+        # Check if this is a Kavita user and get reading data
+        is_kavita_user = False
+        kavita_user_id = None
+        
+        current_app.logger.info(f"DEBUG KAVITA HISTORY: Checking user {user.id} for Kavita access")
+        current_app.logger.info(f"DEBUG KAVITA HISTORY: User access records: {[(access.server.name, access.server.service_type.value, access.external_user_id) for access in user_access_records]}")
+        
+        for access in user_access_records:
+            if access.server.service_type.value == 'kavita':
+                is_kavita_user = True
+                kavita_user_id = access.external_user_id
+                current_app.logger.info(f"DEBUG KAVITA HISTORY: Found Kavita user! Server: {access.server.name}, External User ID: {kavita_user_id}")
+                break
+        
+        current_app.logger.info(f"DEBUG KAVITA HISTORY: Is Kavita user: {is_kavita_user}, User ID: {kavita_user_id}")
+        
+        if is_kavita_user and kavita_user_id:
+            # Get Kavita reading data
+            try:
+                from app.services.media_service_factory import MediaServiceFactory
+                kavita_server = None
+                for access in user_access_records:
+                    if access.server.service_type.value == 'kavita':
+                        kavita_server = access.server
+                        break
+                
+                if kavita_server:
+                    service = MediaServiceFactory.create_service_from_db(kavita_server)
+                    if service:
+                        kavita_reading_stats = service.get_user_reading_stats(kavita_user_id)
+                        kavita_reading_history = service.get_user_reading_history(kavita_user_id)
+                        current_app.logger.info(f"DEBUG KAVITA HISTORY: Stats: {kavita_reading_stats}")
+                        current_app.logger.info(f"DEBUG KAVITA HISTORY: History: {kavita_reading_history}")
+            except Exception as e:
+                current_app.logger.error(f"Error fetching Kavita reading data: {e}")
+        
+        if not is_kavita_user:
+            # For non-Kavita users, use regular stream history
+            stream_history_pagination = StreamHistory.query.filter_by(user_id=user.id)\
+                .order_by(StreamHistory.started_at.desc())\
+                .paginate(page=page, per_page=15, error_out=False)
             
     # Get user service types for service-aware display
     user_service_types = {}
@@ -372,7 +411,10 @@ def view_user(user_id):
     if request.headers.get('HX-Request') and tab == 'history':
         return render_template('users/partials/history_tab_content.html', 
                              user=user, 
-                             history_logs=stream_history_pagination)
+                             history_logs=stream_history_pagination,
+                             kavita_reading_stats=kavita_reading_stats,
+                             kavita_reading_history=kavita_reading_history,
+                             user_service_types=user_service_types)
         
     return render_template(
         'users/profile.html',
@@ -380,6 +422,8 @@ def view_user(user_id):
         user=user,
         form=form,
         history_logs=stream_history_pagination,
+        kavita_reading_stats=kavita_reading_stats,
+        kavita_reading_history=kavita_reading_history,
         active_tab=tab,
         is_admin=AdminAccount.query.filter_by(plex_uuid=user.plex_uuid).first() is not None if user.plex_uuid else False,
         stream_stats=stream_stats,

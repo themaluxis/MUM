@@ -1,6 +1,7 @@
 # File: app/services/kavita_media_service.py
 from typing import List, Dict, Any, Optional, Tuple
 import requests
+import requests.exceptions
 import time
 import hashlib
 from app.services.base_media_service import BaseMediaService
@@ -116,15 +117,22 @@ class KavitaMediaService(BaseMediaService):
         url = f"{self.url.rstrip('/')}/api/{endpoint.lstrip('/')}"
         headers = self._get_headers()
         
+        # Log the request details for debugging
+        self.log_info(f"Making {method} request to: {url}")
+        
         try:
             if method == 'GET':
-                response = requests.get(url, headers=headers, timeout=10)
+                response = requests.get(url, headers=headers, timeout=15)
             elif method == 'POST':
-                response = requests.post(url, headers=headers, json=data, timeout=10)
+                response = requests.post(url, headers=headers, json=data, timeout=15)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, timeout=10)
+                response = requests.delete(url, headers=headers, timeout=15)
             else:
                 raise ValueError(f"Unsupported method: {method}")
+            
+            self.log_info(f"Response status: {response.status_code}")
+            self.log_info(f"Response headers: {dict(response.headers)}")
+            self.log_info(f"Response content length: {len(response.content)}")
             
             response.raise_for_status()
             
@@ -141,7 +149,8 @@ class KavitaMediaService(BaseMediaService):
             
             # Handle empty responses or non-JSON responses
             if not response.content:
-                return {}
+                self.log_warning(f"Empty response from endpoint: {endpoint}")
+                return {} if method == 'GET' else None
             
             # For Health endpoint, it might return plain text instead of JSON
             if endpoint.lower() == 'health':
@@ -167,6 +176,27 @@ class KavitaMediaService(BaseMediaService):
                         "content_type": response.headers.get('Content-Type', 'Unknown'),
                         "status_code": response.status_code
                     }
+            # For Stats endpoints, handle empty responses gracefully
+            elif 'stats/' in endpoint.lower():
+                try:
+                    return response.json()
+                except ValueError:
+                    self.log_warning(f"Stats endpoint returned empty or invalid JSON: '{response.text[:100]}...'")
+                    # Return appropriate empty structure based on endpoint
+                    if '/read' in endpoint.lower():
+                        return {
+                            "totalPagesRead": 0,
+                            "totalWordsRead": 0,
+                            "timeSpentReading": 0,
+                            "chaptersRead": 0,
+                            "lastActive": None,
+                            "avgHoursPerWeekSpentReading": 0,
+                            "percentReadPerLibrary": []
+                        }
+                    elif 'reading-history' in endpoint.lower():
+                        return []
+                    else:
+                        return {}
             else:
                 return response.json()
                 
@@ -416,6 +446,81 @@ class KavitaMediaService(BaseMediaService):
     def get_formatted_sessions(self) -> List[Dict[str, Any]]:
         """Get active Kavita sessions formatted for display - Kavita doesn't have real-time sessions"""
         return []
+
+    def get_user_reading_stats(self, user_id: str) -> Dict[str, Any]:
+        """Get reading statistics for a Kavita user"""
+        try:
+            self.log_info(f"Fetching reading stats for Kavita user {user_id}")
+            
+            # Check if Stats endpoints are supported by testing server info first
+            server_info = self.get_server_info()
+            version = server_info.get('version', 'Unknown')
+            self.log_info(f"Kavita server version: {version}")
+            
+            # Stats endpoints were added in Kavita v0.7+, but let's try anyway
+            stats = self._make_request(f'Stats/user/{user_id}/read')
+            self.log_info(f"Reading stats response: {stats}")
+            
+            # Check if we got an HTML response (indicates endpoint doesn't exist)
+            if isinstance(stats, dict) and 'error' not in stats:
+                return stats
+            else:
+                self.log_warning(f"Stats endpoint returned error or HTML - not supported in this Kavita version")
+                return {
+                    "totalPagesRead": 0,
+                    "totalWordsRead": 0,
+                    "timeSpentReading": 0,
+                    "chaptersRead": 0,
+                    "lastActive": None,
+                    "avgHoursPerWeekSpentReading": 0,
+                    "percentReadPerLibrary": [],
+                    "error": "Stats not supported in this Kavita version"
+                }
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                self.log_warning(f"Reading stats endpoint not found (404) - this Kavita version might not support stats")
+                return {"error": "Stats endpoint not available"}
+            else:
+                self.log_error(f"HTTP error fetching reading stats for user {user_id}: {e}")
+                return {}
+        except Exception as e:
+            self.log_error(f"Error fetching reading stats for user {user_id}: {e}")
+            return {}
+    
+    def get_user_reading_history(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get reading history for a Kavita user"""
+        try:
+            self.log_info(f"Fetching reading history for Kavita user {user_id}")
+            
+            # Try with userId as query parameter first
+            try:
+                history = self._make_request(f'Stats/user/reading-history?userId={user_id}')
+                self.log_info(f"Reading history response (query param): {history}")
+                if history and isinstance(history, list):
+                    return history
+                elif isinstance(history, dict) and 'error' in history:
+                    self.log_warning(f"Reading history endpoint returned error - not supported in this Kavita version")
+                    return []
+            except Exception as e:
+                self.log_warning(f"Query parameter approach failed: {e}")
+            
+            # If that doesn't work, try with userId in the path
+            try:
+                history = self._make_request(f'Stats/user/{user_id}/reading-history')
+                self.log_info(f"Reading history response (path param): {history}")
+                if isinstance(history, list):
+                    return history
+                elif isinstance(history, dict) and 'error' in history:
+                    self.log_warning(f"Reading history endpoint returned error - not supported in this Kavita version")
+                    return []
+                else:
+                    return []
+            except Exception as e:
+                self.log_warning(f"Path parameter approach failed: {e}")
+                return []
+        except Exception as e:
+            self.log_error(f"Error fetching reading history for user {user_id}: {e}")
+            return []
 
     def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
         """Get GeoIP information for a given IP address."""

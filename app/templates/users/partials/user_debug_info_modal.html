@@ -121,15 +121,88 @@
 
 <script>
 function copyUserRawData(userId) {
-    const content = document.getElementById('userRawDataContent-' + userId);
-    if (content) {
-        const text = content.textContent || content.innerText;
-        navigator.clipboard.writeText(text).then(function() {
-            // You could add a toast notification here
-            console.log('Raw user data copied to clipboard');
-        }, function(err) {
-            console.error('Could not copy text: ', err);
-        });
+    const contentElement = document.querySelector(`#userRawDataContent-${userId} pre code`);
+    if (contentElement) {
+        const textToCopy = contentElement.textContent;
+        
+        // Try modern clipboard API first
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showUserDataCopySuccess(userId);
+            }).catch(err => {
+                console.error('Clipboard API failed:', err);
+                fallbackCopyUserData(textToCopy, userId);
+            });
+        } else {
+            // Fallback for older browsers or non-secure contexts
+            fallbackCopyUserData(textToCopy, userId);
+        }
+    }
+}
+
+function fallbackCopyUserData(text, userId) {
+    try {
+        // Create a temporary textarea element
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        
+        // Select and copy the text
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+            showUserDataCopySuccess(userId);
+        } else {
+            showUserDataCopyError(userId);
+        }
+    } catch (err) {
+        console.error('Fallback copy failed:', err);
+        showUserDataCopyError(userId);
+    }
+}
+
+function showUserDataCopySuccess(userId) {
+    const copyButton = document.querySelector(`button[onclick="copyUserRawData('${userId}')"]`);
+    if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+        copyButton.classList.add('btn-success');
+        copyButton.classList.remove('btn-secondary', 'btn-outline');
+        
+        setTimeout(() => {
+            copyButton.innerHTML = originalHTML;
+            copyButton.classList.remove('btn-success');
+            copyButton.classList.add('btn-secondary');
+        }, 2000);
+    }
+}
+
+function showUserDataCopyError(userId) {
+    const copyButton = document.querySelector(`button[onclick="copyUserRawData('${userId}')"]`);
+    if (copyButton) {
+        const originalHTML = copyButton.innerHTML;
+        copyButton.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Copy Failed';
+        copyButton.classList.add('btn-error');
+        copyButton.classList.remove('btn-secondary', 'btn-outline');
+        
+        setTimeout(() => {
+            copyButton.innerHTML = originalHTML;
+            copyButton.classList.remove('btn-error');
+            copyButton.classList.add('btn-secondary');
+        }, 2000);
+        
+        // Also show the text in a prompt as a last resort
+        const contentElement = document.querySelector(`#userRawDataContent-${userId} pre code`);
+        if (contentElement) {
+            prompt('Copy failed. Please manually copy this text:', contentElement.textContent);
+        }
     }
 }
 </script>
