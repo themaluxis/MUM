@@ -59,7 +59,7 @@
         </div>
         <div class="p-4">
             <div class="mockup-code bg-base-300/50 border border-base-300" id="userRawDataContent-{{ user.id }}">
-                <pre class="text-xs"><code>{% if user.raw_service_data.startswith('{') %}{{ user.raw_service_data | format_json }}{% else %}{{ user.raw_service_data }}{% endif %}</code></pre>
+                <pre class="text-xs text-base-content"><code>{% if user.raw_service_data.startswith('{') %}{{ user.raw_service_data | format_json }}{% else %}{{ user.raw_service_data }}{% endif %}</code></pre>
             </div>
         </div>
     </div>

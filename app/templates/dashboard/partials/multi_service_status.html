@@ -1,7 +1,27 @@
 {# File: app/templates/dashboard/partials/multi_service_status.html #}
 {# Expects 'server_status' (dict) in context #}
 
-{% if not server_status %}
+{% if server_status and server_status.loading %}
+    {# Loading state - show spinner while fetching status #}
+    <div class="flex flex-row gap-3 items-center">
+        <div class="self-start p-3 rounded-md bg-base-300 text-base-content/60">
+            <span class="loading loading-spinner loading-lg"></span>
+        </div>
+        <div class="flex flex-col">
+            <h2 class="card-title text-base-content/70 text-sm font-normal mb-px">Media Server Status</h2>
+            <p class="text-sm text-base-content/70">Loading server status...</p>
+            {% if server_status.server_count > 0 %}
+                <p class="text-xs text-base-content/60">{{ server_status.server_count }} server{{ 's' if server_status.server_count != 1 else '' }} configured</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-actions justify-end mt-4">
+        <a href="{{ url_for('plugin_management.index') }}" class="btn btn-xs btn-outline btn-ghost">
+            <i class="fa-solid fa-sliders mr-1"></i> Configure
+        </a>
+    </div>
+
+{% elif not server_status %}
     {# Case where no servers are configured at all #}
     <div class="flex flex-row gap-3 items-center">
         <div class="self-start p-3 rounded-md bg-base-300 text-base-content/60"><i class="fa-solid fa-server fa-2x"></i></div>
@@ -31,7 +51,7 @@
         </div>
     </div>
     <div class="card-actions justify-end mt-4">
-        <button class="btn btn-xs btn-outline btn-ghost" onclick="all_servers_status_modal.showModal()">
+        <button class="btn btn-xs btn-outline btn-ghost" onclick="openAllServersModal()">
             <i class="fa-solid fa-eye mr-1"></i> View All
         </button>
     </div>

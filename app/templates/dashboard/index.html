@@ -46,7 +46,10 @@
             </div>
         </a>
         <div class="card bg-base-200 shadow-xl">
-            <div class="card-body justify-between" id="server_status_card_content">
+            <div class="card-body justify-between" id="server_status_card_content"
+                 hx-get="{{ url_for('api.get_dashboard_server_status') }}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
                 {% include 'dashboard/partials/multi_service_status.html' with context %}
             </div>
         </div>
@@ -124,6 +127,18 @@
 {% block scripts %}
 {{ super() }}
 <script>
+// Function to open the all servers modal and trigger HTMX load
+function openAllServersModal() {
+    // Show the modal
+    all_servers_status_modal.showModal();
+    
+    // Trigger HTMX to load the modal content
+    const modalContent = document.getElementById('all_servers_modal_content');
+    if (modalContent) {
+        htmx.trigger(modalContent, 'modal-opened');
+    }
+}
+
 // Any specific JS for the dashboard, if needed.
 // For example, if you wanted to auto-refresh the Plex status every X seconds:
 /*

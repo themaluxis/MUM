@@ -9,8 +9,108 @@ from app.extensions import csrf, db
 from app.models_media_services import ServiceType
 from app.services.media_service_factory import MediaServiceFactory
 from app.services.media_service_manager import MediaServiceManager
+import time
 
 bp = Blueprint('api', __name__)
+
+# Simple cache for server status data
+_server_status_cache = {
+    'data': None,
+    'timestamp': 0,
+    'ttl': 300  # 5 minutes TTL
+}
+
+def get_cached_server_status():
+    """Get cached server status data or fetch fresh if expired"""
+    current_time = time.time()
+    
+    # Check if cache is valid
+    if (_server_status_cache['data'] is not None and 
+        current_time - _server_status_cache['timestamp'] < _server_status_cache['ttl']):
+        current_app.logger.debug("Using cached server status data")
+        return _server_status_cache['data']
+    
+    # Cache is expired or empty, fetch fresh data
+    current_app.logger.debug("Fetching fresh server status data")
+    server_status_data = _fetch_server_status()
+    
+    # Update cache
+    _server_status_cache['data'] = server_status_data
+    _server_status_cache['timestamp'] = current_time
+    
+    return server_status_data
+
+def _fetch_server_status():
+    """Fetch server status data from all servers"""
+    all_servers = MediaServiceManager.get_all_servers(active_only=True)
+    server_count = len(all_servers)
+    server_status_data = {}
+
+    if server_count == 1:
+        server = all_servers[0]
+        service = MediaServiceFactory.create_service_from_db(server)
+        if service:
+            server_status_data = service.get_server_info()
+            server_status_data['server_id'] = server.id
+            server_status_data['name'] = server.name
+            server_status_data['service_type'] = server.service_type.value
+    elif server_count > 1:
+        online_count = 0
+        offline_count = 0
+        all_server_statuses = []
+        servers_by_service = {}
+        
+        for server in all_servers:
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service:
+                status = service.get_server_info()
+                # Extract the actual server name BEFORE overriding the 'name' field
+                actual_server_name = status.get('name', server.name)
+                
+                status['server_id'] = server.id
+                status['custom_name'] = server.name  # Custom nickname from app
+                status['actual_server_name'] = actual_server_name  # Actual server name from service
+                status['name'] = server.name  # Override with custom name for backward compatibility
+                status['service_type'] = server.service_type.value
+                all_server_statuses.append(status)
+                
+                # Group by service type for categorized display
+                service_type = server.service_type.value
+                if service_type not in servers_by_service:
+                    servers_by_service[service_type] = {
+                        'service_name': service_type.title(),
+                        'servers': [],
+                        'online_count': 0,
+                        'offline_count': 0,
+                        'total_count': 0
+                    }
+                
+                servers_by_service[service_type]['servers'].append(status)
+                servers_by_service[service_type]['total_count'] += 1
+                
+                if status.get('online'):
+                    online_count += 1
+                    servers_by_service[service_type]['online_count'] += 1
+                else:
+                    offline_count += 1
+                    servers_by_service[service_type]['offline_count'] += 1
+                    
+        server_status_data = {
+            'multi_server': True,
+            'online_count': online_count,
+            'offline_count': offline_count,
+            'all_statuses': all_server_statuses,
+            'servers_by_service': servers_by_service
+        }
+    
+    return server_status_data
+
+def invalidate_server_status_cache():
+    """Invalidate the server status cache to force fresh data on next request"""
+    global _server_status_cache
+    _server_status_cache['data'] = None
+    _server_status_cache['timestamp'] = 0
+    current_app.logger.debug("Server status cache invalidated")
 
 # =============================================================================
 # SYSTEM HEALTH
@@ -72,12 +172,39 @@ def check_server_status(server_id):
     # Force a reconnect attempt
     service._get_server_instance(force_reconnect=True) 
     
+    # Invalidate cache since we're forcing a fresh check
+    invalidate_server_status_cache()
+    
     # Then, retrieve the status that was just updated by the call above.
     server_status_for_htmx = service.get_server_info()
     current_app.logger.debug(f"Api.py - check_server_status(): Status after forced check: {server_status_for_htmx}")
             
     # Render the partial template with the fresh status data.
     return render_template('dashboard/partials/plex_status_card.html', plex_server_status=server_status_for_htmx)
+
+@bp.route('/dashboard/server-status', methods=['GET'])
+@login_required
+def get_dashboard_server_status():
+    """Get server status for dashboard - loads asynchronously using cached data"""
+    current_app.logger.debug("Api.py - get_dashboard_server_status(): Loading server status for dashboard")
+    
+    # Use cached server status data
+    server_status_data = get_cached_server_status()
+    current_app.logger.debug(f"Api.py - get_dashboard_server_status(): Server status from cache: {server_status_data}")
+
+    return render_template('dashboard/partials/multi_service_status.html', server_status=server_status_data)
+
+@bp.route('/dashboard/all-servers-modal', methods=['GET'])
+@login_required
+def get_all_servers_modal():
+    """Get all servers status for modal - uses cached data from dashboard"""
+    current_app.logger.debug("Api.py - get_all_servers_modal(): Loading all servers status for modal")
+    
+    # Use the same cached data as the dashboard
+    server_status_data = get_cached_server_status()
+    current_app.logger.debug(f"Api.py - get_all_servers_modal(): Server status for modal from cache: {server_status_data}")
+
+    return render_template('components/modals/all_servers_status_modal_content.html', server_status=server_status_data)
 
 @bp.route('/servers/<int:server_id>/libraries', methods=['GET'])
 @login_required
