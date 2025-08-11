@@ -13,38 +13,9 @@ import time
 
 bp = Blueprint('api', __name__)
 
-# Simple cache for server status data
-_server_status_cache = {
-    'data': None,
-    'timestamp': 0,
-    'ttl': 300  # 5 minutes TTL
-}
-
-def get_cached_server_status():
-    """Get cached server status data or fetch fresh if expired"""
-    current_app.logger.warning("API: get_cached_server_status() called - checking cache")
-    current_time = time.time()
-    
-    # Check if cache is valid
-    if (_server_status_cache['data'] is not None and 
-        current_time - _server_status_cache['timestamp'] < _server_status_cache['ttl']):
-        current_app.logger.debug("API: Using cached server status data")
-        return _server_status_cache['data']
-    
-    # Cache is expired or empty, fetch fresh data
-    current_app.logger.warning("API: Cache expired/empty, fetching fresh server status data - THIS WILL MAKE API CALLS")
-    server_status_data = _fetch_server_status()
-    
-    # Update cache
-    _server_status_cache['data'] = server_status_data
-    _server_status_cache['timestamp'] = current_time
-    current_app.logger.debug("API: Server status cache updated")
-    
-    return server_status_data
-
-def _fetch_server_status():
-    """Fetch server status data from all servers"""
-    current_app.logger.warning("API: _fetch_server_status() called - THIS WILL MAKE API CALLS TO ALL SERVERS")
+def get_fresh_server_status():
+    """Fetch fresh server status data from all servers - NO CACHING"""
+    current_app.logger.info("API: get_fresh_server_status() called - fetching real-time server status")
     all_servers = MediaServiceManager.get_all_servers(active_only=True)
     server_count = len(all_servers)
     current_app.logger.debug(f"API: Found {server_count} servers to check status")
@@ -114,12 +85,7 @@ def _fetch_server_status():
     
     return server_status_data
 
-def invalidate_server_status_cache():
-    """Invalidate the server status cache to force fresh data on next request"""
-    global _server_status_cache
-    _server_status_cache['data'] = None
-    _server_status_cache['timestamp'] = 0
-    current_app.logger.debug("Server status cache invalidated")
+# Server status cache functions removed - now using real-time data
 
 # =============================================================================
 # SYSTEM HEALTH
@@ -178,9 +144,6 @@ def check_server_status(server_id):
     # Force a reconnect attempt
     service._get_server_instance(force_reconnect=True) 
     
-    # Invalidate cache since we're forcing a fresh check
-    invalidate_server_status_cache()
-    
     # Then, retrieve the status that was just updated by the call above.
     server_status_for_htmx = service.get_server_info()
     current_app.logger.debug(f"Api.py - check_server_status(): Status after forced check: {server_status_for_htmx}")
@@ -191,43 +154,43 @@ def check_server_status(server_id):
 @bp.route('/dashboard/server-status', methods=['GET'])
 @login_required
 def get_dashboard_server_status():
-    """Get server status for dashboard - loads asynchronously using cached data"""
-    current_app.logger.warning("=== API ENDPOINT: /dashboard/server-status called ===")
-    current_app.logger.debug("Api.py - get_dashboard_server_status(): Loading server status for dashboard")
+    """Get server status for dashboard - loads asynchronously with real-time data"""
+    current_app.logger.info("=== API ENDPOINT: /dashboard/server-status called ===")
+    current_app.logger.debug("Api.py - get_dashboard_server_status(): Loading real-time server status for dashboard")
     
-    # Use cached server status data
-    server_status_data = get_cached_server_status()
-    current_app.logger.debug(f"Api.py - get_dashboard_server_status(): Server status from cache: {server_status_data}")
+    # Get fresh server status data (no caching)
+    server_status_data = get_fresh_server_status()
+    current_app.logger.debug(f"Api.py - get_dashboard_server_status(): Fresh server status: {server_status_data}")
 
     return render_template('dashboard/partials/multi_service_status.html', server_status=server_status_data)
 
 @bp.route('/dashboard/all-servers-modal', methods=['GET'])
 @login_required
 def get_all_servers_modal():
-    """Get all servers status for modal - uses cached data from dashboard"""
-    current_app.logger.warning("=== API ENDPOINT: /dashboard/all-servers-modal called ===")
-    current_app.logger.debug("Api.py - get_all_servers_modal(): Loading all servers status for modal")
+    """Get all servers status for modal - uses real-time data"""
+    current_app.logger.info("=== API ENDPOINT: /dashboard/all-servers-modal called ===")
+    current_app.logger.debug("Api.py - get_all_servers_modal(): Loading real-time server status for modal")
     
-    # Use the same cached data as the dashboard
-    server_status_data = get_cached_server_status()
-    current_app.logger.debug(f"Api.py - get_all_servers_modal(): Server status for modal from cache: {server_status_data}")
+    # Get fresh server status data (no caching)
+    server_status_data = get_fresh_server_status()
+    current_app.logger.debug(f"Api.py - get_all_servers_modal(): Fresh server status for modal: {server_status_data}")
 
     return render_template('components/modals/all_servers_status_modal_content.html', server_status=server_status_data)
 
 @bp.route('/dashboard/active-streams-count', methods=['GET'])
 @login_required
 def get_active_streams_count():
-    """Get active streams count for dashboard - loads asynchronously"""
-    current_app.logger.warning("=== API ENDPOINT: /dashboard/active-streams-count called ===")
-    current_app.logger.debug("Api.py - get_active_streams_count(): Loading active streams count for dashboard")
+    """Get active streams count for dashboard - real-time data, no caching"""
+    current_app.logger.info("=== API ENDPOINT: /dashboard/active-streams-count called ===")
+    current_app.logger.debug("Api.py - get_active_streams_count(): Loading real-time active streams count")
     
     active_streams_count = 0
     try:
-        current_app.logger.warning("API: Calling MediaServiceManager.get_all_active_sessions() for streams count")
+        current_app.logger.info("API: Fetching real-time active sessions from all servers")
         active_sessions_list = MediaServiceManager.get_all_active_sessions()
         if active_sessions_list:
             active_streams_count = len(active_sessions_list)
-        current_app.logger.debug(f"API: Active streams count: {active_streams_count}")
+        current_app.logger.debug(f"API: Real-time active streams count: {active_streams_count}")
     except Exception as e:
         current_app.logger.error(f"API: Failed to get active streams count: {e}")
     
@@ -579,58 +542,22 @@ def terminate_plex_session():
 @bp.route('/streaming/sessions/count')
 @login_required
 def get_session_count():
-    """Get the current count of active streaming sessions with server-side throttling"""
+    """Get the current count of active streaming sessions - real-time data, no caching"""
     try:
-        import time
+        current_app.logger.debug("API: Fetching real-time session count")
         
-        # Check if navbar stream badge is enabled
-        navbar_badge_enabled = Setting.get_bool('ENABLE_NAVBAR_STREAM_BADGE', False)
+        # Get active sessions from all services (no caching)
+        active_sessions_data = MediaServiceManager.get_all_active_sessions()
         
-        if navbar_badge_enabled:
-            # When navbar badge is enabled, use 5-second interval and always fetch fresh data
-            interval_seconds = 5
-            current_app.logger.debug(f"API: Navbar stream badge enabled, using 5s interval")
-        else:
-            # Use configured session monitoring interval
-            interval_str = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', '30')
-            try:
-                interval_seconds = int(interval_str)
-            except (ValueError, TypeError):
-                interval_seconds = 30
-            current_app.logger.debug(f"API: Using configured interval: {interval_seconds}s")
-        
-        # Check if we have cached session data that's still fresh
-        cache_key = 'last_session_check'
-        last_check_time = getattr(get_session_count, cache_key, 0)
-        current_time = time.time()
-        time_since_last_check = current_time - last_check_time
-        
-        current_app.logger.debug(f"API: Session count requested, {time_since_last_check:.1f}s since last check (interval: {interval_seconds}s)")
-        
-        # Only fetch fresh data if enough time has passed
-        if time_since_last_check >= interval_seconds:
-            current_app.logger.info(f"API: Fetching fresh session data ({time_since_last_check:.1f}s >= {interval_seconds}s)")
-            
-            # Get active sessions from all services
-            active_sessions_data = MediaServiceManager.get_all_active_sessions()
-            
-            # Count total sessions
-            total_sessions = len(active_sessions_data)
-            
-            # Cache the result and timestamp
-            setattr(get_session_count, cache_key, current_time)
-            setattr(get_session_count, 'cached_count', total_sessions)
-            
-        else:
-            # Use cached data
-            total_sessions = getattr(get_session_count, 'cached_count', 0)
-            current_app.logger.debug(f"API: Using cached session data: {total_sessions} sessions")
+        # Count total sessions
+        total_sessions = len(active_sessions_data)
+        current_app.logger.debug(f"API: Real-time session count: {total_sessions}")
         
         return jsonify({
             'success': True,
             'count': total_sessions,
-            'cached': time_since_last_check < interval_seconds,
-            'time_since_last_check': round(time_since_last_check, 1)
+            'cached': False,
+            'real_time': True
         })
     except Exception as e:
         current_app.logger.error(f"Error getting session count: {e}")

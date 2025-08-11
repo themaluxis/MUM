@@ -1,197 +1,89 @@
-[2025-08-10 20:27:12,922] WARNING in users: === USERS PAGE ROUTE START ===
-[2025-08-10 20:27:12,922] INFO in users: === USER LIST PERFORMANCE DEBUG ===
-[2025-08-10 20:27:12,922] INFO in users: Starting list_users() at 1754879232.9224203
-[2025-08-10 20:27:12,922] DEBUG in users: --- Entering list_users ---
-[2025-08-10 20:27:12,922] DEBUG in users: Request args: ImmutableMultiDict([('view', 'cards')])
-[2025-08-10 20:27:12,922] DEBUG in users: Is HTMX request: None
-[2025-08-10 20:27:12,923] DEBUG in users: current_user.id: 1
-[2025-08-10 20:27:12,923] DEBUG in users: Saved preferred view: 'cards'
-[2025-08-10 20:27:12,923] DEBUG in users: Final view_mode for rendering: 'cards'
-[2025-08-10 20:27:12,942] INFO in users: DB query setup took: 0.020s
-[2025-08-10 20:27:12,950] INFO in users: Pagination query took: 0.008s
-[2025-08-10 20:27:12,957] INFO in users: User stats fetching took: 0.007s
-[2025-08-10 20:27:12,966] INFO in users: User access records fetching took: 0.009s
-[2025-08-10 20:27:12,968] WARNING in users: 🚀 USERS PAGE: About to call get_cached_libraries_by_server() for 3 servers - MAY MAKE API CALLS
-[2025-08-10 20:27:12,968] INFO in users: 🚀 OPTIMIZATION: Using cached library data for 3 servers
-[2025-08-10 20:27:12,969] WARNING in users: === USERS PAGE: get_cached_libraries_by_server() called ===
-[2025-08-10 20:27:12,969] DEBUG in users: Users: Checking cache for server 'Plex++++' (key: server_1_libraries)
-[2025-08-10 20:27:12,969] WARNING in users: 🔄 Users: Cache expired/missing - Making API call to Plex++++ (plex) at http://192.168.68.56:32400
-[2025-08-10 20:27:12,969] WARNING in users: Users: Calling service.get_libraries() for Plex++++ - THIS IS AN API CALL
-[2025-08-10 20:27:13,500] DEBUG in users: Users: Got 6 libraries from Plex++++
-[2025-08-10 20:27:13,501] INFO in users: ✅ Users: Cached 6 libraries for Plex++++
-[2025-08-10 20:27:13,501] DEBUG in users: Users: Checking cache for server 'jellyttthhuuu' (key: server_2_libraries)
-[2025-08-10 20:27:13,501] WARNING in users: 🔄 Users: Cache expired/missing - Making API call to jellyttthhuuu (jellyfin) at http://192.168.68.56:8096
-[2025-08-10 20:27:13,501] WARNING in users: Users: Calling service.get_libraries() for jellyttthhuuu - THIS IS AN API CALL
-[2025-08-10 20:27:13,501] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Starting get_libraries() - fetching libraries from Jellyfin server
-[2025-08-10 20:27:13,501] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Making GET request to endpoint: Library/VirtualFolders
-[2025-08-10 20:27:13,501] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Initializing new Jellyfin client
-[2025-08-10 20:27:13,501] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connecting to Jellyfin server: http://192.168.68.56:8096
-[2025-08-10 20:27:13,501] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Client configured - SSL: False
-[2025-08-10 20:27:13,501] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Attempting to connect to Jellyfin server...
-connect_to_address http://192.168.68.56:8096 failed
-[2025-08-10 20:27:15,541] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connection established, attempting authentication...
-[2025-08-10 20:27:15,541] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Setting API token directly in client configuration
-[2025-08-10 20:27:15,541] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Authentication successful
-[2025-08-10 20:27:15,541] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Falling back to requests session with manual headers (client session is None or unavailable)
-[2025-08-10 20:27:15,541] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Full request URL: http://192.168.68.56:8096/Library/VirtualFolders
-[2025-08-10 20:27:15,541] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Request headers: {'User-Agent': 'python-requests/2.32.4', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'X-Emby-Token': 'cfea00f3...', 'Content-Type': 'application/json'}
-[2025-08-10 20:27:16,547] ERROR in base_media_service: [JELLYFIN:jellyttthhuuu] Request error for GET Library/VirtualFolders: HTTPConnectionPool(host='192.168.68.56', port=8096): Max retries exceeded with url: /Library/VirtualFolders (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7f1d0d2d1750>, 'Connection to 192.168.68.56 timed out. (connect timeout=1)'))
-[2025-08-10 20:27:16,547] ERROR in base_media_service: [JELLYFIN:jellyttthhuuu] Error fetching libraries: HTTPConnectionPool(host='192.168.68.56', port=8096): Max retries exceeded with url: /Library/VirtualFolders (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7f1d0d2d1750>, 'Connection to 192.168.68.56 timed out. (connect timeout=1)'))
-Traceback (most recent call last):
-  File "/usr/local/lib/python3.11/site-packages/urllib3/connection.py", line 198, in _new_conn
-    sock = connection.create_connection(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/urllib3/util/connection.py", line 85, in create_connection
-    raise err
-  File "/usr/local/lib/python3.11/site-packages/urllib3/util/connection.py", line 73, in create_connection
-    sock.connect(sa)
-TimeoutError: timed out
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 787, in urlopen
-    response = self._make_request(
-               ^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 493, in _make_request
-    conn.request(
-  File "/usr/local/lib/python3.11/site-packages/urllib3/connection.py", line 494, in request
-    self.endheaders()
-  File "/usr/local/lib/python3.11/http/client.py", line 1298, in endheaders
-    self._send_output(message_body, encode_chunked=encode_chunked)
-  File "/usr/local/lib/python3.11/http/client.py", line 1058, in _send_output
-    self.send(msg)
-  File "/usr/local/lib/python3.11/http/client.py", line 996, in send
-    self.connect()
-  File "/usr/local/lib/python3.11/site-packages/urllib3/connection.py", line 325, in connect
-    self.sock = self._new_conn()
-                ^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/urllib3/connection.py", line 207, in _new_conn
-    raise ConnectTimeoutError(
-urllib3.exceptions.ConnectTimeoutError: (<urllib3.connection.HTTPConnection object at 0x7f1d0d2d1750>, 'Connection to 192.168.68.56 timed out. (connect timeout=1)')
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/usr/local/lib/python3.11/site-packages/requests/adapters.py", line 667, in send
-    resp = conn.urlopen(
-           ^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 841, in urlopen
-    retries = retries.increment(
-              ^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/urllib3/util/retry.py", line 519, in increment
-    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='192.168.68.56', port=8096): Max retries exceeded with url: /Library/VirtualFolders (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7f1d0d2d1750>, 'Connection to 192.168.68.56 timed out. (connect timeout=1)'))
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/app/app/services/jellyfin_media_service.py", line 208, in get_libraries
-    libraries = self._make_request('Library/VirtualFolders')
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/app/app/services/jellyfin_media_service.py", line 99, in _make_request
-    response = session.get(url, timeout=timeout)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/requests/sessions.py", line 602, in get
-    return self.request("GET", url, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/requests/sessions.py", line 589, in request
-    resp = self.send(prep, **send_kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/requests/sessions.py", line 703, in send
-    r = adapter.send(request, **kwargs)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/requests/adapters.py", line 688, in send
-    raise ConnectTimeout(e, request=request)
-requests.exceptions.ConnectTimeout: HTTPConnectionPool(host='192.168.68.56', port=8096): Max retries exceeded with url: /Library/VirtualFolders (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7f1d0d2d1750>, 'Connection to 192.168.68.56 timed out. (connect timeout=1)'))
-[2025-08-10 20:27:16,553] DEBUG in users: Users: Got 0 libraries from jellyttthhuuu
-[2025-08-10 20:27:16,553] INFO in users: ✅ Users: Cached 0 libraries for jellyttthhuuu
-[2025-08-10 20:27:16,553] DEBUG in users: Users: Checking cache for server 'kavitaaaaaa' (key: server_3_libraries)
-[2025-08-10 20:27:16,553] WARNING in users: 🔄 Users: Cache expired/missing - Making API call to kavitaaaaaa (kavita) at https://kavita.abom.cloud
-[2025-08-10 20:27:16,553] WARNING in users: Users: Calling service.get_libraries() for kavitaaaaaa - THIS IS AN API CALL
-[2025-08-10 20:27:16,553] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Authenticating with Kavita API (cache miss): https://kavita.abom.cloud/api/Plugin/authenticate
-[2025-08-10 20:27:16,891] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Cached Kavita JWT token for 3600 seconds
-[2025-08-10 20:27:16,891] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Successfully authenticated with Kavita API key for plugin 'MUM'
-[2025-08-10 20:27:16,892] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Making GET request to: https://kavita.abom.cloud/api/Library/libraries
-[2025-08-10 20:27:17,363] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response status: 200
-[2025-08-10 20:27:17,363] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response headers: {'Date': 'Mon, 11 Aug 2025 02:27:17 GMT', 'Content-Type': 'application/json; charset=utf-8', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Alt-Svc': 'h3=":443"; ma=86400', 'Report-To': '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=x%2BBEfjq28GM2hBErlts9Md9DyEoEQpXURzb%2BkNmiI3AKRCxT%2BuOt7zN8h5n5qYjAYBREwbGbUJWF2Ktu6EGOPCKmtNWWKN7bkXuW8ARuWAwC"}]}', 'Content-Security-Policy': "frame-ancestors 'none';", 'Server': 'cloudflare', 'Vary': 'Accept-Encoding', 'X-Frame-Options': 'SAMEORIGIN', 'Cf-Cache-Status': 'DYNAMIC', 'Nel': '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}', 'Content-Encoding': 'gzip', 'CF-RAY': '96d44b00481b6994-DFW'}
-[2025-08-10 20:27:17,364] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response content length: 852
-[2025-08-10 20:27:17,364] DEBUG in users: Users: Got 2 libraries from kavitaaaaaa
-[2025-08-10 20:27:17,364] INFO in users: ✅ Users: Cached 2 libraries for kavitaaaaaa
-[2025-08-10 20:27:17,364] WARNING in users: Users: Library cache check complete for 3 servers
-[2025-08-10 20:27:17,364] WARNING in users: ✅ USERS PAGE: Library lookup completed in: 4.396s
-[2025-08-10 20:27:17,364] INFO in users: 📊 Retrieved libraries for 3 servers
-[2025-08-10 20:27:17,371] INFO in users: Library processing took: 0.007s
-[2025-08-10 20:27:17,431] INFO in users: Template rendering took: 0.060s
-[2025-08-10 20:27:17,431] WARNING in users: 🎯 USERS PAGE: TOTAL list_users() execution time: 4.509s
-[2025-08-10 20:27:17,431] INFO in users: === END USER LIST PERFORMANCE DEBUG ===
-[2025-08-10 20:27:17,431] WARNING in users: === USERS PAGE ROUTE COMPLETE ===
-[2025-08-10 20:27:17,631] WARNING in users: === USERS PAGE: mass_edit_libraries_form() called - MAY MAKE API CALLS ===
-[2025-08-10 20:27:17,672] WARNING in users: === USERS PAGE ROUTE START ===
-[2025-08-10 20:27:17,672] INFO in users: === USER LIST PERFORMANCE DEBUG ===
-[2025-08-10 20:27:17,672] INFO in users: Starting list_users() at 1754879237.6725924
-[2025-08-10 20:27:17,672] DEBUG in users: --- Entering list_users ---
-[2025-08-10 20:27:17,673] DEBUG in users: Request args: ImmutableMultiDict([('view', 'cards')])
-[2025-08-10 20:27:17,673] DEBUG in users: Is HTMX request: true
-[2025-08-10 20:27:17,673] DEBUG in users: current_user.id: 1
-[2025-08-10 20:27:17,673] DEBUG in users: Saved preferred view: 'cards'
-[2025-08-10 20:27:17,673] DEBUG in users: Final view_mode for rendering: 'cards'
-[2025-08-10 20:27:17,683] INFO in users: DB query setup took: 0.011s
-[2025-08-10 20:27:17,687] INFO in users: Pagination query took: 0.004s
-[2025-08-10 20:27:17,692] INFO in users: User stats fetching took: 0.005s
-[2025-08-10 20:27:17,695] INFO in users: User access records fetching took: 0.003s
-[2025-08-10 20:27:17,697] WARNING in users: 🚀 USERS PAGE: About to call get_cached_libraries_by_server() for 3 servers - MAY MAKE API CALLS
-[2025-08-10 20:27:17,697] INFO in users: 🚀 OPTIMIZATION: Using cached library data for 3 servers
-[2025-08-10 20:27:17,697] WARNING in users: === USERS PAGE: get_cached_libraries_by_server() called ===
-[2025-08-10 20:27:17,697] DEBUG in users: Users: Checking cache for server 'Plex++++' (key: server_1_libraries)
-[2025-08-10 20:27:17,697] INFO in users: 📦 Users: Using cached libraries for Plex++++
-[2025-08-10 20:27:17,697] DEBUG in users: Users: Checking cache for server 'jellyttthhuuu' (key: server_2_libraries)
-[2025-08-10 20:27:17,697] INFO in users: 📦 Users: Using cached libraries for jellyttthhuuu
-[2025-08-10 20:27:17,697] DEBUG in users: Users: Checking cache for server 'kavitaaaaaa' (key: server_3_libraries)
-[2025-08-10 20:27:17,698] INFO in users: 📦 Users: Using cached libraries for kavitaaaaaa
-[2025-08-10 20:27:17,698] WARNING in users: Users: Library cache check complete for 3 servers
-[2025-08-10 20:27:17,698] WARNING in users: ✅ USERS PAGE: Library lookup completed in: 0.001s
-[2025-08-10 20:27:17,698] INFO in users: 📊 Retrieved libraries for 3 servers
-[2025-08-10 20:27:17,701] INFO in users: Library processing took: 0.004s
-[2025-08-10 20:27:17,795] INFO in users: Template rendering took: 0.094s
-[2025-08-10 20:27:17,795] INFO in task_service: --- Running Media Session Monitor Task ---
-[2025-08-10 20:27:17,796] WARNING in users: 🎯 USERS PAGE: TOTAL list_users() execution time: 0.123s
-[2025-08-10 20:27:17,796] INFO in users: === END USER LIST PERFORMANCE DEBUG ===
-[2025-08-10 20:27:17,796] WARNING in users: === USERS PAGE ROUTE COMPLETE ===
-[2025-08-10 20:27:17,801] WARNING in media_service_manager: MediaServiceManager.get_all_active_sessions() called - THIS MAKES API CALLS TO ALL SERVERS
-[2025-08-10 20:27:17,804] DEBUG in media_service_manager: MediaServiceManager: Found 3 servers to check for active sessions
-[2025-08-10 20:27:17,804] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'Plex++++' (plex) at http://192.168.68.56:32400
-[2025-08-10 20:27:17,805] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for Plex++++
-[2025-08-10 20:27:17,831] DEBUG in media_service_manager: MediaServiceManager: Got 2 sessions from Plex++++
-[2025-08-10 20:27:17,832] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'jellyttthhuuu' (jellyfin) at http://192.168.68.56:8096
-[2025-08-10 20:27:17,832] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for jellyttthhuuu
-[2025-08-10 20:27:17,832] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Making GET request to endpoint: Sessions
-[2025-08-10 20:27:17,832] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Initializing new Jellyfin client
-[2025-08-10 20:27:17,833] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connecting to Jellyfin server: http://192.168.68.56:8096
-[2025-08-10 20:27:17,833] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Client configured - SSL: False
-[2025-08-10 20:27:17,834] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Attempting to connect to Jellyfin server...
-[2025-08-10 20:27:17,952] INFO in api: API: Raw session monitoring setting from DB: '120' (type: <class 'int'>)
-[2025-08-10 20:27:17,953] INFO in api: API: Successfully converted to int: 120
-[2025-08-10 20:27:17,953] INFO in api: API: Returning session monitoring interval: 120 seconds
-connect_to_address http://192.168.68.56:8096 failed
-[2025-08-10 20:27:19,866] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connection established, attempting authentication...
-[2025-08-10 20:27:19,866] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Setting API token directly in client configuration
-[2025-08-10 20:27:19,866] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Authentication successful
-[2025-08-10 20:27:19,866] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Falling back to requests session with manual headers (client session is None or unavailable)
-[2025-08-10 20:27:19,867] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Full request URL: http://192.168.68.56:8096/Sessions
-[2025-08-10 20:27:19,867] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Request headers: {'User-Agent': 'python-requests/2.32.4', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'X-Emby-Token': 'cfea00f3...', 'Content-Type': 'application/json'}
-[2025-08-10 20:27:20,872] ERROR in base_media_service: [JELLYFIN:jellyttthhuuu] Request error for GET Sessions: HTTPConnectionPool(host='192.168.68.56', port=8096): Max retries exceeded with url: /Sessions (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7f1d0ce7d890>, 'Connection to 192.168.68.56 timed out. (connect timeout=1)'))
-[2025-08-10 20:27:20,872] ERROR in base_media_service: [JELLYFIN:jellyttthhuuu] Error fetching active sessions: HTTPConnectionPool(host='192.168.68.56', port=8096): Max retries exceeded with url: /Sessions (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7f1d0ce7d890>, 'Connection to 192.168.68.56 timed out. (connect timeout=1)'))
-[2025-08-10 20:27:20,872] DEBUG in media_service_manager: MediaServiceManager: Got 0 sessions from jellyttthhuuu
-[2025-08-10 20:27:20,872] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'kavitaaaaaa' (kavita) at https://kavita.abom.cloud
-[2025-08-10 20:27:20,872] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for kavitaaaaaa
-[2025-08-10 20:27:20,872] DEBUG in media_service_manager: MediaServiceManager: Got 0 sessions from kavitaaaaaa
-[2025-08-10 20:27:20,873] WARNING in media_service_manager: MediaServiceManager: Total sessions found across all servers: 2
-[2025-08-10 20:27:20,873] INFO in task_service: Found 2 active sessions across all servers.
-[2025-08-10 20:27:20,873] INFO in task_service: Processing 2 new or ongoing sessions...
-[2025-08-10 20:27:21,519] WARNING in task_service: Could not find MUM user for Plex User ID 19076956 from session 42. Skipping.
-[2025-08-10 20:27:22,044] INFO in task_service: New session detected: 43. Creating history record.
-[2025-08-10 20:27:22,050] INFO in task_service: Successfully created StreamHistory record (ID: 170) for session 43.
-[2025-08-10 20:27:22,062] INFO in user_service: User_Service.py - update_user_last_streamed(): Updated last_streamed_at for gab7 to 2025-08-11 02:27:20.873171
-[2025-08-10 20:27:22,062] INFO in task_service: --- Media Session Monitor Task Finished ---
+[2025-08-10 21:11:53,517] INFO in dashboard: === DASHBOARD ROUTE START ===
+[2025-08-10 21:11:53,517] DEBUG in dashboard: Dashboard: Fetching total users count
+[2025-08-10 21:11:53,519] DEBUG in dashboard: Dashboard: Total users: 61
+[2025-08-10 21:11:53,519] DEBUG in dashboard: Dashboard: Fetching active invites count
+[2025-08-10 21:11:53,521] DEBUG in dashboard: Dashboard: Active invites: 2
+[2025-08-10 21:11:53,521] DEBUG in dashboard: Dashboard: Setting active streams count to 0 for initial load (will be fetched asynchronously)
+[2025-08-10 21:11:53,521] DEBUG in dashboard: Dashboard: Getting server list (DB only, no API calls)
+[2025-08-10 21:11:53,522] DEBUG in dashboard: Dashboard: Found 3 servers in database
+[2025-08-10 21:11:53,522] DEBUG in dashboard: Dashboard: Server status data prepared (loading state)
+[2025-08-10 21:11:53,522] DEBUG in dashboard: Dashboard: Fetching recent activities
+[2025-08-10 21:11:53,526] DEBUG in dashboard: Dashboard: Recent activities: 10, total count: 456
+[2025-08-10 21:11:53,527] INFO in dashboard: Dashboard: Rendering template with data
+[2025-08-10 21:11:53,527] DEBUG in dashboard: Dashboard: Template data - users: 61, invites: 2, streams: 0, servers: 3, activities: 10
+[2025-08-10 21:11:53,545] INFO in dashboard: === DASHBOARD ROUTE COMPLETE ===
+[2025-08-10 21:11:53,961] WARNING in api: === API ENDPOINT: /dashboard/active-streams-count called ===
+[2025-08-10 21:11:53,961] DEBUG in api: Api.py - get_active_streams_count(): Loading active streams count for dashboard
+[2025-08-10 21:11:53,961] WARNING in api: API: Calling MediaServiceManager.get_all_active_sessions() for streams count
+[2025-08-10 21:11:53,961] WARNING in media_service_manager: MediaServiceManager.get_all_active_sessions() called - THIS MAKES API CALLS TO ALL SERVERS
+[2025-08-10 21:11:53,964] DEBUG in media_service_manager: MediaServiceManager: Found 3 servers to check for active sessions
+[2025-08-10 21:11:53,964] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'Plex++++' (plex) at http://192.168.68.56:32400
+[2025-08-10 21:11:53,964] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for Plex++++
+[2025-08-10 21:11:53,979] DEBUG in media_service_manager: MediaServiceManager: Got 1 sessions from Plex++++
+[2025-08-10 21:11:53,979] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'jellyttthhuuu' (jellyfin) at http://192.168.68.56:8096
+[2025-08-10 21:11:53,979] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for jellyttthhuuu
+[2025-08-10 21:11:53,979] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Making GET request to endpoint: Sessions
+[2025-08-10 21:11:53,980] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Initializing new Jellyfin client
+[2025-08-10 21:11:53,980] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connecting to Jellyfin server: http://192.168.68.56:8096
+[2025-08-10 21:11:53,980] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Client configured - SSL: False
+[2025-08-10 21:11:53,980] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Attempting to connect to Jellyfin server...
+[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connection established, attempting authentication...
+[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Setting API token directly in client configuration
+[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Authentication successful
+[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Falling back to requests session with manual headers (client session is None or unavailable)
+[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Full request URL: http://192.168.68.56:8096/Sessions
+[2025-08-10 21:11:53,990] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Request headers: {'User-Agent': 'python-requests/2.32.4', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'X-Emby-Token': '83f5b80b...', 'Content-Type': 'application/json'}
+[2025-08-10 21:11:53,997] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response status: 200
+[2025-08-10 21:11:53,997] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response headers: {'Content-Type': 'application/json; charset=utf-8', 'Date': 'Mon, 11 Aug 2025 03:11:53 GMT', 'Server': 'Kestrel', 'Content-Encoding': 'gzip', 'Transfer-Encoding': 'chunked', 'Vary': 'Accept-Encoding', 'X-Response-Time-ms': '0.6876'}
+[2025-08-10 21:11:53,997] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response data type: <class 'list'>, length: 1
+[2025-08-10 21:11:53,998] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Retrieved 1 total sessions from Jellyfin
+[2025-08-10 21:11:53,998] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Skipping inactive session: f0ab899d71efcc5bfe89c7cc516188c3
+[2025-08-10 21:11:53,998] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Returning 0 active sessions from Jellyfin
+[2025-08-10 21:11:53,998] DEBUG in media_service_manager: MediaServiceManager: Got 0 sessions from jellyttthhuuu
+[2025-08-10 21:11:53,998] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'kavitaaaaaa' (kavita) at https://kavita.abom.cloud
+[2025-08-10 21:11:53,998] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for kavitaaaaaa
+[2025-08-10 21:11:53,998] DEBUG in media_service_manager: MediaServiceManager: Got 0 sessions from kavitaaaaaa
+[2025-08-10 21:11:53,998] WARNING in media_service_manager: MediaServiceManager: Total sessions found across all servers: 1
+[2025-08-10 21:11:53,998] DEBUG in api: API: Active streams count: 1
+[2025-08-10 21:11:54,074] WARNING in api: === API ENDPOINT: /dashboard/server-status called ===
+[2025-08-10 21:11:54,074] DEBUG in api: Api.py - get_dashboard_server_status(): Loading server status for dashboard
+[2025-08-10 21:11:54,074] WARNING in api: API: get_cached_server_status() called - checking cache
+[2025-08-10 21:11:54,074] WARNING in api: API: Cache expired/empty, fetching fresh server status data - THIS WILL MAKE API CALLS
+[2025-08-10 21:11:54,074] WARNING in api: API: _fetch_server_status() called - THIS WILL MAKE API CALLS TO ALL SERVERS
+[2025-08-10 21:11:54,076] DEBUG in api: API: Found 3 servers to check status
+[2025-08-10 21:11:54,076] WARNING in api: API: Making API calls to 3 servers for status check
+[2025-08-10 21:11:54,076] WARNING in api: API: Making API call to server 'Plex++++' (plex) at http://192.168.68.56:32400
+[2025-08-10 21:11:54,108] DEBUG in api: API: Server 'Plex++++' status: True
+[2025-08-10 21:11:54,108] WARNING in api: API: Making API call to server 'jellyttthhuuu' (jellyfin) at http://192.168.68.56:8096
+[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Making GET request to endpoint: System/Info
+[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Initializing new Jellyfin client
+[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connecting to Jellyfin server: http://192.168.68.56:8096
+[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Client configured - SSL: False
+[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Attempting to connect to Jellyfin server...
+[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connection established, attempting authentication...
+[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Setting API token directly in client configuration
+[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Authentication successful
+[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Falling back to requests session with manual headers (client session is None or unavailable)
+[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Full request URL: http://192.168.68.56:8096/System/Info
+[2025-08-10 21:11:54,116] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Request headers: {'User-Agent': 'python-requests/2.32.4', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'X-Emby-Token': '83f5b80b...', 'Content-Type': 'application/json'}
+[2025-08-10 21:11:54,123] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response status: 200
+[2025-08-10 21:11:54,124] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response headers: {'Content-Type': 'application/json; charset=utf-8', 'Date': 'Mon, 11 Aug 2025 03:11:53 GMT', 'Server': 'Kestrel', 'Content-Encoding': 'gzip', 'Transfer-Encoding': 'chunked', 'Vary': 'Accept-Encoding', 'X-Response-Time-ms': '0.7518'}
+[2025-08-10 21:11:54,124] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response data type: <class 'dict'>, length: 24
+[2025-08-10 21:11:54,124] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Jellyfin server info - ServerName: 'ABOM', Version: '10.10.7'
+[2025-08-10 21:11:54,124] DEBUG in api: API: Server 'jellyttthhuuu' status: True
+[2025-08-10 21:11:54,124] WARNING in api: API: Making API call to server 'kavitaaaaaa' (kavita) at https://kavita.abom.cloud
+[2025-08-10 21:11:54,124] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Making GET request to: https://kavita.abom.cloud/api/Server/server-info-slim
+[2025-08-10 21:11:54,732] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response status: 200
+[2025-08-10 21:11:54,732] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response headers: {'Date': 'Mon, 11 Aug 2025 03:11:54 GMT', 'Content-Type': 'application/json; charset=utf-8', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Alt-Svc': 'h3=":443"; ma=86400', 'Report-To': '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=ZLgJ%2BuEIoig84TwJEb%2BXHX1xiG46es5WDbacO7J4HHeB1C8KEADLAk7RdsIwN1jabAxjVAk27Y1IWpf0hpFOznfMMSQBnJofyoT2T8i6oGH9"}]}', 'Content-Security-Policy': "frame-ancestors 'none';", 'Server': 'cloudflare', 'Vary': 'Accept-Encoding', 'X-Frame-Options': 'SAMEORIGIN', 'Cf-Cache-Status': 'DYNAMIC', 'Nel': '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}', 'Content-Encoding': 'gzip', 'CF-RAY': '96d48c5e39871026-LAX'}
+[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response content length: 139
+[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint request headers: {'Authorization': 'Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW4iLCJuYW1laWQiOiIxIiwicm9sZSI6WyJBZG1pbiIsIkxvZ2luIl0sIm5iZiI6MTc1NDg4MDY5OCwiZXhwIjoxNzU1NzQ0Njk4LCJpYXQiOjE3NTQ4ODA2OTh9.VvLrGFar7zEw1TgGrLHOu5njUns_1mhCkzNHDwvrs9dEL4HtV_G16ryWINuGb7J3EnKAe4gOLj4iCzdzXBXPeg', 'Content-Type': 'application/json'}
+[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint response status: 200
+[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint response headers: {'Date': 'Mon, 11 Aug 2025 03:11:54 GMT', 'Content-Type': 'application/json; charset=utf-8', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Alt-Svc': 'h3=":443"; ma=86400', 'Report-To': '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=ZLgJ%2BuEIoig84TwJEb%2BXHX1xiG46es5WDbacO7J4HHeB1C8KEADLAk7RdsIwN1jabAxjVAk27Y1IWpf0hpFOznfMMSQBnJofyoT2T8i6oGH9"}]}', 'Content-Security-Policy': "frame-ancestors 'none';", 'Server': 'cloudflare', 'Vary': 'Accept-Encoding', 'X-Frame-Options': 'SAMEORIGIN', 'Cf-Cache-Status': 'DYNAMIC', 'Nel': '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}', 'Content-Encoding': 'gzip', 'CF-RAY': '96d48c5e39871026-LAX'}
+[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint response content: '{"installId":"c34f3a2c","isDocker":true,"kavitaVersion":"0.8.7.0","firstInstallDate":"2024-10-09T23:27:49","firstInstallVersion":"0.8.3.2"}...'
+[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint response content length: 139
+[2025-08-10 21:11:54,733] DEBUG in api: API: Server 'kavitaaaaaa' status: True
+[2025-08-10 21:11:54,734] DEBUG in api: API: Server status cache updated
+[2025-08-10 21:11:54,734] DEBUG in api: Api.py - get_dashboard_server_status(): Server status from cache: {'multi_server': True, 'online_count': 3, 'offline_count': 0, 'all_statuses': [{'name': 'Plex++++', 'url': 'http://192.168.68.56:32400', 'service_type': 'plex', 'online': True, 'version': '1.42.1.10054-f333bdaa8', 'machine_id': '1851993e7c714612ac048a20da5e061312ce69db', 'server_id': 1, 'custom_name': 'Plex++++', 'actual_server_name': 'Plex+'}, {'name': 'jellyttthhuuu', 'url': 'http://192.168.68.56:8096', 'service_type': 'jellyfin', 'online': True, 'version': '10.10.7', 'server_id': 2, 'actual_server_name': 'ABOM', 'error_message': None, 'custom_name': 'jellyttthhuuu'}, {'name': 'kavitaaaaaa', 'url': 'https://kavita.abom.cloud', 'service_type': 'kavita', 'online': True, 'version': '0.8.7.0', 'server_id': 3, 'custom_name': 'kavitaaaaaa', 'actual_server_name': 'Kavita (c34f3a2c)'}], 'servers_by_service': {'plex': {'service_name': 'Plex', 'servers': [{'name': 'Plex++++', 'url': 'http://192.168.68.56:32400', 'service_type': 'plex', 'online': True, 'version': '1.42.1.10054-f333bdaa8', 'machine_id': '1851993e7c714612ac048a20da5e061312ce69db', 'server_id': 1, 'custom_name': 'Plex++++', 'actual_server_name': 'Plex+'}], 'online_count': 1, 'offline_count': 0, 'total_count': 1}, 'jellyfin': {'service_name': 'Jellyfin', 'servers': [{'name': 'jellyttthhuuu', 'url': 'http://192.168.68.56:8096', 'service_type': 'jellyfin', 'online': True, 'version': '10.10.7', 'server_id': 2, 'actual_server_name': 'ABOM', 'error_message': None, 'custom_name': 'jellyttthhuuu'}], 'online_count': 1, 'offline_count': 0, 'total_count': 1}, 'kavita': {'service_name': 'Kavita', 'servers': [{'name': 'kavitaaaaaa', 'url': 'https://kavita.abom.cloud', 'service_type': 'kavita', 'online': True, 'version': '0.8.7.0', 'server_id': 3, 'custom_name': 'kavitaaaaaa', 'actual_server_name': 'Kavita (c34f3a2c)'}], 'online_count': 1, 'offline_count': 0, 'total_count': 1}}}
+[2025-08-10 21:11:55,093] INFO in api: API: Raw session monitoring setting from DB: '120' (type: <class 'int'>)
+[2025-08-10 21:11:55,093] INFO in api: API: Successfully converted to int: 120
+[2025-08-10 21:11:55,093] INFO in api: API: Returning session monitoring interval: 120 seconds
