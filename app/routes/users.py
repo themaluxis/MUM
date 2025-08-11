@@ -18,52 +18,28 @@ from sqlalchemy.exc import IntegrityError
 
 bp = Blueprint('users', __name__)
 
-# Cache for library data to avoid expensive API calls on every page load
-_library_cache = {}
-_cache_timestamp = {}
-CACHE_DURATION = 300  # 5 minutes
+# Library data is now fetched from database instead of API calls
 
-def get_cached_libraries_by_server(servers):
-    """Get library data from cache or fetch if expired"""
-    import time
-    current_time = time.time()
+def get_libraries_from_database(servers):
+    """Get library data from database - NO API CALLS"""
+    from app.models_media_services import MediaLibrary
+    
     libraries_by_server = {}
     
     for server in servers:
-        cache_key = f"server_{server.id}_libraries"
+        # Get libraries from database for this server
+        db_libraries = MediaLibrary.query.filter_by(server_id=server.id).all()
+        server_lib_dict = {}
         
-        # Check if we have valid cached data
-        if (cache_key in _library_cache and 
-            cache_key in _cache_timestamp and 
-            current_time - _cache_timestamp[cache_key] < CACHE_DURATION):
-            # Use cached data
-            libraries_by_server[server.id] = _library_cache[cache_key]
-            current_app.logger.info(f"📦 Using cached libraries for {server.name}")
-        else:
-            # Cache expired or missing, fetch fresh data
-            try:
-                current_app.logger.info(f"🔄 Refreshing library cache for {server.name}")
-                service = MediaServiceFactory.create_service_from_db(server)
-                if service:
-                    server_libraries = service.get_libraries()
-                    server_lib_dict = {}
-                    for lib in server_libraries:
-                        lib_id = lib.get('external_id') or lib.get('id')
-                        lib_name = lib.get('name', 'Unknown')
-                        if lib_id:
-                            server_lib_dict[str(lib_id)] = lib_name
-                    
-                    # Update cache
-                    _library_cache[cache_key] = server_lib_dict
-                    _cache_timestamp[cache_key] = current_time
-                    libraries_by_server[server.id] = server_lib_dict
-                    current_app.logger.info(f"✅ Cached {len(server_lib_dict)} libraries for {server.name}")
-                else:
-                    libraries_by_server[server.id] = {}
-            except Exception as e:
-                current_app.logger.error(f"❌ Failed to fetch libraries for {server.name}: {e}")
-                # Use empty dict if fetch fails
-                libraries_by_server[server.id] = {}
+        for lib in db_libraries:
+            # Use external_id as the key (this matches what the API would return)
+            lib_id = lib.external_id
+            lib_name = lib.name
+            if lib_id:
+                server_lib_dict[str(lib_id)] = lib_name
+        
+        libraries_by_server[server.id] = server_lib_dict
+        current_app.logger.info(f"📦 Using stored library data for {server.name}: {len(server_lib_dict)} libraries")
     
     return libraries_by_server
 
@@ -299,11 +275,11 @@ def list_users():
     # Get all servers for library lookups
     all_servers = media_service_manager.get_all_servers(active_only=True)
     
-    # Get cached library data instead of making live API calls
+    # Get library data from database instead of making API calls
     libraries_start = time.time()
-    current_app.logger.info(f"🚀 OPTIMIZATION: Using cached library data for {len(all_servers)} servers")
+    current_app.logger.info(f"🚀 OPTIMIZATION: Using stored library data for {len(all_servers)} servers")
     
-    libraries_by_server = get_cached_libraries_by_server(all_servers)
+    libraries_by_server = get_libraries_from_database(all_servers)
     
     libraries_time = time.time()
     current_app.logger.info(f"✅ Library lookup completed in: {libraries_time - libraries_start:.3f}s")
@@ -721,6 +697,7 @@ def delete_user(user_id):
 @bp.route('/mass_edit_libraries_form')
 @login_required
 def mass_edit_libraries_form():
+    current_app.logger.info("=== USERS PAGE: mass_edit_libraries_form() called - USING DATABASE DATA ===")
     user_ids_str = request.args.get('user_ids', '')
     if not user_ids_str:
         return '<div class="alert alert-error">No users selected.</div>'
@@ -740,8 +717,17 @@ def mass_edit_libraries_form():
             }
         
         if server.id not in services_data[service_type_key]['servers']:
-            service = MediaServiceFactory.create_service_from_db(server)
-            libraries = service.get_libraries() if service else []
+            # Get libraries from database instead of making API calls
+            from app.models_media_services import MediaLibrary
+            db_libraries = MediaLibrary.query.filter_by(server_id=server.id).all()
+            libraries = []
+            for lib in db_libraries:
+                libraries.append({
+                    'id': lib.external_id,
+                    'external_id': lib.external_id,
+                    'name': lib.name
+                })
+            
             services_data[service_type_key]['servers'][server.id] = {
                 'server_name': server.name,
                 'users': [],
@@ -783,15 +769,15 @@ def mass_edit_users():
     
     for server in all_servers:
         try:
-            service = MediaServiceFactory.create_service_from_db(server)
-            if service:
-                server_libraries = service.get_libraries()
-                for lib in server_libraries:
-                    lib_id = lib.get('external_id') or lib.get('id')
-                    lib_name = lib.get('name', 'Unknown')
-                    if lib_id:
-                        # Use just the library name since server name is now shown in a separate badge
-                        available_libraries[str(lib_id)] = lib_name
+            # Get libraries from database instead of making API calls
+            from app.models_media_services import MediaLibrary
+            db_libraries = MediaLibrary.query.filter_by(server_id=server.id).all()
+            for lib in db_libraries:
+                lib_id = lib.external_id
+                lib_name = lib.name
+                if lib_id:
+                    # Use just the library name since server name is now shown in a separate badge
+                    available_libraries[str(lib_id)] = lib_name
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
@@ -899,15 +885,15 @@ def mass_edit_users():
     
     for server in all_servers:
         try:
-            service = MediaServiceFactory.create_service_from_db(server)
-            if service:
-                server_libraries = service.get_libraries()
-                libraries_by_server[server.id] = {}
-                for lib in server_libraries:
-                    lib_id = lib.get('external_id') or lib.get('id')
-                    lib_name = lib.get('name', 'Unknown')
-                    if lib_id:
-                        libraries_by_server[server.id][str(lib_id)] = lib_name
+            # Get libraries from database instead of making API calls
+            from app.models_media_services import MediaLibrary
+            db_libraries = MediaLibrary.query.filter_by(server_id=server.id).all()
+            libraries_by_server[server.id] = {}
+            for lib in db_libraries:
+                lib_id = lib.external_id
+                lib_name = lib.name
+                if lib_id:
+                    libraries_by_server[server.id][str(lib_id)] = lib_name
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
 
@@ -1127,29 +1113,28 @@ def get_quick_edit_form(user_id):
     
     for access in user_access_records:
         try:
-            service = MediaServiceFactory.create_service_from_db(access.server)
+            # Get libraries from database instead of making API calls
+            from app.models_media_services import MediaLibrary
+            db_libraries = MediaLibrary.query.filter_by(server_id=access.server.id).all()
             current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Processing server {access.server.name} (type: {access.server.service_type.value})")
             current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: User access record allowed_library_ids: {access.allowed_library_ids}")
+            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Server libraries from DB: {[{lib.external_id: lib.name} for lib in db_libraries]}")
             
-            if service:
-                server_libraries = service.get_libraries()
-                current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Server libraries from API: {[{lib.get('id'): lib.get('name')} for lib in server_libraries]}")
-                
-                for lib in server_libraries:
-                    lib_id = lib.get('external_id') or lib.get('id')
-                    lib_name = lib.get('name', 'Unknown')
-                    if lib_id:
-                        # For Kavita, create compound IDs to match the format used in user access records
-                        if access.server.service_type.value == 'kavita':
-                            compound_lib_id = f"{lib_id}_{lib_name}"
-                            available_libraries[compound_lib_id] = lib_name
-                            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Added Kavita library: {compound_lib_id} -> {lib_name}")
-                        else:
-                            available_libraries[str(lib_id)] = lib_name
-                            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Added non-Kavita library: {lib_id} -> {lib_name}")
-                
-                # Collect current library IDs from this server
-                current_library_ids.extend(access.allowed_library_ids or [])
+            for lib in db_libraries:
+                lib_id = lib.external_id
+                lib_name = lib.name
+                if lib_id:
+                    # For Kavita, create compound IDs to match the format used in user access records
+                    if access.server.service_type.value == 'kavita':
+                        compound_lib_id = f"{lib_id}_{lib_name}"
+                        available_libraries[compound_lib_id] = lib_name
+                        current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Added Kavita library: {compound_lib_id} -> {lib_name}")
+                    else:
+                        available_libraries[str(lib_id)] = lib_name
+                        current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Added non-Kavita library: {lib_id} -> {lib_name}")
+            
+            # Collect current library IDs from this server
+            current_library_ids.extend(access.allowed_library_ids or [])
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {access.server.name}: {e}")
     
