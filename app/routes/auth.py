@@ -6,6 +6,7 @@ from urllib.parse import urlsplit, urljoin, urlencode, quote as url_quote
 import datetime 
 import time
 from app.utils.helpers import log_event
+from app.utils.timeout_helper import get_api_timeout
 from app.models import AdminAccount, User, Setting, EventType, SettingValueType 
 from app.forms import LoginForm, UserLoginForm
 from app.extensions import db, csrf # <<< IMPORT CSRF
@@ -205,7 +206,8 @@ def plex_sso_callback_admin():
                 data = {"code": pin_code_from_session, "X-Plex-Client-Identifier": client_id_from_session}
                 
                 check_url = f"https://plex.tv/api/v2/pins/{pin_id_from_session}"
-                response = requests.get(check_url, headers=headers, data=data, timeout=10)
+                timeout = get_api_timeout()
+                response = requests.get(check_url, headers=headers, data=data, timeout=timeout)
                 
                 current_app.logger.debug(f"Admin PIN check - Response status: {response.status_code}")
                 

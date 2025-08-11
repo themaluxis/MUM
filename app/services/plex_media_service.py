@@ -11,6 +11,7 @@ import xmltodict
 from flask import current_app
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
+from app.utils.timeout_helper import get_api_timeout
 from app.models import Setting, EventType
 from app.utils.helpers import log_event
 
@@ -36,7 +37,7 @@ class PlexMediaService(BaseMediaService):
                 self._server_instance = None
         
         try:
-            timeout = int(self.config.get('timeout', 10))
+            timeout = get_api_timeout()
             session = requests.Session()
             session.timeout = timeout
             self._server_instance = PlexServer(baseurl=self.url, token=self.api_key, session=session)
@@ -200,7 +201,8 @@ class PlexMediaService(BaseMediaService):
                 shared_servers_url = f"{base_plextv_url}/api/servers/{server_machine_id}/shared_servers"
                 self.log_info(f"get_users(): Fetching detailed shares from: {shared_servers_url}")
                 headers = {'X-Plex-Token': admin_account._token, 'Accept': 'application/xml'}
-                resp = admin_account._session.get(shared_servers_url, headers=headers, timeout=10)
+                timeout = get_api_timeout()
+                resp = admin_account._session.get(shared_servers_url, headers=headers, timeout=timeout)
                 resp.raise_for_status()
                 self.log_info(f"get_users(): Raw XML from /shared_servers: {resp.text[:500]}...")
                 shared_servers_xml_root = ET.fromstring(resp.content)
@@ -773,7 +775,8 @@ class PlexMediaService(BaseMediaService):
             current_app.logger.debug(f"Making GeoIP request to: {url}")
             current_app.logger.debug(f"Request headers: {headers}")
             
-            response = requests.get(url, headers=headers, timeout=10)
+            timeout = get_api_timeout()
+            response = requests.get(url, headers=headers, timeout=timeout)
             current_app.logger.debug(f"Response status code: {response.status_code}")
             current_app.logger.debug(f"Response content: {response.content}")
             current_app.logger.debug(f"Response headers: {response.headers}")

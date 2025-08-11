@@ -452,6 +452,12 @@ class GeneralSettingsForm(FlaskForm): # As before
         default=30,
         description="How often to check for new media sessions (in seconds). Disabled when Nav Bar Stream Badge is enabled."
     )
+    api_timeout_seconds = IntegerField(
+        'API Request Timeout (seconds)',
+        validators=[DataRequired(), NumberRange(min=1, max=60)],
+        default=3,
+        description='How long to wait for API responses from media servers before timing out. Lower values make the app more responsive when servers are offline.'
+    )
     allow_user_accounts = BooleanField(
         'Allow User Accounts',
         default=False,

@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import requests
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
+from app.utils.timeout_helper import get_api_timeout
 
 class MyServiceMediaService(BaseMediaService):
     """
@@ -41,14 +42,15 @@ class MyServiceMediaService(BaseMediaService):
         headers = self._get_headers()
         
         try:
+            timeout = get_api_timeout()
             if method == 'GET':
-                response = requests.get(url, headers=headers, timeout=10)
+                response = requests.get(url, headers=headers, timeout=timeout)
             elif method == 'POST':
-                response = requests.post(url, headers=headers, json=data, timeout=10)
+                response = requests.post(url, headers=headers, json=data, timeout=timeout)
             elif method == 'PUT':
-                response = requests.put(url, headers=headers, json=data, timeout=10)
+                response = requests.put(url, headers=headers, json=data, timeout=timeout)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, timeout=10)
+                response = requests.delete(url, headers=headers, timeout=timeout)
             else:
                 raise ValueError(f"Unsupported method: {method}")
             

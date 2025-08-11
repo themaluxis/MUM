@@ -11,6 +11,7 @@ from app.models import Invite, Setting, EventType, User, InviteUsage, AdminAccou
 from app.forms import InviteCreateForm, InviteEditForm
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, calculate_expiry_date, permission_required
+from app.utils.timeout_helper import get_api_timeout
 from app.utils.plex_auth_helpers import create_plex_pin_login, check_plex_pin_status, get_plex_auth_url
 from app.services.media_service_factory import MediaServiceFactory
 from app.services.media_service_manager import MediaServiceManager
@@ -681,7 +682,8 @@ def plex_oauth_callback():
                 data = {"code": pin_code_from_session, "X-Plex-Client-Identifier": client_id_from_session}
                 
                 check_url = f"https://plex.tv/api/v2/pins/{pin_id_from_session}"
-                response = requests.get(check_url, headers=headers, data=data, timeout=10)
+                timeout = get_api_timeout()
+                response = requests.get(check_url, headers=headers, data=data, timeout=timeout)
                 
                 current_app.logger.debug(f"Plex callback - PIN check response status: {response.status_code}")
                 current_app.logger.debug(f"Plex callback - PIN check response text: {response.text[:500]}")
@@ -790,14 +792,15 @@ def discord_oauth_callback():
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
     try:
-        token_response = requests.post(token_url, data=payload, headers=headers, timeout=15)
+        timeout = get_api_timeout()
+        token_response = requests.post(token_url, data=payload, headers=headers, timeout=timeout)
         token_response.raise_for_status()
         token_data = token_response.json()
         access_token = token_data['access_token']
         
         user_info_url = f"{DISCORD_API_BASE_URL}/users/@me"
         auth_headers = {'Authorization': f'Bearer {access_token}'}
-        user_response = requests.get(user_info_url, headers=auth_headers, timeout=10)
+        user_response = requests.get(user_info_url, headers=auth_headers, timeout=timeout)
         user_response.raise_for_status()
         discord_user_data = user_response.json()
         
@@ -819,7 +822,7 @@ def discord_oauth_callback():
             
             configured_guild_id = int(configured_guild_id_str)
             user_guilds_url = f"{DISCORD_API_BASE_URL}/users/@me/guilds"
-            guilds_response = requests.get(user_guilds_url, headers=auth_headers, timeout=10)
+            guilds_response = requests.get(user_guilds_url, headers=auth_headers, timeout=timeout)
             guilds_response.raise_for_status()
             user_guilds_list = guilds_response.json()
             is_member = any(str(g.get('id')) == str(configured_guild_id) for g in user_guilds_list)

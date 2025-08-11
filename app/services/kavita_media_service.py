@@ -6,6 +6,7 @@ import time
 import hashlib
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
+from app.utils.timeout_helper import get_api_timeout
 
 # Global cache for JWT tokens across all Kavita instances
 _JWT_TOKEN_CACHE = {}
@@ -78,7 +79,8 @@ class KavitaMediaService(BaseMediaService):
         
         try:
             self.log_info(f"Authenticating with Kavita API (cache miss): {url}")
-            response = requests.post(url, headers=headers, params=params, timeout=10)
+            timeout = get_api_timeout()
+            response = requests.post(url, headers=headers, params=params, timeout=timeout)
             response.raise_for_status()
             
             # Try to parse as JSON first (Kavita returns JSON with token field)
@@ -121,12 +123,13 @@ class KavitaMediaService(BaseMediaService):
         self.log_info(f"Making {method} request to: {url}")
         
         try:
+            timeout = get_api_timeout()
             if method == 'GET':
-                response = requests.get(url, headers=headers, timeout=15)
+                response = requests.get(url, headers=headers, timeout=timeout)
             elif method == 'POST':
-                response = requests.post(url, headers=headers, json=data, timeout=15)
+                response = requests.post(url, headers=headers, json=data, timeout=timeout)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, timeout=15)
+                response = requests.delete(url, headers=headers, timeout=timeout)
             else:
                 raise ValueError(f"Unsupported method: {method}")
             
@@ -431,7 +434,8 @@ class KavitaMediaService(BaseMediaService):
             self.log_info(f"Deleting Kavita user: {username} (ID: {user_id})")
             self.log_info(f"DELETE request to: {url} with params: {params}")
             
-            response = requests.delete(url, headers=headers, params=params, timeout=15)
+            timeout = get_api_timeout()
+            response = requests.delete(url, headers=headers, params=params, timeout=timeout)
             
             self.log_info(f"Delete response status: {response.status_code}")
             self.log_info(f"Delete response content: {response.text}")

@@ -5,6 +5,7 @@ import requests
 from jellyfin_apiclient_python import JellyfinClient
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
+from app.utils.timeout_helper import get_api_timeout
 
 class JellyfinMediaService(BaseMediaService):
     """Jellyfin implementation of BaseMediaService using official jellyfin-apiclient-python"""
@@ -93,13 +94,14 @@ class JellyfinMediaService(BaseMediaService):
                 headers_to_log['X-Emby-Token'] = f"{self.api_key[:8]}..." if len(self.api_key) > 8 else "***"
             self.log_info(f"Request headers: {headers_to_log}")
             
+            timeout = get_api_timeout()
             if method == 'GET':
-                response = session.get(url, timeout=10)
+                response = session.get(url, timeout=timeout)
             elif method == 'POST':
                 self.log_info(f"POST data: {data}")
-                response = session.post(url, json=data, timeout=10)
+                response = session.post(url, json=data, timeout=timeout)
             elif method == 'DELETE':
-                response = session.delete(url, timeout=10)
+                response = session.delete(url, timeout=timeout)
             else:
                 raise ValueError(f"Unsupported method: {method}")
             
@@ -141,13 +143,14 @@ class JellyfinMediaService(BaseMediaService):
             headers_to_log['X-Emby-Token'] = f"{self.api_key[:8]}..." if len(self.api_key) > 8 else "***"
             self.log_info(f"Direct request headers: {headers_to_log}")
             
+            timeout = get_api_timeout()
             if method == 'GET':
-                response = requests.get(url, headers=headers, timeout=10)
+                response = requests.get(url, headers=headers, timeout=timeout)
             elif method == 'POST':
                 self.log_info(f"Direct POST data: {data}")
-                response = requests.post(url, headers=headers, json=data, timeout=10)
+                response = requests.post(url, headers=headers, json=data, timeout=timeout)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, timeout=10)
+                response = requests.delete(url, headers=headers, timeout=timeout)
             else:
                 raise ValueError(f"Unsupported method: {method}")
             

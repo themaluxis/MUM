@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 import requests
 from app.models import EventType, Invite, Setting
 from app.utils.helpers import log_event, permission_required
+from app.utils.timeout_helper import get_api_timeout
 from app.extensions import csrf, db
 from app.models_media_services import ServiceType
 from app.services.media_service_factory import MediaServiceFactory
@@ -244,7 +245,8 @@ def jellyfin_image_proxy():
         }
         current_app.logger.info(f"API jellyfin_image_proxy: Using API key: {jellyfin_server.api_key[:8]}...")
         
-        img_response = requests.get(jellyfin_image_url, headers=headers, stream=True, timeout=10)
+        timeout = get_api_timeout()
+        img_response = requests.get(jellyfin_image_url, headers=headers, stream=True, timeout=timeout)
         img_response.raise_for_status()
 
         content_type = img_response.headers.get('Content-Type', 'image/jpeg')
@@ -290,7 +292,8 @@ def jellyfin_user_avatar_proxy():
         
         # Get user info to check for PrimaryImageTag
         user_info_url = f"{jellyfin_server.url.rstrip('/')}/Users/{user_id}"
-        user_response = requests.get(user_info_url, headers=headers, timeout=5)
+        timeout = get_api_timeout()
+        user_response = requests.get(user_info_url, headers=headers, timeout=timeout)
         user_response.raise_for_status()
         user_data = user_response.json()
         
@@ -305,7 +308,8 @@ def jellyfin_user_avatar_proxy():
         
         current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Fetching avatar from: {avatar_url}")
 
-        img_response = requests.get(avatar_url, headers=headers, stream=True, timeout=10)
+        timeout = get_api_timeout()
+        img_response = requests.get(avatar_url, headers=headers, stream=True, timeout=timeout)
         img_response.raise_for_status()
 
         content_type = img_response.headers.get('Content-Type', 'image/jpeg')
