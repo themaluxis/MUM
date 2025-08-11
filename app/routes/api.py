@@ -22,48 +22,57 @@ _server_status_cache = {
 
 def get_cached_server_status():
     """Get cached server status data or fetch fresh if expired"""
+    current_app.logger.warning("API: get_cached_server_status() called - checking cache")
     current_time = time.time()
     
     # Check if cache is valid
     if (_server_status_cache['data'] is not None and 
         current_time - _server_status_cache['timestamp'] < _server_status_cache['ttl']):
-        current_app.logger.debug("Using cached server status data")
+        current_app.logger.debug("API: Using cached server status data")
         return _server_status_cache['data']
     
     # Cache is expired or empty, fetch fresh data
-    current_app.logger.debug("Fetching fresh server status data")
+    current_app.logger.warning("API: Cache expired/empty, fetching fresh server status data - THIS WILL MAKE API CALLS")
     server_status_data = _fetch_server_status()
     
     # Update cache
     _server_status_cache['data'] = server_status_data
     _server_status_cache['timestamp'] = current_time
+    current_app.logger.debug("API: Server status cache updated")
     
     return server_status_data
 
 def _fetch_server_status():
     """Fetch server status data from all servers"""
+    current_app.logger.warning("API: _fetch_server_status() called - THIS WILL MAKE API CALLS TO ALL SERVERS")
     all_servers = MediaServiceManager.get_all_servers(active_only=True)
     server_count = len(all_servers)
+    current_app.logger.debug(f"API: Found {server_count} servers to check status")
     server_status_data = {}
 
     if server_count == 1:
         server = all_servers[0]
+        current_app.logger.warning(f"API: Making API call to single server '{server.name}' ({server.service_type.value})")
         service = MediaServiceFactory.create_service_from_db(server)
         if service:
             server_status_data = service.get_server_info()
             server_status_data['server_id'] = server.id
             server_status_data['name'] = server.name
             server_status_data['service_type'] = server.service_type.value
+            current_app.logger.debug(f"API: Single server status: {server_status_data.get('online', 'unknown')}")
     elif server_count > 1:
         online_count = 0
         offline_count = 0
         all_server_statuses = []
         servers_by_service = {}
         
+        current_app.logger.warning(f"API: Making API calls to {len(all_servers)} servers for status check")
         for server in all_servers:
+            current_app.logger.warning(f"API: Making API call to server '{server.name}' ({server.service_type.value}) at {server.url}")
             service = MediaServiceFactory.create_service_from_db(server)
             if service:
                 status = service.get_server_info()
+                current_app.logger.debug(f"API: Server '{server.name}' status: {status.get('online', 'unknown')}")
                 # Extract the actual server name BEFORE overriding the 'name' field
                 actual_server_name = status.get('name', server.name)
                 
@@ -186,6 +195,7 @@ def check_server_status(server_id):
 @login_required
 def get_dashboard_server_status():
     """Get server status for dashboard - loads asynchronously using cached data"""
+    current_app.logger.warning("=== API ENDPOINT: /dashboard/server-status called ===")
     current_app.logger.debug("Api.py - get_dashboard_server_status(): Loading server status for dashboard")
     
     # Use cached server status data
@@ -198,6 +208,7 @@ def get_dashboard_server_status():
 @login_required
 def get_all_servers_modal():
     """Get all servers status for modal - uses cached data from dashboard"""
+    current_app.logger.warning("=== API ENDPOINT: /dashboard/all-servers-modal called ===")
     current_app.logger.debug("Api.py - get_all_servers_modal(): Loading all servers status for modal")
     
     # Use the same cached data as the dashboard
@@ -205,6 +216,35 @@ def get_all_servers_modal():
     current_app.logger.debug(f"Api.py - get_all_servers_modal(): Server status for modal from cache: {server_status_data}")
 
     return render_template('components/modals/all_servers_status_modal_content.html', server_status=server_status_data)
+
+@bp.route('/dashboard/active-streams-count', methods=['GET'])
+@login_required
+def get_active_streams_count():
+    """Get active streams count for dashboard - loads asynchronously"""
+    current_app.logger.warning("=== API ENDPOINT: /dashboard/active-streams-count called ===")
+    current_app.logger.debug("Api.py - get_active_streams_count(): Loading active streams count for dashboard")
+    
+    active_streams_count = 0
+    try:
+        current_app.logger.warning("API: Calling MediaServiceManager.get_all_active_sessions() for streams count")
+        active_sessions_list = MediaServiceManager.get_all_active_sessions()
+        if active_sessions_list:
+            active_streams_count = len(active_sessions_list)
+        current_app.logger.debug(f"API: Active streams count: {active_streams_count}")
+    except Exception as e:
+        current_app.logger.error(f"API: Failed to get active streams count: {e}")
+    
+    # Return the card content HTML
+    return f'''
+    <div class="flex flex-row gap-3 items-center">
+        <div class="p-3 rounded-md bg-accent/20 text-accent"><i class="fa-solid fa-tower-broadcast fa-2x"></i></div>
+        <div class="flex flex-col">
+            <p class="text-base-content/70">Active Streams</p>
+            <h2 class="card-title text-2xl">{active_streams_count}</h2>
+        </div>
+    </div>
+    <div class="card-actions justify-end w-full mt-2"><span class="text-xs text-accent group-hover:underline">View Streams <i class="fa-solid fa-arrow-right fa-xs ml-1"></i></span></div>
+    '''
 
 @bp.route('/servers/<int:server_id>/libraries', methods=['GET'])
 @login_required

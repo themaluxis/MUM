@@ -391,13 +391,20 @@ class MediaServiceManager:
     @staticmethod
     def get_all_active_sessions() -> List[Dict[str, Any]]:
         """Get active sessions from all servers"""
+        current_app.logger.warning("MediaServiceManager.get_all_active_sessions() called - THIS MAKES API CALLS TO ALL SERVERS")
         all_sessions = []
         
-        for server in MediaServiceManager.get_all_servers():
+        servers = MediaServiceManager.get_all_servers()
+        current_app.logger.debug(f"MediaServiceManager: Found {len(servers)} servers to check for active sessions")
+        
+        for server in servers:
+            current_app.logger.warning(f"MediaServiceManager: Making API call to server '{server.name}' ({server.service_type.value}) at {server.url}")
             service = MediaServiceFactory.create_service_from_db(server)
             if service:
                 try:
+                    current_app.logger.debug(f"MediaServiceManager: Calling get_active_sessions() for {server.name}")
                     sessions = service.get_active_sessions()
+                    current_app.logger.debug(f"MediaServiceManager: Got {len(sessions)} sessions from {server.name}")
                     for session in sessions:
                         if isinstance(session, dict):
                             session['server_name'] = server.name
@@ -409,8 +416,11 @@ class MediaServiceManager:
                             setattr(session, 'service_type', server.service_type.value)
                     all_sessions.extend(sessions)
                 except Exception as e:
-                    current_app.logger.error(f"Error getting sessions from {server.name}: {e}")
+                    current_app.logger.error(f"MediaServiceManager: Error getting sessions from {server.name}: {e}")
+            else:
+                current_app.logger.warning(f"MediaServiceManager: Could not create service for {server.name}")
         
+        current_app.logger.warning(f"MediaServiceManager: Total sessions found across all servers: {len(all_sessions)}")
         return all_sessions
     
     @staticmethod

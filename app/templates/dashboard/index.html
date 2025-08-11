@@ -22,12 +22,17 @@
             </div>
         </a>
         <a href="{{ url_for('streaming.index') }}" class="card bg-base-200 shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out group">
-            <div class="card-body items-start text-center justify-between">
+            <div class="card-body items-start text-center justify-between" id="active_streams_card_content"
+                 hx-get="{{ url_for('api.get_active_streams_count') }}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
                 <div class="flex flex-row gap-3 items-center">
-                    <div class="p-3 rounded-md bg-accent/20 text-accent"><i class="fa-solid fa-tower-broadcast fa-2x"></i></div>
+                    <div class="p-3 rounded-md bg-accent/20 text-accent">
+                        <span class="loading loading-spinner loading-lg"></span>
+                    </div>
                     <div class="flex flex-col">
                         <p class="text-base-content/70">Active Streams</p>
-                        <h2 class="card-title text-2xl">{{ active_streams_count | default('N/A') }}</h2>
+                        <h2 class="card-title text-2xl">Loading...</h2>
                     </div>
                 </div>
                  <div class="card-actions justify-end w-full mt-2"><span class="text-xs text-accent group-hover:underline">View Streams <i class="fa-solid fa-arrow-right fa-xs ml-1"></i></span></div>
