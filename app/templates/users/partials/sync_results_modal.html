@@ -37,9 +37,10 @@
                         {% else %}
                             Media server synchronization completed with 
                             {% if sync_result.added > 0 %}<span class="text-success font-medium">{{ sync_result.added }} users added</span>{% endif %}{% if sync_result.added > 0 and (sync_result.updated > 0 or sync_result.removed > 0) %}, {% endif %}
-                            {% if sync_result.updated > 0 %}<span class="text-primary font-medium">{{ sync_result.updated }} users updated</span>{% endif %}{% if sync_result.updated > 0 and sync_result.removed > 0 %}, and {% endif %}
-                            {% if sync_result.removed > 0 %}<span class="text-warning font-medium">{{ sync_result.removed }} users removed</span>{% endif %}.
-                            {% if sync_result.errors > 0 %} <span class="text-error font-medium">{{ sync_result.errors }} error(s)</span> occurred during the process.{% endif %}
+                            {% if sync_result.updated > 0 %}<span class="text-warning font-medium">{{ sync_result.updated }} users updated</span>{% endif %}{% if sync_result.updated > 0 and sync_result.removed > 0 %}, and {% endif %}
+                            {% if sync_result.removed > 0 %}<span class="text-error font-medium">{{ sync_result.removed }} users removed</span>{%endif%}. 
+                            <span class="text-success font-medium">{{ sync_result.successful_servers|length }} servers synced successfully</span> while 
+                            <span class="text-error font-medium">{{ sync_result.failed_servers|length }} servers failed</span> to connect during the process.
                         {% endif %}
                     </p>
                 </div>
@@ -65,24 +66,6 @@
                             {% endif %}
                         </div>
                     {% endif %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if sync_result.successful_servers and sync_result.failed_servers %}
-        <!-- Mixed Results Card -->
-        <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
-            <div class="flex items-start gap-3">
-                <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <i class="fa-solid fa-info-circle text-info text-sm"></i>
-                </div>
-                <div>
-                    <h4 class="font-medium text-base-content mb-1">Mixed Results</h4>
-                    <p class="text-sm text-base-content/70 leading-relaxed">
-                        <span class="text-success font-medium">{{ sync_result.successful_servers|length }} servers synced successfully</span> while 
-                        <span class="text-error font-medium">{{ sync_result.failed_servers|length }} servers failed</span> to connect.
-                    </p>
                 </div>
             </div>
         </div>
@@ -137,11 +120,11 @@
                         <div class="p-4 border-b border-base-300 cursor-pointer" onclick="toggleCollapse('updated-users')">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                        <i class="fa-solid fa-user-pen text-primary text-sm"></i>
+                                    <div class="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center">
+                                        <i class="fa-solid fa-user-pen text-warning text-sm"></i>
                                     </div>
                                     <div>
-                                        <h4 class="font-medium text-primary">Updated Users</h4>
+                                        <h4 class="font-medium text-warning">Updated Users</h4>
                                         <p class="text-xs text-base-content/60">{{ sync_result.updated }} users were updated</p>
                                     </div>
                                 </div>
@@ -179,7 +162,7 @@
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
                                     <div class="w-8 h-8 rounded-full bg-error/20 flex items-center justify-center">
-                                        <i class="fa-solid fa-user-minus text-warning text-sm"></i>
+                                        <i class="fa-solid fa-user-minus text-error text-sm"></i>
                                     </div>
                                     <div>
                                         <h4 class="font-medium text-error">Removed Users</h4>
