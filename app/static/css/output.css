@@ -3577,6 +3577,9 @@
   .h-10 {
     height: calc(var(--spacing) * 10);
   }
+  .h-12 {
+    height: calc(var(--spacing) * 12);
+  }
   .h-16 {
     height: calc(var(--spacing) * 16);
   }
@@ -3618,6 +3621,9 @@
   }
   .max-h-60 {
     max-height: calc(var(--spacing) * 60);
+  }
+  .max-h-64 {
+    max-height: calc(var(--spacing) * 64);
   }
   .max-h-80 {
     max-height: calc(var(--spacing) * 80);
@@ -4444,6 +4450,12 @@
   }
   .bg-error {
     background-color: var(--color-error);
+  }
+  .bg-error\/5 {
+    background-color: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-error) 5%, transparent);
+    }
   }
   .bg-error\/10 {
     background-color: var(--color-error);
@@ -5508,6 +5520,11 @@
       --input-color: var(--color-accent);
     }
   }
+  .toggle-error {
+    &:checked, &[aria-checked="true"] {
+      --input-color: var(--color-error);
+    }
+  }
   .toggle-info {
     &:checked, &[aria-checked="true"] {
       --input-color: var(--color-info);
@@ -5521,6 +5538,11 @@
   .toggle-secondary {
     &:checked, &[aria-checked="true"] {
       --input-color: var(--color-secondary);
+    }
+  }
+  .toggle-sm {
+    &:is([type="checkbox"]), &:has([type="checkbox"]) {
+      --size: calc(var(--size-selector, 0.25rem) * 5);
     }
   }
   .toggle-success {
