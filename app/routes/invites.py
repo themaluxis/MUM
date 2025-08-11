@@ -677,9 +677,19 @@ def process_invite_form(invite_path_or_token):
                                         # Step 2: Set library access using update_user_access (like manual process)
                                         if user_id and hasattr(service, 'update_user_access'):
                                             try:
+                                                # Filter library IDs to only include ones that exist on this server
+                                                server_libraries = service.get_libraries()
+                                                server_lib_ids = [lib.get('external_id') or lib.get('id') for lib in server_libraries]
+                                                current_app.logger.debug(f"Server {server.name} library IDs: {server_lib_ids}")
+                                                current_app.logger.debug(f"Invite grant_library_ids: {invite.grant_library_ids}")
+                                                
+                                                # Only use library IDs that exist on this server
+                                                filtered_library_ids = [lib_id for lib_id in invite.grant_library_ids if lib_id in server_lib_ids]
+                                                current_app.logger.debug(f"Filtered library IDs for {server.name}: {filtered_library_ids}")
+                                                
                                                 success = service.update_user_access(
                                                     user_id=user_id,
-                                                    library_ids=invite.grant_library_ids
+                                                    library_ids=filtered_library_ids
                                                 )
                                                 if success:
                                                     session[f'invite_{invite.id}_server_{server.id}_completed'] = True

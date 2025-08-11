@@ -271,38 +271,6 @@
                                 {% set current_step = invite_steps[3] %}
                             {% endif %}
                             
-                            {# Debug: Show step status #}
-                            {% if config.DEBUG %}
-                            <div class="alert alert-warning mb-4">
-                                <div class="text-xs">
-                                    <p><strong>Debug Info:</strong></p>
-                                    <p>Total steps: {{ invite_steps|length }}</p>
-                                    <p>Current step: {{ current_step.name if current_step else 'None' }}</p>
-                                    <p>Current step ID: {{ current_step.id if current_step else 'None' }}</p>
-                                    <p>Current step starts with server_access_: {{ current_step.id.startswith('server_access_') if current_step else 'N/A' }}</p>
-                                    {% for step in invite_steps %}
-                                        <p>{{ loop.index }}: {{ step.name }} - Completed: {{ step.completed }} (ID: {{ step.id }})</p>
-                                        {% if not step.completed %}
-                                            <p style="margin-left: 20px;">→ Checking if this should be current step...</p>
-                                            {% set all_previous_completed = true %}
-                                            {% for prev_step in invite_steps[:loop.index0] %}
-                                                {% if not prev_step.completed %}
-                                                    {% set all_previous_completed = false %}
-                                                    <p style="margin-left: 40px;">→ Previous step {{ prev_step.name }} not completed</p>
-                                                {% endif %}
-                                            {% endfor %}
-                                            <p style="margin-left: 40px;">→ All previous completed: {{ all_previous_completed }}</p>
-                                        {% endif %}
-                                    {% endfor %}
-                                    <p><strong>Template Logic Check:</strong></p>
-                                    <p>Has current_step: {{ current_step is not none }}</p>
-                                    <p>Current step starts with server_access_: {{ (current_step and current_step.id.startswith('server_access_')) }}</p>
-                                    <p>Will show individual server step: {{ (current_step and current_step.id.startswith('server_access_')) }}</p>
-                                    <p>Will show final step: {{ not (current_step and current_step.id.startswith('server_access_')) }}</p>
-                                </div>
-                            </div>
-                            {% endif %}
-                            
                             {# Find current server step #}
                             {% if current_step and current_step.id.startswith('server_access_') %}
                                 {# Individual Server Access Step #}
