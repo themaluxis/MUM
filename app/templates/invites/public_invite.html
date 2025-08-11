@@ -19,96 +19,128 @@
                     {% endif %}
                 </div>
             {% elif invite %}
-                <div class="card bg-base-200 shadow-xl p-6 sm:p-8">
-                    <figure class="mb-4"><i class="fa-solid fa-envelope-open-text fa-5x text-primary"></i></figure>
-                    <h1 class="text-3xl sm:text-4xl font-bold">You're Invited!</h1>
-                    <p class="py-4 text-base-content/80">You've been invited to join <strong class="text-accent">{{ server_name }}</strong>.</p>
-
-                    {% if already_authenticated_plex_user %}
-                        <div class="alert alert-success my-4 shadow-md items-start sm:items-center">
-                            <i class="fa-brands fa-plex fa-xl mr-2 mt-1 sm:mt-0"></i>
-                            <div>
-                                <h3 class="font-bold">Plex Account Linked!</h3>
-                                <div class="text-xs">Hello, <strong>{{ already_authenticated_plex_user.username }}</strong>!</div>
-                            </div>
+                <div class="bg-base-100 border border-base-300 rounded-xl shadow-lg overflow-hidden">
+                    <!-- Header Section -->
+                    <div class="bg-gradient-to-r from-primary/10 to-secondary/10 p-6 text-center border-b border-base-300">
+                        <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                            <i class="fa-solid fa-envelope-open-text text-primary text-2xl"></i>
                         </div>
-                    {% endif %}
+                        <h1 class="text-2xl font-bold text-base-content mb-2">You're Invited!</h1>
+                        <p class="text-base-content/70 text-sm">
+                            Join <strong class="text-primary">{{ server_name }}</strong> and start streaming
+                        </p>
+                    </div>
+                    
+                    <!-- Content Section -->
+                    <div class="p-6 space-y-6">
 
-                    {% if show_discord_button and already_authenticated_discord_user %}
-                         <div class="alert alert-info my-4 shadow-md items-start sm:items-center">
-                            <i class="fa-brands fa-discord fa-xl mr-2 mt-1 sm:mt-0"></i>
-                            <div>
-                                <h3 class="font-bold">Discord Account Linked!</h3>
-                                <div class="text-xs">Hello, <strong>{{ already_authenticated_discord_user.username }}</strong>!</div>
+                        {% if already_authenticated_plex_user %}
+                            <!-- Plex Account Linked -->
+                            <div class="bg-[#e5a00d]/10 border border-[#e5a00d]/20 rounded-lg p-4">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-[#e5a00d]/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-brands fa-plex text-[#e5a00d] text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-medium text-[#e5a00d] mb-1">Plex Account Linked</h3>
+                                        <p class="text-sm text-base-content/80">
+                                            Welcome back, <strong class="text-base-content">{{ already_authenticated_plex_user.username }}</strong>!
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    {% endif %}
+                        {% endif %}
+
+                        {% if show_discord_button and already_authenticated_discord_user %}
+                            <!-- Discord Account Linked -->
+                            <div class="bg-[#5865F2]/10 border border-[#5865F2]/20 rounded-lg p-4">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-[#5865F2]/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-brands fa-discord text-[#5865F2] text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-medium text-[#5865F2] mb-1">Discord Account Linked</h3>
+                                        <p class="text-sm text-base-content/80">
+                                            Connected as <strong class="text-base-content">{{ already_authenticated_discord_user.username }}</strong>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
 
                     <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
                         {{ form.hidden_tag() }} {# For potential CSRF if form was more complex #}
 
                         {# User Account Creation Section #}
                         {% if allow_user_accounts and not user_account_created %}
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold mb-4">
-                                    <i class="fa-solid fa-user-plus mr-2"></i>
-                                    Create Your Account
-                                </h3>
-                                <p class="text-sm text-base-content/70 mb-4">
-                                    First, create your account to manage your media access and preferences.
-                                </p>
+                            <div class="space-y-4 mb-6">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-solid fa-user-plus text-primary text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-medium text-base-content">Create Your Account</h3>
+                                        <p class="text-sm text-base-content/70">
+                                            Manage your media access and preferences
+                                        </p>
+                                    </div>
+                                </div>
                                 
-                                <div class="form-control mb-3">
-                                    <label class="label">
-                                        <span class="label-text">{{ account_form.username.label.text }}</span>
-                                    </label>
-                                    {{ account_form.username(class="input input-bordered w-full") }}
-                                </div>
+                                <div class="space-y-4">
+                                    <div class="form-control">
+                                        <label class="label">
+                                            <span class="label-text font-medium text-sm">{{ account_form.username.label.text }}</span>
+                                        </label>
+                                        {{ account_form.username(class="input input-bordered w-full h-11 bg-base-200/50 border-base-300 focus:border-primary focus:bg-base-100") }}
+                                    </div>
 
-                                <div class="form-control mb-3">
-                                    <label class="label">
-                                        <span class="label-text">{{ account_form.email.label.text }}</span>
-                                    </label>
-                                    {{ account_form.email(class="input input-bordered w-full") }}
-                                </div>
+                                    <div class="form-control">
+                                        <label class="label">
+                                            <span class="label-text font-medium text-sm">{{ account_form.email.label.text }}</span>
+                                        </label>
+                                        {{ account_form.email(class="input input-bordered w-full h-11 bg-base-200/50 border-base-300 focus:border-primary focus:bg-base-100") }}
+                                    </div>
 
-                                <div class="form-control mb-3">
-                                    <label class="label">
-                                        <span class="label-text">{{ account_form.password.label.text }}</span>
-                                    </label>
-                                    {{ account_form.password(class="input input-bordered w-full") }}
-                                </div>
+                                    <div class="form-control">
+                                        <label class="label">
+                                            <span class="label-text font-medium text-sm">{{ account_form.password.label.text }}</span>
+                                        </label>
+                                        {{ account_form.password(class="input input-bordered w-full h-11 bg-base-200/50 border-base-300 focus:border-primary focus:bg-base-100") }}
+                                    </div>
 
-                                <div class="form-control mb-4">
-                                    <label class="label">
-                                        <span class="label-text">{{ account_form.confirm_password.label.text }}</span>
-                                    </label>
-                                    {{ account_form.confirm_password(class="input input-bordered w-full") }}
-                                </div>
+                                    <div class="form-control">
+                                        <label class="label">
+                                            <span class="label-text font-medium text-sm">{{ account_form.confirm_password.label.text }}</span>
+                                        </label>
+                                        {{ account_form.confirm_password(class="input input-bordered w-full h-11 bg-base-200/50 border-base-300 focus:border-primary focus:bg-base-100") }}
+                                    </div>
 
-                                <button name="action" value="create_user_account" type="submit" class="btn btn-primary btn-block text-base mb-6">
-                                    <i class="fa-solid fa-user-plus mr-2"></i>
-                                    Create Account & Continue
-                                </button>
+                                    <button name="action" value="create_user_account" type="submit" class="btn btn-primary w-full h-12 text-base font-medium">
+                                        <i class="fa-solid fa-user-plus mr-2"></i>
+                                        Create Account & Continue
+                                    </button>
+                                </div>
                                 
-                                <div class="divider">Then continue with authentication</div>
+                                <div class="divider text-xs text-base-content/60">Then continue with authentication</div>
                             </div>
                         {% endif %}
 
-                        {# Plex Login Button #}
-                        {% if not already_authenticated_plex_user %}
-                        <div class="form-control mt-6">
-                            <button name="auth_method" value="plex" type="submit" class="btn btn-primary bg-[#e5a00d] hover:bg-[#c4880b] border-[#e5a00d] hover:border-[#c4880b] text-black btn-block text-base">
-                                <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In with Plex
-                            </button>
-                        </div>
-                        {% endif %}
+                        <!-- Authentication Section -->
+                        <div class="space-y-4">
+                            {# Plex Login Button #}
+                            {% if not already_authenticated_plex_user %}
+                                <button name="auth_method" value="plex" type="submit" 
+                                        class="btn bg-[#e5a00d] hover:bg-[#c4880b] border-[#e5a00d] hover:border-[#c4880b] text-black w-full h-12 text-base font-medium">
+                                    <i class="fa-solid fa-right-to-bracket mr-2"></i>
+                                    Sign In with Plex
+                                </button>
+                            {% endif %}
 
-                        {# Discord Login Button #}
-                        {% if show_discord_button and not already_authenticated_discord_user %}
-                            <div class="form-control mt-4">
-                                 <button name="auth_method" value="discord" type="submit" class="btn btn-info bg-[#5865F2] hover:bg-[#4752C4] border-[#5865F2] hover:border-[#4752C4] text-white btn-block text-base">
-                                    <i class="fa-brands fa-discord fa-lg mr-2"></i>
+                            {# Discord Login Button #}
+                            {% if show_discord_button and not already_authenticated_discord_user %}
+                                <button name="auth_method" value="discord" type="submit" 
+                                        class="btn bg-[#5865F2] hover:bg-[#4752C4] border-[#5865F2] hover:border-[#4752C4] text-white w-full h-12 text-base font-medium">
+                                    <i class="fa-brands fa-discord mr-2"></i>
                                     {% if already_authenticated_plex_user %} 
                                         Link Discord Account 
                                     {% else %} 
@@ -120,37 +152,56 @@
                                         <span class="badge badge-sm badge-ghost ml-2">Optional</span>
                                     {% endif %}
                                 </button>
-                            </div>
-                        {% endif %}
+                            {% endif %}
+                        </div>
 
-                        <div class="text-xs text-left pl-1 mt-3 space-y-2">
-                            {% if setting_require_guild_membership and not already_authenticated_discord_user %}
-                                {% if setting_discord_server_invite_url %}
-                                <div class="form-control mt-2">
+                        <!-- Discord Server Join (if required) -->
+                        {% if setting_require_guild_membership and not already_authenticated_discord_user %}
+                            {% if setting_discord_server_invite_url %}
+                                <div class="bg-[#5865F2]/10 border border-[#5865F2]/20 rounded-lg p-4">
+                                    <div class="flex items-start gap-3 mb-3">
+                                        <div class="w-6 h-6 rounded-full bg-[#5865F2]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <i class="fa-solid fa-exclamation text-[#5865F2] text-xs"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-medium text-[#5865F2] mb-1">Discord Server Required</h4>
+                                            <p class="text-sm text-base-content/80">
+                                                You must join our Discord server before proceeding
+                                            </p>
+                                        </div>
+                                    </div>
                                     <a href="{{ setting_discord_server_invite_url }}" target="_blank" rel="noopener noreferrer" 
-                                       class="btn btn-secondary btn-block text-base">
-                                        <i class="fa-brands fa-discord fa-lg mr-2"></i>
+                                       class="btn bg-[#5865F2] hover:bg-[#4752C4] border-[#5865F2] hover:border-[#4752C4] text-white w-full h-11 text-sm font-medium">
+                                        <i class="fa-brands fa-discord mr-2"></i>
                                         Join Discord Server
                                         <span class="badge badge-sm badge-warning ml-2 animate-pulse">Required</span>
                                     </a>
                                 </div>
-                                {% endif %}
                             {% endif %}
-                            {# --- END NEW --- #}
-                        </div>
+                        {% endif %}
 
                         {# Accept Invite Button #}
                         {% if already_authenticated_plex_user %}
                             {% if not (discord_sso_is_mandatory and not already_authenticated_discord_user) %}
-                                <div class="form-control mt-8">
-                                    <button name="action" value="accept_invite" type="submit" class="btn btn-success btn-block text-base">
-                                        <i class="fa-solid fa-check-circle mr-2"></i> Accept Invite & Join Server
+                                <div class="pt-4 border-t border-base-300 mt-6">
+                                    <button name="action" value="accept_invite" type="submit" class="btn btn-primary w-full h-12 text-base font-medium">
+                                        <i class="fa-solid fa-check-circle mr-2"></i>
+                                        Accept Invite & Join Server
                                     </button>
                                 </div>
                             {% elif discord_sso_is_mandatory and not show_discord_button %}
-                                <div class="alert alert-error mt-6 text-sm p-3 justify-start items-center">
-                                    <i class="fa-solid fa-circle-xmark mr-2 flex-shrink-0"></i>
-                                    <span>Discord linking is required, but Discord login is currently unavailable. Please contact an admin.</span>
+                                <div class="bg-error/10 border border-error/20 rounded-lg p-4 mt-6">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-6 h-6 rounded-full bg-error/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <i class="fa-solid fa-exclamation text-error text-xs"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-medium text-error mb-1">Discord Required</h4>
+                                            <p class="text-sm text-base-content/80">
+                                                Discord linking is required, but Discord login is currently unavailable. Please contact an admin.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             {% endif %}
                         {% endif %}
