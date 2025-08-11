@@ -1027,9 +1027,57 @@ def discord_oauth_callback():
 @bp.route('/success') # Path is /invites/success
 @setup_required 
 def invite_success():
-    username = request.args.get('username', 'there'); plex_app_url = "https://app.plex.tv"
+    username = request.args.get('username', 'there')
+    servers = request.args.get('servers', '')
     allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
-    return render_template('invites/success.html', username=username, plex_app_url=plex_app_url, allow_user_accounts=allow_user_accounts)
+    
+    # Parse server names and determine service types
+    server_list = [s.strip() for s in servers.split(',') if s.strip()] if servers else []
+    
+    # Get server information from the database to determine service types
+    media_service_manager = MediaServiceManager()
+    all_servers = media_service_manager.get_all_servers(active_only=True)
+    
+    configured_servers = []
+    has_plex = False
+    has_jellyfin = False
+    has_other = False
+    
+    for server_name in server_list:
+        # Find the server in the database
+        server = next((s for s in all_servers if s.name == server_name), None)
+        if server:
+            configured_servers.append({
+                'name': server.name,
+                'type': server.service_type.name.upper(),
+                'url': get_server_url(server)
+            })
+            
+            if server.service_type.name.upper() == 'PLEX':
+                has_plex = True
+            elif server.service_type.name.upper() == 'JELLYFIN':
+                has_jellyfin = True
+            else:
+                has_other = True
+    
+    return render_template('invites/success.html', 
+                         username=username, 
+                         configured_servers=configured_servers,
+                         has_plex=has_plex,
+                         has_jellyfin=has_jellyfin,
+                         has_other=has_other,
+                         allow_user_accounts=allow_user_accounts)
+
+def get_server_url(server):
+    """Get the appropriate URL for a server based on its type"""
+    if server.service_type.name.upper() == 'PLEX':
+        return "https://app.plex.tv"
+    elif server.service_type.name.upper() == 'JELLYFIN':
+        return server.url
+    elif server.service_type.name.upper() == 'EMBY':
+        return server.url
+    else:
+        return server.url
 
 @bp.route('/') # Defines the base /invites/ path
 @setup_required 

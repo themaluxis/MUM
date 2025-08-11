@@ -433,7 +433,9 @@
                                         </div>
                                     </div>
 
-                                    <a href="{{ url_for('invites.invite_success', username=already_authenticated_plex_user.username) }}" class="btn btn-primary btn-block text-base btn-lg">
+                                    {% set success_username = already_authenticated_plex_user.username if already_authenticated_plex_user else 'User' %}
+                                    {% set server_names = invite.servers|map(attribute='name')|join(', ') %}
+                                    <a href="{{ url_for('invites.invite_success', username=success_username, servers=server_names) }}" class="btn btn-primary btn-block text-base btn-lg">
                                         <i class="fa-solid fa-arrow-right mr-2"></i>
                                         Continue to Success Page
                                     </a>
