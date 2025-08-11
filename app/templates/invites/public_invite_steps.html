@@ -48,25 +48,61 @@
                         }) %}
                     {% endif %}
                     
-                    {# Step 3: Plex Login (always required) #}
-                    {% set _ = invite_steps.append({
-                        'id': 'plex',
-                        'name': 'Plex Login',
-                        'icon': 'fa-solid fa-right-to-bracket',
-                        'required': true,
-                        'completed': already_authenticated_plex_user is not none
-                    }) %}
+                    {# Step 3: Plex Login (only if there are Plex servers in the invite) #}
+                    {% set has_plex_servers = invite.servers and invite.servers|selectattr('service_type.name', 'equalto', 'PLEX')|list|length > 0 %}
+                    {% if has_plex_servers %}
+                        {% set _ = invite_steps.append({
+                            'id': 'plex',
+                            'name': 'Plex Login',
+                            'icon': 'fa-solid fa-right-to-bracket',
+                            'required': true,
+                            'completed': already_authenticated_plex_user is not none
+                        }) %}
+                    {% endif %}
                     
                     {# Step 3+: Server Access (for each server in multi-server invites) #}
-                    {# For now, we'll show a single "Server Access" step #}
-                    {# TODO: Extend this when we have proper multi-server invite data #}
-                    {% set _ = invite_steps.append({
-                        'id': 'server_access',
-                        'name': 'Server Access',
-                        'icon': 'fa-solid fa-server',
-                        'required': true,
-                        'completed': false
-                    }) %}
+                    {% if invite.servers %}
+                        {% for server in invite.servers %}
+                            {% set server_icon = 'fa-solid fa-server' %}
+                            {% if server.service_type.name.upper() == 'PLEX' %}
+                                {% set server_icon = 'fa-solid fa-play' %}
+                            {% elif server.service_type.name.upper() == 'JELLYFIN' %}
+                                {% set server_icon = 'fa-solid fa-film' %}
+                            {% elif server.service_type.name.upper() == 'EMBY' %}
+                                {% set server_icon = 'fa-solid fa-video' %}
+                            {% endif %}
+                            {# Check if this server has been completed #}
+                            {% set server_completed = session.get('invite_' ~ invite.id ~ '_server_' ~ server.id ~ '_completed', false) %}
+                            
+                            {# For Plex servers, auto-complete when Plex login is done #}
+                            {% if server.service_type.name.upper() == 'PLEX' and already_authenticated_plex_user %}
+                                {% set server_completed = true %}
+                            {% endif %}
+                            
+                            {# Only add non-Plex servers as separate steps #}
+                            {% if server.service_type.name.upper() != 'PLEX' %}
+                                {% set _ = invite_steps.append({
+                                    'id': 'server_access_' ~ server.id,
+                                    'name': server.name ~ ' Access',
+                                    'icon': server_icon,
+                                    'required': true,
+                                    'completed': server_completed,
+                                    'server_type': server.service_type.name.upper(),
+                                    'server_name': server.name,
+                                    'server_id': server.id
+                                }) %}
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        {# Fallback for legacy single server invites #}
+                        {% set _ = invite_steps.append({
+                            'id': 'server_access',
+                            'name': 'Server Access',
+                            'icon': 'fa-solid fa-server',
+                            'required': true,
+                            'completed': false
+                        }) %}
+                    {% endif %}
 
                     {# Display Steps #}
                     {% if invite_steps|length > 1 %}
@@ -198,8 +234,8 @@
                                     <p class="text-sm text-base-content/60">You can skip Discord login and proceed directly to Plex authentication.</p>
                                 {% endif %}
                             </div>
-                        {% elif not already_authenticated_plex_user %}
-                            {# Plex Step #}
+                        {% elif has_plex_servers and not already_authenticated_plex_user %}
+                            {# Plex Step (only if there are Plex servers) #}
                             <div class="step-section" id="plex-step">
                                 <h2 class="text-xl font-semibold mb-4">
                                     <i class="fa-solid fa-right-to-bracket mr-2"></i>
@@ -222,62 +258,246 @@
                                 </form>
                             </div>
                         {% else %}
-                            {# Final Step - Accept Invite #}
-                            <div class="step-section" id="accept-step">
-                                <h2 class="text-xl font-semibold mb-4">
-                                    <i class="fa-solid fa-check-circle mr-2"></i>
-                                    Ready to Join!
-                                </h2>
+                            {# Server Access Steps or Final Accept #}
+                            {# Find the first incomplete step where all previous steps are completed #}
+                            {% set current_step = none %}
+                            {% if invite_steps|length >= 1 and not invite_steps[0].completed %}
+                                {% set current_step = invite_steps[0] %}
+                            {% elif invite_steps|length >= 2 and invite_steps[0].completed and not invite_steps[1].completed %}
+                                {% set current_step = invite_steps[1] %}
+                            {% elif invite_steps|length >= 3 and invite_steps[0].completed and invite_steps[1].completed and not invite_steps[2].completed %}
+                                {% set current_step = invite_steps[2] %}
+                            {% elif invite_steps|length >= 4 and invite_steps[0].completed and invite_steps[1].completed and invite_steps[2].completed and not invite_steps[3].completed %}
+                                {% set current_step = invite_steps[3] %}
+                            {% endif %}
+                            
+                            {# Debug: Show step status #}
+                            {% if config.DEBUG %}
+                            <div class="alert alert-warning mb-4">
+                                <div class="text-xs">
+                                    <p><strong>Debug Info:</strong></p>
+                                    <p>Total steps: {{ invite_steps|length }}</p>
+                                    <p>Current step: {{ current_step.name if current_step else 'None' }}</p>
+                                    <p>Current step ID: {{ current_step.id if current_step else 'None' }}</p>
+                                    <p>Current step starts with server_access_: {{ current_step.id.startswith('server_access_') if current_step else 'N/A' }}</p>
+                                    {% for step in invite_steps %}
+                                        <p>{{ loop.index }}: {{ step.name }} - Completed: {{ step.completed }} (ID: {{ step.id }})</p>
+                                        {% if not step.completed %}
+                                            <p style="margin-left: 20px;">→ Checking if this should be current step...</p>
+                                            {% set all_previous_completed = true %}
+                                            {% for prev_step in invite_steps[:loop.index0] %}
+                                                {% if not prev_step.completed %}
+                                                    {% set all_previous_completed = false %}
+                                                    <p style="margin-left: 40px;">→ Previous step {{ prev_step.name }} not completed</p>
+                                                {% endif %}
+                                            {% endfor %}
+                                            <p style="margin-left: 40px;">→ All previous completed: {{ all_previous_completed }}</p>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <p><strong>Template Logic Check:</strong></p>
+                                    <p>Has current_step: {{ current_step is not none }}</p>
+                                    <p>Current step starts with server_access_: {{ (current_step and current_step.id.startswith('server_access_')) }}</p>
+                                    <p>Will show individual server step: {{ (current_step and current_step.id.startswith('server_access_')) }}</p>
+                                    <p>Will show final step: {{ not (current_step and current_step.id.startswith('server_access_')) }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {# Find current server step #}
+                            {% if current_step and current_step.id.startswith('server_access_') %}
+                                {# Individual Server Access Step #}
+                                <div class="step-section" id="{{ current_step.id }}">
+                                    <h2 class="text-xl font-semibold mb-4">
+                                        <i class="{{ current_step.icon }} mr-2"></i>
+                                        {{ current_step.name }}
+                                    </h2>
+                                    
+                                    {# Show completed authentications #}
+                                    <div class="space-y-2 mb-6">
+                                        {% if already_authenticated_plex_user %}
+                                            <div class="alert alert-success">
+                                                <i class="fa-solid fa-right-to-bracket mr-2"></i>
+                                                <span>Plex account linked as <strong>{{ already_authenticated_plex_user.username }}</strong></span>
+                                            </div>
+                                        {% endif %}
+                                        {% if already_authenticated_discord_user %}
+                                            <div class="alert alert-success">
+                                                <i class="fa-brands fa-discord mr-2"></i>
+                                                <span>Discord account linked as <strong>{{ already_authenticated_discord_user.username }}</strong></span>
+                                            </div>
+                                        {% endif %}
+                                    </div>
 
-                                {# Show completed authentications #}
-                                <div class="space-y-2 mb-6">
-                                    {% if already_authenticated_plex_user %}
-                                        <div class="alert alert-success">
-                                            <i class="fa-solid fa-right-to-bracket mr-2"></i>
-                                            <span>Plex account linked as <strong>{{ already_authenticated_plex_user.username }}</strong></span>
+                                    <div class="alert alert-info mb-4">
+                                        <i class="fa-solid fa-info-circle mr-2"></i>
+                                        <div>
+                                            <p class="font-semibold">Setting up access to {{ current_step.server_name }}</p>
+                                            <p class="text-sm">Service Type: {{ current_step.server_type }}</p>
                                         </div>
-                                    {% endif %}
-                                    {% if already_authenticated_discord_user %}
-                                        <div class="alert alert-success">
-                                            <i class="fa-brands fa-discord mr-2"></i>
-                                            <span>Discord account linked as <strong>{{ already_authenticated_discord_user.username }}</strong></span>
+                                    </div>
+
+                                    {% if not (discord_sso_is_mandatory and not already_authenticated_discord_user) %}
+                                        <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
+                                            {{ form.hidden_tag() }}
+                                            <input type="hidden" name="current_server_id" value="{{ current_step.server_id }}">
+                                            
+                                            {# For non-Plex servers, show username/password fields #}
+                                            {% if current_step.server_type != 'PLEX' %}
+                                                <div class="space-y-4 mb-6">
+                                                    <div class="form-control">
+                                                        <label class="label">
+                                                            <span class="label-text">Choose a username for {{ current_step.server_name }}</span>
+                                                        </label>
+                                                        <input type="text" name="jellyfin_username" placeholder="Username" class="input input-bordered" value="{{ already_authenticated_plex_user.username }}" required>
+                                                        <label class="label">
+                                                            <span class="label-text-alt">Default: Your Plex username</span>
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-control">
+                                                        <label class="label">
+                                                            <span class="label-text">Set a password for {{ current_step.server_name }}</span>
+                                                        </label>
+                                                        <input type="password" name="jellyfin_password" placeholder="Enter password" class="input input-bordered" required>
+                                                        <label class="label">
+                                                            <span class="label-text-alt">Choose a secure password for your account</span>
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-control">
+                                                        <label class="label">
+                                                            <span class="label-text">Confirm password</span>
+                                                        </label>
+                                                        <input type="password" name="jellyfin_password_confirm" placeholder="Confirm password" class="input input-bordered" required>
+                                                        <label class="label">
+                                                            <span class="label-text-alt">Re-enter your password to confirm</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            <button name="action" value="setup_server_access" type="submit" class="btn btn-success btn-block text-base btn-lg" 
+                                                    {% if current_step.server_type != 'PLEX' %}onclick="return validatePasswords()"{% endif %}>
+                                                <i class="fa-solid fa-check-circle mr-2"></i>
+                                                {% if current_step.server_type == 'PLEX' %}
+                                                    Grant Access to {{ current_step.server_name }}
+                                                {% else %}
+                                                    Create Account on {{ current_step.server_name }}
+                                                {% endif %}
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <div class="alert alert-error">
+                                            <i class="fa-solid fa-circle-xmark mr-2"></i>
+                                            <span>Discord linking is required but not completed. Please go back and link your Discord account.</span>
                                         </div>
                                     {% endif %}
                                 </div>
-
-                                {% if not (discord_sso_is_mandatory and not already_authenticated_discord_user) %}
-                                    <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
-                                        {{ form.hidden_tag() }}
-                                        <button name="action" value="accept_invite" type="submit" class="btn btn-success btn-block text-base btn-lg">
-                                            <i class="fa-solid fa-check-circle mr-2"></i>
-                                            Accept Invite & Join {{ server_name }}
-                                        </button>
-                                    </form>
-                                {% else %}
-                                    <div class="alert alert-error">
-                                        <i class="fa-solid fa-circle-xmark mr-2"></i>
-                                        <span>Discord linking is required but not completed. Please go back and link your Discord account.</span>
+                            {% else %}
+                                {# All servers completed - Final step #}
+                                <div class="step-section" id="final-step">
+                                    <h2 class="text-xl font-semibold mb-4">
+                                        <i class="fa-solid fa-check-circle mr-2"></i>
+                                        All Servers Configured!
+                                    </h2>
+                                    
+                                    {# Show completed authentications #}
+                                    <div class="space-y-2 mb-6">
+                                        {% if already_authenticated_plex_user %}
+                                            <div class="alert alert-success">
+                                                <i class="fa-solid fa-right-to-bracket mr-2"></i>
+                                                <span>Plex account linked as <strong>{{ already_authenticated_plex_user.username }}</strong></span>
+                                            </div>
+                                        {% endif %}
+                                        {% if already_authenticated_discord_user %}
+                                            <div class="alert alert-success">
+                                                <i class="fa-brands fa-discord mr-2"></i>
+                                                <span>Discord account linked as <strong>{{ already_authenticated_discord_user.username }}</strong></span>
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                {% endif %}
-                            </div>
-                            {# Server Access Details (only show on final step) #}
-                            {% if already_authenticated_plex_user and (not discord_sso_is_mandatory or already_authenticated_discord_user) %}
+
+                                    <div class="alert alert-success mb-4">
+                                        <i class="fa-solid fa-check-circle mr-2"></i>
+                                        <div>
+                                            <p class="font-semibold">Access has been configured for all servers!</p>
+                                            <ul class="text-sm mt-2 space-y-1">
+                                                {% if invite.servers %}
+                                                    {% for server in invite.servers %}
+                                                        <li class="flex items-center">
+                                                            <i class="fa-solid fa-check mr-2 text-success"></i>
+                                                            <span class="font-medium">{{ server.name }}</span>
+                                                            <span class="text-xs ml-2 opacity-70">({{ server.service_type.name }})</span>
+                                                        </li>
+                                                    {% endfor %}
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    <a href="{{ url_for('invites.invite_success', username=already_authenticated_plex_user.username) }}" class="btn btn-primary btn-block text-base btn-lg">
+                                        <i class="fa-solid fa-arrow-right mr-2"></i>
+                                        Continue to Success Page
+                                    </a>
+                                </div>
+                            {% endif %}
+                            {# Server Access Details (show for current server step) #}
+                            {% if current_step and current_step.id.startswith('server_access_') and already_authenticated_plex_user and (not discord_sso_is_mandatory or already_authenticated_discord_user) %}
                                 <div class="collapse collapse-arrow bg-base-100 mt-4">
                                     <input type="checkbox" /> 
                                     <div class="collapse-title text-sm font-medium">
                                         <i class="fa-solid fa-info-circle mr-2"></i>
-                                        Server Access Details
+                                        {{ current_step.server_name }} Access Details
                                     </div>
                                     <div class="collapse-content text-xs text-left space-y-1">
-                                        <p><i class="fa-solid fa-server fa-fw w-4"></i> Server: {{ server_name }}</p>
+                                        <p><i class="fa-solid fa-server fa-fw w-4"></i> Server: {{ current_step.server_name }}</p>
+                                        <p><i class="fa-solid fa-cog fa-fw w-4"></i> Service Type: {{ current_step.server_type }}</p>
                                         {% if invite.grant_library_ids|length > 0 %}
-                                            <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Library Access: {{ invite.grant_library_ids|length }} specific libraries</p>
+                                            {# Get libraries for current server #}
+                                            {% set current_server_libraries = servers_with_libraries.get(current_step.server_id|int, {}).get('libraries', {}) if servers_with_libraries else {} %}
+                                            
+                                            {# Find matching libraries #}
+                                            {% set matching_libraries = [] %}
+                                            {% for lib_id in invite.grant_library_ids %}
+                                                {% if lib_id in current_server_libraries %}
+                                                    {% set _ = matching_libraries.append(current_server_libraries[lib_id]) %}
+                                                {% endif %}
+                                            {% endfor %}
+                                            
+                                            {% if matching_libraries %}
+                                                <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Library Access: {{ matching_libraries|length }} selected libraries</p>
+                                                <div class="text-xs opacity-70 ml-6 mt-1">
+                                                    <p><strong>You will get access to:</strong></p>
+                                                    <ul class="list-disc list-inside">
+                                                        {% for lib_name in matching_libraries %}
+                                                            <li>{{ lib_name }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            {% else %}
+                                                <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Library Access: Selected libraries</p>
+                                                <div class="text-xs opacity-70 ml-6 mt-1">
+                                                    <p>No matching libraries found for this server</p>
+                                                </div>
+                                            {% endif %}
                                         {% else %}
-                                            <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Library Access: All shared libraries</p>
+                                            <p><i class="fa-solid fa-layer-group fa-fw w-4"></i> Library Access: All available libraries on this server</p>
                                         {% endif %}
-                                        <p><i class="fa-solid fa-download fa-fw w-4"></i> Downloads/Sync: {{ "Enabled" if invite.allow_downloads else "Disabled" }}</p>
-                                        <p><i class="fa-solid fa-house-user fa-fw w-4"></i> Plex Home Invite: {{ "Yes" if invite.invite_to_plex_home else "No" }}</p>
-                                        <p><i class="fa-solid fa-tv fa-fw w-4"></i> Live TV Access: {{ "Enabled" if invite.allow_live_tv else "Disabled" }}</p>
+                                        
+                                        {# Show server-specific features #}
+                                        {% if current_step.server_type == 'PLEX' %}
+                                            <p><i class="fa-solid fa-download fa-fw w-4"></i> Downloads/Sync: {{ "Enabled" if invite.allow_downloads else "Disabled" }}</p>
+                                            <p><i class="fa-solid fa-house-user fa-fw w-4"></i> Plex Home Invite: {{ "Yes" if invite.invite_to_plex_home else "No" }}</p>
+                                            <p><i class="fa-solid fa-tv fa-fw w-4"></i> Live TV Access: {{ "Enabled" if invite.allow_live_tv else "Disabled" }}</p>
+                                        {% elif current_step.server_type == 'JELLYFIN' %}
+                                            <p><i class="fa-solid fa-user fa-fw w-4"></i> Account Type: New user account will be created</p>
+                                            <p><i class="fa-solid fa-key fa-fw w-4"></i> Authentication: Username and password (required)</p>
+                                            <p><i class="fa-solid fa-download fa-fw w-4"></i> Downloads: Available through Jellyfin apps</p>
+                                        {% elif current_step.server_type == 'EMBY' %}
+                                            <p><i class="fa-solid fa-user fa-fw w-4"></i> Account Type: New user account will be created</p>
+                                            <p><i class="fa-solid fa-key fa-fw w-4"></i> Authentication: Username and password</p>
+                                        {% else %}
+                                            <p><i class="fa-solid fa-user fa-fw w-4"></i> Account Type: New user account will be created</p>
+                                        {% endif %}
+                                        
                                         <div class="divider my-2"></div>
                                         <p><i class="fa-regular fa-clock fa-fw w-4"></i> Invite Expires: {{ invite.expires_at | format_datetime_user if invite.expires_at else "Never" }}</p>
                                         <p><i class="fa-solid fa-users fa-fw w-4"></i> Invite Uses Left: {{ (invite.max_uses - invite.current_uses) if invite.max_uses is not none else "Unlimited" }}</p>
@@ -314,4 +534,48 @@
     min-height: 100px;
 }
 </style>
+
+<script>
+function validatePasswords() {
+    const password = document.querySelector('input[name="jellyfin_password"]');
+    const confirmPassword = document.querySelector('input[name="jellyfin_password_confirm"]');
+    
+    if (!password || !confirmPassword) {
+        return true; // If fields don't exist, let form submit normally
+    }
+    
+    if (password.value !== confirmPassword.value) {
+        alert('Passwords do not match. Please check your password and confirmation.');
+        confirmPassword.focus();
+        return false;
+    }
+    
+    if (password.value.length < 1) {
+        alert('Password is required.');
+        password.focus();
+        return false;
+    }
+    
+    return true;
+}
+
+// Add real-time validation feedback
+document.addEventListener('DOMContentLoaded', function() {
+    const password = document.querySelector('input[name="jellyfin_password"]');
+    const confirmPassword = document.querySelector('input[name="jellyfin_password_confirm"]');
+    
+    if (password && confirmPassword) {
+        function checkPasswordMatch() {
+            if (confirmPassword.value && password.value !== confirmPassword.value) {
+                confirmPassword.setCustomValidity('Passwords do not match');
+            } else {
+                confirmPassword.setCustomValidity('');
+            }
+        }
+        
+        password.addEventListener('input', checkPasswordMatch);
+        confirmPassword.addEventListener('input', checkPasswordMatch);
+    }
+});
+</script>
 {% endblock content %}

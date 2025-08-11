@@ -277,7 +277,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Global function to update mass actions visibility and count
 function updateMassActions() {
-    console.log('🔍 updateMassActions() called');
     
     const massActionsContainer = document.getElementById('mass-actions-container');
     const selectedCountSpan = document.getElementById('selected-invites-count');
@@ -286,42 +285,26 @@ function updateMassActions() {
     const allCheckboxes = document.querySelectorAll('.invite-checkbox');
     const selectedCount = selectedCheckboxes.length;
     
-    console.log('📊 Debug info:', {
-        massActionsContainer: massActionsContainer ? 'Found' : 'NOT FOUND',
-        selectedCountSpan: selectedCountSpan ? 'Found' : 'NOT FOUND',
-        selectedCountSpanMobile: selectedCountSpanMobile ? 'Found' : 'NOT FOUND',
-        allCheckboxes: allCheckboxes.length,
-        selectedCheckboxes: selectedCheckboxes.length,
-        selectedCount: selectedCount
-    });
-    
     if (selectedCountSpan) {
         selectedCountSpan.textContent = selectedCount;
-        console.log('✅ Updated count span to:', selectedCount);
     } else {
-        console.log('❌ selectedCountSpan not found');
     }
     
     if (selectedCountSpanMobile) {
         selectedCountSpanMobile.textContent = selectedCount;
-        console.log('✅ Updated mobile count span to:', selectedCount);
     }
     
     if (massActionsContainer) {
         if (selectedCount > 0) {
             massActionsContainer.classList.remove('hidden');
-            console.log('✅ Showing mass actions container');
         } else {
             massActionsContainer.classList.add('hidden');
-            console.log('🔒 Hiding mass actions container');
         }
     } else {
-        console.log('❌ massActionsContainer not found');
     }
 }
 
 function initializeInviteSelection() {
-    console.log('🔧 initializeInviteSelection() called');
     
     const massActionsContainer = document.getElementById('mass-actions-container');
     const selectedCountSpan = document.getElementById('selected-invites-count');
@@ -329,19 +312,9 @@ function initializeInviteSelection() {
     const disableSelectedButton = document.getElementById('disable-selected-button');
     const selectAllButton = document.getElementById('select_all_visible_button');
     const deselectAllButton = document.getElementById('deselect_all_visible_button');
-    
-    console.log('🔍 Element check:', {
-        massActionsContainer: massActionsContainer ? 'Found' : 'NOT FOUND',
-        selectedCountSpan: selectedCountSpan ? 'Found' : 'NOT FOUND',
-        deleteSelectedButton: deleteSelectedButton ? 'Found' : 'NOT FOUND',
-        disableSelectedButton: disableSelectedButton ? 'Found' : 'NOT FOUND',
-        selectAllButton: selectAllButton ? 'Found' : 'NOT FOUND',
-        deselectAllButton: deselectAllButton ? 'Found' : 'NOT FOUND'
-    });
 
     // Function to handle checkbox changes
     function handleCheckboxChange() {
-        console.log('🔄 handleCheckboxChange() called');
         updateMassActions();
     }
 
@@ -460,7 +433,6 @@ function initializeInviteSelection() {
     // Set up event delegation for dynamically loaded checkboxes
     document.addEventListener('change', function(e) {
         if (e.target.classList.contains('invite-checkbox')) {
-            console.log('🎯 Checkbox changed:', e.target.value, 'checked:', e.target.checked);
             handleCheckboxChange();
             
             // Add/remove visual selection styling
@@ -468,10 +440,8 @@ function initializeInviteSelection() {
             if (card) {
                 if (e.target.checked) {
                     card.classList.add('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
-                    console.log('✅ Added selection styling to card');
                 } else {
                     card.classList.remove('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
-                    console.log('🔒 Removed selection styling from card');
                 }
             }
         }
@@ -481,19 +451,14 @@ function initializeInviteSelection() {
     document.addEventListener('click', function(e) {
         // Only handle clicks on the card itself or clickable area, not on buttons or other interactive elements
         if (e.target.classList.contains('invite-card') || e.target.closest('.invite-card-clickable')) {
-            console.log('🖱️ Card clicked:', e.target);
             const card = e.target.closest('.invite-card');
             if (card) {
                 const checkbox = card.querySelector('.invite-checkbox');
                 if (checkbox) {
-                    console.log('📋 Toggling checkbox from', checkbox.checked, 'to', !checkbox.checked);
                     checkbox.checked = !checkbox.checked;
-                    console.log('🔥 Dispatching change event');
                     checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-                    console.log('✅ Change event dispatched');
                     
                     // Fallback: directly call the handler
-                    console.log('🔧 Calling updateMassActions directly as fallback');
                     updateMassActions();
                     
                     // Add/remove visual selection styling directly
@@ -501,33 +466,26 @@ function initializeInviteSelection() {
                     if (card) {
                         if (checkbox.checked) {
                             card.classList.add('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
-                            console.log('✅ Added selection styling to card (direct)');
                         } else {
                             card.classList.remove('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
-                            console.log('🔒 Removed selection styling from card (direct)');
                         }
                     }
                 } else {
-                    console.log('❌ No checkbox found in card');
                 }
             }
         }
     });
 
     // Initial update
-    console.log('🎬 Calling initial updateMassActions()');
     updateMassActions();
 }
 
 // Re-initialize when content is loaded via HTMX
 document.body.addEventListener('htmx:afterSwap', function(evt) {
-    console.log('🔄 HTMX afterSwap event fired for:', evt.detail.target.id);
     if (evt.detail.target.id === 'invites-list-container') {
-        console.log('✅ HTMX content loaded for invites-list-container, re-initializing selection');
         
         // Check if checkboxes are now available
         const checkboxes = document.querySelectorAll('.invite-checkbox');
-        console.log('📋 Found', checkboxes.length, 'checkboxes after HTMX load');
         
         updateMassActions();
     }

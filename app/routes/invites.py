@@ -260,6 +260,9 @@ def create_invite():
             db.session.add(new_invite)
             db.session.flush()  # Flush to get the invite ID
             
+            # Clear any automatically added servers first
+            new_invite.servers.clear()
+            
             # Add all selected servers to the invite
             if selected_server_ids:
                 for server_id in selected_server_ids:
@@ -450,6 +453,23 @@ def process_invite_form(invite_path_or_token):
     media_service_manager = MediaServiceManager()
     all_servers = media_service_manager.get_all_servers(active_only=True)
     
+    # Get library information for each server in the invite
+    servers_with_libraries = {}
+    if invite and invite.servers:
+        for server in invite.servers:
+            try:
+                service = MediaServiceFactory.create_service_from_db(server)
+                if service:
+                    libraries = service.get_libraries()
+                    servers_with_libraries[server.id] = {
+                        'server': server,
+                        'libraries': {lib['id']: lib['name'] for lib in libraries}
+                    }
+                    current_app.logger.debug(f"Invite {invite.id} - Server {server.name} libraries: {servers_with_libraries[server.id]['libraries']}")
+            except Exception as e:
+                current_app.logger.error(f"Failed to fetch libraries for server {server.name}: {e}")
+                servers_with_libraries[server.id] = {'server': server, 'libraries': {}}
+    
     # Check if user accounts are enabled
     allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
     user_account_created = session.get(f'invite_{invite.id}_user_account_created', False)
@@ -576,6 +596,97 @@ def process_invite_form(invite_path_or_token):
                     return redirect(discord_auth_url)
                 else: flash("Discord integration is not properly configured by admin for login.", "danger")
 
+        elif action_taken == 'setup_server_access':
+            # Handle individual server setup
+            # Check if there are any Plex servers in the invite
+            has_plex_servers = any(server.service_type.name.upper() == 'PLEX' for server in invite.servers)
+            
+            if has_plex_servers and not already_authenticated_plex_user_info: 
+                flash("Please sign in with Plex first to setup server access.", "warning")
+            elif effective_require_sso and not already_authenticated_discord_user_info: 
+                flash("Discord account linking is required for this invite. Please link your Discord account.", "warning")
+            else:
+                current_server_id = request.form.get('current_server_id')
+                if not current_server_id:
+                    flash("No server specified for setup.", "error")
+                else:
+                    # Check if user account was created during this invite flow
+                    existing_user_id = session.get(f'invite_{invite.id}_user_account_id')
+                    
+                    # Process only the current server
+                    media_service_manager = MediaServiceManager()
+                    server = media_service_manager.get_server_by_id(current_server_id)
+                    
+                    if not server:
+                        flash(f"Server not found.", "error")
+                    else:
+                        try:
+                            service = MediaServiceFactory.create_service_from_db(server)
+                            if not service:
+                                flash(f"Failed to create service for {server.name}.", "error")
+                            else:
+                                # Process this specific server
+                                current_app.logger.debug(f"Processing server: {server.name}, service_type: {server.service_type}, service_type.name: {server.service_type.name}, service_type.name.upper(): {server.service_type.name.upper()}")
+                                
+                                if server.service_type.name.upper() == 'PLEX':
+                                    current_app.logger.debug(f"Detected Plex server: {server.name}, calling update_user_access")
+                                    # For Plex, grant access to existing user
+                                    success = service.update_user_access(
+                                        user_id=already_authenticated_plex_user_info['username'],
+                                        library_ids=invite.grant_library_ids
+                                    )
+                                    if success:
+                                        session[f'invite_{invite.id}_server_{server.id}_completed'] = True
+                                        flash(f"Access granted to {server.name}!", "success")
+                                    else:
+                                        flash(f"Failed to grant access to {server.name}.", "error")
+                                else:
+                                    current_app.logger.debug(f"Detected non-Plex server: {server.name} ({server.service_type.name}), calling create_user")
+                                    # For other services, create new user with custom credentials
+                                    jellyfin_username = request.form.get('jellyfin_username', already_authenticated_plex_user_info['username'])
+                                    jellyfin_password = request.form.get('jellyfin_password', '')
+                                    
+                                    current_app.logger.debug(f"Creating {server.service_type.name} user: username='{jellyfin_username}', password_set={bool(jellyfin_password)}")
+                                    
+                                    # Step 1: Create user without library access
+                                    result = service.create_user(
+                                        username=jellyfin_username,
+                                        email=already_authenticated_plex_user_info['email'] or f"{jellyfin_username}@example.com",
+                                        password=jellyfin_password
+                                    )
+                                    
+                                    if isinstance(result, dict) and result.get('success', True):
+                                        user_id = result.get('user_id')
+                                        current_app.logger.debug(f"Successfully created {server.service_type.name} user '{jellyfin_username}' with ID {user_id} on server {server.name}")
+                                        
+                                        # Step 2: Set library access using update_user_access (like manual process)
+                                        if user_id and hasattr(service, 'update_user_access'):
+                                            try:
+                                                success = service.update_user_access(
+                                                    user_id=user_id,
+                                                    library_ids=invite.grant_library_ids
+                                                )
+                                                if success:
+                                                    session[f'invite_{invite.id}_server_{server.id}_completed'] = True
+                                                    flash(f"User account '{jellyfin_username}' created on {server.name}!", "success")
+                                                    current_app.logger.debug(f"Successfully set library access for {server.service_type.name} user {user_id}")
+                                                else:
+                                                    flash(f"User created on {server.name} but failed to set library access.", "warning")
+                                                    current_app.logger.warning(f"Failed to set library access for {server.service_type.name} user {user_id}")
+                                            except Exception as e:
+                                                flash(f"User created on {server.name} but error setting library access: {str(e)}", "warning")
+                                                current_app.logger.error(f"Error setting library access for {server.service_type.name} user {user_id}: {e}")
+                                        else:
+                                            flash(f"User account '{jellyfin_username}' created on {server.name} but library access not set.", "warning")
+                                            current_app.logger.warning(f"Cannot set library access: user_id={user_id}, has_update_method={hasattr(service, 'update_user_access')}")
+                                    else:
+                                        error_msg = result.get('error', 'Unknown error') if isinstance(result, dict) else str(result)
+                                        flash(f"Failed to create account on {server.name}: {error_msg}", "error")
+                                        current_app.logger.error(f"Failed to create {server.service_type.name} user on {server.name}: {error_msg}")
+                        except Exception as e:
+                            current_app.logger.error(f"Error setting up access to {server.name}: {e}")
+                            flash(f"Error setting up access to {server.name}: {str(e)}", "error")
+
         elif action_taken == 'accept_invite':
             if not already_authenticated_plex_user_info: flash("Please sign in with Plex first to accept the invite.", "warning")
             elif effective_require_sso and not already_authenticated_discord_user_info: flash("Discord account linking is required for this invite. Please link your Discord account.", "warning")
@@ -632,7 +743,8 @@ def process_invite_form(invite_path_or_token):
                            server_name=server_name,
                            allow_user_accounts=allow_user_accounts,
                            user_account_created=user_account_created,
-                           account_form=account_form
+                           account_form=account_form,
+                           servers_with_libraries=servers_with_libraries
                            )
 
 @bp.route('/plex_callback') # Path is /invites/plex_callback
@@ -737,6 +849,26 @@ def plex_oauth_callback():
             'thumb': getattr(plex_account, 'thumb', None)
         }
         log_event(EventType.INVITE_USED_SUCCESS_PLEX, f"Plex auth success for {plex_account.username} on invite {invite.id}.", invite_id=invite.id)
+        
+        # Auto-grant access to Plex servers when Plex authentication is completed
+        media_service_manager = MediaServiceManager()
+        plex_servers = [server for server in invite.servers if server.service_type.name.upper() == 'PLEX']
+        
+        for plex_server in plex_servers:
+            try:
+                service = MediaServiceFactory.create_service_from_db(plex_server)
+                if service:
+                    success = service.update_user_access(
+                        user_id=plex_account.username,
+                        library_ids=invite.grant_library_ids
+                    )
+                    if success:
+                        session[f'invite_{invite.id}_server_{plex_server.id}_completed'] = True
+                        current_app.logger.info(f"Auto-granted Plex access to {plex_account.username} on {plex_server.name}")
+                    else:
+                        current_app.logger.warning(f"Failed to auto-grant Plex access to {plex_account.username} on {plex_server.name}")
+            except Exception as e:
+                current_app.logger.error(f"Error auto-granting Plex access on {plex_server.name}: {e}")
 
     except PlexApiException as e_plex:
         flash(f'Plex API error: {str(e_plex)}', 'danger')

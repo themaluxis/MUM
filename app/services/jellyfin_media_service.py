@@ -482,14 +482,8 @@ class JellyfinMediaService(BaseMediaService):
             result = self._make_request('Users/New', method='POST', data=user_data)
             user_id = result.get('Id')
             
-            # Set library access if specified
-            library_ids = kwargs.get('library_ids', [])
-            if library_ids and user_id:
-                policy_data = {
-                    'EnabledFolders': library_ids,
-                    'EnableAllFolders': False
-                }
-                self._make_request(f'Users/{user_id}/Policy', method='POST', data=policy_data)
+            # Library access will be set separately via update_user_access method
+            # This follows the same pattern as the manual library access update process
             
             return {
                 'success': True,

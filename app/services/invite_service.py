@@ -146,31 +146,77 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
             current_app.logger.debug(f"Invite service - Service has invite_user_to_plex_server: {hasattr(service, 'invite_user_to_plex_server')}")
             current_app.logger.debug(f"Invite service - Service has add_user: {hasattr(service, 'add_user')}")
             
-            # Use the correct methods that actually exist in the Plex service
-            if hasattr(service, 'update_user_access'):
-                current_app.logger.debug(f"Invite service - Calling update_user_access for {plex_username}")
+            # Handle different service types appropriately
+            if server.service_type.name.upper() == 'PLEX':
                 # For Plex, we need to grant access to an existing user
-                success = service.update_user_access(
-                    user_id=plex_username,  # Plex uses username as user_id
-                    library_ids=invite.grant_library_ids
-                )
-                if not success:
-                    raise Exception("Failed to update user access")
-                current_app.logger.debug(f"Invite service - Successfully called update_user_access")
-            elif hasattr(service, 'create_user'):
-                # Fallback to create_user if update_user_access doesn't work
-                current_app.logger.debug(f"Invite service - Calling create_user for {plex_username}")
-                result = service.create_user(
-                    username=plex_username,
-                    email=plex_email or f"{plex_username}@example.com"
-                )
-                if result.get('error'):
-                    raise Exception(result['error'])
-                current_app.logger.debug(f"Invite service - Successfully called create_user")
+                if hasattr(service, 'update_user_access'):
+                    current_app.logger.debug(f"Invite service - Calling update_user_access for Plex user {plex_username}")
+                    success = service.update_user_access(
+                        user_id=plex_username,  # Plex uses username as user_id
+                        library_ids=invite.grant_library_ids
+                    )
+                    if not success:
+                        raise Exception("Failed to update user access")
+                    current_app.logger.debug(f"Invite service - Successfully called update_user_access for Plex")
+                else:
+                    current_app.logger.error(f"Invite service - Plex service missing update_user_access method")
+                    failed_servers.append(f"{server.name} (missing update_user_access method)")
+                    continue
             else:
-                current_app.logger.error(f"Invite service - Service {service} has no supported methods")
-                failed_servers.append(f"{server.name} (unsupported service type)")
-                continue
+                # For other services (Jellyfin, Emby, etc.), create a new user
+                if hasattr(service, 'create_user'):
+                    current_app.logger.debug(f"Invite service - Calling create_user for {server.service_type.name} user {plex_username}")
+                    # Step 1: Create user without library access (like manual process)
+                    result = service.create_user(
+                        username=plex_username,
+                        email=plex_email or f"{plex_username}@example.com",
+                        password=""  # Empty password for services that support it
+                    )
+                    if isinstance(result, dict) and result.get('error'):
+                        raise Exception(result['error'])
+                    elif isinstance(result, dict) and not result.get('success', True):
+                        raise Exception(f"User creation failed: {result}")
+                    
+                    # Extract the user ID from the result
+                    current_app.logger.debug(f"Invite service - create_user result: {result}")
+                    external_user_id = None
+                    if isinstance(result, dict):
+                        external_user_id = result.get('user_id')
+                        current_app.logger.debug(f"Invite service - Extracted user_id from result: {external_user_id}")
+                    else:
+                        current_app.logger.warning(f"Invite service - create_user result is not a dict: {type(result)}")
+                    current_app.logger.debug(f"Invite service - Successfully created {server.service_type.name} user, external_user_id: {external_user_id}")
+                    
+                    # Step 2: Set library access using update_user_access (like manual process)
+                    if external_user_id and hasattr(service, 'update_user_access'):
+                        current_app.logger.debug(f"Invite service - Setting library access for {server.service_type.name} user {external_user_id}")
+                        try:
+                            success = service.update_user_access(
+                                user_id=external_user_id,  # Use the external user ID returned from create_user
+                                library_ids=invite.grant_library_ids
+                            )
+                            if success:
+                                current_app.logger.debug(f"Invite service - Successfully set library access for {server.service_type.name} user {external_user_id}")
+                            else:
+                                current_app.logger.warning(f"Invite service - Failed to set library access for {server.service_type.name} user {external_user_id}")
+                        except Exception as e:
+                            current_app.logger.error(f"Invite service - Error setting library access for {server.service_type.name} user {external_user_id}: {e}")
+                    elif not external_user_id:
+                        current_app.logger.error(f"Invite service - Cannot set library access: external_user_id is None for {server.service_type.name}")
+                    elif not hasattr(service, 'update_user_access'):
+                        current_app.logger.error(f"Invite service - Service {server.service_type.name} does not have update_user_access method")
+                    
+                    # Store the external user ID for later UserMediaAccess creation
+                    if external_user_id:
+                        if not hasattr(server, '_temp_external_user_id'):
+                            server._temp_external_user_id = external_user_id
+                        current_app.logger.debug(f"Invite service - Stored external_user_id {external_user_id} for server {server.name}")
+                    else:
+                        current_app.logger.warning(f"Invite service - No user_id returned from create_user for {server.service_type.name}")
+                else:
+                    current_app.logger.error(f"Invite service - Service {service} has no create_user method")
+                    failed_servers.append(f"{server.name} (missing create_user method)")
+                    continue
                 
             successful_servers.append(server.name)
             log_event(EventType.PLEX_USER_ADDED, f"User '{plex_username}' granted access to {server.name}. Downloads: {'enabled' if invite.allow_downloads else 'disabled'}.", invite_id=invite.id, details={'plex_user': plex_username, 'server': server.name, 'allow_downloads': invite.allow_downloads})
@@ -259,6 +305,45 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
         db.session.flush()
         if new_user.id:
             usage_log.mum_user_id = new_user.id
+            
+            # Create UserMediaAccess records for each server
+            from app.models_media_services import UserMediaAccess
+            for server in servers_to_grant_access:
+                try:
+                    # Check if UserMediaAccess already exists
+                    existing_access = UserMediaAccess.query.filter_by(
+                        user_id=new_user.id, 
+                        server_id=server.id
+                    ).first()
+                    
+                    if not existing_access:
+                        # Get the external user ID if available
+                        external_user_id = getattr(server, '_temp_external_user_id', None)
+                        
+                        # For Plex servers, use the plex username as external_user_id
+                        if server.service_type.name.upper() == 'PLEX':
+                            external_user_id = plex_username
+                            external_username = plex_username
+                        else:
+                            external_username = plex_username  # Use same username for consistency
+                        
+                        user_access = UserMediaAccess(
+                            user_id=new_user.id,
+                            server_id=server.id,
+                            external_user_id=external_user_id,
+                            external_username=external_username,
+                            external_email=plex_email,
+                            allowed_library_ids=list(invite.grant_library_ids),
+                            allow_downloads=bool(invite.allow_downloads),
+                            is_active=True
+                        )
+                        db.session.add(user_access)
+                        current_app.logger.debug(f"Invite service - Created UserMediaAccess for user {new_user.id} on server {server.name} with external_user_id: {external_user_id}")
+                    else:
+                        current_app.logger.debug(f"Invite service - UserMediaAccess already exists for user {new_user.id} on server {server.name}")
+                        
+                except Exception as e:
+                    current_app.logger.error(f"Error creating UserMediaAccess for server {server.name}: {e}")
         else:
             current_app.logger.error(f"Failed to get new_user.id after flush for invite {invite.id}")
         usage_log.accepted_invite = True
