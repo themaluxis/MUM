@@ -1,89 +1,162 @@
-[2025-08-10 21:11:53,517] INFO in dashboard: === DASHBOARD ROUTE START ===
-[2025-08-10 21:11:53,517] DEBUG in dashboard: Dashboard: Fetching total users count
-[2025-08-10 21:11:53,519] DEBUG in dashboard: Dashboard: Total users: 61
-[2025-08-10 21:11:53,519] DEBUG in dashboard: Dashboard: Fetching active invites count
-[2025-08-10 21:11:53,521] DEBUG in dashboard: Dashboard: Active invites: 2
-[2025-08-10 21:11:53,521] DEBUG in dashboard: Dashboard: Setting active streams count to 0 for initial load (will be fetched asynchronously)
-[2025-08-10 21:11:53,521] DEBUG in dashboard: Dashboard: Getting server list (DB only, no API calls)
-[2025-08-10 21:11:53,522] DEBUG in dashboard: Dashboard: Found 3 servers in database
-[2025-08-10 21:11:53,522] DEBUG in dashboard: Dashboard: Server status data prepared (loading state)
-[2025-08-10 21:11:53,522] DEBUG in dashboard: Dashboard: Fetching recent activities
-[2025-08-10 21:11:53,526] DEBUG in dashboard: Dashboard: Recent activities: 10, total count: 456
-[2025-08-10 21:11:53,527] INFO in dashboard: Dashboard: Rendering template with data
-[2025-08-10 21:11:53,527] DEBUG in dashboard: Dashboard: Template data - users: 61, invites: 2, streams: 0, servers: 3, activities: 10
-[2025-08-10 21:11:53,545] INFO in dashboard: === DASHBOARD ROUTE COMPLETE ===
-[2025-08-10 21:11:53,961] WARNING in api: === API ENDPOINT: /dashboard/active-streams-count called ===
-[2025-08-10 21:11:53,961] DEBUG in api: Api.py - get_active_streams_count(): Loading active streams count for dashboard
-[2025-08-10 21:11:53,961] WARNING in api: API: Calling MediaServiceManager.get_all_active_sessions() for streams count
-[2025-08-10 21:11:53,961] WARNING in media_service_manager: MediaServiceManager.get_all_active_sessions() called - THIS MAKES API CALLS TO ALL SERVERS
-[2025-08-10 21:11:53,964] DEBUG in media_service_manager: MediaServiceManager: Found 3 servers to check for active sessions
-[2025-08-10 21:11:53,964] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'Plex++++' (plex) at http://192.168.68.56:32400
-[2025-08-10 21:11:53,964] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for Plex++++
-[2025-08-10 21:11:53,979] DEBUG in media_service_manager: MediaServiceManager: Got 1 sessions from Plex++++
-[2025-08-10 21:11:53,979] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'jellyttthhuuu' (jellyfin) at http://192.168.68.56:8096
-[2025-08-10 21:11:53,979] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for jellyttthhuuu
-[2025-08-10 21:11:53,979] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Making GET request to endpoint: Sessions
-[2025-08-10 21:11:53,980] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Initializing new Jellyfin client
-[2025-08-10 21:11:53,980] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connecting to Jellyfin server: http://192.168.68.56:8096
-[2025-08-10 21:11:53,980] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Client configured - SSL: False
-[2025-08-10 21:11:53,980] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Attempting to connect to Jellyfin server...
-[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connection established, attempting authentication...
-[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Setting API token directly in client configuration
-[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Authentication successful
-[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Falling back to requests session with manual headers (client session is None or unavailable)
-[2025-08-10 21:11:53,989] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Full request URL: http://192.168.68.56:8096/Sessions
-[2025-08-10 21:11:53,990] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Request headers: {'User-Agent': 'python-requests/2.32.4', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'X-Emby-Token': '83f5b80b...', 'Content-Type': 'application/json'}
-[2025-08-10 21:11:53,997] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response status: 200
-[2025-08-10 21:11:53,997] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response headers: {'Content-Type': 'application/json; charset=utf-8', 'Date': 'Mon, 11 Aug 2025 03:11:53 GMT', 'Server': 'Kestrel', 'Content-Encoding': 'gzip', 'Transfer-Encoding': 'chunked', 'Vary': 'Accept-Encoding', 'X-Response-Time-ms': '0.6876'}
-[2025-08-10 21:11:53,997] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response data type: <class 'list'>, length: 1
-[2025-08-10 21:11:53,998] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Retrieved 1 total sessions from Jellyfin
-[2025-08-10 21:11:53,998] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Skipping inactive session: f0ab899d71efcc5bfe89c7cc516188c3
-[2025-08-10 21:11:53,998] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Returning 0 active sessions from Jellyfin
-[2025-08-10 21:11:53,998] DEBUG in media_service_manager: MediaServiceManager: Got 0 sessions from jellyttthhuuu
-[2025-08-10 21:11:53,998] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'kavitaaaaaa' (kavita) at https://kavita.abom.cloud
-[2025-08-10 21:11:53,998] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for kavitaaaaaa
-[2025-08-10 21:11:53,998] DEBUG in media_service_manager: MediaServiceManager: Got 0 sessions from kavitaaaaaa
-[2025-08-10 21:11:53,998] WARNING in media_service_manager: MediaServiceManager: Total sessions found across all servers: 1
-[2025-08-10 21:11:53,998] DEBUG in api: API: Active streams count: 1
-[2025-08-10 21:11:54,074] WARNING in api: === API ENDPOINT: /dashboard/server-status called ===
-[2025-08-10 21:11:54,074] DEBUG in api: Api.py - get_dashboard_server_status(): Loading server status for dashboard
-[2025-08-10 21:11:54,074] WARNING in api: API: get_cached_server_status() called - checking cache
-[2025-08-10 21:11:54,074] WARNING in api: API: Cache expired/empty, fetching fresh server status data - THIS WILL MAKE API CALLS
-[2025-08-10 21:11:54,074] WARNING in api: API: _fetch_server_status() called - THIS WILL MAKE API CALLS TO ALL SERVERS
-[2025-08-10 21:11:54,076] DEBUG in api: API: Found 3 servers to check status
-[2025-08-10 21:11:54,076] WARNING in api: API: Making API calls to 3 servers for status check
-[2025-08-10 21:11:54,076] WARNING in api: API: Making API call to server 'Plex++++' (plex) at http://192.168.68.56:32400
-[2025-08-10 21:11:54,108] DEBUG in api: API: Server 'Plex++++' status: True
-[2025-08-10 21:11:54,108] WARNING in api: API: Making API call to server 'jellyttthhuuu' (jellyfin) at http://192.168.68.56:8096
-[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Making GET request to endpoint: System/Info
-[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Initializing new Jellyfin client
-[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connecting to Jellyfin server: http://192.168.68.56:8096
-[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Client configured - SSL: False
-[2025-08-10 21:11:54,109] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Attempting to connect to Jellyfin server...
-[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connection established, attempting authentication...
-[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Setting API token directly in client configuration
-[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Authentication successful
-[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Falling back to requests session with manual headers (client session is None or unavailable)
-[2025-08-10 21:11:54,115] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Full request URL: http://192.168.68.56:8096/System/Info
-[2025-08-10 21:11:54,116] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Request headers: {'User-Agent': 'python-requests/2.32.4', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'X-Emby-Token': '83f5b80b...', 'Content-Type': 'application/json'}
-[2025-08-10 21:11:54,123] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response status: 200
-[2025-08-10 21:11:54,124] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response headers: {'Content-Type': 'application/json; charset=utf-8', 'Date': 'Mon, 11 Aug 2025 03:11:53 GMT', 'Server': 'Kestrel', 'Content-Encoding': 'gzip', 'Transfer-Encoding': 'chunked', 'Vary': 'Accept-Encoding', 'X-Response-Time-ms': '0.7518'}
-[2025-08-10 21:11:54,124] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response data type: <class 'dict'>, length: 24
-[2025-08-10 21:11:54,124] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Jellyfin server info - ServerName: 'ABOM', Version: '10.10.7'
-[2025-08-10 21:11:54,124] DEBUG in api: API: Server 'jellyttthhuuu' status: True
-[2025-08-10 21:11:54,124] WARNING in api: API: Making API call to server 'kavitaaaaaa' (kavita) at https://kavita.abom.cloud
-[2025-08-10 21:11:54,124] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Making GET request to: https://kavita.abom.cloud/api/Server/server-info-slim
-[2025-08-10 21:11:54,732] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response status: 200
-[2025-08-10 21:11:54,732] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response headers: {'Date': 'Mon, 11 Aug 2025 03:11:54 GMT', 'Content-Type': 'application/json; charset=utf-8', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Alt-Svc': 'h3=":443"; ma=86400', 'Report-To': '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=ZLgJ%2BuEIoig84TwJEb%2BXHX1xiG46es5WDbacO7J4HHeB1C8KEADLAk7RdsIwN1jabAxjVAk27Y1IWpf0hpFOznfMMSQBnJofyoT2T8i6oGH9"}]}', 'Content-Security-Policy': "frame-ancestors 'none';", 'Server': 'cloudflare', 'Vary': 'Accept-Encoding', 'X-Frame-Options': 'SAMEORIGIN', 'Cf-Cache-Status': 'DYNAMIC', 'Nel': '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}', 'Content-Encoding': 'gzip', 'CF-RAY': '96d48c5e39871026-LAX'}
-[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Response content length: 139
-[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint request headers: {'Authorization': 'Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW4iLCJuYW1laWQiOiIxIiwicm9sZSI6WyJBZG1pbiIsIkxvZ2luIl0sIm5iZiI6MTc1NDg4MDY5OCwiZXhwIjoxNzU1NzQ0Njk4LCJpYXQiOjE3NTQ4ODA2OTh9.VvLrGFar7zEw1TgGrLHOu5njUns_1mhCkzNHDwvrs9dEL4HtV_G16ryWINuGb7J3EnKAe4gOLj4iCzdzXBXPeg', 'Content-Type': 'application/json'}
-[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint response status: 200
-[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint response headers: {'Date': 'Mon, 11 Aug 2025 03:11:54 GMT', 'Content-Type': 'application/json; charset=utf-8', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Alt-Svc': 'h3=":443"; ma=86400', 'Report-To': '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=ZLgJ%2BuEIoig84TwJEb%2BXHX1xiG46es5WDbacO7J4HHeB1C8KEADLAk7RdsIwN1jabAxjVAk27Y1IWpf0hpFOznfMMSQBnJofyoT2T8i6oGH9"}]}', 'Content-Security-Policy': "frame-ancestors 'none';", 'Server': 'cloudflare', 'Vary': 'Accept-Encoding', 'X-Frame-Options': 'SAMEORIGIN', 'Cf-Cache-Status': 'DYNAMIC', 'Nel': '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}', 'Content-Encoding': 'gzip', 'CF-RAY': '96d48c5e39871026-LAX'}
-[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint response content: '{"installId":"c34f3a2c","isDocker":true,"kavitaVersion":"0.8.7.0","firstInstallDate":"2024-10-09T23:27:49","firstInstallVersion":"0.8.3.2"}...'
-[2025-08-10 21:11:54,733] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Server/server-info-slim endpoint response content length: 139
-[2025-08-10 21:11:54,733] DEBUG in api: API: Server 'kavitaaaaaa' status: True
-[2025-08-10 21:11:54,734] DEBUG in api: API: Server status cache updated
-[2025-08-10 21:11:54,734] DEBUG in api: Api.py - get_dashboard_server_status(): Server status from cache: {'multi_server': True, 'online_count': 3, 'offline_count': 0, 'all_statuses': [{'name': 'Plex++++', 'url': 'http://192.168.68.56:32400', 'service_type': 'plex', 'online': True, 'version': '1.42.1.10054-f333bdaa8', 'machine_id': '1851993e7c714612ac048a20da5e061312ce69db', 'server_id': 1, 'custom_name': 'Plex++++', 'actual_server_name': 'Plex+'}, {'name': 'jellyttthhuuu', 'url': 'http://192.168.68.56:8096', 'service_type': 'jellyfin', 'online': True, 'version': '10.10.7', 'server_id': 2, 'actual_server_name': 'ABOM', 'error_message': None, 'custom_name': 'jellyttthhuuu'}, {'name': 'kavitaaaaaa', 'url': 'https://kavita.abom.cloud', 'service_type': 'kavita', 'online': True, 'version': '0.8.7.0', 'server_id': 3, 'custom_name': 'kavitaaaaaa', 'actual_server_name': 'Kavita (c34f3a2c)'}], 'servers_by_service': {'plex': {'service_name': 'Plex', 'servers': [{'name': 'Plex++++', 'url': 'http://192.168.68.56:32400', 'service_type': 'plex', 'online': True, 'version': '1.42.1.10054-f333bdaa8', 'machine_id': '1851993e7c714612ac048a20da5e061312ce69db', 'server_id': 1, 'custom_name': 'Plex++++', 'actual_server_name': 'Plex+'}], 'online_count': 1, 'offline_count': 0, 'total_count': 1}, 'jellyfin': {'service_name': 'Jellyfin', 'servers': [{'name': 'jellyttthhuuu', 'url': 'http://192.168.68.56:8096', 'service_type': 'jellyfin', 'online': True, 'version': '10.10.7', 'server_id': 2, 'actual_server_name': 'ABOM', 'error_message': None, 'custom_name': 'jellyttthhuuu'}], 'online_count': 1, 'offline_count': 0, 'total_count': 1}, 'kavita': {'service_name': 'Kavita', 'servers': [{'name': 'kavitaaaaaa', 'url': 'https://kavita.abom.cloud', 'service_type': 'kavita', 'online': True, 'version': '0.8.7.0', 'server_id': 3, 'custom_name': 'kavitaaaaaa', 'actual_server_name': 'Kavita (c34f3a2c)'}], 'online_count': 1, 'offline_count': 0, 'total_count': 1}}}
-[2025-08-10 21:11:55,093] INFO in api: API: Raw session monitoring setting from DB: '120' (type: <class 'int'>)
-[2025-08-10 21:11:55,093] INFO in api: API: Successfully converted to int: 120
-[2025-08-10 21:11:55,093] INFO in api: API: Returning session monitoring interval: 120 seconds
+[2025-08-10 21:27:40,886] INFO in dashboard: === DASHBOARD ROUTE START ===
+[2025-08-10 21:27:40,886] DEBUG in dashboard: Dashboard: Fetching total users count
+[2025-08-10 21:27:40,889] DEBUG in dashboard: Dashboard: Total users: 61
+[2025-08-10 21:27:40,889] DEBUG in dashboard: Dashboard: Fetching active invites count
+[2025-08-10 21:27:40,892] DEBUG in dashboard: Dashboard: Active invites: 2
+[2025-08-10 21:27:40,892] DEBUG in dashboard: Dashboard: Setting active streams count to 0 for initial load (will be fetched asynchronously)
+[2025-08-10 21:27:40,892] DEBUG in dashboard: Dashboard: Getting server list (DB only, no API calls)
+[2025-08-10 21:27:40,894] DEBUG in dashboard: Dashboard: Found 3 servers in database
+[2025-08-10 21:27:40,894] DEBUG in dashboard: Dashboard: Server status data prepared (loading state)
+[2025-08-10 21:27:40,894] DEBUG in dashboard: Dashboard: Fetching recent activities
+[2025-08-10 21:27:40,901] DEBUG in dashboard: Dashboard: Recent activities: 10, total count: 464
+[2025-08-10 21:27:40,901] INFO in dashboard: Dashboard: Rendering template with data
+[2025-08-10 21:27:40,901] DEBUG in dashboard: Dashboard: Template data - users: 61, invites: 2, streams: 0, servers: 3, activities: 10
+[2025-08-10 21:27:40,937] INFO in dashboard: === DASHBOARD ROUTE COMPLETE ===
+[2025-08-10 21:27:41,162] INFO in api: === API ENDPOINT: /dashboard/server-status called ===
+[2025-08-10 21:27:41,162] DEBUG in api: Api.py - get_dashboard_server_status(): Loading real-time server status for dashboard
+[2025-08-10 21:27:41,162] INFO in api: API: get_fresh_server_status() called - fetching real-time server status
+[2025-08-10 21:27:41,166] DEBUG in api: API: Found 3 servers to check status
+[2025-08-10 21:27:41,166] WARNING in api: API: Making API calls to 3 servers for status check
+[2025-08-10 21:27:41,166] WARNING in api: API: Making API call to server 'Plex++++' (plex) at http://192.168.68.56:32400
+[2025-08-10 21:27:41,174] DEBUG in api: API: Server 'Plex++++' status: True
+[2025-08-10 21:27:41,174] WARNING in api: API: Making API call to server 'jellyttthhuuu' (jellyfin) at http://192.168.68.56:8096
+[2025-08-10 21:27:41,174] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Making GET request to endpoint: System/Info
+[2025-08-10 21:27:41,174] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Initializing new Jellyfin client
+[2025-08-10 21:27:41,174] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connecting to Jellyfin server: http://192.168.68.56:8096
+[2025-08-10 21:27:41,174] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Client configured - SSL: False
+[2025-08-10 21:27:41,174] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Attempting to connect to Jellyfin server...
+[2025-08-10 21:27:41,180] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connection established, attempting authentication...
+[2025-08-10 21:27:41,180] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Setting API token directly in client configuration
+[2025-08-10 21:27:41,180] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Authentication successful
+[2025-08-10 21:27:41,180] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Falling back to requests session with manual headers (client session is None or unavailable)
+[2025-08-10 21:27:41,181] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Full request URL: http://192.168.68.56:8096/System/Info
+[2025-08-10 21:27:41,181] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Request headers: {'User-Agent': 'python-requests/2.32.4', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'X-Emby-Token': '83f5b80b...', 'Content-Type': 'application/json'}
+[2025-08-10 21:27:41,187] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response status: 200
+[2025-08-10 21:27:41,188] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response headers: {'Content-Type': 'application/json; charset=utf-8', 'Date': 'Mon, 11 Aug 2025 03:27:40 GMT', 'Server': 'Kestrel', 'Content-Encoding': 'gzip', 'Transfer-Encoding': 'chunked', 'Vary': 'Accept-Encoding', 'X-Response-Time-ms': '0.6475'}
+[2025-08-10 21:27:41,188] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response data type: <class 'dict'>, length: 24
+[2025-08-10 21:27:41,188] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Jellyfin server info - ServerName: 'ABOM', Version: '10.10.7'
+[2025-08-10 21:27:41,188] DEBUG in api: API: Server 'jellyttthhuuu' status: True
+[2025-08-10 21:27:41,188] WARNING in api: API: Making API call to server 'kavitaaaaaa' (kavita) at https://kavita.abom.cloud
+[2025-08-10 21:27:41,188] DEBUG in base_media_service: [KAVITA:kavitaaaaaa] Making GET request to: https://kavita.abom.cloud/api/Server/server-info-slim
+[2025-08-10 21:27:42,260] ERROR in base_media_service: [KAVITA:kavitaaaaaa] API request failed: HTTPSConnectionPool(host='kavita.abom.cloud', port=443): Read timed out. (read timeout=1)
+[2025-08-10 21:27:42,260] DEBUG in api: API: Server 'kavitaaaaaa' status: False
+[2025-08-10 21:27:42,261] DEBUG in api: Api.py - get_dashboard_server_status(): Fresh server status: {'multi_server': True, 'online_count': 2, 'offline_count': 1, 'all_statuses': [{'name': 'Plex++++', 'url': 'http://192.168.68.56:32400', 'service_type': 'plex', 'online': True, 'version': '1.42.1.10054-f333bdaa8', 'machine_id': '1851993e7c714612ac048a20da5e061312ce69db', 'server_id': 1, 'custom_name': 'Plex++++', 'actual_server_name': 'Plex+'}, {'name': 'jellyttthhuuu', 'url': 'http://192.168.68.56:8096', 'service_type': 'jellyfin', 'online': True, 'version': '10.10.7', 'server_id': 2, 'actual_server_name': 'ABOM', 'error_message': None, 'custom_name': 'jellyttthhuuu'}, {'name': 'kavitaaaaaa', 'url': 'https://kavita.abom.cloud', 'service_type': 'kavita', 'online': False, 'version': 'Unknown', 'server_id': 3, 'custom_name': 'kavitaaaaaa', 'actual_server_name': 'kavitaaaaaa'}], 'servers_by_service': {'plex': {'service_name': 'Plex', 'servers': [{'name': 'Plex++++', 'url': 'http://192.168.68.56:32400', 'service_type': 'plex', 'online': True, 'version': '1.42.1.10054-f333bdaa8', 'machine_id': '1851993e7c714612ac048a20da5e061312ce69db', 'server_id': 1, 'custom_name': 'Plex++++', 'actual_server_name': 'Plex+'}], 'online_count': 1, 'offline_count': 0, 'total_count': 1}, 'jellyfin': {'service_name': 'Jellyfin', 'servers': [{'name': 'jellyttthhuuu', 'url': 'http://192.168.68.56:8096', 'service_type': 'jellyfin', 'online': True, 'version': '10.10.7', 'server_id': 2, 'actual_server_name': 'ABOM', 'error_message': None, 'custom_name': 'jellyttthhuuu'}], 'online_count': 1, 'offline_count': 0, 'total_count': 1}, 'kavita': {'service_name': 'Kavita', 'servers': [{'name': 'kavitaaaaaa', 'url': 'https://kavita.abom.cloud', 'service_type': 'kavita', 'online': False, 'version': 'Unknown', 'server_id': 3, 'custom_name': 'kavitaaaaaa', 'actual_server_name': 'kavitaaaaaa'}], 'online_count': 0, 'offline_count': 1, 'total_count': 1}}}
+[2025-08-10 21:27:42,286] INFO in api: === API ENDPOINT: /dashboard/active-streams-count called ===
+[2025-08-10 21:27:42,286] DEBUG in api: Api.py - get_active_streams_count(): Loading real-time active streams count
+[2025-08-10 21:27:42,286] INFO in api: API: Fetching real-time active sessions from all servers
+[2025-08-10 21:27:42,286] WARNING in media_service_manager: MediaServiceManager.get_all_active_sessions() called - THIS MAKES API CALLS TO ALL SERVERS
+[2025-08-10 21:27:42,288] DEBUG in media_service_manager: MediaServiceManager: Found 3 servers to check for active sessions
+[2025-08-10 21:27:42,288] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'Plex++++' (plex) at http://192.168.68.56:32400
+[2025-08-10 21:27:42,288] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for Plex++++
+[2025-08-10 21:27:42,300] DEBUG in media_service_manager: MediaServiceManager: Got 1 sessions from Plex++++
+[2025-08-10 21:27:42,300] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'jellyttthhuuu' (jellyfin) at http://192.168.68.56:8096
+[2025-08-10 21:27:42,301] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for jellyttthhuuu
+[2025-08-10 21:27:42,301] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Making GET request to endpoint: Sessions
+[2025-08-10 21:27:42,301] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Initializing new Jellyfin client
+[2025-08-10 21:27:42,301] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connecting to Jellyfin server: http://192.168.68.56:8096
+[2025-08-10 21:27:42,301] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Client configured - SSL: False
+[2025-08-10 21:27:42,301] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Attempting to connect to Jellyfin server...
+[2025-08-10 21:27:42,307] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Connection established, attempting authentication...
+[2025-08-10 21:27:42,307] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Setting API token directly in client configuration
+[2025-08-10 21:27:42,307] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Authentication successful
+[2025-08-10 21:27:42,307] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Falling back to requests session with manual headers (client session is None or unavailable)
+[2025-08-10 21:27:42,308] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Full request URL: http://192.168.68.56:8096/Sessions
+[2025-08-10 21:27:42,308] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Request headers: {'User-Agent': 'python-requests/2.32.4', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'X-Emby-Token': '83f5b80b...', 'Content-Type': 'application/json'}
+[2025-08-10 21:27:42,314] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response status: 200
+[2025-08-10 21:27:42,314] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response headers: {'Content-Type': 'application/json; charset=utf-8', 'Date': 'Mon, 11 Aug 2025 03:27:41 GMT', 'Server': 'Kestrel', 'Content-Encoding': 'gzip', 'Transfer-Encoding': 'chunked', 'Vary': 'Accept-Encoding', 'X-Response-Time-ms': '0.8505'}
+[2025-08-10 21:27:42,314] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Response data type: <class 'list'>, length: 1
+[2025-08-10 21:27:42,315] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Retrieved 1 total sessions from Jellyfin
+[2025-08-10 21:27:42,315] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Skipping inactive session: f0ab899d71efcc5bfe89c7cc516188c3
+[2025-08-10 21:27:42,315] DEBUG in base_media_service: [JELLYFIN:jellyttthhuuu] Returning 0 active sessions from Jellyfin
+[2025-08-10 21:27:42,315] DEBUG in media_service_manager: MediaServiceManager: Got 0 sessions from jellyttthhuuu
+[2025-08-10 21:27:42,315] WARNING in media_service_manager: MediaServiceManager: Making API call to server 'kavitaaaaaa' (kavita) at https://kavita.abom.cloud
+[2025-08-10 21:27:42,315] DEBUG in media_service_manager: MediaServiceManager: Calling get_active_sessions() for kavitaaaaaa
+[2025-08-10 21:27:42,315] DEBUG in media_service_manager: MediaServiceManager: Got 0 sessions from kavitaaaaaa
+[2025-08-10 21:27:42,315] WARNING in media_service_manager: MediaServiceManager: Total sessions found across all servers: 1
+[2025-08-10 21:27:42,315] DEBUG in api: API: Real-time active streams count: 1
+[2025-08-10 21:27:43,156] INFO in users: === USER LIST PERFORMANCE DEBUG ===
+[2025-08-10 21:27:43,156] INFO in users: Starting list_users() at 1754882863.1568687
+[2025-08-10 21:27:43,157] DEBUG in users: --- Entering list_users ---
+[2025-08-10 21:27:43,157] DEBUG in users: Request args: ImmutableMultiDict([])
+[2025-08-10 21:27:43,157] DEBUG in users: Is HTMX request: None
+[2025-08-10 21:27:43,157] DEBUG in users: current_user.id: 1
+[2025-08-10 21:27:43,157] DEBUG in users: Saved preferred view: 'cards'
+[2025-08-10 21:27:43,157] DEBUG in users: Redirecting: 'view' not in args. Using preferred_view: 'cards'
+[2025-08-10 21:27:43,318] INFO in users: === USER LIST PERFORMANCE DEBUG ===
+[2025-08-10 21:27:43,318] INFO in users: Starting list_users() at 1754882863.318416
+[2025-08-10 21:27:43,318] DEBUG in users: --- Entering list_users ---
+[2025-08-10 21:27:43,318] DEBUG in users: Request args: ImmutableMultiDict([('view', 'cards')])
+[2025-08-10 21:27:43,318] DEBUG in users: Is HTMX request: None
+[2025-08-10 21:27:43,318] DEBUG in users: current_user.id: 1
+[2025-08-10 21:27:43,318] DEBUG in users: Saved preferred view: 'cards'
+[2025-08-10 21:27:43,319] DEBUG in users: Final view_mode for rendering: 'cards'
+[2025-08-10 21:27:43,330] INFO in users: DB query setup took: 0.012s
+[2025-08-10 21:27:43,333] INFO in users: Pagination query took: 0.004s
+[2025-08-10 21:27:43,338] INFO in users: User stats fetching took: 0.004s
+[2025-08-10 21:27:43,343] INFO in users: User access records fetching took: 0.005s
+[2025-08-10 21:27:43,344] INFO in users: 🚀 OPTIMIZATION: Using stored library data for 3 servers
+[2025-08-10 21:27:43,345] INFO in users: 📦 Using stored library data for Plex++++: 6 libraries
+[2025-08-10 21:27:43,347] INFO in users: 📦 Using stored library data for jellyttthhuuu: 2 libraries
+[2025-08-10 21:27:43,348] INFO in users: 📦 Using stored library data for kavitaaaaaa: 2 libraries
+[2025-08-10 21:27:43,348] INFO in users: ✅ Library lookup completed in: 0.004s
+[2025-08-10 21:27:43,348] INFO in users: 📊 Retrieved libraries for 3 servers
+[2025-08-10 21:27:43,352] INFO in users: Library processing took: 0.004s
+[2025-08-10 21:27:43,354] INFO in users: Template rendering took: 0.001s
+[2025-08-10 21:27:43,354] INFO in users: 🎯 TOTAL list_users() execution time: 0.036s
+[2025-08-10 21:27:43,354] INFO in users: === END USER LIST PERFORMANCE DEBUG ===
+[2025-08-10 21:27:43,598] INFO in users: === USER LIST PERFORMANCE DEBUG ===
+[2025-08-10 21:27:43,598] INFO in users: Starting list_users() at 1754882863.5982835
+[2025-08-10 21:27:43,598] DEBUG in users: --- Entering list_users ---
+[2025-08-10 21:27:43,598] DEBUG in users: Request args: ImmutableMultiDict([('view', 'cards')])
+[2025-08-10 21:27:43,598] DEBUG in users: Is HTMX request: true
+[2025-08-10 21:27:43,598] DEBUG in users: current_user.id: 1
+[2025-08-10 21:27:43,598] DEBUG in users: Saved preferred view: 'cards'
+[2025-08-10 21:27:43,598] DEBUG in users: Final view_mode for rendering: 'cards'
+[2025-08-10 21:27:43,603] INFO in users: DB query setup took: 0.006s
+[2025-08-10 21:27:43,608] INFO in users: Pagination query took: 0.004s
+[2025-08-10 21:27:43,611] INFO in users: User stats fetching took: 0.003s
+[2025-08-10 21:27:43,615] INFO in users: User access records fetching took: 0.004s
+[2025-08-10 21:27:43,617] INFO in users: 🚀 OPTIMIZATION: Using stored library data for 3 servers
+[2025-08-10 21:27:43,618] INFO in users: 📦 Using stored library data for Plex++++: 6 libraries
+[2025-08-10 21:27:43,620] INFO in users: 📦 Using stored library data for jellyttthhuuu: 2 libraries
+[2025-08-10 21:27:43,621] INFO in users: 📦 Using stored library data for kavitaaaaaa: 2 libraries
+[2025-08-10 21:27:43,621] INFO in users: ✅ Library lookup completed in: 0.005s
+[2025-08-10 21:27:43,621] INFO in users: 📊 Retrieved libraries for 3 servers
+[2025-08-10 21:27:43,625] INFO in users: Library processing took: 0.003s
+[2025-08-10 21:27:43,667] INFO in users: Template rendering took: 0.043s
+[2025-08-10 21:27:43,667] INFO in users: 🎯 TOTAL list_users() execution time: 0.070s
+[2025-08-10 21:27:43,668] INFO in users: === END USER LIST PERFORMANCE DEBUG ===
+[2025-08-10 21:27:43,717] INFO in users: === USERS PAGE: mass_edit_libraries_form() called - USING DATABASE DATA ===
+[2025-08-10 21:27:44,471] WARNING in invites: === INVITES PAGE ROUTE START ===
+[2025-08-10 21:27:44,472] INFO in invites: === INVITE LIST PERFORMANCE DEBUG ===
+[2025-08-10 21:27:44,472] INFO in invites: Starting list_invites() at 1754882864.4719849
+[2025-08-10 21:27:44,476] INFO in invites: DB query setup took: 0.004s
+[2025-08-10 21:27:44,481] INFO in invites: Pagination query took: 0.005s
+[2025-08-10 21:27:44,482] INFO in invites: INVITES: Fetching all active servers from database (no API calls)
+[2025-08-10 21:27:44,483] INFO in invites: INVITES: Found 3 active servers in database
+[2025-08-10 21:27:44,483] INFO in invites: INVITES: Not pre-loading libraries - will be loaded dynamically (no API calls on page load)
+[2025-08-10 21:27:44,483] INFO in invites: Server fetching took: 0.002s
+[2025-08-10 21:27:44,483] DEBUG in invites: INVITES: Loading Discord settings from database
+[2025-08-10 21:27:44,497] DEBUG in invites: INVITES: Discord settings loaded from database
+[2025-08-10 21:27:44,497] DEBUG in invites: INVITES: Grouping servers by service type
+[2025-08-10 21:27:44,497] DEBUG in invites: INVITES: Server grouping took: 0.000s
+[2025-08-10 21:27:44,497] INFO in invites: INVITES: Rendering full page template
+[2025-08-10 21:27:44,499] INFO in invites: INVITES: Template rendering took: 0.002s
+[2025-08-10 21:27:44,499] WARNING in invites: 🎯 INVITES PAGE: TOTAL list_invites() execution time: 0.027s
+[2025-08-10 21:27:44,499] INFO in invites: === END INVITE LIST PERFORMANCE DEBUG ===
+[2025-08-10 21:27:44,499] WARNING in invites: === INVITES PAGE ROUTE COMPLETE ===
+[2025-08-10 21:27:44,746] WARNING in invites: === INVITES PAGE ROUTE START ===
+[2025-08-10 21:27:44,746] INFO in invites: === INVITE LIST PERFORMANCE DEBUG ===
+[2025-08-10 21:27:44,746] INFO in invites: Starting list_invites() at 1754882864.7459977
+[2025-08-10 21:27:44,751] INFO in invites: DB query setup took: 0.005s
+[2025-08-10 21:27:44,757] INFO in invites: Pagination query took: 0.006s
+[2025-08-10 21:27:44,758] INFO in invites: INVITES: Fetching all active servers from database (no API calls)
+[2025-08-10 21:27:44,759] INFO in invites: INVITES: Found 3 active servers in database
+[2025-08-10 21:27:44,759] INFO in invites: INVITES: Not pre-loading libraries - will be loaded dynamically (no API calls on page load)
+[2025-08-10 21:27:44,759] INFO in invites: Server fetching took: 0.002s
+[2025-08-10 21:27:44,759] DEBUG in invites: INVITES: Loading Discord settings from database
+[2025-08-10 21:27:44,767] DEBUG in invites: INVITES: Discord settings loaded from database
+[2025-08-10 21:27:44,767] INFO in invites: INVITES: HTMX request - rendering partial template
+[2025-08-10 21:27:44,770] INFO in invites: INVITES: HTMX template rendering took: 0.003s
+[2025-08-10 21:27:44,770] WARNING in invites: 🎯 INVITES PAGE: TOTAL HTMX execution time: 0.025s
+[2025-08-10 21:27:44,770] WARNING in invites: === INVITES PAGE ROUTE COMPLETE (HTMX) ===

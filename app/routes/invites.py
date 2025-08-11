@@ -31,6 +31,9 @@ DISCORD_API_BASE_URL = 'https://discord.com/api/v10'
 @login_required
 @setup_required
 def list_invites():
+    import time
+    start_time = time.time()
+    
     page = request.args.get('page', 1, type=int)
     # Get view mode, defaulting to 'cards'
     view_mode = request.args.get('view', Setting.get('DEFAULT_INVITE_VIEW', 'cards'))
@@ -89,7 +92,7 @@ def list_invites():
         grouped_servers[service_type_name].append(server)
 
     # For a full page load, render the main list.html
-    return render_template('invites/list.html', 
+    result = render_template('invites/list.html', 
                            title="Manage Invites", 
                            invites_count=invites_count, 
                            form=form, 
@@ -101,6 +104,13 @@ def list_invites():
                            global_force_sso=global_force_sso,
                            enable_discord_membership_requirement=enable_discord_membership_requirement,
                            current_view=view_mode) # Pass the view mode
+    
+    # Log performance for slow requests only
+    total_time = time.time() - start_time
+    if total_time > 1.0:  # Only log if over 1 second
+        current_app.logger.warning(f"Slow invites page load: {total_time:.3f}s")
+    
+    return result
 
 @bp.route('/manage/create', methods=['POST'])
 @login_required
@@ -123,9 +133,11 @@ def create_invite():
         if first_server:
             service = MediaServiceFactory.create_service_from_db(first_server)
             try:
-                available_libraries = {lib['id']: lib['name'] for lib in service.get_libraries()}
+                libraries = service.get_libraries()
+                available_libraries = {lib['id']: lib['name'] for lib in libraries}
             except Exception as e:
-                current_app.logger.error(f"Could not fetch libraries for server {first_server.name}: {e}")
+                current_app.logger.error(f"Failed to fetch libraries from server {first_server.name}: {e}")
+                available_libraries = {}
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
     
@@ -162,7 +174,7 @@ def create_invite():
                             'libraries': server_lib_dict
                         }
                     except Exception as e:
-                        current_app.logger.error(f"Error fetching libraries for validation from server {server.name}: {e}")
+                        current_app.logger.error(f"Failed to fetch libraries from server {server.name}: {e}")
             
             # Second pass: detect conflicts and build choices
             for server_id, server_data in servers_libraries.items():
@@ -944,7 +956,7 @@ def get_edit_invite_form(invite_id):
                     else:
                         available_libraries[lib_id] = lib_name
         except Exception as e:
-            current_app.logger.error(f"Could not fetch libraries for server {server.name}: {e}")
+            current_app.logger.error(f"Failed to fetch libraries from server {server.name}: {e}")
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
 
@@ -994,9 +1006,11 @@ def update_invite(invite_id):
         if invite_server:
             service = MediaServiceFactory.create_service_from_db(invite_server)
             try:
-                available_libraries = {lib['id']: lib['name'] for lib in service.get_libraries()}
+                libraries = service.get_libraries()
+                available_libraries = {lib['id']: lib['name'] for lib in libraries}
             except Exception as e:
-                current_app.logger.error(f"Could not fetch libraries for server {invite_server.name}: {e}")
+                current_app.logger.error(f"Failed to fetch libraries from server {invite_server.name}: {e}")
+                available_libraries = {}
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
 

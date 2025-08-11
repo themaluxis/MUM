@@ -39,7 +39,6 @@ def get_libraries_from_database(servers):
                 server_lib_dict[str(lib_id)] = lib_name
         
         libraries_by_server[server.id] = server_lib_dict
-        current_app.logger.info(f"📦 Using stored library data for {server.name}: {len(server_lib_dict)} libraries")
     
     return libraries_by_server
 
@@ -49,20 +48,14 @@ def get_libraries_from_database(servers):
 def list_users():
     import time
     start_time = time.time()
-    current_app.logger.info(f"=== USER LIST PERFORMANCE DEBUG ===")
-    current_app.logger.info(f"Starting list_users() at {start_time}")
+    current_app.logger.debug(f"Loading users page for user {current_user.id}")
     
-    current_app.logger.debug(f"--- Entering list_users ---")
-    current_app.logger.debug(f"Request args: {request.args}")
-    current_app.logger.debug(f"Is HTMX request: {request.headers.get('HX-Request')}")
-    current_app.logger.debug(f"current_user.id: {current_user.id}")
-    current_app.logger.debug(f"Saved preferred view: '{current_user.preferred_user_list_view}'")
+    is_htmx = request.headers.get('HX-Request')
 
     # If it's a direct browser load and 'view' is missing from the URL
-    if 'view' not in request.args and not request.headers.get('HX-Request'):
+    if 'view' not in request.args and not is_htmx:
         # Get the preferred view, default to 'cards' if not set
         preferred_view = current_user.preferred_user_list_view or 'cards'
-        current_app.logger.debug(f"Redirecting: 'view' not in args. Using preferred_view: '{preferred_view}'")
         
         # Preserve other query params and redirect
         args = request.args.to_dict()
@@ -71,7 +64,6 @@ def list_users():
 
     # For all other cases (redirected request or HTMX), determine view_mode from args
     view_mode = request.args.get('view', 'cards')
-    current_app.logger.debug(f"Final view_mode for rendering: '{view_mode}'")
 
     page = request.args.get('page', 1, type=int)
    
@@ -216,25 +208,15 @@ def list_users():
         # For simple queries, use the existing query
         users_count = query.count()
     
-    db_query_time = time.time()
-    current_app.logger.info(f"DB query setup took: {db_query_time - start_time:.3f}s")
-    
     users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
-    
-    pagination_time = time.time()
-    current_app.logger.info(f"Pagination query took: {pagination_time - db_query_time:.3f}s")
 
     # Extract users from pagination results (handling complex queries that return tuples)
     users_on_page = [item[0] if isinstance(item, tuple) else item for item in users_pagination.items]
     user_ids_on_page = [user.id for user in users_on_page]
 
     # Fetch additional data for the current page
-    stats_start = time.time()
     stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
     last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
-    
-    stats_time = time.time()
-    current_app.logger.info(f"User stats fetching took: {stats_time - stats_start:.3f}s")
 
     # Attach the additional data directly to each user object
     for user in users_on_page:
@@ -244,7 +226,6 @@ def list_users():
         user.last_known_ip = last_ips.get(user.id, 'N/A')
     
     # Get library access info for each user, organized by server to prevent ID collisions
-    access_start = time.time()
     user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
     user_sorted_libraries = {}
     user_service_types = {}  # Track which services each user belongs to
@@ -263,9 +244,6 @@ def list_users():
         # Track which server names this user has access to
         if access.server.name not in user_server_names[access.user_id]:
             user_server_names[access.user_id].append(access.server.name)
-    
-    access_time = time.time()
-    current_app.logger.info(f"User access records fetching took: {access_time - access_start:.3f}s")
 
     media_service_manager = MediaServiceManager()
     
@@ -276,14 +254,7 @@ def list_users():
     all_servers = media_service_manager.get_all_servers(active_only=True)
     
     # Get library data from database instead of making API calls
-    libraries_start = time.time()
-    current_app.logger.info(f"🚀 OPTIMIZATION: Using stored library data for {len(all_servers)} servers")
-    
     libraries_by_server = get_libraries_from_database(all_servers)
-    
-    libraries_time = time.time()
-    current_app.logger.info(f"✅ Library lookup completed in: {libraries_time - libraries_start:.3f}s")
-    current_app.logger.info(f"📊 Retrieved libraries for {len(libraries_by_server)} servers")
 
     
     for user_id, servers_access in user_library_access_by_server.items():
@@ -384,20 +355,16 @@ def list_users():
         'sort_direction': sort_direction,
         'server_dropdown_options': server_dropdown_options
     }
-
-    template_start = time.time()
-    current_app.logger.info(f"Library processing took: {template_start - libraries_time:.3f}s")
     
-    if request.headers.get('HX-Request'):
+    if is_htmx:
         result = render_template('users/partials/user_list_content.html', **template_context)
     else:
         result = render_template('users/list.html', **template_context)
     
-    end_time = time.time()
-    total_time = end_time - start_time
-    current_app.logger.info(f"Template rendering took: {end_time - template_start:.3f}s")
-    current_app.logger.info(f"🎯 TOTAL list_users() execution time: {total_time:.3f}s")
-    current_app.logger.info(f"=== END USER LIST PERFORMANCE DEBUG ===")
+    # Log performance for slow requests only
+    total_time = time.time() - start_time
+    if total_time > 1.0:  # Only log if over 1 second
+        current_app.logger.warning(f"Slow users page load: {total_time:.3f}s")
     
     return result
 
