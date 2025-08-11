@@ -24,9 +24,12 @@ class UnifiedUserService:
         total_errors = 0
         error_messages = []
         all_updated_details = []
+        successful_servers = []
+        failed_servers = []
 
         for server in servers:
             try:
+                current_app.logger.info(f"Syncing users from server: {server.name} ({server.service_type.value})")
                 result = MediaServiceManager.sync_server_users(server.id)
                 if result['success']:
                     total_added += result.get('added', 0)
@@ -34,13 +37,48 @@ class UnifiedUserService:
                     total_removed += result.get('removed', 0)
                     if result.get('updated_details'):
                         all_updated_details.extend(result['updated_details'])
+                    
+                    # Track successful server sync
+                    successful_servers.append({
+                        'name': server.name,
+                        'service_type': server.service_type.value.capitalize(),
+                        'added': result.get('added', 0),
+                        'updated': result.get('updated', 0),
+                        'removed': result.get('removed', 0)
+                    })
+                    current_app.logger.info(f"Successfully synced {server.name}: +{result.get('added', 0)} users, ~{result.get('updated', 0)} updated, -{result.get('removed', 0)} removed")
                 else:
                     total_errors += 1
-                    error_messages.append(f"{server.name}: {result['message']}")
+                    # Use service type name instead of server name to avoid redundancy
+                    service_name = server.service_type.value.capitalize()
+                    error_message = f"{service_name}: {result['message']}"
+                    error_messages.append(error_message)
+                    
+                    # Track failed server sync
+                    failed_servers.append({
+                        'name': server.name,
+                        'service_type': service_name,
+                        'error': result['message']
+                    })
+                    current_app.logger.warning(f"Failed to sync users from {server.name}: {result['message']}")
+                    
+                    # If server is offline, this is expected and shouldn't be treated as a critical error
+                    if 'offline' in result['message'].lower() or 'unreachable' in result['message'].lower():
+                        current_app.logger.info(f"Server {server.name} appears to be offline - this is normal and users will be preserved")
             except Exception as e:
                 total_errors += 1
-                error_messages.append(f"{server.name}: {str(e)}")
-                current_app.logger.error(f"Error syncing users from {server.name}: {e}")
+                # Use service type name instead of server name to avoid redundancy
+                service_name = server.service_type.value.capitalize()
+                error_message = f"{service_name}: {str(e)}"
+                error_messages.append(error_message)
+                
+                # Track failed server sync
+                failed_servers.append({
+                    'name': server.name,
+                    'service_type': service_name,
+                    'error': str(e)
+                })
+                current_app.logger.error(f"Error syncing users from {server.name}: {e}", exc_info=True)
 
         return {
             'success': total_errors == 0,
@@ -50,6 +88,8 @@ class UnifiedUserService:
             'errors': total_errors,
             'error_messages': error_messages,
             'servers_synced': len(servers),
+            'successful_servers': successful_servers,
+            'failed_servers': failed_servers,
             'updated_details': all_updated_details
         }
     

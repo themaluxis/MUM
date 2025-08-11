@@ -47,19 +47,19 @@
                         <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
                         {# Jellyfin fallback avatar with purple theme #}
-                        <div class="bg-purple-500 text-white w-24 h-24 rounded-full flex items-center justify-center text-2xl font-bold" style="display: none;">
+                        <div class="bg-jellyfin text-white w-24 h-24 rounded-full flex items-center justify-center text-5xl font-normal" style="display: none;">
                             {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
                         </div>
                     {% else %}
                         {# No Jellyfin user ID found, show purple fallback directly #}
-                        <div class="bg-purple-500 text-white w-24 h-24 rounded-full flex items-center justify-center text-2xl font-bold">
+                        <div class="bg-jellyfin text-white w-24 h-24 rounded-full flex items-center justify-center text-5xl font-normal">
                             {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
                         </div>
                     {% endif %}
                 {# Check if this is a Kavita user and show fallback avatar #}
                 {% elif primary_service and primary_service.value == 'kavita' %}
                     {# Kavita users don't have avatars, show fallback with Kavita theme color #}
-                    <div class="text-white w-24 h-24 rounded-full flex items-center justify-center text-2xl font-bold" style="background-color: var(--color-kavita);">
+                    <div class="bg-kavita text-white w-24 h-24 rounded-full flex items-center justify-center text-5xl font-normal">
                         {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
                     </div>
                 {% else %}

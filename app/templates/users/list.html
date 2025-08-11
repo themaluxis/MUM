@@ -173,6 +173,8 @@
                                 <option value="username_desc" {% if request.args.get('sort_by')=='username_desc' %}selected{% endif %}>Username (Z-A)</option>
                                 <option value="email_asc" {% if request.args.get('sort_by')=='email_asc' %}selected{% endif %}>Email (A-Z)</option>
                                 <option value="email_desc" {% if request.args.get('sort_by')=='email_desc' %}selected{% endif %}>Email (Z-A)</option>
+                                <option value="last_streamed_desc" {% if request.args.get('sort_by')=='last_streamed_desc' %}selected{% endif %}>Last Streamed (Recent)</option>
+                                <option value="last_streamed_asc" {% if request.args.get('sort_by')=='last_streamed_asc' %}selected{% endif %}>Last Streamed (Oldest)</option>
                                 <option value="created_at_desc" {% if request.args.get('sort_by')=='created_at_desc' %}selected{% endif %}>Date Added (Newest)</option>
                                 <option value="created_at_asc" {% if request.args.get('sort_by')=='created_at_asc' %}selected{% endif %}>Date Added (Oldest)</option>
                             </select>

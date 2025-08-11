@@ -409,7 +409,20 @@ def sync_all_users():
         
         if not sync_result['success']:
             current_app.logger.error(f"User sync failed: {sync_result.get('message', 'Unknown error')}")
-            raw_plex_users_with_access = None
+            # Show modal with the detailed error messages from the unified service
+            modal_html = render_template('users/partials/sync_results_modal.html',
+                                       sync_result=sync_result)
+            trigger_payload = {
+                "showToastEvent": {"message": "Sync encountered errors. See details.", "category": "error"},
+                "openSyncResultsModal": True,
+                "refreshUserList": True
+            }
+            headers = {
+                'HX-Retarget': '#syncResultModalContainer',
+                'HX-Reswap': 'innerHTML',
+                'HX-Trigger-After-Swap': json.dumps(trigger_payload)
+            }
+            return make_response(modal_html, 200, headers)
         else:
             # Check if there are actual changes to determine whether to show modal or just toast
             has_changes = (sync_result.get('added', 0) > 0 or 
@@ -445,23 +458,21 @@ def sync_all_users():
             
     except Exception as e:
         current_app.logger.error(f"Critical error during user synchronization: {e}", exc_info=True)
-        raw_plex_users_with_access = None
-
-    # Fallback error handling if unified service fails
-    if raw_plex_users_with_access is None:
+        # Create a sync result with the actual exception details
         sync_result = {
             'success': False,
             'added': 0,
             'updated': 0,
             'errors': 1,
-            'error_messages': ["Failed to retrieve users from media services."],
+            'error_messages': [f"Critical synchronization error: {str(e)}"],
             'servers_synced': 0
         }
         modal_html = render_template('users/partials/sync_results_modal.html',
                                      sync_result=sync_result)
         trigger_payload = {
-            "showToastEvent": {"message": "Sync failed: Could not contact media services.", "category": "error"},
-            "openSyncResultsModal": True
+            "showToastEvent": {"message": "Sync failed due to critical error. See details.", "category": "error"},
+            "openSyncResultsModal": True,
+            "refreshUserList": True
         }
         headers = {
             'HX-Retarget': '#syncResultModalContainer',
@@ -469,152 +480,6 @@ def sync_all_users():
             'HX-Trigger-After-Swap': json.dumps(trigger_payload)
         }
         return make_response(modal_html, 200, headers)
-
-    mum_users_all = User.query.all()
-    mum_users_map_by_plex_id = {user.plex_user_id: user for user in mum_users_all if user.plex_user_id is not None}
-    mum_users_map_by_plex_uuid = {user.plex_uuid: user for user in mum_users_all if user.plex_uuid}
-    mum_users_map_by_username = {user.primary_username.lower(): user for user in mum_users_all if user.primary_username}
-
-    added_users_details = []
-    updated_users_details = []
-    removed_users_details = []
-    error_count = 0
-    error_messages = []
-
-    current_plex_user_ids_on_server = {item['id'] for item in raw_plex_users_with_access if item.get('id') is not None}
-
-    # Process each user from the Plex sync
-    for plex_user_data in raw_plex_users_with_access:
-        # This includes checking for existing users, updating fields,
-        # creating new users, and handling IntegrityError.
-        plex_id = plex_user_data.get('id')
-        plex_uuid_from_sync = plex_user_data.get('uuid')
-        plex_username_from_sync = plex_user_data.get('username')
-
-        if not plex_username_from_sync:
-            msg = "Plex user data missing 'username'. Skipping."
-            current_app.logger.warning(msg)
-            error_count += 1
-            error_messages.append(msg)
-            continue
-
-        mum_user = mum_users_map_by_plex_id.get(plex_id) or mum_users_map_by_plex_uuid.get(plex_uuid_from_sync)
-        if not mum_user:
-            mum_user = mum_users_map_by_username.get(plex_username_from_sync.lower())
-            if mum_user:
-                current_app.logger.warning(f"Found user '{plex_username_from_sync}' by username, but ID/UUID did not match. Updating existing record (ID: {mum_user.id}).")
-
-        new_library_ids = list(plex_user_data.get('allowed_library_ids_on_server', []))
-        # Try both keys since the Plex service might use either
-        accepted_at_str = plex_user_data.get('acceptedAt') or plex_user_data.get('accepted_at')
-        current_app.logger.debug(f"User sync - {plex_user_data.get('username', 'Unknown')}: acceptedAt raw value = {accepted_at_str}")
-        current_app.logger.debug(f"User sync - {plex_user_data.get('username', 'Unknown')}: Full plex_user_data keys = {list(plex_user_data.keys())}")
-        plex_join_date_dt = None
-        if accepted_at_str and accepted_at_str.isdigit():
-            try:
-                plex_join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
-                current_app.logger.debug(f"User sync - {plex_user_data.get('username', 'Unknown')}: parsed plex_join_date = {plex_join_date_dt}")
-            except (ValueError, TypeError) as e:
-                current_app.logger.warning(f"User sync - {plex_user_data.get('username', 'Unknown')}: Failed to parse acceptedAt '{accepted_at_str}': {e}")
-                plex_join_date_dt = None
-        else:
-            current_app.logger.debug(f"User sync - {plex_user_data.get('username', 'Unknown')}: acceptedAt is not a valid digit string: '{accepted_at_str}'")
-        
-        if mum_user:
-            changes = []
-            if mum_user.plex_user_id != plex_id: changes.append("Plex User ID updated"); mum_user.plex_user_id = plex_id
-            if mum_user.plex_uuid != plex_uuid_from_sync: changes.append("Plex UUID updated"); mum_user.plex_uuid = plex_uuid_from_sync
-            if mum_user.primary_username != plex_username_from_sync: changes.append(f"Username changed"); mum_user.primary_username = plex_username_from_sync
-            if set(mum_user.allowed_library_ids or []) != set(new_library_ids): changes.append("Libraries updated"); mum_user.allowed_library_ids = new_library_ids
-            # Update raw service data if available
-            if plex_user_data.get('raw_data'): 
-                changes.append("Raw data updated"); mum_user.raw_service_data = plex_user_data.get('raw_data')
-            if plex_join_date_dt and (mum_user.plex_join_date is None or mum_user.plex_join_date != plex_join_date_dt.replace(tzinfo=None)):
-                current_app.logger.debug(f"User sync - {mum_user.get_display_name()}: Updating plex_join_date from {mum_user.plex_join_date} to {plex_join_date_dt.replace(tzinfo=None)}")
-                changes.append("Plex join date updated"); mum_user.plex_join_date = plex_join_date_dt.replace(tzinfo=None)
-            elif plex_join_date_dt:
-                current_app.logger.debug(f"User sync - {mum_user.get_display_name()}: plex_join_date already up to date: {mum_user.plex_join_date}")
-            else:
-                current_app.logger.debug(f"User sync - {mum_user.get_display_name()}: No valid plex_join_date to set")
-
-            if changes:
-                mum_user.last_synced_with_plex = datetime.utcnow(); mum_user.updated_at = datetime.utcnow()
-                updated_users_details.append({'username': plex_username_from_sync, 'changes': changes})
-        else:
-            try:
-                new_user = User(
-                    plex_user_id=plex_id, plex_uuid=plex_uuid_from_sync, primary_username=plex_username_from_sync,
-                    plex_email=plex_user_data.get('email'), plex_thumb_url=plex_user_data.get('thumb'),
-                    allowed_library_ids=new_library_ids, is_home_user=plex_user_data.get('is_home_user', False),
-                    shares_back=plex_user_data.get('shares_back', False), is_plex_friend=plex_user_data.get('is_friend', False),
-                    plex_join_date=plex_join_date_dt.replace(tzinfo=None) if plex_join_date_dt else None,
-                    last_synced_with_plex=datetime.utcnow(),
-                    raw_service_data=plex_user_data.get('raw_data')  # Store raw data for new users
-                )
-                db.session.add(new_user)
-                added_users_details.append({'username': plex_username_from_sync, 'plex_id': plex_id})
-            except IntegrityError as ie:
-                db.session.rollback(); msg = f"Integrity error adding '{plex_username_from_sync}': {ie}."; current_app.logger.error(msg); error_count += 1; error_messages.append(msg)
-            except Exception as e:
-                db.session.rollback(); msg = f"Error creating user '{plex_username_from_sync}': {e}"; current_app.logger.error(msg, exc_info=True); error_count += 1; error_messages.append(msg)
-
-    # Process removals
-    for user in mum_users_all:
-        if user.plex_user_id not in current_plex_user_ids_on_server:
-            removed_users_details.append({'username': user.get_display_name(), 'mum_id': user.id, 'plex_id': user.plex_user_id})
-            db.session.delete(user)
-
-    # Commit all session changes to the database
-    if added_users_details or updated_users_details or removed_users_details or error_count > 0:
-        try:
-            db.session.commit()
-            log_event(EventType.PLEX_SYNC_USERS_COMPLETE, f"Plex user sync complete. Added: {len(added_users_details)}, Updated: {len(updated_users_details)}, Removed: {len(removed_users_details)}, Errors: {error_count}.", details={"added": len(added_users_details), "updated": len(updated_users_details), "removed": len(removed_users_details)})
-        except Exception as e_commit:
-            db.session.rollback(); msg = f"DB commit error during sync: {e_commit}"; error_messages.append(msg); error_count += 1
-            # Clear lists as the transaction failed
-            added_users_details, updated_users_details, removed_users_details = [], [], []
-
-    # --- Part 2: Response Generation Logic ---
-    response_headers = {}
-    
-    if added_users_details or updated_users_details or removed_users_details or error_count > 0:
-        modal_html = render_template('users/partials/sync_results_modal.html',
-                                     added_users=added_users_details,
-                                     updated_users=updated_users_details,
-                                     removed_users=removed_users_details,
-                                     error_count=error_count,
-                                     error_messages=error_messages)
-
-        response_headers['HX-Retarget'] = '#syncResultModalContainer'
-        response_headers['HX-Reswap'] = 'innerHTML'
-
-        toast_message = "Sync complete. Changes detected, see details."
-        toast_category = "success"
-        if error_count > 0 and not (added_users_details or updated_users_details or removed_users_details):
-            toast_message = f"Sync encountered {error_count} error(s). See details."
-            toast_category = "error"
-        elif error_count > 0:
-            toast_message = f"Sync complete with {error_count} error(s) and other changes."
-            toast_category = "warning"
-
-        trigger_payload = {
-            "showToastEvent": {"message": toast_message, "category": toast_category},
-            "openSyncResultsModal": True,
-            "refreshUserList": True
-        }
-        response_headers['HX-Trigger-After-Swap'] = json.dumps(trigger_payload)
-
-        return make_response(modal_html, 200, response_headers)
-    
-    else:
-        # No changes and no errors
-        trigger_payload = {
-            "showToastEvent": {"message": "Sync complete. No changes were made.", "category": "success"},
-            "refreshUserList": True
-        }
-        response_headers['HX-Trigger'] = json.dumps(trigger_payload)
-        
-        return make_response("", 200, response_headers)
 
 @bp.route('/delete/<int:user_id>', methods=['DELETE'])
 @login_required

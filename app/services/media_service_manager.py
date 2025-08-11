@@ -124,7 +124,24 @@ class MediaServiceManager:
             return {'success': False, 'message': 'Service type not supported'}
 
         try:
+            # Test connection first before attempting to sync users
+            connection_test = service.test_connection()
+            if not connection_test[0]:  # test_connection returns (success, message)
+                return {
+                    'success': False, 
+                    'message': f'Server {server.name} is offline or unreachable: {connection_test[1]}'
+                }
+            
             users_data = service.get_users()
+            
+            # If we get an empty list, double-check if this is expected or an error
+            if not users_data:
+                current_app.logger.warning(f"No users returned from {server.name}. This could indicate the server is offline or has no users.")
+                # For safety, don't process removals if we get no users - this could indicate server issues
+                return {
+                    'success': False,
+                    'message': f'No users returned from {server.name}. Server may be offline or experiencing issues.'
+                }
             
             added_count = 0
             updated_count = 0
@@ -202,15 +219,27 @@ class MediaServiceManager:
                         updated_details.append({'username': user.get_display_name(), 'changes': changes})
                         access.updated_at = datetime.utcnow()
 
-            # Process removals
-            access_records_to_check = UserMediaAccess.query.filter_by(server_id=server_id).all()
-            for access in access_records_to_check:
-                if str(access.external_user_id) not in external_user_ids_from_service:
-                    user_to_check = User.query.get(access.user_id)
-                    db.session.delete(access)
-                    removed_count += 1
-                    if user_to_check and not user_to_check.media_accesses.count():
-                        db.session.delete(user_to_check)
+            # Process removals - only if we successfully got user data and it's not empty
+            # This prevents accidental deletion when server is offline or experiencing issues
+            if users_data and external_user_ids_from_service:
+                access_records_to_check = UserMediaAccess.query.filter_by(server_id=server_id).all()
+                for access in access_records_to_check:
+                    if str(access.external_user_id) not in external_user_ids_from_service:
+                        user_to_check = User.query.get(access.user_id)
+                        current_app.logger.info(f"Removing user access: {user_to_check.get_display_name() if user_to_check else 'Unknown'} from server {server.name}")
+                        db.session.delete(access)
+                        removed_count += 1
+                        
+                        # Only delete the user if they have NO other server access
+                        # Use a fresh query to get accurate count after the deletion above
+                        remaining_access_count = UserMediaAccess.query.filter_by(user_id=access.user_id).count()
+                        if user_to_check and remaining_access_count == 0:
+                            current_app.logger.info(f"User {user_to_check.get_display_name()} has no remaining server access, deleting user completely")
+                            db.session.delete(user_to_check)
+                        elif user_to_check:
+                            current_app.logger.info(f"User {user_to_check.get_display_name()} still has access to {remaining_access_count} other server(s), keeping user")
+            else:
+                current_app.logger.warning(f"Skipping user removal processing for {server.name} - no valid user data received")
 
             db.session.commit()
             

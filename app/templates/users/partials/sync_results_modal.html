@@ -29,6 +29,40 @@
                 </span>
             </div>
         </div>
+        
+        {# Show server status summary when there are both successful and failed servers #}
+        {% if sync_result.successful_servers and sync_result.failed_servers %}
+        <div class="alert alert-info shadow-lg my-4">
+            <div>
+                <i class="fa-solid fa-info-circle fa-lg mr-2"></i>
+                <div>
+                    <span class="font-medium">Server Status Summary:</span>
+                    <div class="text-xs mt-1 space-y-1">
+                        <div>
+                            <span class="text-success font-medium">✓ Successfully synced:</span>
+                            {% for server in sync_result.successful_servers %}
+                                <span class="badge badge-success badge-xs ml-1">{{ server.service_type }}</span>
+                            {% endfor %}
+                            {% if sync_result.added > 0 or sync_result.updated > 0 or sync_result.removed > 0 %}
+                                <span class="text-xs text-base-content/70 ml-2">
+                                    (+{{ sync_result.added }} users, ~{{ sync_result.updated }} updated, -{{ sync_result.removed }} removed)
+                                </span>
+                            {% else %}
+                                <span class="text-xs text-base-content/70 ml-2">(no changes)</span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <span class="text-error font-medium">✗ Failed to sync:</span>
+                            {% for server in sync_result.failed_servers %}
+                                <span class="badge badge-error badge-xs ml-1">{{ server.service_type }}</span>
+                            {% endfor %}
+                            <span class="text-xs text-base-content/70 ml-2">(users preserved)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     {% endif %}
 
     {% if sync_result.added == 0 and sync_result.updated == 0 and sync_result.errors == 0 %}
