@@ -187,97 +187,135 @@
                     <div class="step-content max-w-sm mx-auto">
                         {% if allow_user_accounts and not user_account_created %}
                             {# User Account Creation Step #}
-                            <div class="step-section" id="user-account-step">
-                                <h2 class="text-xl font-semibold mb-4">
-                                    <i class="fa-solid fa-user-plus mr-2"></i>
-                                    Create Your Account
-                                </h2>
-                                
-                                <p class="text-sm text-base-content/70 mb-6">
-                                    First, create your account to manage your media access and preferences.
-                                </p>
+                            <div class="step-section bg-base-200/30 border border-base-300 rounded-lg p-6" id="user-account-step">
+                                <!-- Step Header -->
+                                <div class="flex items-center gap-3 mb-6">
+                                    <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-solid fa-user-plus text-primary text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-xl font-semibold text-base-content mb-1">Create Your Account</h2>
+                                        <p class="text-sm text-base-content/70">
+                                            Set up your account to manage media access and preferences
+                                        </p>
+                                    </div>
+                                </div>
 
                                 <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
                                     {{ form.hidden_tag() }}
                                     
-                                    <div class="form-control mb-4">
-                                        <label class="label">
-                                            <span class="label-text">{{ account_form.username.label.text }}</span>
-                                        </label>
-                                        {{ account_form.username(class="input input-bordered w-full") }}
-                                        <label class="label">
-                                            <span class="label-text-alt">{{ account_form.username.description }}</span>
-                                        </label>
-                                    </div>
+                                    <div class="space-y-4">
+                                        <div class="form-control">
+                                            <label class="label">
+                                                <span class="label-text font-medium text-sm">{{ account_form.username.label.text }}</span>
+                                            </label>
+                                            {{ account_form.username(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                                            {% if account_form.username.description %}
+                                                <label class="label">
+                                                    <span class="label-text-alt text-xs text-base-content/60">{{ account_form.username.description }}</span>
+                                                </label>
+                                            {% endif %}
+                                        </div>
 
-                                    <div class="form-control mb-4">
-                                        <label class="label">
-                                            <span class="label-text">{{ account_form.email.label.text }}</span>
-                                        </label>
-                                        {{ account_form.email(class="input input-bordered w-full") }}
-                                        <label class="label">
-                                            <span class="label-text-alt">{{ account_form.email.description }}</span>
-                                        </label>
-                                    </div>
+                                        <div class="form-control">
+                                            <label class="label">
+                                                <span class="label-text font-medium text-sm">{{ account_form.email.label.text }}</span>
+                                            </label>
+                                            {{ account_form.email(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                                            {% if account_form.email.description %}
+                                                <label class="label">
+                                                    <span class="label-text-alt text-xs text-base-content/60">{{ account_form.email.description }}</span>
+                                                </label>
+                                            {% endif %}
+                                        </div>
 
-                                    <div class="form-control mb-4">
-                                        <label class="label">
-                                            <span class="label-text">{{ account_form.password.label.text }}</span>
-                                        </label>
-                                        {{ account_form.password(class="input input-bordered w-full") }}
-                                        <label class="label">
-                                            <span class="label-text-alt">{{ account_form.password.description }}</span>
-                                        </label>
-                                    </div>
+                                        <div class="form-control">
+                                            <label class="label">
+                                                <span class="label-text font-medium text-sm">{{ account_form.password.label.text }}</span>
+                                            </label>
+                                            {{ account_form.password(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                                            {% if account_form.password.description %}
+                                                <label class="label">
+                                                    <span class="label-text-alt text-xs text-base-content/60">{{ account_form.password.description }}</span>
+                                                </label>
+                                            {% endif %}
+                                        </div>
 
-                                    <div class="form-control mb-6">
-                                        <label class="label">
-                                            <span class="label-text">{{ account_form.confirm_password.label.text }}</span>
-                                        </label>
-                                        {{ account_form.confirm_password(class="input input-bordered w-full") }}
-                                        <label class="label">
-                                            <span class="label-text-alt">{{ account_form.confirm_password.description }}</span>
-                                        </label>
-                                    </div>
+                                        <div class="form-control">
+                                            <label class="label">
+                                                <span class="label-text font-medium text-sm">{{ account_form.confirm_password.label.text }}</span>
+                                            </label>
+                                            {{ account_form.confirm_password(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                                            {% if account_form.confirm_password.description %}
+                                                <label class="label">
+                                                    <span class="label-text-alt text-xs text-base-content/60">{{ account_form.confirm_password.description }}</span>
+                                                </label>
+                                            {% endif %}
+                                        </div>
 
-                                    <button name="action" value="create_user_account" type="submit" class="btn btn-primary btn-block text-base">
-                                        <i class="fa-solid fa-user-plus mr-2"></i>
-                                        Create Account & Continue
-                                    </button>
+                                        <div class="pt-4">
+                                            <button name="action" value="create_user_account" type="submit" class="btn btn-primary w-full h-12 text-base font-medium">
+                                                <i class="fa-solid fa-user-plus mr-2"></i>
+                                                Create Account & Continue
+                                            </button>
+                                        </div>
+                                    </div>
                                 </form>
                             </div>
                         {% elif show_discord_button and not already_authenticated_discord_user %}
                             {# Discord Step #}
-                            <div class="step-section" id="discord-step">
-                                <h2 class="text-xl font-semibold mb-4">
-                                    <i class="fa-brands fa-discord mr-2"></i>
-                                    Discord Authentication
-                                    {% if not discord_sso_is_mandatory %}
-                                        <span class="badge badge-ghost badge-sm ml-2">Optional</span>
-                                    {% endif %}
-                                </h2>
+                            <div class="step-section bg-base-200/30 border border-base-300 rounded-lg p-6" id="discord-step">
+                                <!-- Step Header -->
+                                <div class="flex items-center gap-3 mb-6">
+                                    <div class="w-10 h-10 rounded-full bg-[#5865F2]/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-brands fa-discord text-[#5865F2] text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-xl font-semibold text-base-content mb-1">Discord Authentication</h2>
+                                        <p class="text-sm text-base-content/70">
+                                            {% if discord_sso_is_mandatory %}
+                                                Required to continue with your invite
+                                            {% else %}
+                                                Optional - Connect your Discord account
+                                            {% endif %}
+                                        </p>
+                                        {% if not discord_sso_is_mandatory %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-base-300/50 text-base-content/70 mt-1">
+                                                Optional
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                                 
                                 {% if setting_require_guild_membership %}
-                                    <div class="alert alert-info mb-4">
-                                        <i class="fa-solid fa-info-circle"></i>
-                                        <span>You must be a member of our Discord server to accept this invite.</span>
-                                    </div>
-                                    {% if setting_discord_server_invite_url %}
-                                        <div class="mb-4">
-                                            <a href="{{ setting_discord_server_invite_url }}" target="_blank" rel="noopener noreferrer" 
-                                               class="btn btn-secondary btn-block">
-                                                <i class="fa-brands fa-discord fa-lg mr-2"></i>
-                                                Join Discord Server First
-                                                <i class="fa-solid fa-external-link-alt ml-2"></i>
-                                            </a>
+                                    <div class="bg-[#5865F2]/10 border border-[#5865F2]/20 rounded-lg p-4 mb-6">
+                                        <div class="flex items-start gap-3">
+                                            <div class="w-6 h-6 rounded-full bg-[#5865F2]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <i class="fa-solid fa-info text-[#5865F2] text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-medium text-[#5865F2] mb-1">Discord Server Required</h4>
+                                                <p class="text-sm text-base-content/80 mb-3">
+                                                    You must be a member of our Discord server to accept this invite.
+                                                </p>
+                                                {% if setting_discord_server_invite_url %}
+                                                    <a href="{{ setting_discord_server_invite_url }}" target="_blank" rel="noopener noreferrer" 
+                                                       class="btn bg-[#5865F2] hover:bg-[#4752C4] border-[#5865F2] hover:border-[#4752C4] text-white btn-sm">
+                                                        <i class="fa-brands fa-discord mr-2"></i>
+                                                        Join Discord Server First
+                                                        <i class="fa-solid fa-external-link-alt ml-2"></i>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
                                         </div>
-                                    {% endif %}
+                                    </div>
                                 {% endif %}
 
                                 <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
                                     {{ form.hidden_tag() }}
-                                    <button name="auth_method" value="discord" type="submit" class="btn btn-info bg-[#5865F2] hover:bg-[#4752C4] border-[#5865F2] hover:border-[#4752C4] text-white btn-block text-base">
-                                        <i class="fa-brands fa-discord fa-lg mr-2"></i>
+                                    <button name="auth_method" value="discord" type="submit" 
+                                            class="btn bg-[#5865F2] hover:bg-[#4752C4] border-[#5865F2] hover:border-[#4752C4] text-white w-full h-12 text-base font-medium">
+                                        <i class="fa-brands fa-discord mr-2"></i>
                                         Continue with Discord
                                     </button>
                                 </form>
@@ -289,22 +327,40 @@
                             </div>
                         {% elif has_plex_servers and not already_authenticated_plex_user %}
                             {# Plex Step (only if there are Plex servers) #}
-                            <div class="step-section" id="plex-step">
-                                <h2 class="text-xl font-semibold mb-4">
-                                    <i class="fa-solid fa-right-to-bracket mr-2"></i>
-                                    Plex Authentication
-                                </h2>
+                            <div class="step-section bg-base-200/30 border border-base-300 rounded-lg p-6" id="plex-step">
+                                <!-- Step Header -->
+                                <div class="flex items-center gap-3 mb-6">
+                                    <div class="w-10 h-10 rounded-full bg-[#e5a00d]/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-solid fa-right-to-bracket text-[#e5a00d] text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-xl font-semibold text-base-content mb-1">Plex Authentication</h2>
+                                        <p class="text-sm text-base-content/70">
+                                            Sign in with your Plex account to access media servers
+                                        </p>
+                                    </div>
+                                </div>
                                 
                                 {% if already_authenticated_discord_user %}
-                                    <div class="alert alert-success mb-4">
-                                        <i class="fa-brands fa-discord mr-2"></i>
-                                        <span>Discord account linked as <strong>{{ already_authenticated_discord_user.username }}</strong></span>
+                                    <div class="bg-[#5865F2]/10 border border-[#5865F2]/20 rounded-lg p-4 mb-6">
+                                        <div class="flex items-start gap-3">
+                                            <div class="w-6 h-6 rounded-full bg-[#5865F2]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <i class="fa-brands fa-discord text-[#5865F2] text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-medium text-[#5865F2] mb-1">Discord Account Connected</h4>
+                                                <p class="text-sm text-base-content/80">
+                                                    Linked as <strong class="text-base-content">{{ already_authenticated_discord_user.username }}</strong>
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 {% endif %}
 
                                 <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
                                     {{ form.hidden_tag() }}
-                                    <button name="auth_method" value="plex" type="submit" class="btn btn-primary bg-[#e5a00d] hover:bg-[#c4880b] border-[#e5a00d] hover:border-[#c4880b] text-black btn-block text-base">
+                                    <button name="auth_method" value="plex" type="submit" 
+                                            class="btn bg-[#e5a00d] hover:bg-[#c4880b] border-[#e5a00d] hover:border-[#c4880b] text-black w-full h-12 text-base font-medium">
                                         <i class="fa-solid fa-right-to-bracket mr-2"></i>
                                         Sign In with Plex
                                     </button>
@@ -327,33 +383,68 @@
                             {# Find current server step #}
                             {% if current_step and current_step.id.startswith('server_access_') %}
                                 {# Individual Server Access Step #}
-                                <div class="step-section" id="{{ current_step.id }}">
-                                    <h2 class="text-xl font-semibold mb-4">
-                                        <i class="{{ current_step.icon }} mr-2"></i>
-                                        {{ current_step.name }}
-                                    </h2>
+                                <div class="step-section bg-base-200/30 border border-base-300 rounded-lg p-6" id="{{ current_step.id }}">
+                                    <!-- Step Header -->
+                                    <div class="flex items-center gap-3 mb-6">
+                                        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                            <i class="{{ current_step.icon }} text-primary text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h2 class="text-xl font-semibold text-base-content mb-1">{{ current_step.name }}</h2>
+                                            <p class="text-sm text-base-content/70">
+                                                Setting up access to {{ current_step.server_name }}
+                                            </p>
+                                        </div>
+                                    </div>
                                     
                                     {# Show completed authentications #}
-                                    <div class="space-y-2 mb-6">
-                                        {% if already_authenticated_plex_user %}
-                                            <div class="alert alert-success">
-                                                <i class="fa-solid fa-right-to-bracket mr-2"></i>
-                                                <span>Plex account linked as <strong>{{ already_authenticated_plex_user.username }}</strong></span>
-                                            </div>
-                                        {% endif %}
-                                        {% if already_authenticated_discord_user %}
-                                            <div class="alert alert-success">
-                                                <i class="fa-brands fa-discord mr-2"></i>
-                                                <span>Discord account linked as <strong>{{ already_authenticated_discord_user.username }}</strong></span>
-                                            </div>
-                                        {% endif %}
-                                    </div>
+                                    {% if already_authenticated_plex_user or already_authenticated_discord_user %}
+                                        <div class="space-y-3 mb-6">
+                                            {% if already_authenticated_plex_user %}
+                                                <div class="bg-[#e5a00d]/10 border border-[#e5a00d]/20 rounded-lg p-4">
+                                                    <div class="flex items-start gap-3">
+                                                        <div class="w-6 h-6 rounded-full bg-[#e5a00d]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                            <i class="fa-solid fa-right-to-bracket text-[#e5a00d] text-xs"></i>
+                                                        </div>
+                                                        <div>
+                                                            <h4 class="font-medium text-[#e5a00d] mb-1">Plex Account Connected</h4>
+                                                            <p class="text-sm text-base-content/80">
+                                                                Signed in as <strong class="text-base-content">{{ already_authenticated_plex_user.username }}</strong>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                            {% if already_authenticated_discord_user %}
+                                                <div class="bg-[#5865F2]/10 border border-[#5865F2]/20 rounded-lg p-4">
+                                                    <div class="flex items-start gap-3">
+                                                        <div class="w-6 h-6 rounded-full bg-[#5865F2]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                            <i class="fa-brands fa-discord text-[#5865F2] text-xs"></i>
+                                                        </div>
+                                                        <div>
+                                                            <h4 class="font-medium text-[#5865F2] mb-1">Discord Account Connected</h4>
+                                                            <p class="text-sm text-base-content/80">
+                                                                Linked as <strong class="text-base-content">{{ already_authenticated_discord_user.username }}</strong>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
 
-                                    <div class="alert alert-info mb-4">
-                                        <i class="fa-solid fa-info-circle mr-2"></i>
-                                        <div>
-                                            <p class="font-semibold">Setting up access to {{ current_step.server_name }}</p>
-                                            <p class="text-sm">Service Type: {{ current_step.server_type }}</p>
+                                    <!-- Server Info Card -->
+                                    <div class="bg-info/10 border border-info/20 rounded-lg p-4 mb-6">
+                                        <div class="flex items-start gap-3">
+                                            <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <i class="fa-solid fa-server text-info text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-medium text-info mb-1">{{ current_step.server_name }}</h4>
+                                                <p class="text-sm text-base-content/80">
+                                                    {{ current_step.server_type }} Media Server
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -367,37 +458,42 @@
                                                 <div class="space-y-4 mb-6">
                                                     <div class="form-control">
                                                         <label class="label">
-                                                            <span class="label-text">Choose a username for {{ current_step.server_name }}</span>
+                                                            <span class="label-text font-medium text-sm">Choose a username for {{ current_step.server_name }}</span>
                                                         </label>
-                                                        <input type="text" name="jellyfin_username" placeholder="Username" class="input input-bordered" value="{{ already_authenticated_plex_user.username }}" required>
+                                                        <input type="text" name="jellyfin_username" placeholder="Username" 
+                                                               class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" 
+                                                               value="{{ already_authenticated_plex_user.username }}" required>
                                                         <label class="label">
-                                                            <span class="label-text-alt">Default: Your Plex username</span>
-                                                        </label>
-                                                    </div>
-                                                    <div class="form-control">
-                                                        <label class="label">
-                                                            <span class="label-text">Set a password for {{ current_step.server_name }}</span>
-                                                        </label>
-                                                        <input type="password" name="jellyfin_password" placeholder="Enter password" class="input input-bordered" required>
-                                                        <label class="label">
-                                                            <span class="label-text-alt">Choose a secure password for your account</span>
+                                                            <span class="label-text-alt text-xs text-base-content/60">Default: Your Plex username</span>
                                                         </label>
                                                     </div>
                                                     <div class="form-control">
                                                         <label class="label">
-                                                            <span class="label-text">Confirm password</span>
+                                                            <span class="label-text font-medium text-sm">Set a password for {{ current_step.server_name }}</span>
                                                         </label>
-                                                        <input type="password" name="jellyfin_password_confirm" placeholder="Confirm password" class="input input-bordered" required>
+                                                        <input type="password" name="jellyfin_password" placeholder="Enter password" 
+                                                               class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" required>
                                                         <label class="label">
-                                                            <span class="label-text-alt">Re-enter your password to confirm</span>
+                                                            <span class="label-text-alt text-xs text-base-content/60">Choose a secure password for your account</span>
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-control">
+                                                        <label class="label">
+                                                            <span class="label-text font-medium text-sm">Confirm password</span>
+                                                        </label>
+                                                        <input type="password" name="jellyfin_password_confirm" placeholder="Confirm password" 
+                                                               class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" required>
+                                                        <label class="label">
+                                                            <span class="label-text-alt text-xs text-base-content/60">Re-enter your password to confirm</span>
                                                         </label>
                                                     </div>
                                                 </div>
                                             {% endif %}
                                             
-                                            <button name="action" value="setup_server_access" type="submit" class="btn btn-success btn-block text-base btn-lg" 
+                                            <button name="action" value="setup_server_access" type="submit" 
+                                                    class="btn btn-primary w-full h-12 text-base font-medium" 
                                                     {% if current_step.server_type != 'PLEX' %}onclick="return validatePasswords()"{% endif %}>
-                                                <i class="fa-solid fa-check-circle mr-2"></i>
+                                                <i class="fa-solid fa-user-plus mr-2"></i>
                                                 {% if current_step.server_type == 'PLEX' %}
                                                     Grant Access to {{ current_step.server_name }}
                                                 {% else %}
