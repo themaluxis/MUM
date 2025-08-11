@@ -1,117 +1,242 @@
 {# File: app/templates/users/_sync_results_modal_content.html #}
 {# Expects added_users, updated_users, removed_users, error_count, error_messages #}
 
-<div class="modal-box max-w-2xl">
-    <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" type="button" 
-              onclick="document.getElementById('sync_results_modal').close()">✕</button>
-    </form>
-    <h3 class="font-bold text-lg"><i class="fa-solid fa-list-check mr-2"></i>Sync Results</h3>
-
-    {% if sync_result.errors > 0 %}
-        <div class="alert alert-error shadow-lg my-4">
+<div class="modal-box max-w-3xl bg-base-100 border border-base-300 shadow-2xl p-0">
+    <!-- Professional Header -->
+    <div class="flex items-center justify-between p-6 border-b border-base-300">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <i class="fa-solid fa-sync text-primary text-lg"></i>
+            </div>
             <div>
-                <i class="fa-solid fa-circle-xmark fa-lg mr-2"></i>
-                <span>
-                    Encountered {{ sync_result.errors }} error(s) during sync.
-                    {% if sync_result.error_messages %}
-                        <ul class="list-disc list-inside text-xs mt-1">
-                            {% for msg in sync_result.error_messages[:3] %} {# Show first 3 errors #}
-                                <li>{{ msg | truncate(150) }}</li>
-                            {% endfor %}
-                            {% if sync_result.error_messages|length > 3 %}
-                                <li>... and {{ sync_result.error_messages|length - 3 }} more. Check server logs.</li>
-                            {% endif %}
-                        </ul>
-                    {% else %}
-                         Check server logs for details.
-                    {% endif %}
-                </span>
+                <h3 class="text-xl font-semibold text-base-content">Sync Results</h3>
+                <p class="text-sm text-base-content/60">Review changes made during synchronization</p>
             </div>
         </div>
-        
-        {# Show server status summary when there are both successful and failed servers #}
-        {% if sync_result.successful_servers and sync_result.failed_servers %}
-        <div class="alert alert-info shadow-lg my-4">
-            <div>
-                <i class="fa-solid fa-info-circle fa-lg mr-2"></i>
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200" type="button" 
+                    onclick="document.getElementById('sync_results_modal').close()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </form>
+    </div>
+
+    <!-- Content -->
+    <div class="p-6">
+        <!-- Description Card -->
+        <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+            <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-info text-primary text-sm"></i>
+                </div>
                 <div>
-                    <span class="font-medium">Server Status Summary:</span>
-                    <div class="text-xs mt-1 space-y-1">
-                        <div>
-                            <span class="text-success font-medium">✓ Successfully synced:</span>
-                            {% for server in sync_result.successful_servers %}
-                                <span class="badge badge-success badge-xs ml-1">{{ server.service_type }}</span>
+                    <h4 class="font-medium text-base-content mb-1">Synchronization Summary</h4>
+                    <p class="text-sm text-base-content/70 leading-relaxed">
+                        {% if sync_result.added == 0 and sync_result.updated == 0 and sync_result.removed == 0 and sync_result.errors == 0 %}
+                            All media servers are synchronized and up to date. No user changes were required.
+                        {% else %}
+                            Media server synchronization completed with 
+                            {% if sync_result.added > 0 %}<span class="text-success font-medium">{{ sync_result.added }} users added</span>{% endif %}{% if sync_result.added > 0 and (sync_result.updated > 0 or sync_result.removed > 0) %}, {% endif %}
+                            {% if sync_result.updated > 0 %}<span class="text-primary font-medium">{{ sync_result.updated }} users updated</span>{% endif %}{% if sync_result.updated > 0 and sync_result.removed > 0 %}, and {% endif %}
+                            {% if sync_result.removed > 0 %}<span class="text-warning font-medium">{{ sync_result.removed }} users removed</span>{% endif %}.
+                            {% if sync_result.errors > 0 %} <span class="text-error font-medium">{{ sync_result.errors }} error(s)</span> occurred during the process.{% endif %}
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {% if sync_result.errors > 0 %}
+        <!-- Error Card -->
+        <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+            <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-full bg-error/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-exclamation-triangle text-error text-sm"></i>
+                </div>
+                <div>
+                    <h4 class="font-medium text-base-content mb-1">Sync Errors</h4>
+                    {% if sync_result.error_messages %}
+                        <div class="text-sm text-base-content/70 leading-relaxed">
+                            {% for msg in sync_result.error_messages[:2] %}
+                                <div class="mb-1">• {{ msg | truncate(100) }}</div>
                             {% endfor %}
-                            {% if sync_result.added > 0 or sync_result.updated > 0 or sync_result.removed > 0 %}
-                                <span class="text-xs text-base-content/70 ml-2">
-                                    (+{{ sync_result.added }} users, ~{{ sync_result.updated }} updated, -{{ sync_result.removed }} removed)
-                                </span>
-                            {% else %}
-                                <span class="text-xs text-base-content/70 ml-2">(no changes)</span>
+                            {% if sync_result.error_messages|length > 2 %}
+                                <div class="text-xs text-base-content/60 mt-1">... and {{ sync_result.error_messages|length - 2 }} more errors occurred</div>
                             {% endif %}
                         </div>
-                        <div>
-                            <span class="text-error font-medium">✗ Failed to sync:</span>
-                            {% for server in sync_result.failed_servers %}
-                                <span class="badge badge-error badge-xs ml-1">{{ server.service_type }}</span>
-                            {% endfor %}
-                            <span class="text-xs text-base-content/70 ml-2">(users preserved)</span>
-                        </div>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
         {% endif %}
-    {% endif %}
 
-    {% if sync_result.added == 0 and sync_result.updated == 0 and sync_result.errors == 0 %}
-        <p class="py-4 text-success"><i class="fa-solid fa-check-circle mr-2"></i>Sync complete. No changes were made to user data.</p>
-    {% else %}
-        <p class="py-2 text-sm">Review the changes made during the media server synchronization:</p>
-        <div class="max-h-[60vh] overflow-y-auto space-y-3">
-            {% if sync_result.added > 0 %}
-            <div class="collapse collapse-arrow bg-base-100 rounded-md shadow">
-                <input type="checkbox" checked /> 
-                <div class="collapse-title text-md font-medium text-success">
-                    <i class="fa-solid fa-user-plus mr-2"></i>Added Users ({{ sync_result.added }})
+        {% if sync_result.successful_servers and sync_result.failed_servers %}
+        <!-- Mixed Results Card -->
+        <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+            <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-info-circle text-info text-sm"></i>
                 </div>
-                <div class="collapse-content">
-                    <p class="text-xs">{{ sync_result.added }} new users were added from media servers.</p>
+                <div>
+                    <h4 class="font-medium text-base-content mb-1">Mixed Results</h4>
+                    <p class="text-sm text-base-content/70 leading-relaxed">
+                        <span class="text-success font-medium">{{ sync_result.successful_servers|length }} servers synced successfully</span> while 
+                        <span class="text-error font-medium">{{ sync_result.failed_servers|length }} servers failed</span> to connect.
+                    </p>
                 </div>
             </div>
-            {% endif %}
+        </div>
+        {% endif %}
 
-            {% if sync_result.updated > 0 %}
-            <div class="collapse collapse-arrow bg-base-100 rounded-md shadow">
-                <input type="checkbox" checked /> 
-                <div class="collapse-title text-md font-medium text-info">
-                    <i class="fa-solid fa-user-pen mr-2"></i>Updated Users ({{ sync_result.updated }})
-                </div>
-                <div class="collapse-content">
-                    {% if sync_result.updated_details %}
-                        <ul class="list-none text-xs pl-2 space-y-1">
-                            {% for detail in sync_result.updated_details %}
-                                <li>
-                                    <strong>{{ detail.username }}</strong>
-                                    <ul class="list-disc list-inside pl-3 text-base-content/80">
-                                        {% for change in detail.changes %}
-                                            <li>{{ change }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-xs">{{ sync_result.updated }} existing users were updated with new information.</p>
+        {% if sync_result.added > 0 or sync_result.updated > 0 or sync_result.removed > 0 %}
+            <div class="mb-4">
+                <h4 class="font-medium text-base-content text-lg mb-3">Sync Results:</h4>
+                <div class="max-h-[60vh] overflow-y-auto space-y-3">
+                    {% if sync_result.added > 0 %}
+                    <!-- Added Users Card -->
+                    <div class="bg-base-200 border border-base-300 rounded-lg overflow-hidden">
+                        <div class="p-4 border-b border-base-300 cursor-pointer" onclick="toggleCollapse('added-users')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
+                                        <i class="fa-solid fa-user-plus text-success text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-success">Added Users</h4>
+                                        <p class="text-xs text-base-content/60">{{ sync_result.added }} new users were added</p>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-base-content/60 transition-transform" id="added-users-icon"></i>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-base-300/50" id="added-users" style="display: block;">
+                            {% if sync_result.added_details %}
+                                <div class="space-y-3">
+                                    {% for detail in sync_result.added_details %}
+                                        <div class="bg-base-100 rounded p-3 border border-base-300">
+                                            <div class="flex items-center justify-between">
+                                                <h5 class="font-medium text-base-content text-sm">{{ detail.username }}</h5>
+                                                <span class="px-2 py-1 bg-success/20 text-success text-xs rounded font-medium">
+                                                    {{ detail.service_type }}
+                                                </span>
+                                            </div>
+                                            <p class="text-xs text-base-content/60 mt-1">Added from {{ detail.server_name }}</p>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-xs text-base-content/60">{{ sync_result.added }} new users were successfully added from media servers.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if sync_result.updated > 0 %}
+                    <!-- Updated Users Card -->
+                    <div class="bg-base-200 border border-base-300 rounded-lg overflow-hidden">
+                        <div class="p-4 border-b border-base-300 cursor-pointer" onclick="toggleCollapse('updated-users')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                        <i class="fa-solid fa-user-pen text-primary text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-primary">Updated Users</h4>
+                                        <p class="text-xs text-base-content/60">{{ sync_result.updated }} users were updated</p>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-base-content/60 transition-transform" id="updated-users-icon"></i>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-base-300/50" id="updated-users" style="display: block;">
+                            {% if sync_result.updated_details %}
+                                <div class="space-y-3">
+                                    {% for detail in sync_result.updated_details %}
+                                        <div class="bg-base-100 rounded p-3 border border-base-300">
+                                            <h5 class="font-medium text-base-content text-sm mb-2">{{ detail.username }}</h5>
+                                            <div class="space-y-1">
+                                                {% for change in detail.changes %}
+                                                    <div class="text-xs text-base-content/70 flex items-center gap-2">
+                                                        <i class="fa-solid fa-circle text-primary text-[6px]"></i>
+                                                        {{ change }}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-xs text-base-content/60">{{ sync_result.updated }} existing users were updated with new information.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if sync_result.removed > 0 %}
+                    <!-- Removed Users Card -->
+                    <div class="bg-base-200 border border-base-300 rounded-lg overflow-hidden">
+                        <div class="p-4 border-b border-base-300 cursor-pointer" onclick="toggleCollapse('removed-users')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-error/20 flex items-center justify-center">
+                                        <i class="fa-solid fa-user-minus text-warning text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-error">Removed Users</h4>
+                                        <p class="text-xs text-base-content/60">{{ sync_result.removed }} users were removed</p>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-base-content/60 transition-transform" id="removed-users-icon"></i>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-base-300/50" id="removed-users" style="display: block;">
+                            {% if sync_result.removed_details %}
+                                <div class="space-y-3">
+                                    {% for detail in sync_result.removed_details %}
+                                        <div class="bg-base-100 rounded p-3 border border-base-300">
+                                            <div class="flex items-center justify-between">
+                                                <h5 class="font-medium text-base-content text-sm">{{ detail.username }}</h5>
+                                                <span class="px-2 py-1 bg-error/20 text-error text-xs rounded font-medium">
+                                                    {{ detail.service_type }}
+                                                </span>
+                                            </div>
+                                            <p class="text-xs text-base-content/60 mt-1">Removed from {{ detail.server_name }}</p>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-xs text-base-content/60">{{ sync_result.removed }} users were removed from media servers.</p>
+                            {% endif %}
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
             </div>
-            {% endif %}
-        </div>
-    {% endif %}
+        {% endif %}
 
-    <div class="modal-action mt-6">
-      <button type="button" class="btn btn-primary" onclick="document.getElementById('sync_results_modal').close()">Close</button>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center justify-end gap-3 p-6 border-t border-base-300">
+        <button type="button" class="btn btn-ghost" 
+                onclick="document.getElementById('sync_results_modal').close()">
+            <i class="fa-solid fa-times mr-2"></i>
+            Close
+        </button>
     </div>
 </div>
+
+<script>
+function toggleCollapse(elementId) {
+    const content = document.getElementById(elementId);
+    const icon = document.getElementById(elementId + '-icon');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.style.transform = 'rotate(0deg)';
+    } else {
+        content.style.display = 'none';
+        icon.style.transform = 'rotate(-90deg)';
+    }
+}
+</script>

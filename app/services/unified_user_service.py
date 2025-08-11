@@ -24,6 +24,8 @@ class UnifiedUserService:
         total_errors = 0
         error_messages = []
         all_updated_details = []
+        all_added_details = []
+        all_removed_details = []
         successful_servers = []
         failed_servers = []
 
@@ -37,6 +39,10 @@ class UnifiedUserService:
                     total_removed += result.get('removed', 0)
                     if result.get('updated_details'):
                         all_updated_details.extend(result['updated_details'])
+                    if result.get('added_details'):
+                        all_added_details.extend(result['added_details'])
+                    if result.get('removed_details'):
+                        all_removed_details.extend(result['removed_details'])
                     
                     # Track successful server sync
                     successful_servers.append({
@@ -44,7 +50,10 @@ class UnifiedUserService:
                         'service_type': server.service_type.value.capitalize(),
                         'added': result.get('added', 0),
                         'updated': result.get('updated', 0),
-                        'removed': result.get('removed', 0)
+                        'removed': result.get('removed', 0),
+                        'added_details': result.get('added_details', []),
+                        'updated_details': result.get('updated_details', []),
+                        'removed_details': result.get('removed_details', [])
                     })
                     current_app.logger.info(f"Successfully synced {server.name}: +{result.get('added', 0)} users, ~{result.get('updated', 0)} updated, -{result.get('removed', 0)} removed")
                 else:
@@ -90,7 +99,9 @@ class UnifiedUserService:
             'servers_synced': len(servers),
             'successful_servers': successful_servers,
             'failed_servers': failed_servers,
-            'updated_details': all_updated_details
+            'updated_details': all_updated_details,
+            'added_details': all_added_details,
+            'removed_details': all_removed_details
         }
     
     @staticmethod

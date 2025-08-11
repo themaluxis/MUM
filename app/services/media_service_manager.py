@@ -147,6 +147,8 @@ class MediaServiceManager:
             updated_count = 0
             removed_count = 0
             updated_details = []
+            added_details = []
+            removed_details = []
 
             # For enriching library change details
             server_libraries = {lib.external_id: lib.name for lib in server.libraries}
@@ -171,6 +173,11 @@ class MediaServiceManager:
                     )
                     db.session.add(access)
                     added_count += 1
+                    added_details.append({
+                        'username': user.get_display_name(),
+                        'server_name': server.name,
+                        'service_type': server.service_type.value.capitalize()
+                    })
                 else:
                     changes = []
                     if access.external_username != user_data.get('username'):
@@ -227,6 +234,15 @@ class MediaServiceManager:
                     if str(access.external_user_id) not in external_user_ids_from_service:
                         user_to_check = User.query.get(access.user_id)
                         current_app.logger.info(f"Removing user access: {user_to_check.get_display_name() if user_to_check else 'Unknown'} from server {server.name}")
+                        
+                        # Track removal details before deleting
+                        if user_to_check:
+                            removed_details.append({
+                                'username': user_to_check.get_display_name(),
+                                'server_name': server.name,
+                                'service_type': server.service_type.value.capitalize()
+                            })
+                        
                         db.session.delete(access)
                         removed_count += 1
                         
@@ -249,7 +265,9 @@ class MediaServiceManager:
                 'added': added_count,
                 'updated': updated_count,
                 'removed': removed_count,
-                'updated_details': updated_details
+                'updated_details': updated_details,
+                'added_details': added_details,
+                'removed_details': removed_details
             }
             
         except Exception as e:
