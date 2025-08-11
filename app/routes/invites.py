@@ -642,16 +642,31 @@ def process_invite_form(invite_path_or_token):
                                         flash(f"Failed to grant access to {server.name}.", "error")
                                 else:
                                     current_app.logger.debug(f"Detected non-Plex server: {server.name} ({server.service_type.name}), calling create_user")
+                                    current_app.logger.debug(f"already_authenticated_plex_user_info: {already_authenticated_plex_user_info}")
+                                    
                                     # For other services, create new user with custom credentials
-                                    jellyfin_username = request.form.get('jellyfin_username', already_authenticated_plex_user_info['username'])
+                                    jellyfin_username = request.form.get('jellyfin_username')
                                     jellyfin_password = request.form.get('jellyfin_password', '')
                                     
-                                    current_app.logger.debug(f"Creating {server.service_type.name} user: username='{jellyfin_username}', password_set={bool(jellyfin_password)}")
+                                    # Handle case where there's no Plex authentication (Jellyfin-only invites)
+                                    if not jellyfin_username:
+                                        if already_authenticated_plex_user_info:
+                                            jellyfin_username = already_authenticated_plex_user_info['username']
+                                        else:
+                                            jellyfin_username = f"user_{server.id}_{int(time.time())}"  # Generate a default username
+                                    
+                                    # Handle email - use Plex email if available, otherwise generate one
+                                    if already_authenticated_plex_user_info and already_authenticated_plex_user_info.get('email'):
+                                        user_email = already_authenticated_plex_user_info['email']
+                                    else:
+                                        user_email = f"{jellyfin_username}@example.com"
+                                    
+                                    current_app.logger.debug(f"Creating {server.service_type.name} user: username='{jellyfin_username}', email='{user_email}', password_set={bool(jellyfin_password)}")
                                     
                                     # Step 1: Create user without library access
                                     result = service.create_user(
                                         username=jellyfin_username,
-                                        email=already_authenticated_plex_user_info['email'] or f"{jellyfin_username}@example.com",
+                                        email=user_email,
                                         password=jellyfin_password
                                     )
                                     
