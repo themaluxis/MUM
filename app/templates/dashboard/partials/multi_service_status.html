@@ -71,9 +71,6 @@
                     {{ server_status.error_message | default('Could not connect to server.') | truncate(100, True) }}
                 </p>
             {% endif %}
-            <p class="text-xs text-base-content/70">
-                Last Check: {{ server_status.last_check_time | time_ago if server_status.last_check_time else 'N/A' }}
-            </p>
         </div>
     </div>
     <div class="card-actions justify-end mt-4">

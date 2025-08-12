@@ -34,9 +34,8 @@ def get_fresh_server_status():
             server_status_data['name'] = f"{server.service_type.value.title()} Server Status"
             server_status_data['service_type'] = server.service_type.value
             server_status_data['friendly_name'] = actual_server_name
-            # Set last_check_time to current time since we just checked
-            from datetime import datetime
-            server_status_data['last_check_time'] = datetime.utcnow()
+            # Don't show last check time since it's always current
+            server_status_data['last_check_time'] = None
             current_app.logger.debug(f"API: Single server status: {server_status_data.get('online', 'unknown')}")
     elif server_count > 1:
         online_count = 0
@@ -157,15 +156,17 @@ def check_server_status(server_id):
             
     # Render the partial template with the fresh status data.
     # We need to format this as a single server status for the multi_service_status template
+    # Use the same logic as get_fresh_server_status for consistency
+    actual_server_name = server_status_for_htmx.get('name', server.name)
     server_status_data = {
         'server_id': server.id,
         'service_type': server.service_type.value,
         'name': f"{server.service_type.value.title()} Server Status",
         'online': server_status_for_htmx.get('online', False),
-        'friendly_name': server_status_for_htmx.get('friendly_name', 'Unknown Server'),
+        'friendly_name': actual_server_name,
         'version': server_status_for_htmx.get('version'),
         'error_message': server_status_for_htmx.get('error_message'),
-        'last_check_time': server_status_for_htmx.get('last_check_time'),
+        'last_check_time': None,  # Don't show last check time since it's always "just now"
         'multi_server': False
     }
     return render_template('dashboard/partials/multi_service_status.html', server_status=server_status_data)
