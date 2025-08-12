@@ -77,7 +77,7 @@
         </div>
     </div>
     <div class="card-actions justify-end mt-4">
-        <a href="{{ url_for('media_servers.edit_server', server_id=server_status.server_id) }}" class="btn btn-xs btn-outline btn-ghost">
+        <a href="{{ url_for('plugin_management.edit_server', plugin_id=server_status.service_type, server_id=server_status.server_id) }}" class="btn btn-xs btn-outline btn-ghost">
             <i class="fa-solid fa-sliders mr-1"></i> Configure
         </a>
         <button class="btn btn-xs btn-outline btn-ghost"

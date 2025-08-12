@@ -27,7 +27,7 @@
 
 {% if plex_server_status and plex_server_status.server_id %}
     <div class="card-actions justify-end mt-4">
-        <a href="{{ url_for('media_servers.edit_server', server_id=plex_server_status.server_id) }}" class="btn btn-xs btn-outline btn-ghost">
+        <a href="{{ url_for('plugin_management.edit_server', plugin_id=plex_server_status.service_type, server_id=plex_server_status.server_id) }}" class="btn btn-xs btn-outline btn-ghost">
             <i class="fa-solid fa-sliders mr-1"></i> Configure
         </a>
         <button class="btn btn-xs btn-outline btn-ghost"
@@ -42,7 +42,7 @@
 {% else %}
     <p class="text-sm text-warning">Plex server status unavailable.</p>
     <div class="card-actions justify-end mt-4">
-        <a href="{{ url_for('media_servers.add_server', service_type='plex') }}" class="btn btn-xs btn-primary">
+        <a href="{{ url_for('plugin_management.configure', plugin_id='plex') }}" class="btn btn-xs btn-primary">
             <i class="fa-solid fa-sliders mr-1"></i> Configure Plex
         </a>
     </div>

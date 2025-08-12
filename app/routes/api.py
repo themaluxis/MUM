@@ -27,9 +27,16 @@ def get_fresh_server_status():
         service = MediaServiceFactory.create_service_from_db(server)
         if service:
             server_status_data = service.get_server_info()
+            # The service returns 'name' field with the server's actual friendly name (e.g., "Plex+")
+            # Save this as 'friendly_name' for the template
+            actual_server_name = server_status_data.get('name', server.name)
             server_status_data['server_id'] = server.id
-            server_status_data['name'] = server.name
+            server_status_data['name'] = f"{server.service_type.value.title()} Server Status"
             server_status_data['service_type'] = server.service_type.value
+            server_status_data['friendly_name'] = actual_server_name
+            # Set last_check_time to current time since we just checked
+            from datetime import datetime
+            server_status_data['last_check_time'] = datetime.utcnow()
             current_app.logger.debug(f"API: Single server status: {server_status_data.get('online', 'unknown')}")
     elif server_count > 1:
         online_count = 0
@@ -149,7 +156,19 @@ def check_server_status(server_id):
     current_app.logger.debug(f"Api.py - check_server_status(): Status after forced check: {server_status_for_htmx}")
             
     # Render the partial template with the fresh status data.
-    return render_template('dashboard/partials/plex_status_card.html', plex_server_status=server_status_for_htmx)
+    # We need to format this as a single server status for the multi_service_status template
+    server_status_data = {
+        'server_id': server.id,
+        'service_type': server.service_type.value,
+        'name': f"{server.service_type.value.title()} Server Status",
+        'online': server_status_for_htmx.get('online', False),
+        'friendly_name': server_status_for_htmx.get('friendly_name', 'Unknown Server'),
+        'version': server_status_for_htmx.get('version'),
+        'error_message': server_status_for_htmx.get('error_message'),
+        'last_check_time': server_status_for_htmx.get('last_check_time'),
+        'multi_server': False
+    }
+    return render_template('dashboard/partials/multi_service_status.html', server_status=server_status_data)
 
 @bp.route('/dashboard/server-status', methods=['GET'])
 @login_required
