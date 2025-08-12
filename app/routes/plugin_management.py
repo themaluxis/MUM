@@ -328,15 +328,30 @@ def test_connection(plugin_id):
         from app.services.media_service_factory import MediaServiceFactory
         from flask import jsonify
         
-        # Get form data
-        name = request.form.get('name', '').strip()
-        url = request.form.get('url', '').strip()
-        api_key = request.form.get('api_key', '').strip()
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '').strip()
+        # Get data from JSON request
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'})
+            
+        name = data.get('name', '').strip()
+        url = data.get('url', '').strip()
+        api_key = data.get('api_key', '').strip()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
         
-        if not url or not api_key:
-            return jsonify({'success': False, 'message': 'URL and API key are required'})
+        # Validate required fields based on service type
+        if not url:
+            return jsonify({'success': False, 'message': 'URL is required'})
+        
+        # Services that use credentials instead of API keys
+        credential_services = ['romm']
+        
+        if plugin_id in credential_services:
+            if not username or not password:
+                return jsonify({'success': False, 'message': 'URL, username, and password are required'})
+        else:
+            if not api_key:
+                return jsonify({'success': False, 'message': 'URL and API key are required'})
         
         # Create temporary server config for testing
         server_config = {
