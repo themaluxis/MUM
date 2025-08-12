@@ -1967,6 +1967,17 @@
     min-height: 1lh;
     transition: background-color 0.2s ease-out;
   }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
   .menu-horizontal {
     display: inline-flex;
     flex-direction: row;
@@ -2377,6 +2388,9 @@
   .top-0 {
     top: calc(var(--spacing) * 0);
   }
+  .top-0\.5 {
+    top: calc(var(--spacing) * 0.5);
+  }
   .top-1 {
     top: calc(var(--spacing) * 1);
   }
@@ -2412,6 +2426,9 @@
   }
   .left-0 {
     left: calc(var(--spacing) * 0);
+  }
+  .left-0\.5 {
+    left: calc(var(--spacing) * 0.5);
   }
   .left-1 {
     left: calc(var(--spacing) * 1);
@@ -3827,6 +3844,10 @@
     --tw-translate-x: calc(calc(1/2 * 100%) * -1);
     translate: var(--tw-translate-x) var(--tw-translate-y);
   }
+  .translate-x-5 {
+    --tw-translate-x: calc(var(--spacing) * 5);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
   .-translate-y-1 {
     --tw-translate-y: calc(var(--spacing) * -1);
     translate: var(--tw-translate-x) var(--tw-translate-y);
@@ -4016,6 +4037,13 @@
       margin-block-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-y-reverse)));
     }
   }
+  .space-y-5 {
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 5) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 5) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
   .space-y-6 {
     :where(& > :not(:last-child)) {
       --tw-space-y-reverse: 0;
@@ -4192,6 +4220,9 @@
   .border-\[\#00a4dc\]\/20 {
     border-color: color-mix(in oklab, #00a4dc 20%, transparent);
   }
+  .border-\[\#00a8fc\]\/20 {
+    border-color: color-mix(in oklab, #00a8fc 20%, transparent);
+  }
   .border-\[\#1e1f22\] {
     border-color: #1e1f22;
   }
@@ -4219,8 +4250,14 @@
   .border-\[\#e5a00d\]\/20 {
     border-color: color-mix(in oklab, #e5a00d 20%, transparent);
   }
+  .border-\[\#f23f42\] {
+    border-color: #f23f42;
+  }
   .border-\[\#f23f42\]\/20 {
     border-color: color-mix(in oklab, #f23f42 20%, transparent);
+  }
+  .border-\[\#faa61a\]\/20 {
+    border-color: color-mix(in oklab, #faa61a 20%, transparent);
   }
   .border-base-300 {
     border-color: var(--color-base-300);
@@ -4369,6 +4406,9 @@
   .bg-\[\#00a4dc\]\/20 {
     background-color: color-mix(in oklab, #00a4dc 20%, transparent);
   }
+  .bg-\[\#00a8fc\]\/10 {
+    background-color: color-mix(in oklab, #00a8fc 10%, transparent);
+  }
   .bg-\[\#1e1f22\] {
     background-color: #1e1f22;
   }
@@ -4377,6 +4417,9 @@
   }
   .bg-\[\#4e5058\] {
     background-color: #4e5058;
+  }
+  .bg-\[\#23a55a\] {
+    background-color: #23a55a;
   }
   .bg-\[\#23a55a\]\/10 {
     background-color: color-mix(in oklab, #23a55a 10%, transparent);
@@ -4425,6 +4468,9 @@
   }
   .bg-\[\#f23f42\]\/20 {
     background-color: color-mix(in oklab, #f23f42 20%, transparent);
+  }
+  .bg-\[\#faa61a\]\/10 {
+    background-color: color-mix(in oklab, #faa61a 10%, transparent);
   }
   .bg-\[THEME\]\/20 {
     background-color: color-mix(in oklab, THEME 20%, transparent);
@@ -4662,6 +4708,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-warning) 20%, transparent);
     }
+  }
+  .bg-white {
+    background-color: var(--color-white);
   }
   .bg-yellow-100 {
     background-color: var(--color-yellow-100);
@@ -4926,6 +4975,9 @@
   .py-2 {
     padding-block: calc(var(--spacing) * 2);
   }
+  .py-2\.5 {
+    padding-block: calc(var(--spacing) * 2.5);
+  }
   .py-4 {
     padding-block: calc(var(--spacing) * 4);
   }
@@ -5151,6 +5203,9 @@
   .text-\[\#00a4dc\] {
     color: #00a4dc;
   }
+  .text-\[\#00a8fc\] {
+    color: #00a8fc;
+  }
   .text-\[\#23a55a\] {
     color: #23a55a;
   }
@@ -5162,6 +5217,9 @@
   }
   .text-\[\#5865f2\] {
     color: #5865f2;
+  }
+  .text-\[\#87898c\] {
+    color: #87898c;
   }
   .text-\[\#b5bac1\] {
     color: #b5bac1;
@@ -5177,6 +5235,9 @@
   }
   .text-\[\#f23f42\] {
     color: #f23f42;
+  }
+  .text-\[\#faa61a\] {
+    color: #faa61a;
   }
   .text-\[THEME\] {
     color: THEME;
@@ -5733,6 +5794,17 @@
       opacity: 100%;
     }
   }
+  .peer-checked\:translate-x-5 {
+    &:is(:where(.peer):checked ~ *) {
+      --tw-translate-x: calc(var(--spacing) * 5);
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+  }
+  .peer-checked\:bg-\[\#23a55a\] {
+    &:is(:where(.peer):checked ~ *) {
+      background-color: #23a55a;
+    }
+  }
   .last\:mb-0 {
     &:last-child {
       margin-bottom: calc(var(--spacing) * 0);
@@ -6002,9 +6074,19 @@
       }
     }
   }
+  .focus\:border-\[\#00a8fc\] {
+    &:focus {
+      border-color: #00a8fc;
+    }
+  }
   .focus\:border-\[\#5865f2\] {
     &:focus {
       border-color: #5865f2;
+    }
+  }
+  .focus\:border-\[\#f23f42\] {
+    &:focus {
+      border-color: #f23f42;
     }
   }
   .focus\:border-primary {
@@ -6023,9 +6105,36 @@
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
   }
+  .focus\:ring-2 {
+    &:focus {
+      --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+  }
+  .focus\:ring-\[\#00a8fc\] {
+    &:focus {
+      --tw-ring-color: #00a8fc;
+    }
+  }
   .focus\:ring-\[\#5865f2\] {
     &:focus {
       --tw-ring-color: #5865f2;
+    }
+  }
+  .focus\:ring-\[\#f23f42\] {
+    &:focus {
+      --tw-ring-color: #f23f42;
+    }
+  }
+  .focus\:ring-offset-2 {
+    &:focus {
+      --tw-ring-offset-width: 2px;
+      --tw-ring-offset-shadow: var(--tw-ring-inset,) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+    }
+  }
+  .focus\:ring-offset-\[\#313338\] {
+    &:focus {
+      --tw-ring-offset-color: #313338;
     }
   }
   .focus\:outline-none {

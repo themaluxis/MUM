@@ -199,9 +199,29 @@ def create_invite():
             
             # Update form choices for multi-server
             form.libraries.choices = all_valid_choices
+            
+            # Convert submitted libraries to match the prefixed format if needed
+            if submitted_libraries:
+                converted_libraries = []
+                for submitted_lib_id in submitted_libraries:
+                    # Check if this library ID exists in multiple servers (needs prefixing)
+                    servers_with_this_lib = []
+                    for server_id, server_data in servers_libraries.items():
+                        if submitted_lib_id in server_data['libraries']:
+                            servers_with_this_lib.append(server_id)
+                    
+                    if len(servers_with_this_lib) > 1:
+                        # This library exists in multiple servers, we need to add prefixed versions for all
+                        for server_id in servers_with_this_lib:
+                            converted_libraries.append(f"{server_id}_{submitted_lib_id}")
+                    else:
+                        # No conflict, use original ID
+                        converted_libraries.append(submitted_lib_id)
+                
+                form.libraries.data = converted_libraries
         
-        # Set the form data
-        if submitted_libraries:
+        # Set the form data for single server case
+        if len(selected_server_ids) == 1 and submitted_libraries:
             form.libraries.data = submitted_libraries
 
     toast_message_text = ""
