@@ -1,0 +1,76 @@
+<!-- User Account Creation Step -->
+<div class="step-section bg-base-200/30 border border-base-300 rounded-lg p-6" id="user-account-step">
+    <!-- Step Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-user-plus text-primary text-lg"></i>
+        </div>
+        <div>
+            <h2 class="text-xl font-semibold text-base-content mb-1">Create Your Account</h2>
+            <p class="text-sm text-base-content/70">
+                Set up your account to manage media access and preferences
+            </p>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="space-y-4">
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-medium text-sm">{{ account_form.username.label.text }}</span>
+                </label>
+                {{ account_form.username(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                {% if account_form.username.description %}
+                    <label class="label">
+                        <span class="label-text-alt text-xs text-base-content/60">{{ account_form.username.description }}</span>
+                    </label>
+                {% endif %}
+            </div>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-medium text-sm">{{ account_form.email.label.text }}</span>
+                </label>
+                {{ account_form.email(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                {% if account_form.email.description %}
+                    <label class="label">
+                        <span class="label-text-alt text-xs text-base-content/60">{{ account_form.email.description }}</span>
+                    </label>
+                {% endif %}
+            </div>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-medium text-sm">{{ account_form.password.label.text }}</span>
+                </label>
+                {{ account_form.password(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                {% if account_form.password.description %}
+                    <label class="label">
+                        <span class="label-text-alt text-xs text-base-content/60">{{ account_form.password.description }}</span>
+                    </label>
+                {% endif %}
+            </div>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-medium text-sm">{{ account_form.confirm_password.label.text }}</span>
+                </label>
+                {{ account_form.confirm_password(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                {% if account_form.confirm_password.description %}
+                    <label class="label">
+                        <span class="label-text-alt text-xs text-base-content/60">{{ account_form.confirm_password.description }}</span>
+                    </label>
+                {% endif %}
+            </div>
+
+            <div class="pt-4">
+                <button name="action" value="create_user_account" type="submit" class="btn btn-primary w-full h-12 text-base font-medium">
+                    <i class="fa-solid fa-user-plus mr-2"></i>
+                    Create Account & Continue
+                </button>
+            </div>
+        </div>
+    </form>
+</div>

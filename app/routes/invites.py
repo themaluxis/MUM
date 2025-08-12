@@ -745,8 +745,75 @@ def process_invite_form(invite_path_or_token):
     # Use steps if:
     # - User accounts are enabled (account creation needs to be step 1)
     # - Discord OAuth is enabled 
-    # - Multiple servers are available
-    has_multiple_servers_available = len(all_servers) > 1
+    # - Multiple servers are available in this invite
+    has_multiple_servers_available = len(invite.servers) > 1
+    
+    # Check if there are Plex servers in the invite
+    has_plex_servers = any(server.service_type.name.upper() == 'PLEX' for server in invite.servers)
+    
+    # Generate invite steps for progress indicator
+    invite_steps = []
+    current_step = None
+    
+    # Step 1: User Account Creation (if enabled)
+    if allow_user_accounts:
+        invite_steps.append({
+            'id': 'user_account',
+            'name': 'Create Account',
+            'icon': 'fa-solid fa-user-plus',
+            'required': True,
+            'completed': user_account_created
+        })
+    
+    # Step 2: Discord Authentication (if required)
+    if show_discord_button:
+        invite_steps.append({
+            'id': 'discord',
+            'name': 'Discord Login',
+            'icon': 'fa-brands fa-discord',
+            'required': effective_require_sso,
+            'completed': already_authenticated_discord_user_info is not None
+        })
+    
+    # Step 3: Plex Authentication (if there are Plex servers)
+    if has_plex_servers:
+        # Get the first Plex server name for the step title
+        plex_server = next((server for server in invite.servers if server.service_type.name.upper() == 'PLEX'), None)
+        plex_server_name = plex_server.name if plex_server else 'Plex'
+        
+        invite_steps.append({
+            'id': 'plex',
+            'name': f'{plex_server_name} Access',
+            'icon': 'fa-solid fa-right-to-bracket',
+            'required': True,
+            'completed': already_authenticated_plex_user_info is not None
+        })
+    
+    # Step 4+: Server Access Steps (for non-Plex servers)
+    for server in invite.servers:
+        if server.service_type.name.upper() != 'PLEX':
+            step_id = f'server_access_{server.id}'
+            server_completed = session.get(f'invite_{invite.id}_server_{server.id}_completed', False)
+            invite_steps.append({
+                'id': step_id,
+                'name': f'{server.name} Access',
+                'icon': 'fa-solid fa-server',
+                'required': True,
+                'completed': server_completed,
+                'server_id': server.id,
+                'server_name': server.name,
+                'server_type': server.service_type.name.upper()
+            })
+            
+            # Set current step if this server setup is not completed
+            if not server_completed and current_step is None:
+                # Check if prerequisites are met
+                discord_ready = not show_discord_button or already_authenticated_discord_user_info
+                plex_ready = not has_plex_servers or already_authenticated_plex_user_info
+                account_ready = not allow_user_accounts or user_account_created
+                
+                if discord_ready and plex_ready and account_ready:
+                    current_step = invite_steps[-1]  # Set this as current step
     
     use_steps_template = allow_user_accounts or show_discord_button or has_multiple_servers_available
     
@@ -769,7 +836,11 @@ def process_invite_form(invite_path_or_token):
                            allow_user_accounts=allow_user_accounts,
                            user_account_created=user_account_created,
                            account_form=account_form,
-                           servers_with_libraries=servers_with_libraries
+                           servers_with_libraries=servers_with_libraries,
+                           # Add missing variables
+                           has_plex_servers=has_plex_servers,
+                           invite_steps=invite_steps,
+                           current_step=current_step
                            )
 
 @bp.route('/plex_callback') # Path is /invites/plex_callback

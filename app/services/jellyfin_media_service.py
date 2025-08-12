@@ -206,13 +206,13 @@ class JellyfinMediaService(BaseMediaService):
         
         try:
             libraries = self._make_request('Library/VirtualFolders')
-            self.log_info(f"Raw libraries response: {libraries}")
+            # DONT DELETE, USED FOR DEBUGGING. self.log_info(f"Raw libraries response: {libraries}")
             
             result = []
             
             for i, lib in enumerate(libraries):
-                self.log_info(f"Processing library {i+1}/{len(libraries)}: {lib}")
-                self.log_info(f"Library keys: {list(lib.keys()) if isinstance(lib, dict) else 'Not a dict'}")
+                # DONT DELETE, USED FOR DEBUGGING. self.log_info(f"Processing library {i+1}/{len(libraries)}: {lib}")
+                # DONT DELETE, USED FOR DEBUGGING. self.log_info(f"Library keys: {list(lib.keys()) if isinstance(lib, dict) else 'Not a dict'}")
                 
                 # Extract library information
                 lib_name = lib.get('Name', 'Unknown')
@@ -294,9 +294,9 @@ class JellyfinMediaService(BaseMediaService):
                     'raw_data': lib  # Store the complete VirtualFolders response for the info modal
                 }
                 
-                self.log_info(f"Processed library data: {library_data}")
-                self.log_info(f"Library data keys: {list(library_data.keys())}")
-                self.log_info(f"Raw data present: {'raw_data' in library_data}")
+                # DONT DELETE, USED FOR DEBUGGING. self.log_info(f"Processed library data: {library_data}")
+                # DONT DELETE, USED FOR DEBUGGING. self.log_info(f"Library data keys: {list(library_data.keys())}")
+                # DONT DELETE, USED FOR DEBUGGING. self.log_info(f"Raw data present: {'raw_data' in library_data}")
                 if 'raw_data' in library_data:
                     self.log_info(f"Raw data type: {type(library_data['raw_data'])}")
                     self.log_info(f"Raw data keys: {list(library_data['raw_data'].keys()) if isinstance(library_data['raw_data'], dict) else 'Not a dict'}")
