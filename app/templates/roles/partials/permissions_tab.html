@@ -2,46 +2,86 @@
 <form method="POST" action="{{ url_for('role_management.edit', role_id=role.id, tab='permissions') }}">
     {{ form.hidden_tag() }}
     
-    <div class="form-control">
-        <label class="label"><span class="label-text font-medium">Permissions for this Role</span></label>
-        <p class="text-sm text-base-content/70 mb-4">Select the permissions that members of this role will have.</p>
-    </div>
-    
-    <div class="space-y-6" id="permissions-container">
-        {% for category, data in permissions_structure.items() %}
-        <fieldset class="border border-base-300 p-3 rounded-lg">
-            <legend class="px-2 font-semibold">
-                <label class="label cursor-pointer p-0">
-                     <input type="checkbox" class="checkbox checkbox-primary mr-3 permission-parent" data-category="{{ category }}">
-                     <span class="label-text">{{ data.label }}</span>
-                </label>
-            </legend>
-            
-            {% if data.children %}
-            <div class="pl-8 pt-2 space-y-1">
-                {# Loop through the permission dictionary now #}
-                {% for p_key, p_data in data.children.items() %}
-                    <div class="py-1 {% if p_key == 'view_admins_tab' %}hidden{% endif %}">
-                         <label class="label cursor-pointer justify-start" title="{{ p_data.description }}">
-                             {# Create individual checkbox for each permission #}
-                             <input type="checkbox" name="permissions" value="{{ p_key }}" 
-                                    class="toggle toggle-secondary permission-child" 
-                                    data-category="{{ category }}" 
-                                    data-permission-key="{{ p_key }}"
-                                    {% if form.permissions.data and p_key in form.permissions.data %}checked{% endif %}>
-                             <span class="label-text text-sm ml-2">{{ p_data.label }}</span>
-                        </label>
-                        <p class="text-xs text-base-content/60 pl-14">{{ p_data.description }}</p>
-                    </div>
-                {% endfor %}
+    <div class="space-y-6">
+        
+        <!-- Permissions Overview Section -->
+        <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-shield-halved text-success text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold text-base-content mb-1">Role Permissions</h2>
+                    <p class="text-sm text-base-content/70">Configure what actions members of this role can perform</p>
+                </div>
             </div>
-            {% endif %}
-        </fieldset>
-        {% endfor %}
-    </div>
+            
+            <!-- Info Card -->
+            <div class="bg-info/10 border border-info/20 rounded-lg p-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-info text-info text-xs"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-info mb-1">Permission Guidelines</h4>
+                        <p class="text-sm text-base-content/80">
+                            Select the permissions that members of this role will have. Admin ID 1 automatically has all permissions regardless of role assignments.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div class="card-actions justify-end mt-6">
-        <button type="submit" name="submit_permissions" value="Save" class="btn btn-primary">Save Permissions</button>
+        <!-- Permission Categories -->
+        <div class="space-y-4" id="permissions-container">
+            {% for category, data in permissions_structure.items() %}
+            <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
+                <!-- Category Header -->
+                <div class="flex items-center gap-3 mb-4">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-primary permission-parent" data-category="{{ category }}">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                <i class="fa-solid fa-{{ 'users-gear' if category == 'Admins' else 'user-shield' if category == 'Users' else 'ticket' if category == 'Invites' else 'server' if category == 'Media Servers' else 'cog' }} text-primary text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-base-content">{{ data.label }}</h3>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+                
+                <!-- Individual Permissions -->
+                {% if data.children %}
+                <div class="space-y-3 ml-11">
+                    {% for p_key, p_data in data.children.items() %}
+                        <div class="{% if p_key == 'view_admins_tab' %}hidden{% endif %}">
+                            <label class="flex items-start gap-3 p-3 rounded-lg hover:bg-base-100/50 cursor-pointer" title="{{ p_data.description }}">
+                                <input type="checkbox" name="permissions" value="{{ p_key }}" 
+                                       class="toggle toggle-primary permission-child mt-1" 
+                                       data-category="{{ category }}" 
+                                       data-permission-key="{{ p_key }}"
+                                       {% if form.permissions.data and p_key in form.permissions.data %}checked{% endif %}>
+                                <div class="flex-1">
+                                    <span class="text-sm font-medium text-base-content block">{{ p_data.label }}</span>
+                                    <p class="text-xs text-base-content/60 mt-1">{{ p_data.description }}</p>
+                                </div>
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Save Button -->
+        <div class="flex justify-end pt-6">
+            <button type="submit" name="submit_permissions" value="Save" class="btn btn-primary">
+                <i class="fa-solid fa-save mr-2"></i>
+                Save Permissions
+            </button>
+        </div>
     </div>
 </form>
 

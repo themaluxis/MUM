@@ -1,49 +1,129 @@
 <!-- File: app/templates/roles/partials/display_tab.html -->
 {# Expects 'edit_form' and 'role' in context #}
 
-<form method="POST" action="{{ url_for('role_management.edit', role_id=role.id, tab='display') }}" class="max-w-md space-y-4">
+<form method="POST" action="{{ url_for('role_management.edit', role_id=role.id, tab='display') }}">
     {{ edit_form.hidden_tag() }}
     
-    <div class="form-control">
-        {{ edit_form.name.label(class="label") }}
-        {{ edit_form.name(class="input input-bordered " + ("input-error" if edit_form.name.errors else ""), id="edit_role_name") }}
-        {% if edit_form.name.errors %}<p class="text-error text-xs mt-1">{{ edit_form.name.errors[0] }}</p>{% endif %}
-    </div>
+    <div class="space-y-6">
+        
+        <!-- Role Identity Section -->
+        <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-id-badge text-primary text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold text-base-content mb-1">Role Identity</h2>
+                    <p class="text-sm text-base-content/70">Basic information about this role</p>
+                </div>
+            </div>
+            
+            <div class="space-y-4">
+                <!-- Role Name -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-medium text-sm">{{ edit_form.name.label.text }}</span>
+                    </label>
+                    {{ edit_form.name(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if edit_form.name.errors else ""), id="edit_role_name") }}
+                    {% if edit_form.name.errors %}
+                        <label class="label">
+                            <span class="label-text-alt text-error">{{ edit_form.name.errors[0] }}</span>
+                        </label>
+                    {% else %}
+                        <label class="label">
+                            <span class="label-text-alt text-xs text-base-content/60">A unique name for this role</span>
+                        </label>
+                    {% endif %}
+                </div>
 
-    <div class="form-control">
-        {{ edit_form.description.label(class="label") }}
-        {{ edit_form.description(class="input input-bordered " + ("input-error" if edit_form.description.errors else "")) }}
-    </div>
-    
-    <div class="form-control">
-        {{ edit_form.color.label(class="label") }}
-        <div class="input-group">
-            <input type="color" value="{{ edit_form.color.data or '#808080' }}" class="input input-bordered !p-1" id="edit_color_picker">
-            {{ edit_form.color(class="input input-bordered " + ("input-error" if edit_form.color.errors else ""), id="edit_color_text") }}
+                <!-- Description -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-medium text-sm">{{ edit_form.description.label.text }}</span>
+                    </label>
+                    {{ edit_form.description(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if edit_form.description.errors else "")) }}
+                    <label class="label">
+                        <span class="label-text-alt text-xs text-base-content/60">Optional description of what this role does</span>
+                    </label>
+                </div>
+            </div>
         </div>
-         {% if edit_form.color.errors %}<p class="text-error text-xs mt-1">{{ edit_form.color.errors[0] }}</p>{% endif %}
-    </div>
 
-    <div class="form-control">
-        {{ edit_form.icon.label(class="label") }}
-        {{ edit_form.icon(class="input input-bordered " + ("input-error" if edit_form.icon.errors else ""), id="edit_role_icon", placeholder="e.g., fa-solid fa-star") }}
-        <label class="label"><span class="label-text-alt">Find icons on <a href="https://fontawesome.com/search" target="_blank" class="link">Font Awesome</a>.</span></label>
-        {% if edit_form.icon.errors %}<p class="text-error text-xs mt-1">{{ edit_form.icon.errors[0] }}</p>{% endif %}
-    </div>
+        <!-- Appearance Section -->
+        <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-palette text-secondary text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold text-base-content mb-1">Visual Appearance</h2>
+                    <p class="text-sm text-base-content/70">Customize how this role appears in the interface</p>
+                </div>
+            </div>
+            
+            <div class="space-y-4">
+                <!-- Color -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-medium text-sm">{{ edit_form.color.label.text }}</span>
+                    </label>
+                    <div class="flex gap-2">
+                        <input type="color" value="{{ edit_form.color.data or '#808080' }}" 
+                               class="w-12 h-11 rounded border border-base-300 cursor-pointer" id="edit_color_picker">
+                        {{ edit_form.color(class="input input-bordered flex-1 h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if edit_form.color.errors else ""), id="edit_color_text") }}
+                    </div>
+                    {% if edit_form.color.errors %}
+                        <label class="label">
+                            <span class="label-text-alt text-error">{{ edit_form.color.errors[0] }}</span>
+                        </label>
+                    {% else %}
+                        <label class="label">
+                            <span class="label-text-alt text-xs text-base-content/60">Choose a color for role badges and highlights</span>
+                        </label>
+                    {% endif %}
+                </div>
 
-    <div class="form-control mt-4">
-        <label class="label"><span class="label-text">Badge Preview:</span></label>
-        <div class="p-2 border rounded-md border-base-300">
-            <span class="badge" id="edit_badge_preview">
-                {# The <i> tag is now always present, and the Jinja logic is inside the class attribute #}
-                <i id="edit_badge_icon_preview" class="{{ role.icon if role.icon else '' }}"></i>
-                <span id="edit_badge_text_preview">{{ role.name }}</span>
-            </span>
+                <!-- Icon -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-medium text-sm">{{ edit_form.icon.label.text }}</span>
+                    </label>
+                    {{ edit_form.icon(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if edit_form.icon.errors else ""), id="edit_role_icon", placeholder="e.g., fa-solid fa-star") }}
+                    {% if edit_form.icon.errors %}
+                        <label class="label">
+                            <span class="label-text-alt text-error">{{ edit_form.icon.errors[0] }}</span>
+                        </label>
+                    {% else %}
+                        <label class="label">
+                            <span class="label-text-alt text-xs text-base-content/60">
+                                Find icons on <a href="https://fontawesome.com/search" target="_blank" class="link link-primary">Font Awesome</a>
+                            </span>
+                        </label>
+                    {% endif %}
+                </div>
+
+                <!-- Preview -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-medium text-sm">Badge Preview</span>
+                    </label>
+                    <div class="bg-base-100 border border-base-300 rounded-lg p-4">
+                        <span class="badge text-sm" id="edit_badge_preview">
+                            <i id="edit_badge_icon_preview" class="{{ role.icon if role.icon else '' }} mr-1"></i>
+                            <span id="edit_badge_text_preview">{{ role.name }}</span>
+                        </span>
+                    </div>
+                    <label class="label">
+                        <span class="label-text-alt text-xs text-base-content/60">Live preview of how the role badge will appear</span>
+                    </label>
+                </div>
+            </div>
         </div>
-    </div>
-    
-    <div class="card-actions justify-end mt-4">
-        <button type="submit" name="submit_display" value="Save" class="btn btn-primary">Save Display Settings</button>
+
+        <!-- Save Button -->
+        <div class="flex justify-end pt-6">
+            <button type="submit" name="submit_display" value="Save" class="btn btn-primary">Save Display Settings</button>
+        </div>
     </div>
 </form>
 
