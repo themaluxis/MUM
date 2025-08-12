@@ -510,52 +510,90 @@
                                 </div>
                             {% else %}
                                 {# All servers completed - Final step #}
-                                <div class="step-section" id="final-step">
-                                    <h2 class="text-xl font-semibold mb-4">
-                                        <i class="fa-solid fa-check-circle mr-2"></i>
-                                        All Servers Configured!
-                                    </h2>
-                                    
-                                    {# Show completed authentications #}
-                                    <div class="space-y-2 mb-6">
-                                        {% if already_authenticated_plex_user %}
-                                            <div class="alert alert-success">
-                                                <i class="fa-solid fa-right-to-bracket mr-2"></i>
-                                                <span>Plex account linked as <strong>{{ already_authenticated_plex_user.username }}</strong></span>
-                                            </div>
-                                        {% endif %}
-                                        {% if already_authenticated_discord_user %}
-                                            <div class="alert alert-success">
-                                                <i class="fa-brands fa-discord mr-2"></i>
-                                                <span>Discord account linked as <strong>{{ already_authenticated_discord_user.username }}</strong></span>
-                                            </div>
-                                        {% endif %}
+                                <div class="step-section bg-gradient-to-br from-success/10 to-primary/10 border border-success/20 rounded-lg p-8" id="final-step">
+                                    <!-- Success Header -->
+                                    <div class="text-center mb-8">
+                                        <div class="w-20 h-20 rounded-full bg-success/20 flex items-center justify-center mx-auto mb-6">
+                                            <i class="fa-solid fa-check-circle text-success text-3xl"></i>
+                                        </div>
+                                        <h2 class="text-2xl font-bold text-success mb-3">All Servers Configured!</h2>
+                                        <p class="text-base-content/70 text-lg">
+                                            Your media server access has been successfully set up
+                                        </p>
                                     </div>
+                                    
+                                    <!-- Authentication Status -->
+                                    {% if already_authenticated_plex_user or already_authenticated_discord_user %}
+                                        <div class="space-y-3 mb-8">
+                                            {% if already_authenticated_plex_user %}
+                                                <div class="bg-[#e5a00d]/10 border border-[#e5a00d]/20 rounded-lg p-4">
+                                                    <div class="flex items-start gap-3">
+                                                        <div class="w-6 h-6 rounded-full bg-[#e5a00d]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                            <i class="fa-solid fa-right-to-bracket text-[#e5a00d] text-xs"></i>
+                                                        </div>
+                                                        <div>
+                                                            <h4 class="font-medium text-[#e5a00d] mb-1">Plex Account Connected</h4>
+                                                            <p class="text-sm text-base-content/80">
+                                                                Authenticated as <strong class="text-base-content">{{ already_authenticated_plex_user.username }}</strong>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                            {% if already_authenticated_discord_user %}
+                                                <div class="bg-[#5865F2]/10 border border-[#5865F2]/20 rounded-lg p-4">
+                                                    <div class="flex items-start gap-3">
+                                                        <div class="w-6 h-6 rounded-full bg-[#5865F2]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                            <i class="fa-brands fa-discord text-[#5865F2] text-xs"></i>
+                                                        </div>
+                                                        <div>
+                                                            <h4 class="font-medium text-[#5865F2] mb-1">Discord Account Connected</h4>
+                                                            <p class="text-sm text-base-content/80">
+                                                                Linked as <strong class="text-base-content">{{ already_authenticated_discord_user.username }}</strong>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
 
-                                    <div class="alert alert-success mb-4">
-                                        <i class="fa-solid fa-check-circle mr-2"></i>
-                                        <div>
-                                            <p class="font-semibold">Access has been configured for all servers!</p>
-                                            <ul class="text-sm mt-2 space-y-1">
-                                                {% if invite.servers %}
-                                                    {% for server in invite.servers %}
-                                                        <li class="flex items-center">
-                                                            <i class="fa-solid fa-check mr-2 text-success"></i>
-                                                            <span class="font-medium">{{ server.name }}</span>
-                                                            <span class="text-xs ml-2 opacity-70">({{ server.service_type.name }})</span>
-                                                        </li>
-                                                    {% endfor %}
-                                                {% endif %}
-                                            </ul>
+                                    <!-- Server Access Summary -->
+                                    <div class="bg-base-100/50 border border-base-300/50 rounded-lg p-6 mb-8">
+                                        <div class="flex items-center justify-center gap-3 mb-4">
+                                            <div class="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
+                                                <i class="fa-solid fa-server text-success text-sm"></i>
+                                            </div>
+                                            <h3 class="font-medium text-base-content">Media Server Access Granted</h3>
+                                        </div>
+                                        <div class="space-y-2">
+                                            {% if invite.servers %}
+                                                {% for server in invite.servers %}
+                                                    <div class="flex items-center justify-center gap-2 text-sm">
+                                                        <div class="w-4 h-4 rounded-full bg-success/20 flex items-center justify-center">
+                                                            <i class="fa-solid fa-check text-success text-xs"></i>
+                                                        </div>
+                                                        <span class="font-medium">{{ server.name }}</span>
+                                                        <span class="text-xs text-base-content/60">({{ server.service_type.name }})</span>
+                                                    </div>
+                                                {% endfor %}
+                                            {% endif %}
                                         </div>
                                     </div>
 
-                                    {% set success_username = already_authenticated_plex_user.username if already_authenticated_plex_user else 'User' %}
-                                    {% set server_names = invite.servers|map(attribute='name')|join(', ') %}
-                                    <a href="{{ url_for('invites.invite_success', username=success_username, servers=server_names) }}" class="btn btn-primary btn-block text-base btn-lg">
-                                        <i class="fa-solid fa-arrow-right mr-2"></i>
-                                        Continue to Success Page
-                                    </a>
+                                    <!-- Continue Button -->
+                                    <div class="text-center space-y-4">
+                                        {% set success_username = already_authenticated_plex_user.username if already_authenticated_plex_user else 'User' %}
+                                        {% set server_names = invite.servers|map(attribute='name')|join(', ') %}
+                                        <a href="{{ url_for('invites.invite_success', username=success_username, servers=server_names) }}" 
+                                           class="btn btn-primary w-full h-14 text-lg font-medium">
+                                            <i class="fa-solid fa-arrow-right mr-2"></i>
+                                            Continue to Success Page
+                                        </a>
+                                        <p class="text-xs text-base-content/60">
+                                            Get your server access links and start streaming
+                                        </p>
+                                    </div>
                                 </div>
                             {% endif %}
                             {# Server Access Details (show for current server step) #}

@@ -20,67 +20,105 @@
             
             <!-- Content Section -->
             <div class="p-6 space-y-6">
-                
                 {% if configured_servers %}
-                    <p class="py-6 text-lg">
-                        Your invite has been successfully accepted. You now have access to:
-                    </p>
+                    <!-- Server Access Section -->
+                    <div class="space-y-4">
+                        <h3 class="font-medium text-base-content text-sm uppercase tracking-wide">You now have access to</h3>
+                        <div class="space-y-3">
+                            {% for server in configured_servers %}
+                                <div class="bg-base-200/50 border border-base-300/50 rounded-lg p-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0
+                                            {% if server.type == 'PLEX' %}bg-[#e5a00d]/20
+                                            {% elif server.type == 'JELLYFIN' %}bg-[#00a4dc]/20
+                                            {% elif server.type == 'EMBY' %}bg-[#52b54b]/20
+                                            {% else %}bg-base-300/50{% endif %}">
+                                            {% if server.type == 'PLEX' %}
+                                                <i class="fa-solid fa-play text-[#e5a00d] text-lg"></i>
+                                            {% elif server.type == 'JELLYFIN' %}
+                                                <i class="fa-solid fa-film text-[#00a4dc] text-lg"></i>
+                                            {% elif server.type == 'EMBY' %}
+                                                <i class="fa-solid fa-video text-[#52b54b] text-lg"></i>
+                                            {% else %}
+                                                <i class="fa-solid fa-server text-base-content/60 text-lg"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="font-medium text-base-content">{{ server.name }}</div>
+                                            <div class="text-sm text-base-content/60">{{ server.type }} Media Server</div>
+                                        </div>
+                                        <a href="{{ server.url }}" target="_blank" 
+                                           class="btn btn-sm btn-outline btn-primary">
+                                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                     
-                    <div class="space-y-2 mb-6">
-                        {% for server in configured_servers %}
-                            <div class="alert alert-info">
-                                <div class="flex items-center">
+                    <!-- Quick Access Buttons -->
+                    <div class="space-y-3">
+                        <h3 class="font-medium text-base-content text-sm uppercase tracking-wide">Quick Access</h3>
+                        <div class="grid grid-cols-1 gap-2">
+                            {% for server in configured_servers %}
+                                <a href="{{ server.url }}" target="_blank" 
+                                   class="btn btn-outline w-full justify-start h-11
+                                   {% if server.type == 'PLEX' %}hover:bg-[#e5a00d]/10 hover:border-[#e5a00d]
+                                   {% elif server.type == 'JELLYFIN' %}hover:bg-[#00a4dc]/10 hover:border-[#00a4dc]
+                                   {% elif server.type == 'EMBY' %}hover:bg-[#52b54b]/10 hover:border-[#52b54b]
+                                   {% endif %}">
                                     {% if server.type == 'PLEX' %}
-                                        <i class="fa-solid fa-play mr-2"></i>
+                                        <i class="fa-solid fa-play text-[#e5a00d] mr-2"></i>
+                                        <span>Open Plex</span>
                                     {% elif server.type == 'JELLYFIN' %}
-                                        <i class="fa-solid fa-film mr-2"></i>
+                                        <i class="fa-solid fa-film text-[#00a4dc] mr-2"></i>
+                                        <span>Open {{ server.name }}</span>
                                     {% elif server.type == 'EMBY' %}
-                                        <i class="fa-solid fa-video mr-2"></i>
+                                        <i class="fa-solid fa-video text-[#52b54b] mr-2"></i>
+                                        <span>Open {{ server.name }}</span>
                                     {% else %}
                                         <i class="fa-solid fa-server mr-2"></i>
+                                        <span>Open {{ server.name }}</span>
                                     {% endif %}
-                                    <span class="font-medium">{{ server.name }}</span>
-                                    <span class="text-xs ml-2 opacity-70">({{ server.type }})</span>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                    
-                    <div class="card-actions justify-center space-x-2">
-                        {% for server in configured_servers %}
-                            <a href="{{ server.url }}" target="_blank" class="btn btn-neutral btn-sm">
-                                {% if server.type == 'PLEX' %}
-                                    <i class="fa-solid fa-play mr-1"></i> Plex
-                                {% elif server.type == 'JELLYFIN' %}
-                                    <i class="fa-solid fa-film mr-1"></i> {{ server.name }}
-                                {% elif server.type == 'EMBY' %}
-                                    <i class="fa-solid fa-video mr-1"></i> {{ server.name }}
-                                {% else %}
-                                    <i class="fa-solid fa-server mr-1"></i> {{ server.name }}
-                                {% endif %}
-                                <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
-                            </a>
-                        {% endfor %}
-                        {% if allow_user_accounts %}
-                        <a href="{{ url_for('auth.user_login') }}" class="btn btn-secondary btn-sm">
-                            <i class="fa-solid fa-user mr-1"></i> User Login
-                        </a>
-                        {% endif %}
+                                    <i class="fa-solid fa-arrow-up-right-from-square ml-auto text-xs"></i>
+                                </a>
+                            {% endfor %}
+                            {% if allow_user_accounts %}
+                                <a href="{{ url_for('auth.user_login') }}" class="btn btn-outline w-full justify-start h-11">
+                                    <i class="fa-solid fa-user mr-2"></i>
+                                    <span>User Dashboard</span>
+                                </a>
+                            {% endif %}
+                        </div>
                     </div>
                 {% else %}
-                    <p class="py-6 text-lg">
-                        Your invite has been successfully accepted. You should now have access to the media servers.
-                    </p>
-                    <div class="card-actions justify-center">
+                    <!-- Fallback Content -->
+                    <div class="text-center space-y-4">
+                        <div class="bg-info/10 border border-info/20 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <i class="fa-solid fa-info text-info text-xs"></i>
+                                </div>
+                                <p class="text-sm text-base-content/80">
+                                    You now have access to the media servers. Check your email or contact an admin for access details.
+                                </p>
+                            </div>
+                        </div>
                         {% if allow_user_accounts %}
-                        <a href="{{ url_for('auth.user_login') }}" class="btn btn-secondary">
-                            <i class="fa-solid fa-user mr-2"></i> User Login
-                        </a>
+                            <a href="{{ url_for('auth.user_login') }}" class="btn btn-primary w-full h-12">
+                                <i class="fa-solid fa-user mr-2"></i>
+                                User Dashboard
+                            </a>
                         {% endif %}
                     </div>
                 {% endif %}
-                 <p class="text-xs mt-8">
-                    If you encounter any issues, please contact the server administrator.
+            </div>
+            
+            <!-- Footer -->
+            <div class="px-6 py-4 bg-base-200/30 border-t border-base-300 text-center">
+                <p class="text-xs text-base-content/60">
+                    Enjoy streaming! If you need help, contact your server administrator.
                 </p>
             </div>
         </div>
