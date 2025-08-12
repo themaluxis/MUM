@@ -1,91 +1,188 @@
 <!-- File: app/templates/settings/partials/_plugin_edit_server.html -->
-<div class="mb-6">
-    <div class="breadcrumbs text-sm">
-        <ul>
-            <li><a href="{{ url_for('plugin_management.index') }}">Plugins</a></li>
-            <li><a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}">{{ plugin.name }}</a></li>
-            <li>Edit {{ server.name }}</li>
-        </ul>
+
+<!-- Navigation -->
+<div class="flex items-center mb-8">
+    <a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}" class="btn btn-ghost btn-sm">
+        <i class="fa-solid fa-arrow-left mr-2"></i> Back to {{ plugin.name }}
+    </a>
+</div>
+
+<!-- Clean Header -->
+<div class="mb-8">
+    <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-server text-primary text-xl"></i>
+        </div>
+        <div>
+            <h1 class="text-2xl font-bold text-base-content mb-1">Edit Server</h1>
+            <p class="text-base-content/70 text-sm">Configure settings for <strong>{{ server.name }}</strong></p>
+        </div>
     </div>
 </div>
 
-<div class="card bg-base-100 shadow-xl">
-    <div class="card-body">
-        <h2 class="card-title text-2xl mb-4">Edit {{ server.name }}</h2>
+<!-- Description Card -->
+<div class="bg-info/10 border border-info/20 rounded-lg p-4 mb-6">
+    <div class="flex items-start gap-3">
+        <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i class="fa-solid fa-info text-info text-xs"></i>
+        </div>
+        <div>
+            <h4 class="font-medium text-info mb-1">Server Configuration</h4>
+            <p class="text-sm text-base-content/80">
+                Update connection details and settings for this {{ plugin.name }} server. Changes will be applied immediately.
+            </p>
+        </div>
+    </div>
+</div>
+
+<form method="POST" 
+      hx-post="{{ url_for('plugin_management.edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}"
+      hx-trigger="submit"
+      hx-swap="none"
+      hx-on::after-request="if(event.detail.xhr.status === 200) { window.location.href = '{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}'; }">
+    {{ form.hidden_tag() }}
+
+    <!-- Basic Settings Section -->
+    <div class="space-y-4 mb-6">
+        <h4 class="font-medium text-base-content text-lg mb-3">
+            <i class="fa-solid fa-cog text-primary text-sm mr-2"></i>
+            Basic Settings
+        </h4>
         
-        <form method="POST" 
-              hx-post="{{ url_for('plugin_management.edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}"
-              hx-trigger="submit"
-              hx-swap="none"
-              hx-on::after-request="if(event.detail.xhr.status === 200) { window.location.href = '{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}'; }">
-            {{ form.hidden_tag() }}
-            
-            <div class="form-control w-full mb-4">
-                {{ form.name.label(class="label") }}
-                {{ form.name(class="input input-bordered w-full") }}
-                {% if form.name.errors %}
-                    <div class="label">
-                        <span class="label-text-alt text-error">{{ form.name.errors[0] }}</span>
-                    </div>
-                {% endif %}
+        <!-- Server Name -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-tag text-primary text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.name.label.text }}</h5>
+                    <div class="badge badge-xs badge-outline badge-error">Required</div>
+                </div>
             </div>
+            {{ form.name(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.name.errors else "")) }}
+            {% if form.name.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.name.errors[0] }}</span>
+            {% else %}
+                <span class="text-base-content/60 text-xs mt-1 block">A friendly name for this server</span>
+            {% endif %}
+        </div>
 
-
-            <div class="form-control w-full mb-4">
-                {{ form.url.label(class="label") }}
-                {{ form.url(class="input input-bordered w-full") }}
-                {% if form.url.errors %}
-                    <div class="label">
-                        <span class="label-text-alt text-error">{{ form.url.errors[0] }}</span>
-                    </div>
-                {% endif %}
+        <!-- Server URL -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-link text-secondary text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.url.label.text }}</h5>
+                    <div class="badge badge-xs badge-outline badge-error">Required</div>
+                </div>
             </div>
-
-            <div class="form-control w-full mb-4">
-                {{ form.api_key.label(class="label") }}
-                {{ form.api_key(class="input input-bordered w-full", placeholder="Leave blank to keep current") }}
-                {% if form.api_key.errors %}
-                    <div class="label">
-                        <span class="label-text-alt text-error">{{ form.api_key.errors[0] }}</span>
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="form-control w-full mb-4">
-                {{ form.username.label(class="label") }}
-                {{ form.username(class="input input-bordered w-full") }}
-                {% if form.username.errors %}
-                    <div class="label">
-                        <span class="label-text-alt text-error">{{ form.username.errors[0] }}</span>
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="form-control w-full mb-4">
-                {{ form.password.label(class="label") }}
-                {{ form.password(class="input input-bordered w-full", placeholder="Leave blank to keep current") }}
-                {% if form.password.errors %}
-                    <div class="label">
-                        <span class="label-text-alt text-error">{{ form.password.errors[0] }}</span>
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="form-control mb-6">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.is_active(class="checkbox checkbox-primary mr-3") }}
-                    <span class="label-text">{{ form.is_active.label.text }}</span>
-                </label>
-            </div>
-
-            <div class="card-actions justify-end">
-                <a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}" class="btn btn-ghost">Cancel</a>
-                <button type="button" onclick="testConnection()" class="btn btn-outline">Test Connection</button>
-                {{ form.submit(class="btn btn-primary") }}
-            </div>
-        </form>
+            {{ form.url(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.url.errors else "")) }}
+            {% if form.url.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.url.errors[0] }}</span>
+            {% else %}
+                <span class="text-base-content/60 text-xs mt-1 block">Full URL including protocol (http:// or https://)</span>
+            {% endif %}
+        </div>
     </div>
-</div>
+
+    <!-- Authentication Section -->
+    <div class="space-y-4 mb-6">
+        <h4 class="font-medium text-base-content text-lg mb-3">
+            <i class="fa-solid fa-key text-warning text-sm mr-2"></i>
+            Authentication
+        </h4>
+        
+        {% if form.api_key %}
+        <!-- API Key -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-warning text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.api_key.label.text }}</h5>
+                    <div class="badge badge-xs badge-outline badge-warning">Optional</div>
+                </div>
+            </div>
+            {{ form.api_key(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.api_key.errors else ""), placeholder="Leave blank to keep current") }}
+            {% if form.api_key.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.api_key.errors[0] }}</span>
+            {% else %}
+                <span class="text-base-content/60 text-xs mt-1 block">Leave blank to keep current API key</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if form.username %}
+        <!-- Username -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-user text-accent text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.username.label.text }}</h5>
+                    <div class="badge badge-xs badge-outline badge-warning">Optional</div>
+                </div>
+            </div>
+            {{ form.username(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.username.errors else "")) }}
+            {% if form.username.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.username.errors[0] }}</span>
+            {% else %}
+                <span class="text-base-content/60 text-xs mt-1 block">Username for server authentication</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if form.password %}
+        <!-- Password -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-lock text-accent text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.password.label.text }}</h5>
+                    <div class="badge badge-xs badge-outline badge-warning">Optional</div>
+                </div>
+            </div>
+            {{ form.password(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.password.errors else ""), placeholder="Leave blank to keep current") }}
+            {% if form.password.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.password.errors[0] }}</span>
+            {% else %}
+                <span class="text-base-content/60 text-xs mt-1 block">Leave blank to keep current password</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Server Status Section -->
+    <div class="space-y-4 mb-6">
+        <h4 class="font-medium text-base-content text-lg mb-3">
+            <i class="fa-solid fa-toggle-on text-success text-sm mr-2"></i>
+            Server Status
+        </h4>
+        
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-power-off text-success text-sm"></i>
+                    <div>
+                        <h5 class="font-medium text-base-content">{{ form.is_active.label.text }}</h5>
+                        <span class="text-base-content/60 text-xs">Enable or disable this server</span>
+                    </div>
+                </div>
+                {{ form.is_active(class="toggle toggle-success") }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center justify-end gap-3 pt-6 border-t border-base-300">
+        <a href="{{ url_for('plugin_management.configure', plugin_id=plugin.plugin_id) }}" class="btn btn-ghost h-12">
+            <i class="fa-solid fa-times mr-2"></i>
+            Cancel
+        </a>
+        <button type="button" onclick="testConnection()" class="btn btn-outline h-12">
+            <i class="fa-solid fa-wifi mr-2"></i>
+            Test Connection
+        </button>
+        {{ form.submit(class="btn btn-primary h-12 gap-2") }}
+    </div>
+</form>
 
 <script>
 function testConnection() {
