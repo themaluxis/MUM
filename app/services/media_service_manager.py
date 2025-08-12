@@ -183,6 +183,11 @@ class MediaServiceManager:
                     if access.external_username != user_data.get('username'):
                         changes.append(f"Username changed from '{access.external_username}' to '{user_data.get('username')}'")
                         access.external_username = user_data.get('username')
+                        
+                        # For services like Kavita where username is the primary identifier,
+                        # also update the user's primary_username to keep them in sync
+                        if server.service_type.value in ['kavita', 'jellyfin', 'emby', 'audiobookshelf', 'komga', 'romm']:
+                            user.primary_username = user_data.get('username')
                     if access.external_email != user_data.get('email'):
                         changes.append(f"Email changed from '{access.external_email}' to '{user_data.get('email')}'")
                         access.external_email = user_data.get('email')
