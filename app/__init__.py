@@ -371,7 +371,7 @@ def create_app(config_name=None):
                     'plugin_management.disable_server', 'plugin_management.enable_server', 'plugin_management.delete_server',
                     # Media server setup endpoints
                     'media_servers.setup_list_servers', 'media_servers.add_server_setup', 'media_servers.setup_edit_server',
-                    'media_servers.test_new_server_connection',
+                    'plugin_management.test_connection',
                     # Setup endpoints - needed when no admin exists yet
                     'setup.account_setup', 'setup.create_admin', 'setup.app_config', 'setup.servers', 'setup.add_server', 'setup.edit_server', 'setup.plugins'
                 ]

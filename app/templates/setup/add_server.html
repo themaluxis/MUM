@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
             password: formData.get('password')
         };
         
-        fetch("{{ url_for('media_servers.test_new_server_connection') }}", {
+        fetch("{{ url_for('plugin_management.test_connection', plugin_id=form.service_type.data) }}", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

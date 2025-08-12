@@ -223,7 +223,7 @@ function testConnection(event) {
         password: formData.get('password')
     };
     
-    fetch("{{ url_for('media_servers.test_new_server_connection') }}", {
+    fetch(`/settings/plugins/${serverConfig.service_type}/test-connection`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
