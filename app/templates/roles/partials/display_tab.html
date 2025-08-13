@@ -32,7 +32,9 @@
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-tag text-primary text-sm"></i>
                     <h5 class="font-medium text-base-content">{{ edit_form.name.label.text }}</h5>
-                    <div class="badge badge-xs badge-outline badge-error">Required</div>
+                    <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">
+                        Required
+                    </span>
                 </div>
             </div>
             {{ edit_form.name(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if edit_form.name.errors else ""), id="edit_role_name") }}
@@ -49,7 +51,9 @@
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-align-left text-secondary text-sm"></i>
                     <h5 class="font-medium text-base-content">{{ edit_form.description.label.text }}</h5>
-                    <div class="badge badge-xs badge-outline badge-warning">Optional</div>
+                    <span class="inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-400/10 px-2 py-1 text-xs font-medium text-yellow-700 dark:text-yellow-400 ring-1 ring-inset ring-yellow-600/20 dark:ring-yellow-500/20">
+                        Optional
+                    </span>
                 </div>
             </div>
             {{ edit_form.description(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if edit_form.description.errors else "")) }}
@@ -124,7 +128,9 @@
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-icons text-accent text-sm"></i>
                     <h5 class="font-medium text-base-content">{{ edit_form.icon.label.text }}</h5>
-                    <div class="badge badge-xs badge-outline badge-warning">Optional</div>
+                    <span class="inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-400/10 px-2 py-1 text-xs font-medium text-yellow-700 dark:text-yellow-400 ring-1 ring-inset ring-yellow-600/20 dark:ring-yellow-500/20">
+                        Optional
+                    </span>
                 </div>
             </div>
             {{ edit_form.icon(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if edit_form.icon.errors else ""), id="edit_role_icon", placeholder="e.g., fa-solid fa-star") }}
