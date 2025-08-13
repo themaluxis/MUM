@@ -1,180 +1,253 @@
 <!-- File: app/templates/settings/partials/_plugin_configure.html -->
-<div class="mb-6">
-    <a href="{{ url_for('plugin_management.index') }}" class="btn btn-ghost">
-        <i class="fas fa-arrow-left mr-2"></i>
-        Back to Plugins
+
+<!-- Navigation -->
+<div class="flex items-center mb-8">
+    <a href="{{ url_for('plugin_management.index') }}" class="btn btn-ghost btn-sm">
+        <i class="fa-solid fa-arrow-left mr-2"></i> Back to Plugins
     </a>
 </div>
 
-<div class="card bg-base-100 shadow-xl">
-    <div class="card-body">
-        <div class="flex items-center mb-4">
-            <h2 class="card-title text-2xl">{{ title }}</h2>
-            {% if plugin.is_enabled %}
-                <span class="badge badge-success ml-4">Enabled</span>
-            {% else %}
-                <span class="badge badge-ghost ml-4">Disabled</span>
-            {% endif %}
+<!-- Clean Header -->
+<div class="mb-8">
+    <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-puzzle-piece text-primary text-xl"></i>
         </div>
-        <p>{{ plugin.description }}</p>
-
-        <div class="divider"></div>
-
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold">Configured Servers</h3>
-            <div class="flex gap-2">
-                {% if servers_with_details|length > 0 and not plugin.is_enabled %}
-                <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline"
-                      hx-post="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}"
-                      hx-trigger="submit"
-                      hx-indicator=".htmx-indicator">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-power-off mr-2"></i>Enable Plugin
-                        <span class="htmx-indicator loading loading-spinner loading-sm ml-2"></span>
-                    </button>
-                </form>
+        <div class="flex-1">
+            <div class="flex items-center gap-3 mb-1">
+                <h1 class="text-2xl font-bold text-base-content">{{ plugin.name }}</h1>
+                {% if plugin.is_enabled %}
+                    <span class="inline-flex items-center rounded-md bg-green-400/10 px-2 py-1 text-xs font-medium text-green-400 ring-1 ring-inset ring-green-500/20 gap-1">
+                        <i class="fa-solid fa-check-circle"></i>
+                        Enabled
+                    </span>
+                {% else %}
+                    <span class="inline-flex items-center rounded-md bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-400 ring-1 ring-inset ring-gray-500/20 gap-1">
+                        <i class="fa-solid fa-circle"></i>
+                        Disabled
+                    </span>
                 {% endif %}
-                <a href="{{ url_for('plugin_management.add_server', plugin_id=plugin.plugin_id) }}" class="btn btn-primary">
-                    <i class="fas fa-plus mr-2"></i>
-                    Add Server
-                </a>
             </div>
+            <p class="text-base-content/70 text-sm">{{ plugin.description }}</p>
         </div>
+    </div>
+</div>
 
-        {% if servers_with_details %}
-        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {% for details in servers_with_details %}
-            {% set server = details.server %}
-            <div class="card bg-base-200 shadow-xl">
-                <div class="card-body">
-                    <div class="flex items-center justify-between">
-                        <h2 class="card-title">{{ server.name }}</h2>
-                        <div class="badge badge-{{ 'success' if server.is_active else 'error' }}">
-                            {{ 'Active' if server.is_active else 'Inactive' }}
-                        </div>
+<!-- Plugin Status Card -->
+<div class="bg-info/10 border border-info/20 rounded-lg p-4 mb-6">
+    <div class="flex items-start gap-3">
+        <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i class="fa-solid fa-info text-info text-xs"></i>
+        </div>
+        <div>
+            <h4 class="font-medium text-info mb-1">Plugin Configuration</h4>
+            <p class="text-sm text-base-content/80">
+                Manage servers and settings for this {{ plugin.name }} plugin. Add servers to enable media access and user management.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Servers Section -->
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-semibold text-base-content mb-1">Configured Servers</h2>
+            <p class="text-sm text-base-content/70">{{ servers_with_details|length }} server{{ 's' if servers_with_details|length != 1 else '' }} configured</p>
+        </div>
+        <div class="flex gap-3">
+            {% if servers_with_details|length > 0 and not plugin.is_enabled %}
+            <form method="POST" action="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}" class="inline"
+                  hx-post="{{ url_for('plugins.enable_plugin', plugin_id=plugin.plugin_id) }}"
+                  hx-trigger="submit"
+                  hx-indicator=".htmx-indicator">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-success h-12 gap-2">
+                    <i class="fa-solid fa-power-off"></i>
+                    Enable Plugin
+                    <span class="htmx-indicator loading loading-spinner loading-sm"></span>
+                </button>
+            </form>
+            {% endif %}
+            <a href="{{ url_for('plugin_management.add_server', plugin_id=plugin.plugin_id) }}" class="btn btn-primary h-12 gap-2">
+                <i class="fa-solid fa-plus"></i>
+                Add Server
+            </a>
+        </div>
+    </div>
+
+    {% if servers_with_details %}
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {% for details in servers_with_details %}
+        {% set server = details.server %}
+        <div class="bg-base-200/30 border border-base-300 rounded-lg p-6 hover:border-base-300/60 transition-colors">
+            <!-- Server Header -->
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-server text-primary text-lg"></i>
                     </div>
-                    
-                    <div class="space-y-2">
-                        <div class="flex items-center">
-                            <i class="fas fa-server mr-2 text-gray-500"></i>
-                            <span class="text-sm">{{ details.actual_server_name or server.service_type.value.title() }}</span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-link mr-2 text-gray-500"></i>
-                            <span class="text-sm truncate">{{ server.url }}</span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-clock mr-2 text-gray-500"></i>
-                            <span class="text-sm">
-                                {% if server.last_sync_at %}
-                                    Last sync: {{ server.last_sync_at|format_datetime_user(False) }}
-                                {% else %}
-                                    Never synced
-                                {% endif %}
-                            </span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-users mr-2 text-gray-500"></i>
-                            <span class="text-sm">
-                                {{ details.member_count }} members
-                            </span>
-                        </div>
-                        <div class="flex items-start">
-                            <i class="fas fa-list-ul mr-2 text-gray-500 mt-1"></i>
-                            <div class="text-sm">
-                                {% if details.libraries %}
-                                    <div id="libraries-{{ server.id }}" class="flex flex-wrap gap-1">
-                                        {% for lib in details.libraries[:5] %}
-                                            <span class="badge badge-outline">{{ lib }}</span>
-                                        {% endfor %}
-                                        {% if details.libraries|length > 5 %}
-                                            <button id="more-libs-{{ server.id }}" onclick='showMoreLibraries({{ server.id }}, {{ details.libraries|tojson|safe }})' class="btn btn-info btn-xs">+{{ details.libraries|length - 5 }} more</button>
-                                        {% endif %}
-                                    </div>
-                                {% else %}
-                                    No libraries found.
+                    <div>
+                        <h3 class="font-semibold text-base-content">{{ server.name }}</h3>
+                        <span class="text-xs text-base-content/60">{{ details.actual_server_name or server.service_type.value.title() }}</span>
+                    </div>
+                </div>
+                {% if server.is_active %}
+                    <span class="inline-flex items-center rounded-md bg-green-400/10 px-2 py-1 text-xs font-medium text-green-400 ring-1 ring-inset ring-green-500/20 gap-1">
+                        <i class="fa-solid fa-check-circle"></i>
+                        Active
+                    </span>
+                {% else %}
+                    <span class="inline-flex items-center rounded-md bg-red-400/10 px-2 py-1 text-xs font-medium text-red-400 ring-1 ring-inset ring-red-500/20 gap-1">
+                        <i class="fa-solid fa-times-circle"></i>
+                        Inactive
+                    </span>
+                {% endif %}
+            </div>
+
+            <!-- Server Details -->
+            <div class="space-y-3 mb-4">
+                <!-- URL -->
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-link text-base-content/60 text-sm w-4"></i>
+                    <span class="text-sm text-base-content/80 truncate">{{ server.url }}</span>
+                </div>
+                
+                <!-- Last Sync -->
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-clock text-base-content/60 text-sm w-4"></i>
+                    <span class="text-sm text-base-content/80">
+                        {% if server.last_sync_at %}
+                            Last sync: {{ server.last_sync_at|format_datetime_user(False) }}
+                        {% else %}
+                            Never synced
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <!-- Members -->
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-users text-base-content/60 text-sm w-4"></i>
+                    <span class="text-sm text-base-content/80">{{ details.member_count }} member{{ 's' if details.member_count != 1 else '' }}</span>
+                </div>
+                
+                <!-- Libraries -->
+                <div class="flex items-start gap-2">
+                    <i class="fa-solid fa-folder text-base-content/60 text-sm w-4 mt-0.5"></i>
+                    <div class="flex-1">
+                        {% if details.libraries %}
+                            <div id="libraries-{{ server.id }}" class="flex flex-wrap gap-1">
+                                {% for lib in details.libraries[:3] %}
+                                    <span class="inline-flex items-center rounded-md bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-400 ring-1 ring-inset ring-blue-500/20">{{ lib }}</span>
+                                {% endfor %}
+                                {% if details.libraries|length > 3 %}
+                                    <button id="more-libs-{{ server.id }}" onclick='showMoreLibraries({{ server.id }}, {{ details.libraries|tojson|safe }})' class="inline-flex items-center rounded-md bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-400 ring-1 ring-inset ring-purple-500/20 cursor-pointer hover:bg-purple-400/20 transition-colors">
+                                        +{{ details.libraries|length - 3 }} more
+                                    </button>
                                 {% endif %}
                             </div>
-                        </div>
-                    </div>
-
-                    {% if details.error %}
-                    <div class="alert alert-warning mt-4">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <span>{{ details.error }}</span>
-                    </div>
-                    {% endif %}
-
-                    <div class="card-actions justify-end mt-4">
-                        {% if server.is_active %}
-                        <form method="POST" action="{{ url_for('plugin_management.disable_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" class="inline mr-2">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                            <button type="submit" class="btn btn-warning btn-sm">
-                                <i class="fas fa-pause mr-1"></i>Disable
-                            </button>
-                        </form>
                         {% else %}
-                        <form method="POST" action="{{ url_for('plugin_management.enable_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" class="inline mr-2">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                            <button type="submit" class="btn btn-success btn-sm">
-                                <i class="fas fa-play mr-1"></i>Enable
-                            </button>
-                        </form>
+                            <span class="text-sm text-base-content/60">No libraries found</span>
                         {% endif %}
-                        
-                        <!-- Edit Button -->
-                        <a href="{{ url_for('plugin_management.edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" 
-                           class="btn btn-ghost btn-sm" title="Edit Server">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        
-                        <!-- Delete Button -->
-                        <button onclick="deleteServer({{ server.id }}, '{{ server.name }}')" 
-                                class="btn btn-ghost btn-sm text-error hover:bg-error/10" title="Delete Server">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        
-                        <!-- Actions Dropdown (for remaining actions) -->
-                        <div class="dropdown dropdown-end">
-                            <label tabindex="0" class="btn btn-ghost btn-sm" title="More Actions">
-                                <i class="fas fa-ellipsis-v"></i>
-                            </label>
-                            <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
-                                <li>
-                                    <button onclick="testConnection({{ server.id }})" class="text-blue-600">
-                                        <i class="fas fa-plug mr-2"></i>Test Connection
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onclick="syncLibraries({{ server.id }})" class="text-green-600">
-                                        <i class="fas fa-sync mr-2"></i>Sync Libraries
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onclick="syncUsers({{ server.id }})" class="text-purple-600">
-                                        <i class="fas fa-users mr-2"></i>Sync Users
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onclick="showRawServerInfo({{ server.id }}, '{{ server.name }}')" class="text-gray-600">
-                                        <i class="fas fa-code mr-2"></i>Raw Server Info
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
                     </div>
                 </div>
             </div>
-            {% endfor %}
+
+            <!-- Error Alert -->
+            {% if details.error %}
+            <div class="bg-error/10 border border-error/20 rounded-lg p-3 mb-4">
+                <div class="flex items-start gap-2">
+                    <i class="fa-solid fa-exclamation-triangle text-error text-sm mt-0.5"></i>
+                    <span class="text-sm text-base-content/80">{{ details.error }}</span>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-between pt-4 border-t border-base-300">
+                <div class="flex items-center gap-2">
+                    <!-- Enable/Disable Toggle -->
+                    {% if server.is_active %}
+                    <form method="POST" action="{{ url_for('plugin_management.disable_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-warning btn-xs gap-1" title="Disable Server">
+                            <i class="fa-solid fa-pause"></i>
+                            <span class="hidden sm:inline">Disable</span>
+                        </button>
+                    </form>
+                    {% else %}
+                    <form method="POST" action="{{ url_for('plugin_management.enable_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-success btn-xs gap-1" title="Enable Server">
+                            <i class="fa-solid fa-play"></i>
+                            <span class="hidden sm:inline">Enable</span>
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    <!-- Edit Button -->
+                    <a href="{{ url_for('plugin_management.edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" 
+                       class="btn btn-ghost btn-xs" title="Edit Server">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </a>
+                    
+                    <!-- Delete Button -->
+                    <button onclick="deleteServer({{ server.id }}, '{{ server.name }}')" 
+                            class="btn btn-ghost btn-xs text-error hover:bg-error/10" title="Delete Server">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+                
+                <!-- Actions Dropdown -->
+                <div class="dropdown dropdown-end">
+                    <label tabindex="0" class="btn btn-ghost btn-xs" title="More Actions">
+                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </label>
+                    <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
+                        <li>
+                            <button onclick="testConnection({{ server.id }})" class="text-info gap-2">
+                                <i class="fa-solid fa-wifi"></i>Test Connection
+                            </button>
+                        </li>
+                        <li>
+                            <button onclick="syncLibraries({{ server.id }})" class="text-success gap-2">
+                                <i class="fa-solid fa-sync"></i>Sync Libraries
+                            </button>
+                        </li>
+                        <li>
+                            <button onclick="syncUsers({{ server.id }})" class="text-secondary gap-2">
+                                <i class="fa-solid fa-users"></i>Sync Users
+                            </button>
+                        </li>
+                        <li>
+                            <button onclick="showRawServerInfo({{ server.id }}, '{{ server.name }}')" class="text-base-content/60 gap-2">
+                                <i class="fa-solid fa-code"></i>Raw Server Info
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
         </div>
-        {% else %}
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i>
-            <span>No servers have been configured for this service yet.</span>
-        </div>
-        {% endif %}
+        {% endfor %}
     </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-base-200/30 border border-base-300 rounded-lg p-12">
+        <div class="text-center">
+            <div class="w-16 h-16 rounded-full bg-base-200/50 flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-server text-base-content/40 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-base-content mb-2">No Servers Configured</h3>
+            <p class="text-sm text-base-content/70 mb-6">
+                Add your first {{ plugin.name }} server to start managing media and users.
+            </p>
+            <a href="{{ url_for('plugin_management.add_server', plugin_id=plugin.plugin_id) }}" class="btn btn-primary gap-2">
+                <i class="fa-solid fa-plus"></i>
+                Add First Server
+            </a>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Delete Modal -->
@@ -305,7 +378,7 @@ function showMoreLibraries(serverId, libraries) {
     container.innerHTML = ''; // Clear existing badges
     libraries.forEach(lib => {
         const badge = document.createElement('span');
-        badge.className = 'badge badge-outline';
+        badge.className = 'inline-flex items-center rounded-md bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-400 ring-1 ring-inset ring-blue-500/20';
         badge.textContent = lib;
         container.appendChild(badge);
     });
