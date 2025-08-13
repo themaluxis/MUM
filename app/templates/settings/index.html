@@ -183,40 +183,115 @@ console.log('No enabled_plugins data from backend, using fallback');
     {{ super() }}
     {% if active_tab == 'logs' %}
         <dialog id="clear_logs_modal" class="modal modal-bottom sm:modal-middle">
-          <div class="modal-box max-w-lg">
-            <form method="dialog">
-                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" type="button" onclick="clear_logs_modal.close()">✕</button>
-            </form>
-            <h3 class="font-bold text-lg text-error"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Confirm Clear Logs</h3>
-            <p class="py-4 text-sm">This action is irreversible. Select which event types to clear, or clear all.</p>
-            <form id="confirmClearLogsForm" 
-                  hx-post="{{ url_for('settings.clear_logs') }}"
-                  hx-indicator="#clear-logs-loader"
-                  hx-on::after-request="if(event.detail.successful) { clear_logs_modal.close(); }"> 
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <div class="form-control mb-4">
-                      <label class="label cursor-pointer justify-start">
-                          <input type="checkbox" name="clear_all_types" value="true" class="checkbox checkbox-error mr-2" id="clear_all_history_types_checkbox" checked onchange="toggleEventTypeCheckboxesDisabled(this.checked)">
-                          <span class="label-text font-semibold">Clear ALL Event Types</span>
-                      </label>
-                  </div>
-                  <div id="specific_event_types_for_clear" class="max-h-60 overflow-y-auto border border-base-300 rounded p-2 space-y-1 mb-4 opacity-50">
-                      {% for type in event_types %}
-                      <label class="label cursor-pointer justify-start py-1">
-                          <input type="checkbox" name="event_types_to_clear[]" value="{{ type.name }}" class="checkbox checkbox-sm checkbox-secondary mr-2 event-type-clear-checkbox" checked disabled>
-                          <span class="label-text text-xs">{{ type.name | title | replace('_', ' ') }}</span>
-                      </label>
-                      {% endfor %}
-                  </div>
-                  <div class="modal-action mt-4">
-                      <button type="button" class="btn btn-ghost" onclick="clear_logs_modal.close()">Cancel</button>
-                      <button type="submit" class="btn btn-error">
-                          <span id="clear-logs-loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
-                          Confirm Clear
-                      </button>
-                  </div>
-            </form>
-          </div>
+            <div class="modal-box max-w-2xl bg-base-100 border border-base-300 shadow-2xl p-0">
+                <!-- Header -->
+                <div class="flex items-center justify-between p-6 border-b border-base-300">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center">
+                            <i class="fa-solid fa-triangle-exclamation text-error text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold text-base-content">Clear Application Logs</h3>
+                            <p class="text-sm text-base-content/60">This action cannot be undone</p>
+                        </div>
+                    </div>
+                    <form method="dialog">
+                        <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200" type="button" onclick="clear_logs_modal.close()">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Content -->
+                <div class="p-6">
+                    <!-- Warning Card -->
+                    <div class="bg-error/10 border border-error/20 rounded-lg p-4 mb-6">
+                        <div class="flex items-start gap-3">
+                            <div class="w-6 h-6 rounded-full bg-error/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <i class="fa-solid fa-exclamation text-error text-xs"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-medium text-error mb-1">Permanent Action</h4>
+                                <p class="text-sm text-base-content/80">
+                                    Once cleared, log entries cannot be recovered. Choose which event types to clear or select all.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form id="confirmClearLogsForm" 
+                          hx-post="{{ url_for('settings.clear_logs') }}"
+                          hx-indicator="#clear-logs-loader"
+                          hx-on::after-request="if(event.detail.successful) { clear_logs_modal.close(); }"
+                          class="space-y-6"> 
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <!-- Clear All Toggle -->
+                        <div class="bg-base-200/30 border border-base-300 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-solid fa-trash text-warning text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-base-content">Clear All Event Types</h4>
+                                        <p class="text-sm text-base-content/70">Remove all log entries regardless of type</p>
+                                    </div>
+                                </div>
+                                <input type="checkbox" 
+                                       name="clear_all_types" 
+                                       value="true" 
+                                       class="toggle toggle-error" 
+                                       id="clear_all_history_types_checkbox" 
+                                       checked 
+                                       onchange="toggleEventTypeCheckboxesDisabled(this.checked)">
+                            </div>
+                        </div>
+                        
+                        <!-- Specific Event Types -->
+                        <div id="specific_event_types_for_clear" class="opacity-50 transition-opacity">
+                            <div class="flex items-center gap-2 mb-4">
+                                <h4 class="font-medium text-base-content">Select Specific Event Types</h4>
+                                <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">
+                                    {{ event_types|length }} types available
+                                </span>
+                            </div>
+                            
+                            <div class="bg-base-100 border border-base-300 rounded-lg max-h-60 overflow-y-auto">
+                                <div class="p-3 space-y-2">
+                                    {% for type in event_types %}
+                                    <label class="flex items-center gap-3 p-2 rounded hover:bg-base-200/50 cursor-pointer transition-colors">
+                                        <input type="checkbox" 
+                                               name="event_types_to_clear[]" 
+                                               value="{{ type.name }}" 
+                                               class="checkbox checkbox-sm checkbox-error event-type-clear-checkbox" 
+                                               checked 
+                                               disabled>
+                                        <div class="flex-1">
+                                            <span class="text-sm font-medium text-base-content">{{ type.name | title | replace('_', ' ') }}</span>
+                                        </div>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Footer -->
+                <div class="flex items-center justify-end gap-3 p-6 bg-base-200/30 border-t border-base-300">
+                    <button type="button" class="btn btn-ghost" onclick="clear_logs_modal.close()">
+                        <i class="fa-solid fa-times mr-2"></i>
+                        Cancel
+                    </button>
+                    <button type="submit" form="confirmClearLogsForm" class="btn btn-error">
+                        <span id="clear-logs-loader" class="htmx-indicator loading loading-spinner loading-xs mr-2"></span>
+                        <i class="fa-solid fa-trash mr-2"></i>
+                        Clear Logs
+                    </button>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop"><button>close</button></form>
         </dialog>
     {% endif %}
 {% endblock modals %}
