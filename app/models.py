@@ -227,7 +227,17 @@ class User(db.Model, UserMixin):
     
     def get_display_name(self):
         """Get the best display name for this user"""
-        return self.primary_username or self.primary_email or 'Unknown User'
+        username = self.primary_username or self.primary_email or 'Unknown User'
+        
+        # If username has service suffix (e.g., "AllGas@jellyfin"), remove it for display
+        if '@' in username and username.count('@') == 1:
+            display_name, service = username.split('@', 1)
+            # Only remove suffix if it's a known service type
+            known_services = ['plex', 'jellyfin', 'emby', 'kavita', 'audiobookshelf', 'komga', 'romm']
+            if service.lower() in known_services:
+                return display_name
+        
+        return username
     
     def get_primary_email(self):
         """Get the primary email for this user"""

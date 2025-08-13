@@ -285,28 +285,43 @@ class MediaServiceManager:
         """Find existing user or create new one based on user data"""
         username = user_data.get('username')
         email = user_data.get('email')
+        external_user_id = str(user_data.get('id')) if user_data.get('id') else None
         
-        # Try to find existing user
+        # Try to find existing user by checking if they already have access to this specific server
         user = None
         
-        # For Plex, try to match by UUID first, then by username
-        if server.service_type == ServiceType.PLEX:
+        # First, check if this user already exists for this specific server
+        if external_user_id:
+            existing_access = UserMediaAccess.query.filter_by(
+                server_id=server.id,
+                external_user_id=external_user_id
+            ).first()
+            if existing_access:
+                user = User.query.get(existing_access.user_id)
+                current_app.logger.debug(f"Found existing user via server access: {user.get_display_name() if user else 'None'}")
+        
+        # For Plex, also try to match by UUID (for legacy compatibility)
+        if not user and server.service_type == ServiceType.PLEX:
             uuid = user_data.get('uuid')
             if uuid:
                 user = User.query.filter_by(plex_uuid=uuid).first()
-            if not user and username:
-                user = User.query.filter_by(primary_username=username).first()
+                current_app.logger.debug(f"Found existing Plex user via UUID: {user.get_display_name() if user else 'None'}")
         
-        # Try to match by primary username or email
-        if not user and username:
-            user = User.query.filter_by(primary_username=username).first()
-        if not user and email:
-            user = User.query.filter_by(primary_email=email).first()
+        # If no existing user found, we'll create a new one
+        # This ensures users with the same username on different services remain separate
         
         if not user:
-            # Create new user - use username as primary_username for all services
-            primary_username_value = username or email or f"user_{user_data.get('id', 'unknown')}"
-            current_app.logger.info(f"Creating new user with primary_username='{primary_username_value}', username='{username}', email='{email}'")
+            # Create new user - make username unique per service to avoid conflicts
+            if username:
+                # For non-Plex services, append service type to make username unique
+                if server.service_type != ServiceType.PLEX:
+                    primary_username_value = f"{username}@{server.service_type.value}"
+                else:
+                    primary_username_value = username
+            else:
+                primary_username_value = email or f"user_{user_data.get('id', 'unknown')}@{server.service_type.value}"
+            
+            current_app.logger.info(f"Creating new user with primary_username='{primary_username_value}', username='{username}', email='{email}', service='{server.service_type.value}'")
             
             user = User(
                 primary_username=primary_username_value,
