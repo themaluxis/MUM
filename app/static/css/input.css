@@ -21,6 +21,8 @@
   --color-romm: oklch(62.28% 0.16 282.4);
 }
 
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 /* Custom base styles or overrides can go here */
 body {
   @apply font-sans;

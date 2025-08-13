@@ -17,12 +17,12 @@
             <div class="flex items-center gap-3 mb-1">
                 <h1 class="text-2xl font-bold text-base-content">{{ plugin.name }}</h1>
                 {% if plugin.is_enabled %}
-                    <span class="inline-flex items-center rounded-md bg-green-400/10 px-2 py-1 text-xs font-medium text-green-400 ring-1 ring-inset ring-green-500/20 gap-1">
+                    <span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-400/10 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/20 gap-1">
                         <i class="fa-solid fa-check-circle"></i>
                         Enabled
                     </span>
                 {% else %}
-                    <span class="inline-flex items-center rounded-md bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-400 ring-1 ring-inset ring-gray-500/20 gap-1">
+                    <span class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1">
                         <i class="fa-solid fa-circle"></i>
                         Disabled
                     </span>
@@ -93,12 +93,12 @@
                     </div>
                 </div>
                 {% if server.is_active %}
-                    <span class="inline-flex items-center rounded-md bg-green-400/10 px-2 py-1 text-xs font-medium text-green-400 ring-1 ring-inset ring-green-500/20 gap-1">
+                    <span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-400/10 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/20 gap-1">
                         <i class="fa-solid fa-check-circle"></i>
                         Active
                     </span>
                 {% else %}
-                    <span class="inline-flex items-center rounded-md bg-red-400/10 px-2 py-1 text-xs font-medium text-red-400 ring-1 ring-inset ring-red-500/20 gap-1">
+                    <span class="inline-flex items-center rounded-md bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20 gap-1">
                         <i class="fa-solid fa-times-circle"></i>
                         Inactive
                     </span>
@@ -138,10 +138,10 @@
                         {% if details.libraries %}
                             <div id="libraries-{{ server.id }}" class="flex flex-wrap gap-1">
                                 {% for lib in details.libraries[:3] %}
-                                    <span class="inline-flex items-center rounded-md bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-400 ring-1 ring-inset ring-blue-500/20">{{ lib }}</span>
+                                    <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">{{ lib }}</span>
                                 {% endfor %}
                                 {% if details.libraries|length > 3 %}
-                                    <button id="more-libs-{{ server.id }}" onclick='showMoreLibraries({{ server.id }}, {{ details.libraries|tojson|safe }})' class="inline-flex items-center rounded-md bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-400 ring-1 ring-inset ring-purple-500/20 cursor-pointer hover:bg-purple-400/20 transition-colors">
+                                    <button id="more-libs-{{ server.id }}" onclick='showMoreLibraries({{ server.id }}, {{ details.libraries|tojson|safe }})' class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-400/20 transition-colors">
                                         +{{ details.libraries|length - 3 }} more
                                     </button>
                                 {% endif %}
@@ -378,7 +378,7 @@ function showMoreLibraries(serverId, libraries) {
     container.innerHTML = ''; // Clear existing badges
     libraries.forEach(lib => {
         const badge = document.createElement('span');
-        badge.className = 'inline-flex items-center rounded-md bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-400 ring-1 ring-inset ring-blue-500/20';
+        badge.className = 'inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20';
         badge.textContent = lib;
         container.appendChild(badge);
     });
