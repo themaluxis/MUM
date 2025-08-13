@@ -214,7 +214,8 @@ async def on_member_remove(member: discord.Member):
 
             bot_logger.info(f"Attempting to remove Plex access for MUM user {mum_user.plex_username} (Discord: {member.display_name}).")
             try:
-                user_service_for_bot.delete_user_from_mum_and_plex(mum_user.id, admin_id=None) # Bot action, admin_id can be None or a system ID
+                from app.services.unified_user_service import UnifiedUserService
+                UnifiedUserService.delete_user_completely(mum_user.id, admin_id=None) # Bot action, admin_id can be None or a system ID
                 success_msg = f"Bot removed Plex access for {mum_user.plex_username} (Discord: {member.display_name}) due to leaving server."
                 log_event_mum(EventType.DISCORD_BOT_USER_REMOVED_FROM_PLEX, success_msg, user_id=mum_user.id)
                 await send_log_to_discord_channel(success_msg, level="WARN")

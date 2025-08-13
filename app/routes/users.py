@@ -492,7 +492,7 @@ def delete_user(user_id):
     username = user.get_display_name()
     
     try:
-        user_service.delete_user_from_mum_and_plex(user_id, admin_id=current_user.id)
+        UnifiedUserService.delete_user_completely(user_id, admin_id=current_user.id)
         
         # Create a toast message payload
         toast = {

@@ -264,12 +264,9 @@ def check_user_access_expirations_task():
             try:
                 current_app.logger.info(f"Removing expired user '{username_for_log}' (expired: {original_expiry_for_log})")
                 
-                # Check if user_service.delete_user_from_mum_and_plex exists
-                if not hasattr(user_service, 'delete_user_from_mum_and_plex'):
-                    current_app.logger.error(f"user_service.delete_user_from_mum_and_plex method not found!")
-                    continue
-                
-                user_service.delete_user_from_mum_and_plex(user_id=mum_user_id_for_log, admin_id=system_admin_id)
+                # Use the unified user service for deletion
+                from app.services.unified_user_service import UnifiedUserService
+                UnifiedUserService.delete_user_completely(user_id=mum_user_id_for_log, admin_id=system_admin_id)
                 removal_count += 1
                 
                 log_event(

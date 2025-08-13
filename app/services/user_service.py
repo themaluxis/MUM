@@ -571,7 +571,8 @@ def purge_inactive_users(user_ids_to_purge: list[int], admin_id: int, inactive_d
 
     for user in users_to_process:
         try:
-            delete_user_from_mum_and_plex(user.id, admin_id=admin_id)
+            from app.services.unified_user_service import UnifiedUserService
+            UnifiedUserService.delete_user_completely(user.id, admin_id=admin_id)
             purged_count += 1
         except Exception as e:
             error_count += 1
