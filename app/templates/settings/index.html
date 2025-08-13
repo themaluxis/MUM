@@ -276,22 +276,31 @@ function showPluginInfo(pluginId) {
             document.getElementById('pluginInfoTitle').textContent = data.name || 'Unknown Plugin';
             document.getElementById('pluginInfoContent').innerHTML = `
                 <!-- Plugin Overview Card -->
-                <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300/50">
+                <div class="bg-info/10 border border-info/20 rounded-lg p-4 mb-6">
                     <div class="flex items-start gap-3">
-                        <div class="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <i class="fa-solid fa-info text-accent text-sm"></i>
+                        <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-info text-info text-xs"></i>
                         </div>
                         <div class="flex-1">
-                            <h4 class="font-medium text-base-content mb-1">Plugin Overview</h4>
-                            <p class="text-sm text-base-content/70 leading-relaxed">
+                            <h4 class="font-medium text-info mb-1">Plugin Overview</h4>
+                            <p class="text-sm text-base-content/80 leading-relaxed">
                                 ${data.description || 'No description available for this plugin.'}
                             </p>
                             <div class="flex items-center gap-3 mt-3">
-                                <span class="badge badge-${data.enabled ? 'success' : 'neutral'} badge-sm gap-1">
-                                    <i class="fa-solid fa-${data.enabled ? 'check-circle' : 'circle'}"></i>
-                                    ${data.enabled ? 'Enabled' : 'Disabled'}
-                                </span>
-                                ${data.plugin_type ? `<span class="badge badge-outline badge-sm">${data.plugin_type}</span>` : ''}
+                                ${data.enabled ? 
+                                    `<span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-400/10 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/20 gap-1">
+                                        <i class="fa-solid fa-check-circle"></i>
+                                        Enabled
+                                    </span>` : 
+                                    `<span class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1">
+                                        <i class="fa-solid fa-circle"></i>
+                                        Disabled
+                                    </span>`
+                                }
+                                ${data.plugin_type ? 
+                                    `<span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">${data.plugin_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>` : 
+                                    ''
+                                }
                             </div>
                         </div>
                     </div>
@@ -335,7 +344,7 @@ function showPluginInfo(pluginId) {
                         </div>
                         <div class="flex flex-wrap gap-2">
                             ${data.supported_features.map(feature => 
-                                `<span class="badge badge-outline badge-sm">${feature.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>`
+                                `<span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">${feature.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>`
                             ).join('')}
                         </div>
                     </div>
