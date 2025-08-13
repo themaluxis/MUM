@@ -4,8 +4,15 @@
 
 <!-- Clean Header -->
 <div class="mb-8">
-    <h1 class="text-2xl font-bold text-base-content mb-2">General Settings</h1>
-    <p class="text-base-content/70 text-sm">Configure your application's core settings and behavior.</p>
+    <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-sliders text-primary text-lg"></i>
+        </div>
+        <div>
+            <h1 class="text-2xl font-bold text-base-content mb-1">General Settings</h1>
+            <p class="text-sm text-base-content/70">Configure your application's core settings and behavior</p>
+        </div>
+    </div>
 </div>
 
 <form method="POST" action="{{ url_for('settings.general') }}">
@@ -16,64 +23,55 @@
         <!-- Application Identity Section -->
         <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
             <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <i class="fa-solid fa-id-card text-primary text-lg"></i>
+                <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-id-card text-primary text-sm"></i>
                 </div>
                 <div>
-                    <h2 class="text-xl font-semibold text-base-content mb-1">Application Identity</h2>
+                    <h2 class="text-lg font-semibold text-base-content mb-1">Application Identity</h2>
                     <p class="text-sm text-base-content/70">Configure how your application appears to users</p>
                 </div>
             </div>
             
             <div class="space-y-4">
                 <!-- App Name -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text font-medium text-sm">{{ form.app_name.label.text }}</span>
-                    </label>
-                    {{ form.app_name(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.app_name.errors else "")) }}
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-tag text-primary text-sm"></i>
+                        <h5 class="font-medium text-base-content">{{ form.app_name.label.text }}</h5>
+                    </div>
+                    {{ form.app_name(class="input input-bordered w-full " + ("input-error" if form.app_name.errors else "")) }}
                     {% if form.app_name.errors %}
-                        <label class="label">
-                            <span class="label-text-alt text-error">{{ form.app_name.errors[0] }}</span>
-                        </label>
+                        <p class="text-error text-xs mt-2">{{ form.app_name.errors[0] }}</p>
                     {% else %}
-                        <label class="label">
-                            <span class="label-text-alt text-xs text-base-content/60">The public name for this application.</span>
-                        </label>
+                        <p class="text-xs text-base-content/60 mt-2">The public name for this application</p>
                     {% endif %}
                 </div>
 
                 <!-- App Base URL -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text font-medium text-sm">{{ form.app_base_url.label.text }}</span>
-                    </label>
-                    {{ form.app_base_url(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.app_base_url.errors else "")) }}
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-globe text-primary text-sm"></i>
+                        <h5 class="font-medium text-base-content">{{ form.app_base_url.label.text }}</h5>
+                    </div>
+                    {{ form.app_base_url(class="input input-bordered w-full " + ("input-error" if form.app_base_url.errors else "")) }}
                     {% if form.app_base_url.errors %}
-                        <label class="label">
-                            <span class="label-text-alt text-error">{{ form.app_base_url.errors[0] }}</span>
-                        </label>
+                        <p class="text-error text-xs mt-2">{{ form.app_base_url.errors[0] }}</p>
                     {% else %}
-                        <label class="label">
-                            <span class="label-text-alt text-xs text-base-content/60">{{ form.app_base_url.description }}</span>
-                        </label>
+                        <p class="text-xs text-base-content/60 mt-2">{{ form.app_base_url.description }}</p>
                     {% endif %}
                 </div>
 
                 <!-- App Local URL -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text font-medium text-sm">{{ form.app_local_url.label.text }}</span>
-                    </label>
-                    {{ form.app_local_url(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.app_local_url.errors else "")) }}
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-network-wired text-primary text-sm"></i>
+                        <h5 class="font-medium text-base-content">{{ form.app_local_url.label.text }}</h5>
+                    </div>
+                    {{ form.app_local_url(class="input input-bordered w-full " + ("input-error" if form.app_local_url.errors else "")) }}
                     {% if form.app_local_url.errors %}
-                        <label class="label">
-                            <span class="label-text-alt text-error">{{ form.app_local_url.errors[0] }}</span>
-                        </label>
+                        <p class="text-error text-xs mt-2">{{ form.app_local_url.errors[0] }}</p>
                     {% else %}
-                        <label class="label">
-                            <span class="label-text-alt text-xs text-base-content/60">{{ form.app_local_url.description }}</span>
-                        </label>
+                        <p class="text-xs text-base-content/60 mt-2">{{ form.app_local_url.description }}</p>
                     {% endif %}
                 </div>
             </div>
@@ -82,11 +80,11 @@
         <!-- Performance & Monitoring Section -->
         <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
             <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
-                    <i class="fa-solid fa-gauge-high text-success text-lg"></i>
+                <div class="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-gauge-high text-success text-sm"></i>
                 </div>
                 <div>
-                    <h2 class="text-xl font-semibold text-base-content mb-1">Performance & Monitoring</h2>
+                    <h2 class="text-lg font-semibold text-base-content mb-1">Performance & Monitoring</h2>
                     <p class="text-sm text-base-content/70">Configure real-time monitoring and performance settings</p>
                 </div>
             </div>
@@ -94,14 +92,16 @@
             <div class="space-y-6">
                 <!-- Stream Badge Toggle -->
                 <div class="space-y-3">
-                    <div class="form-control">
-                        <label class="label cursor-pointer justify-start">
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-satellite-dish text-success text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ form.enable_navbar_stream_badge.label.text }}</h5>
+                        </div>
+                        <label class="label cursor-pointer justify-start p-0">
                             {{ form.enable_navbar_stream_badge(class="toggle toggle-primary mr-3", id="enable_navbar_stream_badge") }}
-                            <span class="label-text font-medium">{{ form.enable_navbar_stream_badge.label.text }}</span>
+                            <span class="text-sm text-base-content/80">Enable real-time stream count in navigation</span>
                         </label>
-                        <label class="label">
-                            <span class="label-text-alt text-xs text-base-content/60">{{ form.enable_navbar_stream_badge.description }}</span>
-                        </label>
+                        <p class="text-xs text-base-content/60 mt-2">{{ form.enable_navbar_stream_badge.description }}</p>
                     </div>
                     
                     <!-- Warning Card -->
@@ -121,37 +121,31 @@
                 </div>
 
                 <!-- Session Monitoring Interval -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text font-medium text-sm">{{ form.session_monitoring_interval.label.text }}</span>
-                    </label>
-                    {{ form.session_monitoring_interval(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.session_monitoring_interval.errors else ""), id="session_monitoring_interval") }}
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-clock text-success text-sm"></i>
+                        <h5 class="font-medium text-base-content">{{ form.session_monitoring_interval.label.text }}</h5>
+                    </div>
+                    {{ form.session_monitoring_interval(class="input input-bordered w-full " + ("input-error" if form.session_monitoring_interval.errors else ""), id="session_monitoring_interval") }}
                     {% if form.session_monitoring_interval.errors %}
-                        <label class="label">
-                            <span class="label-text-alt text-error">{{ form.session_monitoring_interval.errors[0] }}</span>
-                        </label>
+                        <p class="text-error text-xs mt-2">{{ form.session_monitoring_interval.errors[0] }}</p>
                     {% else %}
-                        <label class="label">
-                            <span class="label-text-alt text-xs text-base-content/60" id="interval-description">{{ form.session_monitoring_interval.description }}</span>
-                        </label>
+                        <p class="text-xs text-base-content/60 mt-2" id="interval-description">{{ form.session_monitoring_interval.description }}</p>
                     {% endif %}
                 </div>
 
                 <!-- API Timeout -->
                 <div class="space-y-3">
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text font-medium text-sm">{{ form.api_timeout_seconds.label.text }}</span>
-                        </label>
-                        {{ form.api_timeout_seconds(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.api_timeout_seconds.errors else "")) }}
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-stopwatch text-success text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ form.api_timeout_seconds.label.text }}</h5>
+                        </div>
+                        {{ form.api_timeout_seconds(class="input input-bordered w-full " + ("input-error" if form.api_timeout_seconds.errors else "")) }}
                         {% if form.api_timeout_seconds.errors %}
-                            <label class="label">
-                                <span class="label-text-alt text-error">{{ form.api_timeout_seconds.errors[0] }}</span>
-                            </label>
+                            <p class="text-error text-xs mt-2">{{ form.api_timeout_seconds.errors[0] }}</p>
                         {% else %}
-                            <label class="label">
-                                <span class="label-text-alt text-xs text-base-content/60">{{ form.api_timeout_seconds.description }}</span>
-                            </label>
+                            <p class="text-xs text-base-content/60 mt-2">{{ form.api_timeout_seconds.description }}</p>
                         {% endif %}
                     </div>
                     
@@ -176,29 +170,31 @@
         <!-- User Management Section -->
         <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
             <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <i class="fa-solid fa-users text-primary text-lg"></i>
+                <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-users text-info text-sm"></i>
                 </div>
                 <div>
-                    <h2 class="text-xl font-semibold text-base-content mb-1">User Management</h2>
+                    <h2 class="text-lg font-semibold text-base-content mb-1">User Management</h2>
                     <p class="text-sm text-base-content/70">Configure user account and authentication settings</p>
                 </div>
             </div>
             
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start">
+            <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                <div class="flex items-center gap-2 mb-2">
+                    <i class="fa-solid fa-user-check text-info text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.allow_user_accounts.label.text }}</h5>
+                </div>
+                <label class="label cursor-pointer justify-start p-0">
                     {{ form.allow_user_accounts(class="toggle toggle-primary mr-3", id="allow_user_accounts") }}
-                    <span class="label-text font-medium">{{ form.allow_user_accounts.label.text }}</span>
+                    <span class="text-sm text-base-content/80">Allow users to create accounts via invites</span>
                 </label>
-                <label class="label">
-                    <span class="label-text-alt text-xs text-base-content/60">{{ form.allow_user_accounts.description }}</span>
-                </label>
+                <p class="text-xs text-base-content/60 mt-2">{{ form.allow_user_accounts.description }}</p>
             </div>
         </div>
 
         <!-- Save Button -->
-        <div class="flex justify-end pt-6">
-            {{ form.submit(class="btn btn-primary") }}
+        <div class="flex justify-end pt-6 border-t border-base-300">
+            {{ form.submit(class="btn btn-primary h-11") }}
         </div>
     </div>
 </form>
