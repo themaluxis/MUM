@@ -318,34 +318,120 @@ class KavitaMediaService(BaseMediaService):
             return []
     
     def create_user(self, username: str, email: str, password: str = None, **kwargs) -> Dict[str, Any]:
-        """Create new Kavita user"""
+        """Create a new user in Kavita using invite + confirm-email flow.
+
+        Note: Kavita uses an invite-based system. The /api/Account/register endpoint
+        only works for the initial admin user. For subsequent users, we must use
+        the /api/Account/invite endpoint followed by /api/Account/confirm-email.
+        """
+        from urllib.parse import urlparse, parse_qs
+        
+        user_email = email or f"{username}@wizarr.local"
+        user_password = password or 'changeme123'
+        library_ids = kwargs.get('library_ids', [])
+
         try:
-            user_data = {
-                'username': username,
-                'email': email or '',
-                'password': password or 'changeme123',
-                'roles': ['Pleb']  # Default role
+            # Step 1: Send invitation
+            self.log_info(f"Sending invite to {user_email} on Kavita")
+
+            # Convert library IDs to integers for Kavita API
+            kavita_library_ids = []
+            if library_ids:
+                for lib_id in library_ids:
+                    try:
+                        # Handle compound library IDs (e.g., "2_Books" -> 2)
+                        if '_' in str(lib_id):
+                            numeric_id = str(lib_id).split('_')[0]
+                            kavita_library_ids.append(int(numeric_id))
+                        else:
+                            kavita_library_ids.append(int(lib_id))
+                    except (ValueError, TypeError):
+                        self.log_warning(f"Invalid library ID for Kavita: {lib_id}")
+
+            invite_data = {
+                "email": user_email,
+                "roles": ["Login"],
+                "libraries": kavita_library_ids,
+                "ageRestriction": {"ageRating": 0, "includeUnknowns": True},
             }
             
-            result = self._make_request('Account/register', method='POST', data=user_data)
-            user_id = result.get('id')
+            self.log_info(f"Sending invite with data: {invite_data}")
+            invite_response_data = self._make_request('Account/invite', method='POST', data=invite_data)
+            self.log_info(f"Invite response: {invite_response_data}")
+
+            # Extract the token from the emailLink, handling possible extra arguments after the token
+            email_link = invite_response_data.get("emailLink", "")
+            if not email_link:
+                raise Exception("No emailLink found in Kavita invite response")
+
+            # Defensive: parse token from emailLink (may be in query or fragment)
+            invite_token = None
+            parsed = urlparse(email_link)
+            # Try query first
+            params = parse_qs(parsed.query)
+            invite_token = params.get("token", [None])[0]
+            # If not found, try fragment (some Kavita versions use #token=...)
+            if not invite_token and parsed.fragment:
+                frag_params = parse_qs(parsed.fragment)
+                invite_token = frag_params.get("token", [None])[0]
+
+            if not invite_token:
+                self.log_error(f"Could not extract invitation token from emailLink: {email_link}")
+                raise Exception("No invitation token found in response")
+
+            self.log_info(f"Extracted invitation token: {invite_token[:10]}...")
+
+            # Step 2: Confirm email with username and password
+            self.log_info(f"Confirming email for user {username}")
+            confirm_data = {
+                "token": invite_token,
+                "password": user_password,
+                "username": username,
+                "email": user_email,
+            }
             
-            # Set library access if specified
-            library_ids = kwargs.get('library_ids', [])
-            if library_ids and user_id:
-                for lib_id in library_ids:
-                    self._make_request(f'Account/grant-library-access', method='POST', 
-                                     data={'userId': user_id, 'libraryId': int(lib_id)})
-            
+            self.log_info(f"Confirming email with data: {confirm_data}")
+            confirm_response_data = self._make_request('Account/confirm-email', method='POST', data=confirm_data)
+            self.log_info(f"Confirm email response: {confirm_response_data}")
+
+            # Step 3: Get user ID
+            self.log_info("Getting user ID from users list")
+            users_response_data = self._make_request('Users')
+
+            if not users_response_data:
+                self.log_warning("Could not get users list")
+                return {
+                    'success': True,
+                    'user_id': user_email,  # Use email as fallback
+                    'username': username,
+                    'email': user_email
+                }
+
+            # Find the created user
+            for user in users_response_data:
+                uname = user.get("username") or user.get("userName")
+                if uname == username or user.get("email") == user_email:
+                    user_id = str(user["id"])
+                    self.log_info(f"Found created user with ID: {user_id}")
+                    return {
+                        'success': True,
+                        'user_id': user_id,
+                        'username': username,
+                        'email': user_email
+                    }
+
+            # User created successfully but not found in list yet - use email as fallback
+            self.log_warning("User created but not found in users list yet")
             return {
                 'success': True,
-                'user_id': str(user_id),
+                'user_id': user_email,
                 'username': username,
-                'email': email
+                'email': user_email
             }
+
         except Exception as e:
-            self.log_error(f"Error creating user: {e}")
-            raise
+            self.log_error(f"Failed to create user in Kavita: {e}")
+            raise Exception(f"Failed to create user in Kavita: {e}")
     
     def update_user_access(self, user_id: str, library_ids: List[str] = None, **kwargs) -> bool:
         """Update Kavita user's library access using /api/Account/update"""
