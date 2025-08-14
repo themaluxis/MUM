@@ -28,7 +28,7 @@
                     
                     <!-- Admin Info -->
                     <div>
-                        <h1 class="text-3xl font-bold text-base-content mb-2">Administrator</h1>
+                        <h1 class="text-3xl font-bold text-base-content mb-2">{{ current_user.username or current_user.plex_username or 'Administrator' }}</h1>
                         <div class="flex items-center justify-center gap-2">
                             <span class="inline-flex items-center rounded-md bg-primary-50 dark:bg-primary-400/10 px-3 py-1 text-sm font-medium text-primary-700 dark:text-primary-400 ring-1 ring-inset ring-primary-600/20 dark:ring-primary-500/20 gap-2">
                                 <i class="fa-solid fa-crown w-4 h-4"></i>
