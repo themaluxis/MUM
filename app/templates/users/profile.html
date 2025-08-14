@@ -161,8 +161,8 @@
                         <i class="fa-solid fa-cog mr-2"></i>Settings
                     </a>
                     {% if user.password_hash and user.used_invite_id %}
-                    <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='advanced', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'advanced' else '' }}">
-                        <i class="fa-solid fa-tools mr-2"></i>Advanced
+                    <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='security', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'security' else '' }}">
+                        <i class="fa-solid fa-shield-alt mr-2"></i>Security
                     </a>
                     {% endif %}
                 </div>
@@ -176,8 +176,8 @@
                     {% include 'users/partials/history_tab.html' %}
                 {% elif active_tab == 'settings' %}
                     {% include 'users/partials/settings_tab.html' %}
-                {% elif active_tab == 'advanced' %}
-                    {% include 'users/partials/advanced_tab.html' %}
+                {% elif active_tab == 'security' %}
+                    {% include 'users/partials/security_tab.html' %}
                 {% endif %}
             </div>
         </div>
