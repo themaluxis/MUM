@@ -154,8 +154,16 @@ def create_invite():
         
         # Use different logic for single vs multi-server invites
         if len(selected_server_ids) == 1:
-            # Single server - choices already set above, no need to rebuild
-            pass
+            # Single server - convert to unique format for consistency with frontend
+            first_server = media_service_manager.get_server_by_id(selected_server_ids[0])
+            if first_server:
+                # Convert the existing choices to unique format
+                unique_choices = []
+                service_type = first_server.service_type.name.upper()
+                for lib_id, lib_name in available_libraries.items():
+                    unique_lib_id = f"[{service_type}]-{first_server.name}-{lib_id}"
+                    unique_choices.append((unique_lib_id, lib_name))
+                form.libraries.choices = unique_choices
         else:
             # Multi-server - use conflict handling logic
             all_valid_choices = []

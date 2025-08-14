@@ -12,18 +12,33 @@
             <div class="flex items-center space-x-2">
                 {% if invite.is_active %}
                     {% if invite.expires_at and invite.expires_at < now %}
-                        <span class="badge badge-warning">Expired</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                            <i class="fa-solid fa-clock w-3 h-3"></i>
+                            Expired
+                        </span>
                     {% elif invite.max_uses and invite.current_uses >= invite.max_uses %}
-                        <span class="badge badge-error">Used Up</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-red-500/10 text-red-400 border border-red-500/20">
+                            <i class="fa-solid fa-users-slash w-3 h-3"></i>
+                            Used Up
+                        </span>
                     {% else %}
-                        <span class="badge badge-success">Active</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-green-500/10 text-green-400 border border-green-500/20">
+                            <i class="fa-solid fa-check-circle w-3 h-3"></i>
+                            Active
+                        </span>
                     {% endif %}
                 {% else %}
-                    <span class="badge badge-neutral">Inactive</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-gray-500/10 text-gray-400 border border-gray-500/20">
+                        <i class="fa-solid fa-pause-circle w-3 h-3"></i>
+                        Inactive
+                    </span>
                 {% endif %}
                 
                 {% if invite.custom_path %}
-                    <span class="badge badge-info badge-outline">Custom Path</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <i class="fa-solid fa-link w-3 h-3"></i>
+                        Custom Path
+                    </span>
                 {% endif %}
             </div>
             
@@ -108,7 +123,48 @@
                 <label class="text-sm font-medium text-base-content/70">Server Access:</label>
                 <div class="flex flex-wrap gap-1 mt-1">
                     {% for invite_server in invite.invite_servers %}
-                        <span class="badge badge-outline badge-sm">{{ invite_server.server.name }}</span>
+                        {% set server = invite_server.server %}
+                        {% if server.service_type.value == 'plex' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm transition-all duration-200 hover:shadow-md" style="background: linear-gradient(135deg, #e5a00d 0%, #f9c23c 100%); border: 1px solid rgba(233, 160, 13, 0.3);">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="transparent" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
+                                {{ server.name }}
+                            </span>
+                        {% elif server.service_type.value == 'jellyfin' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm transition-all duration-200 hover:shadow-md" style="background: linear-gradient(135deg, #00a4dc 0%, #0078d4 100%); border: 1px solid rgba(0, 164, 220, 0.3);">
+                                <i class="fa-solid fa-cube w-3.5 h-3.5"></i>
+                                {{ server.name }}
+                            </span>
+                        {% elif server.service_type.value == 'emby' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm transition-all duration-200 hover:shadow-md" style="background: linear-gradient(135deg, #52b54b 0%, #478f41 100%); border: 1px solid rgba(82, 181, 75, 0.3);">
+                                <i class="fa-solid fa-play-circle w-3.5 h-3.5"></i>
+                                {{ server.name }}
+                            </span>
+                        {% elif server.service_type.value == 'audiobookshelf' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm transition-all duration-200 hover:shadow-md" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: 1px solid rgba(245, 158, 11, 0.3);">
+                                <i class="fa-solid fa-headphones w-3.5 h-3.5"></i>
+                                {{ server.name }}
+                            </span>
+                        {% elif server.service_type.value == 'kavita' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm transition-all duration-200 hover:shadow-md" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border: 1px solid rgba(139, 92, 246, 0.3);">
+                                <i class="fa-solid fa-book w-3.5 h-3.5"></i>
+                                {{ server.name }}
+                            </span>
+                        {% elif server.service_type.value == 'komga' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm transition-all duration-200 hover:shadow-md" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); border: 1px solid rgba(6, 182, 212, 0.3);">
+                                <i class="fa-solid fa-book-open w-3.5 h-3.5"></i>
+                                {{ server.name }}
+                            </span>
+                        {% elif server.service_type.value == 'romm' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm transition-all duration-200 hover:shadow-md" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border: 1px solid rgba(239, 68, 68, 0.3);">
+                                <i class="fa-solid fa-gamepad w-3.5 h-3.5"></i>
+                                {{ server.name }}
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-gray-600/20 text-gray-300 border border-gray-600/30 shadow-sm transition-all duration-200 hover:shadow-md hover:bg-gray-600/30">
+                                <i class="fa-solid fa-server w-3.5 h-3.5"></i>
+                                {{ server.name }}
+                            </span>
+                        {% endif %}
                     {% endfor %}
                 </div>
             </div>
