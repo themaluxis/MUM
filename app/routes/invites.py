@@ -151,17 +151,13 @@ def create_invite():
     if request.method == 'POST':
         # Get all submitted library IDs from the form
         submitted_libraries = request.form.getlist('libraries')
-        current_app.logger.debug(f"INVITE CREATE DEBUG - Raw submitted libraries: {submitted_libraries}")
-        current_app.logger.debug(f"INVITE CREATE DEBUG - Selected server IDs: {selected_server_ids}")
         
         # Use different logic for single vs multi-server invites
         if len(selected_server_ids) == 1:
             # Single server - choices already set above, no need to rebuild
-            current_app.logger.debug(f"INVITE CREATE DEBUG - Single server mode, using libraries as-is")
             pass
         else:
             # Multi-server - use conflict handling logic
-            current_app.logger.debug(f"INVITE CREATE DEBUG - Multi-server mode, processing {len(selected_server_ids)} servers")
             all_valid_choices = []
             servers_libraries = {}  # server_id -> {lib_id: lib_name}
             
@@ -177,7 +173,6 @@ def create_invite():
                             'server': server,
                             'libraries': server_lib_dict
                         }
-                        current_app.logger.debug(f"INVITE CREATE DEBUG - Server {server.name} (ID: {server.id}) libraries: {list(server_lib_dict.keys())}")
                     except Exception as e:
                         current_app.logger.error(f"Failed to fetch libraries from server {server.name}: {e}")
             
@@ -199,23 +194,19 @@ def create_invite():
                         service_type = server.service_type.name.upper()
                         unique_lib_id = f"[{service_type}]-{server.name}-{lib_id}"
                         all_valid_choices.append((unique_lib_id, f"[{server.name}] {lib_name}"))
-                        current_app.logger.debug(f"INVITE CREATE DEBUG - Conflict detected for lib_id {lib_id}, using unique: {unique_lib_id}")
                     else:
                         # Still use unique format for consistency in multi-server invites
                         service_type = server.service_type.name.upper()
                         unique_lib_id = f"[{service_type}]-{server.name}-{lib_id}"
                         all_valid_choices.append((unique_lib_id, f"[{server.name}] {lib_name}"))
-                        current_app.logger.debug(f"INVITE CREATE DEBUG - Using unique format for lib_id {lib_id}: {unique_lib_id}")
             
             # Update form choices for multi-server
             form.libraries.choices = all_valid_choices
-            current_app.logger.debug(f"INVITE CREATE DEBUG - Final form choices: {[choice[0] for choice in all_valid_choices]}")
             
             # The frontend now submits libraries in unique format, so we can use them directly
             if submitted_libraries:
                 # Remove duplicates from submitted libraries first
                 unique_submitted = list(dict.fromkeys(submitted_libraries))  # Preserves order, removes duplicates
-                current_app.logger.debug(f"INVITE CREATE DEBUG - Unique submitted libraries: {unique_submitted}")
                 
                 # Validate that submitted libraries exist in our available choices
                 valid_choices = [choice[0] for choice in all_valid_choices]
@@ -224,17 +215,14 @@ def create_invite():
                 for submitted_lib_id in unique_submitted:
                     if submitted_lib_id in valid_choices:
                         validated_libraries.append(submitted_lib_id)
-                        current_app.logger.debug(f"INVITE CREATE DEBUG - Validated library: {submitted_lib_id}")
                     else:
-                        current_app.logger.warning(f"INVITE CREATE DEBUG - Invalid library ID submitted: {submitted_lib_id}")
+                        current_app.logger.warning(f"Invalid library ID submitted: {submitted_lib_id}")
                 
                 form.libraries.data = validated_libraries
-                current_app.logger.debug(f"INVITE CREATE DEBUG - Final validated libraries: {validated_libraries}")
         
         # Set the form data for single server case
         if len(selected_server_ids) == 1 and submitted_libraries:
             form.libraries.data = submitted_libraries
-            current_app.logger.debug(f"INVITE CREATE DEBUG - Single server libraries set: {submitted_libraries}")
 
     toast_message_text = ""
     toast_category = "info"
@@ -277,13 +265,9 @@ def create_invite():
 
         max_uses = form.number_of_uses.data if form.number_of_uses.data and form.number_of_uses.data > 0 else None
         
-        # Debug the final library IDs being stored
-        final_library_ids = form.libraries.data or []
-        current_app.logger.debug(f"INVITE CREATE DEBUG - Final library IDs to store: {final_library_ids}")
-        
         new_invite = Invite(
             custom_path=custom_path, expires_at=expires_at, max_uses=max_uses,
-            grant_library_ids=final_library_ids,
+            grant_library_ids=form.libraries.data or [],
             allow_downloads=form.allow_downloads.data,
             invite_to_plex_home=form.invite_to_plex_home.data,
             allow_live_tv=form.allow_live_tv.data,
@@ -492,7 +476,6 @@ def process_invite_form(invite_path_or_token):
     # Get library information for each server in the invite
     servers_with_libraries = {}
     if invite and invite.servers:
-        current_app.logger.debug(f"PUBLIC INVITE DEBUG - Invite {invite.id} grant_library_ids: {invite.grant_library_ids}")
         for server in invite.servers:
             try:
                 service = MediaServiceFactory.create_service_from_db(server)
@@ -502,7 +485,6 @@ def process_invite_form(invite_path_or_token):
                         'server': server,
                         'libraries': {lib['id']: lib['name'] for lib in libraries}
                     }
-                    current_app.logger.debug(f"PUBLIC INVITE DEBUG - Server {server.name} (ID: {server.id}) libraries: {list(servers_with_libraries[server.id]['libraries'].keys())}")
             except Exception as e:
                 current_app.logger.error(f"Failed to fetch libraries for server {server.name}: {e}")
                 servers_with_libraries[server.id] = {'server': server, 'libraries': {}}
@@ -666,13 +648,9 @@ def process_invite_form(invite_path_or_token):
                                 current_app.logger.debug(f"Processing server: {server.name}, service_type: {server.service_type}, service_type.name: {server.service_type.name}, service_type.name.upper(): {server.service_type.name.upper()}")
                                 
                                 if server.service_type.name.upper() == 'PLEX':
-                                    current_app.logger.debug(f"SERVER ACCESS DEBUG - Detected Plex server: {server.name}, calling update_user_access")
-                                    current_app.logger.debug(f"SERVER ACCESS DEBUG - Invite grant_library_ids: {invite.grant_library_ids}")
-                                    
                                     # Filter library IDs for this specific server
                                     server_libraries = service.get_libraries()
                                     server_lib_ids = [lib.get('external_id') or lib.get('id') for lib in server_libraries]
-                                    current_app.logger.debug(f"SERVER ACCESS DEBUG - Server {server.name} available library IDs: {server_lib_ids}")
                                     
                                     # Handle unique library IDs and filter for this server
                                     filtered_library_ids = []
@@ -685,13 +663,9 @@ def process_invite_form(invite_path_or_token):
                                             actual_lib_id = lib_id[len(server_prefix):]
                                             if actual_lib_id in server_lib_ids:
                                                 filtered_library_ids.append(actual_lib_id)
-                                                current_app.logger.debug(f"SERVER ACCESS DEBUG - Using unique library {lib_id} -> {actual_lib_id}")
                                         elif lib_id in server_lib_ids:
                                             # This is a direct library ID that exists on this server (legacy format)
                                             filtered_library_ids.append(lib_id)
-                                            current_app.logger.debug(f"SERVER ACCESS DEBUG - Using direct library {lib_id}")
-                                    
-                                    current_app.logger.debug(f"SERVER ACCESS DEBUG - Filtered library IDs for {server.name}: {filtered_library_ids}")
                                     
                                     # For Plex, grant access to existing user
                                     success = service.update_user_access(
@@ -743,8 +717,6 @@ def process_invite_form(invite_path_or_token):
                                                 # Filter library IDs to only include ones that exist on this server
                                                 server_libraries = service.get_libraries()
                                                 server_lib_ids = [lib.get('external_id') or lib.get('id') for lib in server_libraries]
-                                                current_app.logger.debug(f"Server {server.name} library IDs: {server_lib_ids}")
-                                                current_app.logger.debug(f"Invite grant_library_ids: {invite.grant_library_ids}")
                                                 
                                                 # Handle unique library IDs and filter for this server
                                                 filtered_library_ids = []
@@ -757,13 +729,9 @@ def process_invite_form(invite_path_or_token):
                                                         actual_lib_id = lib_id[len(server_prefix):]
                                                         if actual_lib_id in server_lib_ids:
                                                             filtered_library_ids.append(actual_lib_id)
-                                                            current_app.logger.debug(f"SERVER ACCESS DEBUG - Non-Plex: Using unique library {lib_id} -> {actual_lib_id}")
                                                     elif lib_id in server_lib_ids:
                                                         # This is a direct library ID that exists on this server (legacy format)
                                                         filtered_library_ids.append(lib_id)
-                                                        current_app.logger.debug(f"SERVER ACCESS DEBUG - Non-Plex: Using direct library {lib_id}")
-                                                
-                                                current_app.logger.debug(f"SERVER ACCESS DEBUG - Non-Plex filtered library IDs for {server.name}: {filtered_library_ids}")
                                                 
                                                 success = service.update_user_access(
                                                     user_id=user_id,
@@ -1032,13 +1000,9 @@ def plex_oauth_callback():
             try:
                 service = MediaServiceFactory.create_service_from_db(plex_server)
                 if service:
-                    current_app.logger.debug(f"PLEX CALLBACK DEBUG - Auto-granting access to {plex_server.name}")
-                    current_app.logger.debug(f"PLEX CALLBACK DEBUG - Invite grant_library_ids: {invite.grant_library_ids}")
-                    
                     # Filter library IDs for this specific server
                     server_libraries = service.get_libraries()
                     server_lib_ids = [lib.get('external_id') or lib.get('id') for lib in server_libraries]
-                    current_app.logger.debug(f"PLEX CALLBACK DEBUG - Server {plex_server.name} available library IDs: {server_lib_ids}")
                     
                     # Handle unique library IDs and filter for this server
                     filtered_library_ids = []
@@ -1051,13 +1015,9 @@ def plex_oauth_callback():
                             actual_lib_id = lib_id[len(server_prefix):]
                             if actual_lib_id in server_lib_ids:
                                 filtered_library_ids.append(actual_lib_id)
-                                current_app.logger.debug(f"PLEX CALLBACK DEBUG - Using unique library {lib_id} -> {actual_lib_id}")
                         elif lib_id in server_lib_ids:
                             # This is a direct library ID that exists on this server (legacy format)
                             filtered_library_ids.append(lib_id)
-                            current_app.logger.debug(f"PLEX CALLBACK DEBUG - Using direct library {lib_id}")
-                    
-                    current_app.logger.debug(f"PLEX CALLBACK DEBUG - Filtered library IDs for {plex_server.name}: {filtered_library_ids}")
                     
                     success = service.update_user_access(
                         user_id=plex_account.username,
@@ -1318,9 +1278,6 @@ def get_edit_invite_form(invite_id):
         if invite_server:
             invite_servers = [invite_server]
     
-    current_app.logger.debug(f"INVITE EDIT DEBUG - Invite {invite.id} has {len(invite_servers)} servers")
-    current_app.logger.debug(f"INVITE EDIT DEBUG - Current grant_library_ids: {invite.grant_library_ids}")
-    
     # Collect libraries from all servers
     for server in invite_servers:
         try:
@@ -1332,37 +1289,23 @@ def get_edit_invite_form(invite_id):
                     'server': server,
                     'libraries': server_lib_dict
                 }
-                current_app.logger.debug(f"INVITE EDIT DEBUG - Server {server.name} (ID: {server.id}) libraries: {list(server_lib_dict.keys())}")
                 
                 # Always use unique format for multi-server invites for consistency
                 for lib_id, lib_name in server_lib_dict.items():
                     service_type = server.service_type.name.upper()
                     unique_lib_id = f"[{service_type}]-{server.name}-{lib_id}"
                     available_libraries[unique_lib_id] = f"[{server.name}] {lib_name}"
-                    current_app.logger.debug(f"INVITE EDIT DEBUG - Using unique format for lib_id {lib_id}: {unique_lib_id}")
         except Exception as e:
             current_app.logger.error(f"Failed to fetch libraries from server {server.name}: {e}")
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
-    current_app.logger.debug(f"INVITE EDIT DEBUG - Available library choices: {[choice[0] for choice in form.libraries.choices]}")
 
     # If grant_library_ids is an empty list, it signifies access to ALL libraries.
     # In this case, we pre-select all the available library checkboxes in the form.
     if invite.grant_library_ids == []:
         form.libraries.data = list(available_libraries.keys())
-        current_app.logger.debug(f"INVITE EDIT DEBUG - Empty grant_library_ids, selecting all: {form.libraries.data}")
     else:
         form.libraries.data = list(invite.grant_library_ids or [])
-        current_app.logger.debug(f"INVITE EDIT DEBUG - Using stored grant_library_ids: {form.libraries.data}")
-        
-        # Debug: Check which stored IDs match available choices
-        available_choices = [choice[0] for choice in form.libraries.choices]
-        matching_ids = [lib_id for lib_id in form.libraries.data if lib_id in available_choices]
-        non_matching_ids = [lib_id for lib_id in form.libraries.data if lib_id not in available_choices]
-        
-        current_app.logger.debug(f"INVITE EDIT DEBUG - Matching stored IDs: {matching_ids}")
-        current_app.logger.debug(f"INVITE EDIT DEBUG - Non-matching stored IDs: {non_matching_ids}")
-        current_app.logger.debug(f"INVITE EDIT DEBUG - Available choice IDs: {available_choices[:10]}...")  # Show first 10
 
     # Discord settings
     bot_is_enabled = Setting.get_bool('DISCORD_BOT_ENABLED', False)
@@ -1407,8 +1350,6 @@ def update_invite(invite_id):
         if invite_server:
             invite_servers = [invite_server]
     
-    current_app.logger.debug(f"INVITE UPDATE DEBUG - Processing {len(invite_servers)} servers for invite {invite.id}")
-    
     # Collect libraries from all servers (same as edit form)
     for server in invite_servers:
         try:
@@ -1420,19 +1361,16 @@ def update_invite(invite_id):
                     'server': server,
                     'libraries': server_lib_dict
                 }
-                current_app.logger.debug(f"INVITE UPDATE DEBUG - Server {server.name} (ID: {server.id}) libraries: {list(server_lib_dict.keys())}")
                 
                 # Always use unique format for multi-server invites for consistency
                 for lib_id, lib_name in server_lib_dict.items():
                     service_type = server.service_type.name.upper()
                     unique_lib_id = f"[{service_type}]-{server.name}-{lib_id}"
                     available_libraries[unique_lib_id] = f"[{server.name}] {lib_name}"
-                    current_app.logger.debug(f"INVITE UPDATE DEBUG - Using unique format for lib_id {lib_id}: {unique_lib_id}")
         except Exception as e:
             current_app.logger.error(f"Failed to fetch libraries from server {server.name}: {e}")
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
-    current_app.logger.debug(f"INVITE UPDATE DEBUG - Available library choices: {[choice[0] for choice in form.libraries.choices]}")
 
     # Global Discord settings for comparison
     bot_is_enabled = Setting.get_bool('DISCORD_BOT_ENABLED', False)
@@ -1463,18 +1401,13 @@ def update_invite(invite_id):
         # Library Access Logic
         # For multi-server invites, always store the actual selected libraries
         # Empty list should only be used when ALL libraries from ALL servers are selected
-        current_app.logger.debug(f"INVITE UPDATE DEBUG - Submitted libraries: {form.libraries.data}")
-        current_app.logger.debug(f"INVITE UPDATE DEBUG - Available libraries count: {len(available_libraries)}")
-        current_app.logger.debug(f"INVITE UPDATE DEBUG - Selected libraries count: {len(form.libraries.data)}")
         
         # Only store empty list if ALL available libraries are selected
         if len(form.libraries.data) == len(available_libraries) and len(available_libraries) > 0:
             invite.grant_library_ids = []
-            current_app.logger.debug(f"INVITE UPDATE DEBUG - All libraries selected, storing empty list")
         else:
             # Store the actual selected libraries (even if it's an empty selection)
             invite.grant_library_ids = form.libraries.data or []
-            current_app.logger.debug(f"INVITE UPDATE DEBUG - Storing selected libraries: {form.libraries.data}")
         
         # Other boolean fields
         invite.allow_downloads = form.allow_downloads.data
