@@ -269,6 +269,15 @@ class User(db.Model, UserMixin):
     def check_password(self, password):
         """Check password for user account"""
         return check_password_hash(self.password_hash, password) if self.password_hash else False
+    
+    def has_permission(self, permission_name):
+        """Regular users don't have admin permissions"""
+        return False
+    
+    @property
+    def preferred_user_list_view(self):
+        """Regular users default to cards view"""
+        return 'cards'
 
 # (Invite, InviteUsage, HistoryLog models as before - no immediate changes for bot setup yet)
 class Invite(db.Model):

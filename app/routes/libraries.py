@@ -12,6 +12,7 @@ bp = Blueprint('libraries', __name__)
 @bp.route('/libraries')
 @login_required
 @setup_required
+@permission_required('view_libraries')
 def index():
     """Display libraries from stored database data instead of live API calls"""
     libraries_by_service = {}

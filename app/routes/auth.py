@@ -327,9 +327,19 @@ def plex_sso_callback_admin():
 @bp.route('/logout')
 @login_required
 def logout():
-    admin_name = current_user.username or current_user.plex_username
-    log_event(EventType.ADMIN_LOGOUT, f"Admin '{admin_name}' logged out.", admin_id=current_user.id)
-    logout_user(); flash('You have been logged out.', 'success'); return redirect(url_for('auth.app_login'))
+    # Handle both AdminAccount and User objects
+    if hasattr(current_user, 'username'):
+        # AdminAccount
+        user_name = current_user.username or current_user.plex_username
+        log_event(EventType.ADMIN_LOGOUT, f"Admin '{user_name}' logged out.", admin_id=current_user.id)
+    else:
+        # User
+        user_name = current_user.get_display_name()
+        log_event(EventType.ADMIN_LOGOUT, f"User '{user_name}' logged out.", user_id=current_user.id)
+    
+    logout_user()
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('auth.app_login'))
 
 @bp.route('/logout_setup')
 def logout_setup():

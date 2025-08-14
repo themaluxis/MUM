@@ -30,6 +30,7 @@ DISCORD_API_BASE_URL = 'https://discord.com/api/v10'
 @bp.route('/manage') 
 @login_required
 @setup_required
+@permission_required('manage_invites')
 def list_invites():
     import time
     start_time = time.time()

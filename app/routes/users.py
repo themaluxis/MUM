@@ -45,6 +45,7 @@ def get_libraries_from_database(servers):
 @bp.route('/')
 @login_required
 @setup_required
+@permission_required('view_users')
 def list_users():
     import time
     start_time = time.time()
