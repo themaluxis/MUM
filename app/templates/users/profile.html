@@ -4,121 +4,176 @@
 {% block title %}{{ super() }} - {{ title }}{% endblock %}
 
 {% block content %}
-{# Determine service-specific background tint similar to user cards #}
+{# Determine service-specific colors and gradients #}
 {% set service_types = user_service_types.get(user.id, []) %}
 {% set primary_service = service_types[0] if service_types else None %}
 {% if primary_service %}
     {% if primary_service.value == 'plex' %}
-        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-plex/5" %}
+        {% set header_gradient = "bg-gradient-to-r from-plex/10 to-plex/20" %}
+        {% set service_color = "plex" %}
+        {% set service_icon = "fa-brands fa-plex" %}
+        {% set service_name = "Plex" %}
     {% elif primary_service.value == 'jellyfin' %}
-        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-jellyfin/5" %}
+        {% set header_gradient = "bg-gradient-to-r from-jellyfin/10 to-jellyfin/20" %}
+        {% set service_color = "jellyfin" %}
+        {% set service_icon = "fa-solid fa-cube" %}
+        {% set service_name = "Jellyfin" %}
     {% elif primary_service.value == 'emby' %}
-        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-emby/5" %}
+        {% set header_gradient = "bg-gradient-to-r from-emby/10 to-emby/20" %}
+        {% set service_color = "emby" %}
+        {% set service_icon = "fa-solid fa-play-circle" %}
+        {% set service_name = "Emby" %}
     {% elif primary_service.value == 'kavita' %}
-        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-kavita/5" %}
+        {% set header_gradient = "bg-gradient-to-r from-kavita/10 to-kavita/20" %}
+        {% set service_color = "kavita" %}
+        {% set service_icon = "fa-solid fa-book" %}
+        {% set service_name = "Kavita" %}
     {% elif primary_service.value == 'audiobookshelf' %}
-        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-audiobookshelf/5" %}
+        {% set header_gradient = "bg-gradient-to-r from-audiobookshelf/10 to-audiobookshelf/20" %}
+        {% set service_color = "audiobookshelf" %}
+        {% set service_icon = "fa-solid fa-headphones" %}
+        {% set service_name = "AudiobookShelf" %}
     {% elif primary_service.value == 'komga' %}
-        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-komga/5" %}
+        {% set header_gradient = "bg-gradient-to-r from-komga/10 to-komga/20" %}
+        {% set service_color = "komga" %}
+        {% set service_icon = "fa-solid fa-book-open" %}
+        {% set service_name = "Komga" %}
     {% elif primary_service.value == 'romm' %}
-        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-romm/5" %}
+        {% set header_gradient = "bg-gradient-to-r from-romm/10 to-romm/20" %}
+        {% set service_color = "romm" %}
+        {% set service_icon = "fa-solid fa-gamepad" %}
+        {% set service_name = "RomM" %}
     {% else %}
-        {% set content_bg_class = "bg-base-100" %}
+        {% set header_gradient = "bg-gradient-to-r from-primary/10 to-secondary/10" %}
+        {% set service_color = "primary" %}
+        {% set service_icon = "fa-solid fa-user" %}
+        {% set service_name = "Unknown Service" %}
     {% endif %}
 {% else %}
-    {% set content_bg_class = "bg-base-100" %}
+    {% set header_gradient = "bg-gradient-to-r from-primary/10 to-secondary/10" %}
+    {% set service_color = "primary" %}
+    {% set service_icon = "fa-solid fa-user" %}
+    {% set service_name = "No Service" %}
 {% endif %}
 
-<div class="container mx-auto px-4 py-2 max-w-5xl">
-    <div class="{{ content_bg_class }} rounded-lg shadow-lg p-6 min-h-screen">
-    <div class="flex items-center mb-2">
+<div class="min-h-screen bg-base-100">
+    <!-- Back Navigation -->
+    <div class="container mx-auto px-4 py-4">
         {% set back_url = request.args.get('back') %}
         {% set back_view = request.args.get('back_view') %}
         {% if back_url == 'streaming' %}
-            <a href="{{ url_for('streaming.index') }}" class="btn btn-ghost btn-sm mr-4">
+            <a href="{{ url_for('streaming.index') }}" class="btn btn-ghost btn-sm">
                 <i class="fa-solid fa-arrow-left"></i> Back to Streaming
             </a>
         {% elif back_url == 'users' %}
             {% if back_view %}
-                <a href="{{ url_for('users.list_users', view=back_view) }}" class="btn btn-ghost btn-sm mr-4">
+                <a href="{{ url_for('users.list_users', view=back_view) }}" class="btn btn-ghost btn-sm">
                     <i class="fa-solid fa-arrow-left"></i> Back to Users
                 </a>
             {% else %}
-                <a href="{{ url_for('users.list_users') }}" class="btn btn-ghost btn-sm mr-4">
+                <a href="{{ url_for('users.list_users') }}" class="btn btn-ghost btn-sm">
                     <i class="fa-solid fa-arrow-left"></i> Back to Users
                 </a>
             {% endif %}
         {% else %}
-            <a href="{{ url_for('users.list_users') }}" class="btn btn-ghost btn-sm mr-4">
+            <a href="{{ url_for('users.list_users') }}" class="btn btn-ghost btn-sm">
                 <i class="fa-solid fa-arrow-left"></i> Back to Users
             </a>
         {% endif %}
     </div>
 
-    {# --- User Header section --- #}
-    <div class="flex items-center space-x-4 p-4">
-        <div class="avatar">
-            <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                {# Use service-aware avatar logic similar to user cards #}
-                {% set avatar_url = user.get_avatar(url_for('static', filename='img/default_avatar.png')) %}
-                {% set service_types = user_service_types.get(user.id, []) %}
-                {% set primary_service = service_types[0] if service_types else None %}
-                
-                {# Check if this is a Jellyfin user and try to get their avatar #}
-                {% if primary_service and primary_service.value == 'jellyfin' and user.raw_service_data and user.raw_service_data.startswith('{') %}
-                    {# Extract Jellyfin user info using the custom filter #}
-                    {% set jellyfin_info = user.raw_service_data | extract_jellyfin_user_info %}
-                    {% if jellyfin_info[0] and jellyfin_info[1] %}
-                        {% set jellyfin_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_info[0]) %}
-                        <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                        {# Jellyfin fallback avatar with purple theme #}
-                        <div class="bg-jellyfin text-white w-24 h-24 rounded-full flex items-center justify-center text-5xl font-normal" style="display: none;">
-                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
+    <!-- Main Content Card -->
+    <div class="container mx-auto px-4 pb-8 max-w-5xl">
+        <div class="bg-base-100 border border-base-300 rounded-xl shadow-lg overflow-hidden">
+            <!-- Hero Header Section -->
+            <div class="{{ header_gradient }} p-8 text-center border-b border-base-300">
+                <div class="flex flex-col items-center space-y-4">
+                    <!-- Avatar -->
+                    <div class="avatar">
+                        <div class="w-24 h-24 rounded-full ring-4 ring-primary/30 ring-offset-4 ring-offset-base-100">
+                            {# Use service-aware avatar logic #}
+                            {% set avatar_url = user.get_avatar(url_for('static', filename='img/default_avatar.png')) %}
+                            
+                            {# Check if this is a Jellyfin user and try to get their avatar #}
+                            {% if primary_service and primary_service.value == 'jellyfin' and user.raw_service_data and user.raw_service_data.startswith('{') %}
+                                {# Extract Jellyfin user info using the custom filter #}
+                                {% set jellyfin_info = user.raw_service_data | extract_jellyfin_user_info %}
+                                {% if jellyfin_info[0] and jellyfin_info[1] %}
+                                    {% set jellyfin_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_info[0]) %}
+                                    <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                    {# Jellyfin fallback avatar #}
+                                    <div class="bg-jellyfin text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal" style="display: none;">
+                                        {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
+                                    </div>
+                                {% else %}
+                                    {# No Jellyfin user ID found, show fallback directly #}
+                                    <div class="bg-jellyfin text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
+                                        {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
+                                    </div>
+                                {% endif %}
+                            {# Check if this is a Kavita user and show fallback avatar #}
+                            {% elif primary_service and primary_service.value == 'kavita' %}
+                                {# Kavita users don't have avatars, show fallback with Kavita theme color #}
+                                <div class="bg-kavita text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
+                                    {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
+                                </div>
+                            {% else %}
+                                <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" />
+                            {% endif %}
                         </div>
-                    {% else %}
-                        {# No Jellyfin user ID found, show purple fallback directly #}
-                        <div class="bg-jellyfin text-white w-24 h-24 rounded-full flex items-center justify-center text-5xl font-normal">
-                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
-                        </div>
-                    {% endif %}
-                {# Check if this is a Kavita user and show fallback avatar #}
-                {% elif primary_service and primary_service.value == 'kavita' %}
-                    {# Kavita users don't have avatars, show fallback with Kavita theme color #}
-                    <div class="bg-kavita text-white w-24 h-24 rounded-full flex items-center justify-center text-5xl font-normal">
-                        {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
                     </div>
-                {% else %}
-                    <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" />
+                    
+                    <!-- User Info -->
+                    <div>
+                        <h1 class="text-3xl font-bold text-base-content mb-2">{{ user.get_display_name() }}</h1>
+                        <div class="flex items-center justify-center gap-2">
+                            {% set user_servers = user_server_names.get(user.id, []) %}
+                            {% if user_servers %}
+                                <span class="inline-flex items-center rounded-md bg-{{ service_color }}-50 dark:bg-{{ service_color }}-400/10 px-3 py-1 text-sm font-medium text-{{ service_color }}-700 dark:text-{{ service_color }}-400 ring-1 ring-inset ring-{{ service_color }}-600/20 dark:ring-{{ service_color }}-500/20 gap-2">
+                                    <i class="{{ service_icon }} w-4 h-4"></i>
+                                    {{ user_servers[0] }} User
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center rounded-md bg-{{ service_color }}-50 dark:bg-{{ service_color }}-400/10 px-3 py-1 text-sm font-medium text-{{ service_color }}-700 dark:text-{{ service_color }}-400 ring-1 ring-inset ring-{{ service_color }}-600/20 dark:ring-{{ service_color }}-500/20 gap-2">
+                                    <i class="{{ service_icon }} w-4 h-4"></i>
+                                    {{ service_name }} User
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="overflow-x-auto border-b border-base-300">
+                <div role="tablist" class="tabs tabs-border whitespace-nowrap flex-nowrap">
+                    {% set tab_params = {} %}
+                    {% if request.args.get('back') %}{% set _ = tab_params.update({'back': request.args.get('back')}) %}{% endif %}
+                    {% if request.args.get('back_view') %}{% set _ = tab_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
+                    <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='profile', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'profile' else '' }}">
+                        <i class="fa-solid fa-user mr-2"></i>Profile
+                    </a>
+                    <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='history', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'history' else '' }}">
+                        <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
+                    </a>
+                    <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='settings', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'settings' else '' }}">
+                        <i class="fa-solid fa-cog mr-2"></i>Settings
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="p-6">
+                {% if active_tab == 'profile' %}
+                    {% include 'users/partials/profile_tab.html' %}
+                {% elif active_tab == 'history' %}
+                    {% include 'users/partials/history_tab.html' %}
+                {% elif active_tab == 'settings' %}
+                    {% include 'users/partials/settings_tab.html' %}
                 {% endif %}
             </div>
         </div>
-        <div>
-            <h1 class="text-4xl font-bold">{{ user.get_display_name() }}</h1>            
-        </div>
     </div>
-
-    <div class="overflow-x-auto">
-        <div role="tablist" class="tabs tabs-border mt-2 whitespace-nowrap flex-nowrap">
-            {% set tab_params = {} %}
-            {% if request.args.get('back') %}{% set _ = tab_params.update({'back': request.args.get('back')}) %}{% endif %}
-            {% if request.args.get('back_view') %}{% set _ = tab_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
-            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='profile', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'profile' else '' }}">Profile</a>
-            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='history', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'history' else '' }}">History</a>
-            <a role="tab" href="{{ url_for('user.view_user', user_id=user.id, tab='settings', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'settings' else '' }}">Settings</a>
-        </div>
-    </div>
-
-    {# --- Tab Content --- #}
-    <div class="py-6">
-        {% if active_tab == 'profile' %}
-            {% include 'users/partials/profile_tab.html' %}
-        {% elif active_tab == 'history' %}
-            {% include 'users/partials/history_tab.html' %}
-        {% elif active_tab == 'settings' %}
-            {% include 'users/partials/settings_tab.html' %}
-        {% endif %}
-    </div>
-    </div> {# Close content container #}
 </div>
 {% endblock %}
