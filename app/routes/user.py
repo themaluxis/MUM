@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from datetime import datetime, timezone, timedelta
 from app.models import User, AdminAccount, StreamHistory, EventType
-from app.forms import UserEditForm
+from app.forms import UserEditForm, UserResetPasswordForm
 from app.extensions import db
 from app.utils.helpers import permission_required, log_event
 from app.services.media_service_factory import MediaServiceFactory
@@ -487,3 +487,33 @@ def delete_stream_history(user_id):
         response = make_response("", 500)
         response.headers['HX-Trigger'] = json.dumps(toast_payload)
         return response
+
+@bp.route('/<int:user_id>/reset_password', methods=['GET', 'POST'])
+@login_required
+@permission_required('edit_user')
+def reset_password(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    # Only allow reset for local accounts created through invites (have password_hash and used_invite_id)
+    if not user.password_hash or not user.used_invite_id:
+        flash('Password reset is only available for local user accounts created through invites.', 'danger')
+        return redirect(url_for('user.view_user', user_id=user_id, tab='settings'))
+    
+    form = UserResetPasswordForm()
+
+    if request.method == 'POST':
+        if form.validate_on_submit():
+            user.set_password(form.new_password.data)
+            db.session.commit()
+            
+            log_event(EventType.SETTING_CHANGE, f"Password was reset for user '{user.get_display_name()}'.", user_id=user.id, admin_id=current_user.id)
+            toast = {"showToastEvent": {"message": "Password has been reset successfully.", "category": "success"}}
+            response = make_response("", 204)
+            response.headers['HX-Trigger'] = json.dumps(toast)
+            return response
+        else:
+            # Re-render form with validation errors for HTMX
+            return render_template('users/partials/reset_password_modal.html', form=form, user=user), 422
+    
+    # For GET request, just render the form
+    return render_template('users/partials/reset_password_modal.html', form=form, user=user)

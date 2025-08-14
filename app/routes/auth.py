@@ -38,16 +38,22 @@ def app_login():
         current_app.logger.warning(f"Could not query AdminAccount in login: {e_db}")
         # Allow rendering the login page even if DB check fails, it will likely fail on submit anyway
     
+    # Check if user accounts are enabled
+    allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+    
     # The form is always prepared now.
     form = LoginForm()
 
     if form.validate_on_submit():
-        # Find the admin by the submitted username
-        admin = AdminAccount.query.filter_by(username=form.username.data).first()
+        # Normalize inputs
+        input_username = (form.username.data or '').strip()
+        input_password = (form.password.data or '')
         
-        # Check if an admin with that username exists AND if they have a password that matches.
-        # The check_password method will safely return False if password_hash is None.
-        if admin and admin.check_password(form.password.data):
+        # First, try to find an admin by username
+        admin = AdminAccount.query.filter_by(username=input_username).first()
+        
+        if admin and admin.check_password(input_password):
+            # Admin login successful
             login_user(admin, remember=True)
             admin.last_login_at = db.func.now()
             db.session.commit()
@@ -55,43 +61,67 @@ def app_login():
             
             # Check if setup is complete, if not redirect to appropriate setup step
             if not getattr(g, 'setup_complete', False):
-                # Determine which setup step to redirect to based on current state
                 try:
                     from app.models_plugins import Plugin
-                    from app.models import Setting
                     
-                    # Check if any plugins are enabled with servers
                     enabled_plugins_with_servers = Plugin.query.filter(
                         Plugin.is_enabled == True,
                         Plugin.servers_count > 0
                     ).count()
                     
                     if enabled_plugins_with_servers == 0:
-                        # No plugins configured, go to plugins setup
                         flash('Please configure at least one media service to continue.', 'info')
                         return redirect(url_for('setup.plugins'))
                     
-                    # Check if app configuration is done
                     app_config_done = Setting.get_bool('APP_CONFIG_DONE', False)
                     if not app_config_done:
-                        # App config not done, go to app config
                         return redirect(url_for('setup.app_config'))
-                    
+                        
                 except Exception as e:
                     current_app.logger.error(f"Error checking setup state: {e}")
-                    # If we can't determine state, go to plugins setup as safe default
                     return redirect(url_for('setup.plugins'))
 
             next_page = request.args.get('next')
             if not next_page or not is_safe_url(next_page):
                 next_page = url_for('dashboard.index')
             return redirect(next_page)
-        else:
-            log_event(EventType.ADMIN_LOGIN_FAIL, f"Failed login attempt for username '{form.username.data}'.")
-            flash('Invalid username or password.', 'danger')
+            
+        # If admin login failed, try user login (if user accounts are enabled)
+        elif allow_user_accounts:
+            # Try to find a user account
+            try:
+                from sqlalchemy import func
+                user = User.query.filter(func.lower(User.primary_username) == func.lower(input_username)).first()
+            except Exception:
+                user = User.query.filter_by(primary_username=input_username).first()
+            
+            # If no exact match, try display name fallback
+            if not user:
+                potential_users = User.query.filter(User.password_hash.isnot(None)).all()
+                for potential_user in potential_users:
+                    if potential_user.get_display_name() == input_username:
+                        user = potential_user
+                        break
+            
+            if user and user.check_password(input_password):
+                # User login successful
+                login_user(user, remember=True)
+                user.updated_at = datetime.utcnow()
+                db.session.commit()
+                
+                log_event(EventType.ADMIN_LOGIN_SUCCESS, f"User '{user.primary_username}' logged in.", user_id=user.id)
+                
+                next_page = request.args.get('next')
+                if not next_page or not is_safe_url(next_page):
+                    next_page = url_for('user.index')
+                return redirect(next_page)
+        
+        # If both admin and user login failed
+        log_event(EventType.ADMIN_LOGIN_FAIL, f"Failed login attempt for username '{input_username}'.")
+        flash('Invalid username or password.', 'danger')
             
     # Always render the login page with both options enabled.
-    return render_template('auth/login.html', title="Admin Login", form=form)
+    return render_template('auth/login.html', title="Login", form=form, allow_user_accounts=allow_user_accounts)
 
 @bp.route('/plex_sso_admin', methods=['POST'])
 def plex_sso_login_admin():
@@ -312,43 +342,10 @@ def logout_setup():
 
 @bp.route('/user/login', methods=['GET', 'POST'])
 def user_login():
-    """User login for regular user accounts"""
-    # Check if user accounts are enabled
-    allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
-    if not allow_user_accounts:
-        flash('User accounts are not enabled on this server.', 'warning')
-        return redirect(url_for('auth.app_login'))
-    
-    if current_user.is_authenticated:
-        # Check if current user is an admin or regular user
-        if isinstance(current_user, AdminAccount):
-            return redirect(url_for('dashboard.index'))
-        else:
-            return redirect(url_for('user.index'))
-    
-    form = UserLoginForm()
-    
-    if form.validate_on_submit():
-        # Find the user by username
-        user = User.query.filter_by(primary_username=form.username.data).first()
+    """User login for regular user accounts - DEPRECATED: Use /auth/login instead"""
+    # Redirect to the unified login page
+    return redirect(url_for('auth.app_login'))
         
-        # Check if user exists and password matches
-        if user and user.check_password(form.password.data):
-            login_user(user, remember=True)
-            user.last_activity_at = db.func.now()
-            db.session.commit()
-            
-            log_event(EventType.ADMIN_LOGIN_SUCCESS, f"User '{user.primary_username}' logged in.", user_id=user.id)
-            
-            next_page = request.args.get('next')
-            if not next_page or not is_safe_url(next_page):
-                next_page = url_for('user.index')
-            return redirect(next_page)
-        else:
-            log_event(EventType.ADMIN_LOGIN_FAIL, f"Failed user login attempt for username '{form.username.data}'.")
-            flash('Invalid username or password.', 'danger')
-    
-    return render_template('auth/user_login.html', title="User Login", form=form)
 
 DISCORD_API_BASE_URL = 'https://discord.com/api/v10'
 

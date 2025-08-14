@@ -525,6 +525,17 @@ class TimezonePreferenceForm(FlaskForm):
     local_timezone = HiddenField() # This will be populated by JavaScript
     submit = SubmitField('Save Timezone Setting')
 
+class UserResetPasswordForm(FlaskForm):
+    new_password = PasswordField(
+        'New Password', 
+        validators=[DataRequired(), Length(min=8)]
+    )
+    confirm_new_password = PasswordField(
+        'Confirm New Password', 
+        validators=[DataRequired(), EqualTo('new_password', message='Passwords must match.')]
+    )
+    submit_reset_password = SubmitField('Set New Password')
+
 class UserLoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()], render_kw={"placeholder": "Username"})
     password = PasswordField('Password', validators=[DataRequired()], render_kw={"placeholder": "Password"})
