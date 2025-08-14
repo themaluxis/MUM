@@ -113,7 +113,7 @@ def app_login():
                 
                 next_page = request.args.get('next')
                 if not next_page or not is_safe_url(next_page):
-                    next_page = url_for('user.dashboard')
+                    next_page = url_for('user.index')
                 return redirect(next_page)
         
         # If both admin and user login failed

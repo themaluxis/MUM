@@ -6443,6 +6443,11 @@
   .ring-inset {
     --tw-ring-inset: inset;
   }
+  .select-error {
+    &, &:focus, &:focus-within {
+      --input-color: var(--color-error);
+    }
+  }
   .textarea-error {
     &, &:focus, &:focus-within {
       --input-color: var(--color-error);

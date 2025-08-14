@@ -518,3 +518,59 @@ def reset_password(user_id):
     
     # For GET request, just render the form
     return render_template('users/partials/reset_password_modal.html', form=form, user=user)
+
+@bp.route('/account', methods=['GET', 'POST'])
+@login_required
+def account():
+    """User account management page - similar to admin account page"""
+    # Ensure this is a regular user, not an admin
+    if isinstance(current_user, AdminAccount):
+        return redirect(url_for('settings.account'))
+    
+    # Ensure this is a User with password_hash (user account)
+    if not isinstance(current_user, User) or not current_user.password_hash:
+        flash('Access denied. Please log in with a valid user account.', 'danger')
+        return redirect(url_for('auth.user_login'))
+    
+    from app.forms import ChangePasswordForm, TimezonePreferenceForm
+    from app.models import UserPreferences
+    
+    # Initialize forms
+    change_password_form = ChangePasswordForm()
+    timezone_form = TimezonePreferenceForm()
+    
+    # Get user preferences (create if doesn't exist)
+    # Note: UserPreferences is designed for admin_id, but we'll adapt it
+    user_prefs = UserPreferences.get_timezone_preference(current_user.id)
+    timezone_form.timezone_preference.data = user_prefs.get('preference', 'local')
+    timezone_form.time_format.data = user_prefs.get('time_format', '12')
+    
+    if request.method == 'POST':
+        form_type = request.form.get('form_type')
+        
+        if form_type == 'change_password' and change_password_form.validate_on_submit():
+            # Verify current password
+            if current_user.check_password(change_password_form.current_password.data):
+                current_user.set_password(change_password_form.new_password.data)
+                db.session.commit()
+                log_event(EventType.ADMIN_PASSWORD_CHANGE, f"User '{current_user.get_display_name()}' changed their password.", user_id=current_user.id)
+                flash('Password changed successfully.', 'success')
+            else:
+                flash('Current password is incorrect.', 'danger')
+        
+        elif form_type == 'timezone' and timezone_form.validate_on_submit():
+            UserPreferences.set_timezone_preference(
+                current_user.id,
+                timezone_form.timezone_preference.data,
+                timezone_form.local_timezone.data,
+                timezone_form.time_format.data
+            )
+            flash('Timezone preferences updated successfully.', 'success')
+        
+        return redirect(url_for('user.account'))
+    
+    return render_template('user/account.html',
+                         title="My Account",
+                         user=current_user,
+                         change_password_form=change_password_form,
+                         timezone_form=timezone_form)
