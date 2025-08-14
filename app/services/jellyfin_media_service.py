@@ -646,7 +646,10 @@ class JellyfinMediaService(BaseMediaService):
                 jellyfin_user_id = raw_session.get('UserId')
                 if jellyfin_user_id:
                     try:
-                        user_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_user_id)
+                        # Check if user has an avatar before generating URL
+                        user_info = self._get_user_info(jellyfin_user_id)
+                        if user_info and user_info.get('PrimaryImageTag'):
+                            user_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_user_id)
                     except Exception:
                         user_avatar_url = None
                 

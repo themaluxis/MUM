@@ -66,12 +66,12 @@
                 <i class="fa-solid fa-search"></i>
             </button>
             <label for="sort-filter-drawer" class="btn btn-secondary drawer-button">
-                <i class="fa-solid fa-filter mr-2"></i>
+                <i class="fa-solid fa-filter mr-0 sm:mr-2"></i>
                 <span class="hidden sm:inline">Sort & Filter</span>
             </label>
             {% if current_user.has_permission('purge_users') %}
             <button type="button" class="btn btn-warning" onclick="purge_modal.showModal()">
-                <i class="fa-solid fa-user-clock mr-2"></i>
+                <i class="fa-solid fa-user-clock mr-0 sm:mr-2"></i>
                 <span class="hidden sm:inline">Purge</span>
             </button>
             {% endif %}

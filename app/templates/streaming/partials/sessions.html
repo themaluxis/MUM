@@ -70,14 +70,81 @@
                                         <div class="w-4 h-4 rounded-full">
                                             <img src="{{ session.user_avatar_url }}" alt="{{ session.user }} avatar" 
                                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                                            {# Jellyfin fallback avatar with service color #}
-                                            <div class="bg-jellyfin text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
-                                                {{ session.user[0]|upper if session.user else 'U' }}
-                                            </div>
+                                            {# Service-aware fallback avatar #}
+                                            {% if session.service_type == 'jellyfin' %}
+                                                <div class="bg-jellyfin text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'plex' %}
+                                                <div class="bg-plex text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'emby' %}
+                                                <div class="bg-emby text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'kavita' %}
+                                                <div class="bg-kavita text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'audiobookshelf' %}
+                                                <div class="bg-audiobookshelf text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'komga' %}
+                                                <div class="bg-komga text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'romm' %}
+                                                <div class="bg-romm text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% else %}
+                                                <div class="bg-primary text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold" style="display: none;">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 {% else %}
-                                    <i class="fa-solid fa-user fa-fw mr-1.5 text-info w-4 text-center"></i>
+                                    {# Service-aware fallback avatar when no avatar URL #}
+                                    <div class="avatar avatar-xs mr-1.5">
+                                        <div class="w-4 h-4 rounded-full">
+                                            {% if session.service_type == 'jellyfin' %}
+                                                <div class="bg-jellyfin text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'plex' %}
+                                                <div class="bg-plex text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'emby' %}
+                                                <div class="bg-emby text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'kavita' %}
+                                                <div class="bg-kavita text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'audiobookshelf' %}
+                                                <div class="bg-audiobookshelf text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'komga' %}
+                                                <div class="bg-komga text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% elif session.service_type == 'romm' %}
+                                                <div class="bg-romm text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% else %}
+                                                <div class="bg-primary text-white w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold">
+                                                    {{ session.user[0]|upper if session.user else 'U' }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 {% endif %}
                                 {% if session.mum_user_id %}
                                     <a href="{{ url_for('user.view_user', user_id=session.mum_user_id, back='streaming') }}" class="link link-hover text-info">
