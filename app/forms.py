@@ -460,15 +460,18 @@ class GeneralSettingsForm(FlaskForm): # As before
         default=3,
         description='How long to wait for API responses from media servers before timing out. Lower values make the app more responsive when servers are offline.'
     )
+    submit = SubmitField('Save General Settings')
+
+    def __init__(self, *args, **kwargs):
+        super(GeneralSettingsForm, self).__init__(*args, **kwargs)
+
+class UserAccountsSettingsForm(FlaskForm):
     allow_user_accounts = BooleanField(
         'Allow User Accounts',
         default=False,
         description="When enabled, invited users will be prompted to create a user account before accessing media servers. This allows users to log in and manage their own settings."
     )
-    submit = SubmitField('Save General Settings')
-
-    def __init__(self, *args, **kwargs):
-        super(GeneralSettingsForm, self).__init__(*args, **kwargs)
+    submit = SubmitField('Save User Account Settings')
 
 class UserAccountCreationForm(FlaskForm):
     username = StringField(

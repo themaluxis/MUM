@@ -168,29 +168,6 @@
         </div>
 
         <!-- User Management Section -->
-        <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0">
-                    <i class="fa-solid fa-users text-info text-sm"></i>
-                </div>
-                <div>
-                    <h2 class="text-lg font-semibold text-base-content mb-1">User Management</h2>
-                    <p class="text-sm text-base-content/70">Configure user account and authentication settings</p>
-                </div>
-            </div>
-            
-            <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
-                <div class="flex items-center gap-2 mb-2">
-                    <i class="fa-solid fa-user-check text-info text-sm"></i>
-                    <h5 class="font-medium text-base-content">{{ form.allow_user_accounts.label.text }}</h5>
-                </div>
-                <label class="label cursor-pointer justify-start p-0">
-                    {{ form.allow_user_accounts(class="toggle toggle-primary mr-3", id="allow_user_accounts") }}
-                    <span class="text-sm text-base-content/80">Allow users to create accounts via invites</span>
-                </label>
-                <p class="text-xs text-base-content/60 mt-2">{{ form.allow_user_accounts.description }}</p>
-            </div>
-        </div>
 
         <!-- Save Button -->
         <div class="flex justify-end pt-6 border-t border-base-300">

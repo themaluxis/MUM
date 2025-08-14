@@ -17,6 +17,7 @@
                     <ul>
                         {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
                         <li><a href="{{ url_for('settings.general') }}" class="{{ 'active menu-active' if active_tab == 'general' else '' }}"><i class="fa-solid fa-sliders mr-2"></i> General</a></li>
+                        <li><a href="{{ url_for('settings.user_accounts') }}" class="{{ 'active menu-active' if active_tab == 'user_accounts' else '' }}"><i class="fa-solid fa-user-plus mr-2"></i> User Accounts</a></li>
                         {% endif %}
                         {% if current_user.id == 1 or current_user.has_permission('view_admins_tab') %}
                         <h2 class="menu-title"><span><i class="fa-solid fa-user-shield fa-fw mr-2"></i> Manage Admins</span></h2>
@@ -55,6 +56,7 @@
                 <select class="select select-bordered" onchange="if (this.value) window.location.href=this.value;">
                     {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
                     <option value="{{ url_for('settings.general') }}" {% if active_tab == 'general' %}selected{% endif %}>General</option>
+                    <option value="{{ url_for('settings.user_accounts') }}" {% if active_tab == 'user_accounts' %}selected{% endif %}>User Accounts</option>
                     {% endif %}
                     {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
                     <option value="{{ url_for('admin_management.index') }}" {% if active_tab == 'admins' %}selected{% endif %}>Manage Admins</option>
@@ -89,6 +91,9 @@
                     
                 {% elif active_tab == 'general' %}
                     {% include 'settings/partials/general.html' %}
+                    
+                {% elif active_tab == 'user_accounts' %}
+                    {% include 'settings/partials/user_accounts.html' %}
                     
                 {% elif active_tab == 'discord' %}
                     {% include 'settings/partials/discord.html' %}

@@ -25,6 +25,7 @@ def index():
     # The first one the user has access to will be their destination.
     permission_map = [
         ('manage_general_settings', 'settings.general'),
+        ('manage_general_settings', 'settings.user_accounts'),
         ('view_admins_tab', 'admin_management.index'),
         ('view_admins_tab', 'role_management.index'), # Use same perm for both admin tabs
         ('manage_discord_settings', 'settings.discord'),
@@ -60,7 +61,6 @@ def general():
         Setting.set('ENABLE_NAVBAR_STREAM_BADGE', form.enable_navbar_stream_badge.data, SettingValueType.BOOLEAN, "Enable Nav Bar Stream Badge")
         Setting.set('SESSION_MONITORING_INTERVAL_SECONDS', form.session_monitoring_interval.data, SettingValueType.INTEGER, "Session Monitoring Interval")
         Setting.set('API_TIMEOUT_SECONDS', form.api_timeout_seconds.data, SettingValueType.INTEGER, "API Request Timeout")
-        Setting.set('ALLOW_USER_ACCOUNTS', form.allow_user_accounts.data, SettingValueType.BOOLEAN, "Allow User Accounts")
         
         # Update app config
         current_app.config['APP_NAME'] = form.app_name.data
@@ -81,12 +81,33 @@ def general():
         form.enable_navbar_stream_badge.data = Setting.get_bool('ENABLE_NAVBAR_STREAM_BADGE', False)
         form.session_monitoring_interval.data = Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', 30)
         form.api_timeout_seconds.data = Setting.get('API_TIMEOUT_SECONDS', 3)
-        form.allow_user_accounts.data = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
     return render_template(
         'settings/index.html',
         title="General Settings", 
         form=form, 
         active_tab='general'
+    )
+
+@bp.route('/user_accounts', methods=['GET', 'POST'])
+@login_required
+@setup_required
+@permission_required('manage_general_settings')
+def user_accounts():
+    from app.forms import UserAccountsSettingsForm
+    form = UserAccountsSettingsForm()
+    if form.validate_on_submit():
+        Setting.set('ALLOW_USER_ACCOUNTS', form.allow_user_accounts.data, SettingValueType.BOOLEAN, "Allow User Accounts")
+        
+        log_event(EventType.SETTING_CHANGE, "User account settings updated.", admin_id=current_user.id)
+        flash('User account settings saved successfully.', 'success')
+        return redirect(url_for('settings.user_accounts'))
+    elif request.method == 'GET':
+        form.allow_user_accounts.data = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+    return render_template(
+        'settings/index.html',
+        title="User Account Settings", 
+        form=form, 
+        active_tab='user_accounts'
     )
 
 @bp.route('/account', methods=['GET', 'POST'])
