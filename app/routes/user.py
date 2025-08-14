@@ -17,9 +17,10 @@ bp = Blueprint('user', __name__, url_prefix='/user')
 
 @bp.route('/')
 @bp.route('/index')
+@bp.route('/dashboard')
 @login_required
 def index():
-    """User dashboard/index page for regular user accounts"""
+    """User dashboard/index page for regular user accounts - accessible at /user/dashboard"""
     # Ensure this is a regular user, not an admin
     if isinstance(current_user, AdminAccount):
         return redirect(url_for('dashboard.index'))

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, current_app
 from flask_login import login_required
 from app.models import User, Invite, HistoryLog
 from app.extensions import db
-from app.utils.helpers import setup_required
+from app.utils.helpers import setup_required, permission_required
 from app.services.media_service_factory import MediaServiceFactory
 from app.services.media_service_manager import MediaServiceManager
 
@@ -11,9 +11,10 @@ bp = Blueprint('dashboard', __name__)
 @bp.route('/')
 @bp.route('/dashboard')
 @login_required
-@setup_required 
+@setup_required
+@permission_required('view_dashboard')
 def index():
-    current_app.logger.info("=== DASHBOARD ROUTE START ===")
+    current_app.logger.info("=== ADMIN DASHBOARD ROUTE START ===")
     
     current_app.logger.debug("Dashboard: Fetching total users count")
     total_users = User.query.count()
@@ -63,5 +64,5 @@ def index():
                            recent_activities=recent_activities,
                            recent_activities_count=recent_activities_count)
     
-    current_app.logger.info("=== DASHBOARD ROUTE COMPLETE ===")
+    current_app.logger.info("=== ADMIN DASHBOARD ROUTE COMPLETE ===")
     return result

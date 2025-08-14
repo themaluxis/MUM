@@ -1,0 +1,47 @@
+<!-- File: app/templates/components/navigation/user_navbar.html -->
+<!-- User Navigation Bar -->
+<div class="navbar bg-base-100 shadow-md">
+    <div class="navbar-start">
+        <a href="{{ url_for('user.index') }}" class="btn btn-ghost text-xl">
+            <i class="fa-solid fa-home mr-2"></i>{{ g.app_name or "MUM" }}
+        </a>
+    </div>
+    
+    <div class="navbar-center hidden lg:flex">
+        <ul class="menu menu-horizontal px-1">
+            <li><a href="{{ url_for('user.index') }}" class="{{ 'active' if request.endpoint == 'user.index' else '' }}"><i class="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</a></li>
+        </ul>
+    </div>
+    
+    <div class="navbar-end">
+        <!-- Theme Toggle -->
+        <label class="swap swap-rotate btn btn-ghost btn-circle mr-2" title="Toggle Theme">
+            <input type="checkbox" id="theme-toggle" />
+            <i class="fa-solid fa-sun swap-on fill-current w-5 h-5"></i>
+            <i class="fa-solid fa-moon swap-off fill-current w-5 h-5"></i>
+        </label>
+        
+        <!-- User Menu -->
+        <div class="dropdown dropdown-end">
+            <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+                <div class="w-10 h-10 rounded-full">
+                    {% if current_user.get_avatar and current_user.get_avatar() != '/static/img/default_avatar.png' %}
+                        <img alt="Avatar" src="{{ current_user.get_avatar() }}" class="w-full h-full rounded-full object-cover" />
+                    {% else %}
+                        <div class="bg-primary text-primary-content w-full h-full rounded-full flex items-center justify-center text-lg font-semibold">
+                            {{ current_user.get_display_name()[0]|upper }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                <li class="menu-title">
+                    <span>{{ current_user.get_display_name() }}</span>
+                </li>
+                <li><a href="{{ url_for('user_preferences.set_timezone') }}"><i class="fa-solid fa-cog mr-2"></i>Preferences</a></li>
+                <li><hr></li>
+                <li><a href="{{ url_for('auth.logout') }}"><i class="fa-solid fa-sign-out-alt mr-2"></i>Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
