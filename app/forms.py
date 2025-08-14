@@ -221,8 +221,10 @@ class MassUserEditForm(FlaskForm): # As updated
         ('extend_access', 'Extend Access by Days'),
         ('set_expiration', 'Set Expiration Date'),
         ('clear_expiration', 'Clear Expiration (Never Expire)'),
-        ('whitelist_purge', 'Whitelist from Purge'),
-        ('unwhitelist_purge', 'Remove Purge Whitelist'),
+        ('add_to_purge_whitelist', 'Whitelist from Purge'),
+        ('remove_from_purge_whitelist', 'Remove Purge Whitelist'),
+        ('add_to_bot_whitelist', 'Whitelist from Bot Actions'),
+        ('remove_from_bot_whitelist', 'Remove Bot Whitelist'),
         ('delete_users', 'Delete Users')
     ], validators=[DataRequired()])
     libraries = SelectMultipleField('Libraries', coerce=str, validators=[Optional()])

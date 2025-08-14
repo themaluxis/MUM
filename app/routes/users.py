@@ -636,6 +636,28 @@ def mass_edit_users():
                 processed_count, error_count = user_service.mass_update_user_libraries_by_server(user_ids, updates_by_server, admin_id=current_user.id)
                 toast_message = f"Mass library update: {processed_count} users updated, {error_count} errors."
                 toast_category = "success" if error_count == 0 else "warning"
+            elif action == 'extend_access':
+                days_to_extend = form.days_to_extend.data
+                if not days_to_extend or days_to_extend < 1:
+                    toast_message = "Invalid number of days to extend."
+                    toast_category = "error"
+                else:
+                    processed_count, error_count = user_service.mass_extend_access(user_ids, days_to_extend, admin_id=current_user.id)
+                    toast_message = f"Extended access for {processed_count} users by {days_to_extend} days, {error_count} errors."
+                    toast_category = "success" if error_count == 0 else "warning"
+            elif action == 'set_expiration':
+                new_expiration_date = form.new_expiration_date.data
+                if not new_expiration_date:
+                    toast_message = "Expiration date is required."
+                    toast_category = "error"
+                else:
+                    processed_count, error_count = user_service.mass_set_expiration(user_ids, new_expiration_date, admin_id=current_user.id)
+                    toast_message = f"Set expiration date for {processed_count} users, {error_count} errors."
+                    toast_category = "success" if error_count == 0 else "warning"
+            elif action == 'clear_expiration':
+                processed_count, error_count = user_service.mass_clear_expiration(user_ids, admin_id=current_user.id)
+                toast_message = f"Cleared expiration for {processed_count} users, {error_count} errors."
+                toast_category = "success" if error_count == 0 else "warning"
             elif action == 'delete_users':
                 if not form.confirm_delete.data:
                     toast_message = "Deletion was not confirmed. No action taken."
@@ -671,14 +693,43 @@ def mass_edit_users():
                 print(f"[SERVER DEBUG 4] Validation Error for '{field_label}': {error}")
         toast_message = "Validation Error: " + "; ".join(error_list)
 
-    # Re-rendering logic (unchanged)
+    # Re-rendering logic - use the same logic as the main list_users route to preserve all filters
     page = request.args.get('page', 1, type=int)
-    view_mode = request.args.get('view', Setting.get('DEFAULT_USER_VIEW', 'cards'))
+    view_mode = request.args.get('view', 'cards')
     items_per_page = session.get('users_list_per_page', int(current_app.config.get('DEFAULT_USERS_PER_PAGE', 12)))
     
     query = User.query
+    
+    # Handle separate search fields (same as main route)
+    search_username = request.args.get('search_username', '').strip()
+    search_email = request.args.get('search_email', '').strip()
+    search_notes = request.args.get('search_notes', '').strip()
     search_term = request.args.get('search', '').strip()
-    if search_term: query = query.filter(or_(User.primary_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
+    
+    # Build search filters
+    search_filters = []
+    if search_username:
+        search_filters.append(User.primary_username.ilike(f"%{search_username}%"))
+    if search_email:
+        search_filters.append(User.plex_email.ilike(f"%{search_email}%"))
+    if search_notes:
+        search_filters.append(User.notes.ilike(f"%{search_notes}%"))
+    if search_term:
+        search_filters.append(or_(User.primary_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
+    
+    # Apply search filters if any exist
+    if search_filters:
+        query = query.filter(or_(*search_filters))
+
+    # Server filter (same as main route)
+    server_filter_id = request.args.get('server_id', 'all')
+    if server_filter_id != 'all':
+        try:
+            server_filter_id_int = int(server_filter_id)
+            from app.models_media_services import UserMediaAccess
+            query = query.join(UserMediaAccess).filter(UserMediaAccess.server_id == server_filter_id_int)
+        except ValueError:
+            current_app.logger.warning(f"Invalid server_id received: {server_filter_id}")
     
     filter_type = request.args.get('filter_type', '')
     if filter_type == 'home_user': query = query.filter(User.is_home_user == True)
@@ -686,16 +737,72 @@ def mass_edit_users():
     elif filter_type == 'has_discord': query = query.filter(User.discord_user_id != None)
     elif filter_type == 'no_discord': query = query.filter(User.discord_user_id == None)
     
-    sort_by = request.args.get('sort_by', 'username_asc')
-    if sort_by == 'username_desc': query = query.order_by(User.primary_username.desc().nullslast(), User.id.asc())
-    elif sort_by == 'last_streamed_desc': query = query.order_by(User.last_streamed_at.desc().nullslast(), User.id.asc())
-    elif sort_by == 'last_streamed_asc': query = query.order_by(User.last_streamed_at.asc().nullsfirst(), User.id.asc())
-    elif sort_by == 'created_at_desc': query = query.order_by(User.created_at.desc().nullslast(), User.id.asc())
-    elif sort_by == 'created_at_asc': query = query.order_by(User.created_at.asc().nullsfirst(), User.id.asc())
-    else: query = query.order_by(User.primary_username.asc().nullsfirst(), User.id.asc())
+    # Enhanced sorting logic (same as main route)
+    sort_by_param = request.args.get('sort_by', 'username_asc')
+    sort_parts = sort_by_param.rsplit('_', 1)
+    sort_column = sort_parts[0]
+    sort_direction = 'desc' if len(sort_parts) > 1 and sort_parts[1] == 'desc' else 'asc'
+    
+    # Handle sorting that requires joins and aggregation
+    if sort_column in ['total_plays', 'total_duration']:
+        query = query.outerjoin(User.stream_history).group_by(User.id)
+        sort_field = func.count(StreamHistory.id) if sort_column == 'total_plays' else func.sum(func.coalesce(StreamHistory.duration_seconds, 0))
+        query = query.add_columns(sort_field.label('sort_value'))
+        
+        if sort_direction == 'desc':
+            query = query.order_by(db.desc('sort_value').nullslast(), User.id.asc())
+        else:
+            query = query.order_by(db.asc('sort_value').nullsfirst(), User.id.asc())
+    else:
+        sort_map = {
+            'username': User.primary_username,
+            'email': User.plex_email,
+            'last_streamed': User.last_streamed_at,
+            'plex_join_date': User.plex_join_date,
+            'created_at': User.created_at
+        }
+        
+        sort_field = sort_map.get(sort_column, User.primary_username)
+
+        if sort_column in ['username', 'email']:
+            if sort_direction == 'desc':
+                query = query.order_by(func.lower(sort_field).desc().nullslast(), User.id.asc())
+            else:
+                query = query.order_by(func.lower(sort_field).asc().nullsfirst(), User.id.asc())
+        else:
+            if sort_direction == 'desc':
+                query = query.order_by(sort_field.desc().nullslast(), User.id.asc())
+            else:
+                query = query.order_by(sort_field.asc().nullsfirst(), User.id.asc())
+    
+    # Calculate count properly for complex queries
+    if sort_column in ['total_plays', 'total_duration']:
+        count_query = User.query
+        if search_filters:
+            count_query = count_query.filter(or_(*search_filters))
+        if server_filter_id != 'all':
+            try:
+                server_filter_id_int = int(server_filter_id)
+                from app.models_media_services import UserMediaAccess
+                count_query = count_query.join(UserMediaAccess).filter(UserMediaAccess.server_id == server_filter_id_int)
+            except ValueError:
+                pass
+        if filter_type == 'home_user': 
+            count_query = count_query.filter(User.is_home_user == True)
+        elif filter_type == 'shares_back': 
+            count_query = count_query.filter(User.shares_back == True)
+        elif filter_type == 'has_discord': 
+            count_query = count_query.filter(User.discord_user_id != None)
+        elif filter_type == 'no_discord': 
+            count_query = count_query.filter(User.discord_user_id == None)
+        users_count = count_query.count()
+    else:
+        users_count = query.count()
     
     users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
-    users_count = query.count()
+    
+    # Extract users from pagination results (handling complex queries that return tuples)
+    users_on_page = [item[0] if isinstance(item, tuple) else item for item in users_pagination.items]
     
     # Extract user IDs from pagination results
     user_ids_on_page = [user.id for user in users_pagination.items]
@@ -768,9 +875,16 @@ def mass_edit_users():
     admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts}
     
     # Get stream stats and other data
-    user_ids_on_page = [user.id for user in users_pagination.items]
+    user_ids_on_page = [user.id for user in users_on_page]
     stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
     last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
+    
+    # Attach the additional data directly to each user object
+    for user in users_on_page:
+        stats = stream_stats.get(user.id, {})
+        user.total_plays = stats.get('play_count', 0)
+        user.total_duration = stats.get('total_duration', 0)
+        user.last_known_ip = last_ips.get(user.id, 'N/A')
     
     # Build user_service_types for template context
     user_service_types = {}  # Track which services each user belongs to
@@ -792,6 +906,16 @@ def mass_edit_users():
         if access.server.name not in user_server_names[access.user_id]:
             user_server_names[access.user_id].append(access.server.name)
 
+    # Get server dropdown options for template
+    media_service_manager = MediaServiceManager()
+    all_servers = media_service_manager.get_all_servers()
+    server_dropdown_options = [{"id": "all", "name": "All Servers"}]
+    for server in all_servers:
+        server_dropdown_options.append({
+            "id": server.id,
+            "name": f"{server.name} ({server.service_type.value.capitalize()})"
+        })
+
     response_html = render_template('users/partials/user_list_content.html',
                                     users=users_pagination,
                                     users_count=users_count,
@@ -804,7 +928,10 @@ def mass_edit_users():
                                     last_ips=last_ips,
                                     admins_by_uuid=admins_by_uuid,
                                     user_service_types=user_service_types,
-                                    user_server_names=user_server_names)
+                                    user_server_names=user_server_names,
+                                    sort_column=sort_column,
+                                    sort_direction=sort_direction,
+                                    server_dropdown_options=server_dropdown_options)
     
     response = make_response(response_html)
     toast_payload = {"showToastEvent": {"message": toast_message, "category": toast_category}}

@@ -714,3 +714,100 @@ def get_bulk_last_known_ips(user_ids: list[int]) -> dict:
     results = db.session.query(subquery.c.user_id, subquery.c.ip_address).filter(subquery.c.rn == 1).all()
 
     return {user_id: ip_address for user_id, ip_address in results}
+
+def mass_extend_access(user_ids: list[int], days_to_extend: int, admin_id: int = None):
+    """Extend access expiration for multiple users by a specified number of days"""
+    from datetime import datetime, timedelta
+    processed_count = 0
+    error_count = 0
+    
+    users_to_update = User.query.filter(User.id.in_(user_ids)).all()
+    
+    for user in users_to_update:
+        try:
+            # If user has no expiration, set it to today + extension days
+            if user.access_expires_at is None:
+                user.access_expires_at = datetime.now() + timedelta(days=days_to_extend)
+            else:
+                # If user already has expiration, extend it by the specified days
+                user.access_expires_at = user.access_expires_at + timedelta(days=days_to_extend)
+            
+            processed_count += 1
+        except Exception as e:
+            current_app.logger.error(f"Error extending access for user {user.get_display_name()}: {e}")
+            error_count += 1
+    
+    if processed_count > 0:
+        try:
+            db.session.commit()
+            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Mass extend access: {processed_count} users extended by {days_to_extend} days.", admin_id=admin_id)
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error committing mass extend access: {e}")
+            error_count = len(users_to_update)
+            processed_count = 0
+    
+    return processed_count, error_count
+
+def mass_set_expiration(user_ids: list[int], expiration_date, admin_id: int = None):
+    """Set expiration date for multiple users"""
+    from datetime import datetime, time
+    processed_count = 0
+    error_count = 0
+    
+    users_to_update = User.query.filter(User.id.in_(user_ids)).all()
+    
+    # Convert date to datetime at end of day
+    if hasattr(expiration_date, 'date'):
+        # If it's already a datetime, extract the date
+        expiration_datetime = datetime.combine(expiration_date.date(), time(23, 59, 59))
+    else:
+        # If it's a date object
+        expiration_datetime = datetime.combine(expiration_date, time(23, 59, 59))
+    
+    for user in users_to_update:
+        try:
+            user.access_expires_at = expiration_datetime
+            processed_count += 1
+        except Exception as e:
+            current_app.logger.error(f"Error setting expiration for user {user.get_display_name()}: {e}")
+            error_count += 1
+    
+    if processed_count > 0:
+        try:
+            db.session.commit()
+            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Mass set expiration: {processed_count} users set to expire on {expiration_date}.", admin_id=admin_id)
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error committing mass set expiration: {e}")
+            error_count = len(users_to_update)
+            processed_count = 0
+    
+    return processed_count, error_count
+
+def mass_clear_expiration(user_ids: list[int], admin_id: int = None):
+    """Clear expiration date for multiple users (set to never expire)"""
+    processed_count = 0
+    error_count = 0
+    
+    users_to_update = User.query.filter(User.id.in_(user_ids)).all()
+    
+    for user in users_to_update:
+        try:
+            user.access_expires_at = None
+            processed_count += 1
+        except Exception as e:
+            current_app.logger.error(f"Error clearing expiration for user {user.get_display_name()}: {e}")
+            error_count += 1
+    
+    if processed_count > 0:
+        try:
+            db.session.commit()
+            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Mass clear expiration: {processed_count} users set to never expire.", admin_id=admin_id)
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error committing mass clear expiration: {e}")
+            error_count = len(users_to_update)
+            processed_count = 0
+    
+    return processed_count, error_count

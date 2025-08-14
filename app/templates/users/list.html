@@ -320,6 +320,66 @@
                     </div>
                 </div>
 
+                <!-- Extend Access Section -->
+                <div id="mass_edit_extend_access_section" class="space-y-4 mb-6 hidden">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-calendar-plus text-success text-sm mr-2"></i>
+                        Extend Access
+                    </h4>
+                    
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium">Days to Extend</span>
+                            </label>
+                            {{ mass_edit_form.days_to_extend(class="input input-bordered", placeholder="Enter number of days") }}
+                            <div class="label">
+                                <span class="label-text-alt">Extends current expiration date, or sets expiration from today if none exists</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Set Expiration Section -->
+                <div id="mass_edit_set_expiration_section" class="space-y-4 mb-6 hidden">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-calendar-xmark text-warning text-sm mr-2"></i>
+                        Set Expiration Date
+                    </h4>
+                    
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium">Expiration Date</span>
+                            </label>
+                            {{ mass_edit_form.new_expiration_date(class="input input-bordered") }}
+                            <div class="label">
+                                <span class="label-text-alt">Users will lose access at the end of this date</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Clear Expiration Section -->
+                <div id="mass_edit_clear_expiration_section" class="space-y-4 mb-6 hidden">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-infinity text-info text-sm mr-2"></i>
+                        Clear Expiration
+                    </h4>
+                    
+                    <div class="bg-info/10 rounded-lg p-4 border border-info/30">
+                        <div class="flex items-start gap-3">
+                            <i class="fa-solid fa-info-circle text-info text-lg mt-0.5"></i>
+                            <div>
+                                <h5 class="font-medium text-base-content mb-1">Permanent Access</h5>
+                                <p class="text-sm text-base-content/80">
+                                    This will remove expiration dates from selected users, granting them permanent access until manually changed.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Delete Confirmation Section -->
                 <div id="mass_edit_delete_confirmation_section" class="space-y-4 mb-6 hidden">
                     <h4 class="font-medium text-base-content text-lg mb-3">
@@ -1092,8 +1152,15 @@
             if (!massEditActionSelect) return;
             const action = massEditActionSelect.value;
             
+            // Hide all sections first
             if(librariesSection) librariesSection.classList.add('hidden');
             if(deleteConfirmSection) deleteConfirmSection.classList.add('hidden');
+            const extendAccessSection = document.getElementById('mass_edit_extend_access_section');
+            const setExpirationSection = document.getElementById('mass_edit_set_expiration_section');
+            const clearExpirationSection = document.getElementById('mass_edit_clear_expiration_section');
+            if(extendAccessSection) extendAccessSection.classList.add('hidden');
+            if(setExpirationSection) setExpirationSection.classList.add('hidden');
+            if(clearExpirationSection) clearExpirationSection.classList.add('hidden');
             
             const submitBtn = document.getElementById('mass_edit_submit_button');
             if(submitBtn) submitBtn.disabled = (action === '');
@@ -1105,11 +1172,20 @@
                     target: '#mass_edit_libraries_content',
                     swap: 'innerHTML'
                 });
+            } else if (action === 'extend_access' && extendAccessSection) {
+                extendAccessSection.classList.remove('hidden');
+            } else if (action === 'set_expiration' && setExpirationSection) {
+                setExpirationSection.classList.remove('hidden');
+            } else if (action === 'clear_expiration' && clearExpirationSection) {
+                clearExpirationSection.classList.remove('hidden');
             } else if (action === 'delete_users' && deleteConfirmSection) {
                 deleteConfirmSection.classList.remove('hidden');
                 if (submitBtn && confirmDeleteCheckbox) {
                     submitBtn.disabled = !confirmDeleteCheckbox.checked;
                 }
+            } else if (action.includes('whitelist')) {
+                // Whitelist actions don't need additional UI, just enable the submit button
+                if(submitBtn) submitBtn.disabled = false;
             }
         }
 
