@@ -107,12 +107,7 @@
                                                 </span>
                                             </label>
                                             <div class="max-h-40 overflow-y-auto p-2 border border-base-300 rounded-md bg-base-100/30 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                                                {% for value, label in form.libraries.choices %}
-                                                    <label class="label cursor-pointer justify-start py-1">
-                                                        <input type="checkbox" name="{{ form.libraries.name }}" value="{{ value }}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" {% if form.libraries.data and value in form.libraries.data %}checked{% endif %}>
-                                                        <span class="label-text" title="{{ label }}">{{ label | truncate(30, True) }}</span>
-                                                    </label>
-                                                {% endfor %}
+                                                <div class="text-center py-4 text-base-content/60">Select this server to see libraries</div>
                                             </div>
                                             {% if form.libraries.errors %}<span class="label-text-alt text-error mt-1">{{ form.libraries.errors[0] }}</span>{% endif %}
                                         </div>
@@ -479,9 +474,15 @@
                         // Build library checkboxes HTML
                         let librariesHtml = '';
                         data.libraries.forEach(lib => {
+                            // Generate unique library ID format: [SERVICE_TYPE]-{ServerName}-{LibraryID}
+                            // Use server info from API response
+                            const serviceType = data.service_type || 'UNKNOWN';
+                            const serverName = data.server_name || 'Unknown Server';
+                            const uniqueLibId = `[${serviceType}]-${serverName}-${lib.id}`;
+                            
                             librariesHtml += `
                                 <label class="label cursor-pointer justify-start py-1">
-                                    <input type="checkbox" name="libraries" value="${lib.id}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" checked>
+                                    <input type="checkbox" name="libraries" value="${uniqueLibId}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" checked>
                                     <span class="label-text" title="${lib.name}">${lib.name.length > 30 ? lib.name.substring(0, 30) + '...' : lib.name}</span>
                                 </label>
                             `;

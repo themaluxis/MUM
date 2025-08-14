@@ -240,7 +240,12 @@ def get_server_libraries(server_id):
     
     try:
         libraries = service.get_libraries()
-        return jsonify({'success': True, 'libraries': libraries})
+        return jsonify({
+            'success': True, 
+            'libraries': libraries,
+            'service_type': server.service_type.name.upper(),
+            'server_name': server.name
+        })
     except Exception as e:
         current_app.logger.error(f"Error getting libraries for server {server_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
