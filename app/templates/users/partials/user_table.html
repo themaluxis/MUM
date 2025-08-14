@@ -251,21 +251,26 @@
                 <td data-col="libraries" class="text-xs" data-user-id-for-libs="{{ user.id }}">
                     {% set sorted_libraries = user_sorted_libraries.get(user.id, []) %}
                     {% if sorted_libraries %}
-                        <div id="libraries-{{ user.id }}" class="flex flex-col space-y-0.5">
+                        <div id="libraries-{{ user.id }}" class="flex flex-col space-y-1">
                         {% set initially_visible_count = 3 %}
                         {% for lib_name in sorted_libraries[:initially_visible_count] %}
-                            <span class="badge badge-xs badge-outline whitespace-nowrap" title="{{ lib_name }}">
-                                {{ lib_name | truncate(25, True) }}
+                            <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1 whitespace-nowrap" title="{{ lib_name }}">
+                                <i class="fa-solid fa-folder w-2 h-2"></i>
+                                {{ lib_name | truncate(20, True) }}
                             </span>
                         {% endfor %}
                         {% if sorted_libraries|length > initially_visible_count %}
-                            <button id="more-libs-{{ user.id }}" onclick='showMoreTableLibraries({{ user.id }}, {{ sorted_libraries|tojson|safe }})' class="btn btn-xs btn-ghost text-accent p-0 mt-1">
-                                + {{ sorted_libraries|length - initially_visible_count }} more
+                            <button id="more-libs-{{ user.id }}" onclick='showMoreTableLibraries({{ user.id }}, {{ sorted_libraries|tojson|safe }})' class="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-400/10 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 ring-1 ring-inset ring-indigo-600/20 dark:ring-indigo-500/20 gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-400/20 transition-colors cursor-pointer">
+                                <i class="fa-solid fa-ellipsis w-2 h-2"></i>
+                                +{{ sorted_libraries|length - initially_visible_count }}
                             </button>
                         {% endif %}
                         </div>
                     {% else %}
-                        <span class="opacity-60">No libraries specifically shared.</span>
+                        <span class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1">
+                            <i class="fa-solid fa-folder-open w-2 h-2"></i>
+                            No libraries
+                        </span>
                     {% endif %}
                 </td>
                 <td data-col="last_streamed" class="text-sm" title="{{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}">
@@ -344,9 +349,16 @@
         container.innerHTML = ''; // Clear existing badges
         libraryNames.forEach(libName => {
             const badge = document.createElement('span');
-            badge.className = 'badge badge-xs badge-outline whitespace-nowrap';
+            badge.className = 'inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1 whitespace-nowrap mb-1';
             badge.title = libName;
-            badge.textContent = libName.length > 25 ? libName.substring(0, 25) + '...' : libName;
+            
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid fa-folder w-2 h-2';
+            badge.appendChild(icon);
+            
+            const text = document.createTextNode(libName.length > 20 ? libName.substring(0, 17) + '...' : libName);
+            badge.appendChild(text);
+            
             container.appendChild(badge);
         });
         if (button) {

@@ -31,6 +31,12 @@
     --color-blue-500: oklch(62.3% 0.214 259.815);
     --color-blue-600: oklch(54.6% 0.245 262.881);
     --color-blue-700: oklch(48.8% 0.243 264.376);
+    --color-indigo-50: oklch(96.2% 0.018 272.314);
+    --color-indigo-100: oklch(93% 0.034 272.788);
+    --color-indigo-400: oklch(67.3% 0.182 276.935);
+    --color-indigo-500: oklch(58.5% 0.233 277.117);
+    --color-indigo-600: oklch(51.1% 0.262 276.966);
+    --color-indigo-700: oklch(45.7% 0.24 277.023);
     --color-violet-600: oklch(54.1% 0.281 293.009);
     --color-purple-50: oklch(97.7% 0.014 308.299);
     --color-purple-100: oklch(94.6% 0.033 307.174);
@@ -3254,6 +3260,9 @@
   .h-1 {
     height: calc(var(--spacing) * 1);
   }
+  .h-2 {
+    height: calc(var(--spacing) * 2);
+  }
   .h-2\.5 {
     height: calc(var(--spacing) * 2.5);
   }
@@ -3361,6 +3370,9 @@
   }
   .loading-xs {
     width: calc(var(--size-selector, 0.25rem) * 4);
+  }
+  .w-2 {
+    width: calc(var(--spacing) * 2);
   }
   .w-2\.5 {
     width: calc(var(--spacing) * 2.5);
@@ -4242,6 +4254,9 @@
   .bg-green-600 {
     background-color: var(--color-green-600);
   }
+  .bg-indigo-50 {
+    background-color: var(--color-indigo-50);
+  }
   .bg-info\/10 {
     background-color: var(--color-info);
     @supports (color: color-mix(in lab, red, red)) {
@@ -4946,6 +4961,9 @@
   .text-green-700 {
     color: var(--color-green-700);
   }
+  .text-indigo-700 {
+    color: var(--color-indigo-700);
+  }
   .text-info {
     color: var(--color-info);
   }
@@ -5153,6 +5171,12 @@
     --tw-ring-color: color-mix(in srgb, oklch(62.7% 0.194 149.214) 20%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       --tw-ring-color: color-mix(in oklab, var(--color-green-600) 20%, transparent);
+    }
+  }
+  .ring-indigo-600\/20 {
+    --tw-ring-color: color-mix(in srgb, oklch(51.1% 0.262 276.966) 20%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      --tw-ring-color: color-mix(in oklab, var(--color-indigo-600) 20%, transparent);
     }
   }
   .ring-jellyfin-600\/20 {
@@ -5642,6 +5666,13 @@
       }
     }
   }
+  .hover\:bg-indigo-100 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-indigo-100);
+      }
+    }
+  }
   .hover\:bg-info\/10 {
     &:hover {
       @media (hover: hover) {
@@ -6046,6 +6077,14 @@
       }
     }
   }
+  .dark\:bg-indigo-400\/10 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      background-color: color-mix(in srgb, oklch(67.3% 0.182 276.935) 10%, transparent);
+      @supports (color: color-mix(in lab, red, red)) {
+        background-color: color-mix(in oklab, var(--color-indigo-400) 10%, transparent);
+      }
+    }
+  }
   .dark\:bg-jellyfin-400\/10 {
     &:where([data-theme=dark], [data-theme=dark] *) {
       background-color: color-mix(in srgb, oklch(68% 0.22 304.24) 10%, transparent);
@@ -6135,6 +6174,11 @@
       color: var(--color-green-400);
     }
   }
+  .dark\:text-indigo-400 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      color: var(--color-indigo-400);
+    }
+  }
   .dark\:text-jellyfin-400 {
     &:where([data-theme=dark], [data-theme=dark] *) {
       color: var(--color-jellyfin-400);
@@ -6215,6 +6259,14 @@
       }
     }
   }
+  .dark\:ring-indigo-500\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      --tw-ring-color: color-mix(in srgb, oklch(58.5% 0.233 277.117) 20%, transparent);
+      @supports (color: color-mix(in lab, red, red)) {
+        --tw-ring-color: color-mix(in oklab, var(--color-indigo-500) 20%, transparent);
+      }
+    }
+  }
   .dark\:ring-jellyfin-500\/20 {
     &:where([data-theme=dark], [data-theme=dark] *) {
       --tw-ring-color: color-mix(in srgb, oklch(63% 0.27 304.24) 20%, transparent);
@@ -6276,6 +6328,18 @@
       --tw-ring-color: color-mix(in srgb, oklch(79.5% 0.184 86.047) 20%, transparent);
       @supports (color: color-mix(in lab, red, red)) {
         --tw-ring-color: color-mix(in oklab, var(--color-yellow-500) 20%, transparent);
+      }
+    }
+  }
+  .dark\:hover\:bg-indigo-400\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in srgb, oklch(67.3% 0.182 276.935) 20%, transparent);
+          @supports (color: color-mix(in lab, red, red)) {
+            background-color: color-mix(in oklab, var(--color-indigo-400) 20%, transparent);
+          }
+        }
       }
     }
   }

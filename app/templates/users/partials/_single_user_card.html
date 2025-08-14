@@ -197,13 +197,21 @@
         </div>
 
         <div class="mb-3">
-            <p class="text-xs font-semibold mb-1 inline">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.id, [])|length }}</span>):</p>
+            <p class="text-xs font-semibold mb-2">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.id, [])|length }}</span>):</p>
             {% if user_sorted_libraries.get(user.id) %}
-                {% for lib_name in user_sorted_libraries.get(user.id, []) %}
-                    <span class="badge badge-sm badge-outline mr-1 mb-1" title="{{ lib_name }}">{{ lib_name }}</span>
-                {% endfor %}
+                <div class="flex flex-wrap gap-1">
+                    {% for lib_name in user_sorted_libraries.get(user.id, []) %}
+                        <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1" title="{{ lib_name }}">
+                            <i class="fa-solid fa-folder w-2.5 h-2.5"></i>
+                            {{ lib_name }}
+                        </span>
+                    {% endfor %}
+                </div>
             {% else %}
-                <span class="text-xs text-base-content/60">No libraries specifically shared.</span>
+                <span class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1">
+                    <i class="fa-solid fa-folder-open w-2.5 h-2.5"></i>
+                    No libraries specifically shared
+                </span>
             {% endif %}
         </div>
 
