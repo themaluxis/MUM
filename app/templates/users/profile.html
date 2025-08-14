@@ -4,7 +4,33 @@
 {% block title %}{{ super() }} - {{ title }}{% endblock %}
 
 {% block content %}
+{# Determine service-specific background tint similar to user cards #}
+{% set service_types = user_service_types.get(user.id, []) %}
+{% set primary_service = service_types[0] if service_types else None %}
+{% if primary_service %}
+    {% if primary_service.value == 'plex' %}
+        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-plex/5" %}
+    {% elif primary_service.value == 'jellyfin' %}
+        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-jellyfin/5" %}
+    {% elif primary_service.value == 'emby' %}
+        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-emby/5" %}
+    {% elif primary_service.value == 'kavita' %}
+        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-kavita/5" %}
+    {% elif primary_service.value == 'audiobookshelf' %}
+        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-audiobookshelf/5" %}
+    {% elif primary_service.value == 'komga' %}
+        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-komga/5" %}
+    {% elif primary_service.value == 'romm' %}
+        {% set content_bg_class = "bg-gradient-to-br from-base-100 to-romm/5" %}
+    {% else %}
+        {% set content_bg_class = "bg-base-100" %}
+    {% endif %}
+{% else %}
+    {% set content_bg_class = "bg-base-100" %}
+{% endif %}
+
 <div class="container mx-auto px-4 py-2 max-w-5xl">
+    <div class="{{ content_bg_class }} rounded-lg shadow-lg p-6 min-h-screen">
     <div class="flex items-center mb-2">
         {% set back_url = request.args.get('back') %}
         {% set back_view = request.args.get('back_view') %}
@@ -93,5 +119,6 @@
             {% include 'users/partials/settings_tab.html' %}
         {% endif %}
     </div>
+    </div> {# Close content container #}
 </div>
 {% endblock %}
