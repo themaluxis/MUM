@@ -11,7 +11,7 @@
     {% set primary_service = None %}
     {% set service_types = [] %}
 {% else %}
-    {% set service_types = user_service_types.get(user.id, []) %}
+    {% set service_types = user_service_types.get(user.uuid, []) %}
     {% set primary_service = service_types[0] if service_types else None %}
 {% endif %}
 {% if primary_service %}

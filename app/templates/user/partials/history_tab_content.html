@@ -1,10 +1,10 @@
 <!-- File: app/templates/user/_history_tab_content.html -->
-{% set user_services = user_service_types.get(user.id, []) if user_service_types else [] %}
+{% set user_services = user_service_types.get(user.uuid, []) if user_service_types else [] %}
 {% set service_values = [] %}
 {% for st in user_services %}
     {% set _ = service_values.append(st.value) %}
 {% endfor %}
-{% set is_kavita_user = user_service_types and user_service_types.get(user.id) and 'kavita' in service_values %}
+{% set is_kavita_user = user_service_types and user_service_types.get(user.uuid) and 'kavita' in service_values %}
 
 {# Use the same table format for all users, but with different headers for Kavita users #}
     <!-- Regular Stream History for non-Kavita users -->

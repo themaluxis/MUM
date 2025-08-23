@@ -132,7 +132,7 @@
                         {% set service_name = primary_service.value|title %}
                     {% endif %}
                     {# Server name badge with service icon and color (Discord-style) #}
-                        {% set user_servers = user_server_names.get(user.uuid if user.uuid is defined else user.id, []) %}
+                        {% set user_servers = user_server_names.get(user.uuid, []) %}
                         {% if user_servers %}
                             {% if primary_service %}
                                 {% if primary_service.value == 'plex' %}
@@ -225,10 +225,10 @@
         </div>
 
         <div class="mb-3">
-            <p class="text-xs font-semibold mb-2">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.uuid if user.uuid is defined else user.id, [])|length }}</span>):</p>
-            {% if user_sorted_libraries.get(user.uuid if user.uuid is defined else user.id) %}
+            <p class="text-xs font-semibold mb-2">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.uuid, [])|length }}</span>):</p>
+            {% if user_sorted_libraries.get(user.uuid) %}
                 <div class="flex flex-wrap gap-1">
-                    {% for lib_name in user_sorted_libraries.get(user.uuid if user.uuid is defined else user.id, []) %}
+                    {% for lib_name in user_sorted_libraries.get(user.uuid, []) %}
                         <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1" title="{{ lib_name }}">
                             <i class="fa-solid fa-folder w-2.5 h-2.5 mr-1 bottom-px relative"></i>
                             {{ lib_name }}

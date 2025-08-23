@@ -2,7 +2,7 @@
 {# Template for local user accounts matching service user card layout #}
 <div id="local-user-card-{{ user.id }}" class="card bg-gradient-to-br from-base-200 to-primary/10 shadow-lg hover:shadow-xl transition-all duration-200 ease-in-out relative group user-card-clickable local-user-card" data-local-user-id="{{ user.id }}" data-service-color="var(--color-primary)" data-service-class="primary">
     <!-- User Selection Checkbox -->
-    <input type="checkbox" id="local-user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-local-user-id="{{ user._prefixed_id if user._prefixed_id is defined else user.id }}" title="Select local user" style="--input-color: var(--color-primary); --chkfg: white;">
+    <input type="checkbox" id="local-user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-user-id="{{ user.uuid }}" title="Select local user" style="--input-color: var(--color-primary); --chkfg: white;">
     
     <div class="card-body p-4">
         <div class="flex flex-row items-center mb-3">

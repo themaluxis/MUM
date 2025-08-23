@@ -18,7 +18,7 @@
             <!-- Content -->
             <div class="p-4 space-y-4">
                 {# Determine service type for dynamic labels #}
-                {% set service_types = user_service_types.get(user.id, []) %}
+                {% set service_types = user_service_types.get(user.uuid, []) %}
                 {% set primary_service = service_types[0] if service_types else None %}
                 {% if primary_service %}
                     {% if primary_service.value == 'plex' %}

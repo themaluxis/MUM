@@ -174,7 +174,7 @@
                                 {% else %}
                                     <!-- Service user profile link -->
                                     {% if user._user_type is defined and user._user_type == 'service' %}
-                                        {% set user_servers = user_server_names.get(user.uuid if user.uuid is defined else user.id, []) %}
+                                        {% set user_servers = user_server_names.get(user.uuid, []) %}
                                         {% if user_servers %}
                                             {% set server_name = user_servers[0] %}
                                             {% if user.plex_username %}
@@ -305,16 +305,16 @@
                         {% endfor %}
                     {% endif %}
                 </td>
-                <td data-col="libraries" class="text-xs" data-user-id-for-libs="{{ user.uuid if user.uuid is defined else user.id }}">
-                    {% set sorted_libraries = user_sorted_libraries.get(user.uuid if user.uuid is defined else user.id, []) %}
+                <td data-col="libraries" class="text-xs" data-user-id-for-libs="{{ user.uuid }}">
+                    {% set sorted_libraries = user_sorted_libraries.get(user.uuid, []) %}
                     {% if sorted_libraries %}
-                        <div id="libraries-{{ user.uuid if user.uuid is defined else user.id }}" class="flex flex-col space-y-1">
+                        <div id="libraries-{{ user.uuid }}" class="flex flex-col space-y-1">
                         {% set initially_visible_count = 3 %}
                         {% for lib_name in sorted_libraries[:initially_visible_count] %}
                             {# Library badge colors: Service-specific for local users, blue for service users #}
                             {% if user._user_type is defined and user._user_type == 'local' %}
                                 {# Local users: Use service-specific colors based on library mapping #}
-                                {% set lib_service = user_library_service_mapping.get(user._prefixed_id if user._prefixed_id is defined else user.id, {}).get(lib_name, 'unknown') %}
+                                {% set lib_service = user_library_service_mapping.get(user.uuid, {}).get(lib_name, 'unknown') %}
                                 
                                 {% if lib_service == 'plex' %}
                                     <span class="inline-flex items-center rounded-md bg-plex-50 dark:bg-plex-400/10 px-2 py-1 text-xs font-medium text-plex-700 dark:text-plex-400 ring-1 ring-inset ring-plex-600/20 dark:ring-plex-500/20 gap-1 whitespace-nowrap" title="{{ lib_name }}">
@@ -338,7 +338,7 @@
                                 {# Service users: Use blue color for all libraries #}
                                 {# TODO: To re-enable service-specific colors for service users, uncomment the block below and remove this blue span #}
                                 {# 
-                                {% set lib_service = user_library_service_mapping.get(user._prefixed_id if user._prefixed_id is defined else user.id, {}).get(lib_name, 'unknown') %}
+                                {% set lib_service = user_library_service_mapping.get(user.uuid, {}).get(lib_name, 'unknown') %}
                                 [Add the same service-specific color logic as above for local users]
                                 #}
                                 <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1 whitespace-nowrap" title="{{ lib_name }}">
@@ -348,7 +348,7 @@
                             </span>
                         {% endfor %}
                         {% if sorted_libraries|length > initially_visible_count %}
-                            <button id="more-libs-{{ user.uuid if user.uuid is defined else user.id }}" onclick='showMoreTableLibraries("{{ user.uuid if user.uuid is defined else user.id }}", {{ sorted_libraries|tojson|safe }}, {{ user_library_service_mapping.get(user.uuid if user.uuid is defined else user.id, {})|tojson|safe }})' class="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-400/10 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 ring-1 ring-inset ring-indigo-600/20 dark:ring-indigo-500/20 gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-400/20 transition-colors cursor-pointer">
+                            <button id="more-libs-{{ user.uuid }}" onclick='showMoreTableLibraries("{{ user.uuid }}", {{ sorted_libraries|tojson|safe }}, {{ user_library_service_mapping.get(user.uuid, {})|tojson|safe }})' class="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-400/10 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 ring-1 ring-inset ring-indigo-600/20 dark:ring-indigo-500/20 gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-400/20 transition-colors cursor-pointer">
                                 +{{ sorted_libraries|length - initially_visible_count }} more
                             </button>
                         {% endif %}
@@ -406,7 +406,7 @@
                             {% else %}
                                 <!-- Service user profile link -->
                                 {% if user._user_type is defined and user._user_type == 'service' %}
-                                    {% set user_servers = user_server_names.get(user.uuid if user.uuid is defined else user.id, []) %}
+                                    {% set user_servers = user_server_names.get(user.uuid, []) %}
                                     {% if user_servers %}
                                         {% set server_name = user_servers[0] %}
                                         {% if user.plex_username %}
@@ -462,8 +462,8 @@
         const button = document.getElementById(`more-libs-${userId}`);
         container.innerHTML = ''; // Clear existing badges
         
-        // Check if this is a local user (user_app_access) or service user (user_media_access)
-        const isLocalUser = userId.startsWith('user_app_access:');
+        // Check if this is a local user by checking if userId is a UUID (service users have UUIDs, local users have numeric IDs in this context)
+        const isLocalUser = !userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
         
         libraryNames.forEach(libName => {
             const badge = document.createElement('span');
