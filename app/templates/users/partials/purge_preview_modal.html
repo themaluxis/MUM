@@ -71,7 +71,7 @@
                     {% for user in eligible_users %}
                     <div class="bg-base-100 border border-base-300 rounded-lg p-3 hover:border-base-300/60 transition-colors user-selection-card">
                         <label class="flex items-start gap-3 cursor-pointer">
-                            <input type="checkbox" name="user_ids_to_purge" value="{{ user.id }}" class="checkbox checkbox-error checkbox-sm mt-1 purge-user-checkbox" checked>
+                            <input type="checkbox" name="user_ids_to_purge" value="{{ user.uuid }}" class="checkbox checkbox-error checkbox-sm mt-1 purge-user-checkbox" checked>
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="font-medium text-base-content">{{ user.display_name or user.plex_username or user.username or 'Unknown User' }}</span>

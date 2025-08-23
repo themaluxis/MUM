@@ -92,7 +92,7 @@
                     {% set service_bg_class = "gray" %}
                 {% endif %}
             {% endif %}
-            <tr id="user-row-{{ user.id }}" class="hover:bg-base-300 user-row user-row-clickable cursor-pointer" data-user-id="{{ user.id }}" data-service-color="{{ service_color }}" data-service-class="{{ service_bg_class }}">
+            <tr id="user-row-{{ user.uuid }}" class="hover:bg-base-300 user-row user-row-clickable cursor-pointer" data-user-id="{{ user.uuid }}" data-service-color="{{ service_color }}" data-service-class="{{ service_bg_class }}">
                 <td class="text-center">
                     <input type="checkbox" class="checkbox checkbox-xs sm:checkbox-sm user-select-checkbox" data-user-id="{{ user.uuid }}" style="--input-color: {{ service_color }}; --chkfg: white;">
                 </td>
@@ -443,7 +443,7 @@
                         <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Remove User"
                                 hx-confirm="Are you sure you want to remove '{{ user.get_display_name() }}' from MUM and media servers?"
                                 hx-delete="{{ url_for('users.delete_user', user_uuid=user.uuid) }}"
-                                hx-target="#user-row-{{ user.id }}" hx-swap="outerHTML swap:0.5s" hx-indicator="this">
+                                hx-target="#user-row-{{ user.uuid }}" hx-swap="outerHTML swap:0.5s" hx-indicator="this">
                             <i class="fa-solid fa-trash-can htmx-indicator-hide"></i>
                             <span class="htmx-indicator loading loading-spinner loading-xs"></span>
                         </button>

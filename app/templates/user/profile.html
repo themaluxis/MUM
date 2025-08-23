@@ -145,7 +145,7 @@
                                     Local Account
                                 </span>
                             {% else %}
-                                {% set user_servers = user_server_names.get(user.id, []) %}
+                                {% set user_servers = user_server_names.get(user.uuid, []) %}
                                 {% if user_servers %}
                                     <span class="inline-flex items-center rounded-md bg-{{ service_color }}-50 dark:bg-{{ service_color }}-400/10 px-3 py-1 text-sm font-medium text-{{ service_color }}-700 dark:text-{{ service_color }}-400 ring-1 ring-inset ring-{{ service_color }}-600/20 dark:ring-{{ service_color }}-500/20 gap-2">
                                         {% if primary_service and primary_service.value == 'plex' %}
@@ -204,7 +204,7 @@
                         </a>
                     {% else %}
                         {# Service Account - use server/username route #}
-                        {% set user_servers = user_server_names.get(user.id, []) %}
+                        {% set user_servers = user_server_names.get(user.uuid, []) %}
                         {% if user_servers %}
                             {% set server_name = user_servers[0] %}
                             {% set username = user.get_display_name() %}

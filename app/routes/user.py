@@ -290,10 +290,10 @@ def view_service_account(server_nickname, server_username):
                 # 1. Render the updated form for the modal (the primary target)
                 # Build user_server_names for the template
                 user_server_names_for_modal = {}
-                user_server_names_for_modal[user.id] = []
+                user_server_names_for_modal[user.uuid] = []
                 for access in user_access_records:
-                    if access.server.name not in user_server_names_for_modal[user.id]:
-                        user_server_names_for_modal[user.id].append(access.server.name)
+                    if access.server.name not in user_server_names_for_modal[user.uuid]:
+                        user_server_names_for_modal[user.uuid].append(access.server.name)
                 
                 modal_html = render_template('user/partials/settings_tab.html', form=form_after_save, user=user, user_server_names=user_server_names_for_modal)
 
@@ -308,17 +308,17 @@ def view_service_account(server_nickname, server_username):
                 
                 # Collect library IDs from all access records
                 all_library_ids = []
-                user_service_types[user.id] = []
-                user_server_names[user.id] = []
+                user_service_types[user.uuid] = []
+                user_server_names[user.uuid] = []
                 
                 for access in all_user_access_records:
                     all_library_ids.extend(access.allowed_library_ids or [])
                     # Track service types
-                    if access.server.service_type not in user_service_types[user.id]:
-                        user_service_types[user.id].append(access.server.service_type)
+                    if access.server.service_type not in user_service_types[user.uuid]:
+                        user_service_types[user.uuid].append(access.server.service_type)
                     # Track server names
-                    if access.server.name not in user_server_names[user.id]:
-                        user_server_names[user.id].append(access.server.name)
+                    if access.server.name not in user_server_names[user.uuid]:
+                        user_server_names[user.uuid].append(access.server.name)
                 
                 # Handle special case for Jellyfin users with '*' (all libraries access)
                 if all_library_ids == ['*']:
@@ -340,7 +340,7 @@ def view_service_account(server_nickname, server_username):
                             else:
                                 # Regular library ID lookup
                                 lib_names.append(available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}'))
-                user_sorted_libraries[user.id] = sorted(lib_names, key=str.lower)
+                user_sorted_libraries[user.uuid] = sorted(lib_names, key=str.lower)
                 
                 # Get Owner with plex_uuid for filtering (AppUsers don't have plex_uuid)
                 owner = Owner.query.filter(Owner.plex_uuid.isnot(None)).first()
@@ -358,7 +358,7 @@ def view_service_account(server_nickname, server_username):
                 )
                 
                 # 3. Add the oob-swap attribute to the card's root div
-                card_html_oob = card_html.replace(f'id="user-card-{user.id}"', f'id="user-card-{user.id}" hx-swap-oob="true"')
+                card_html_oob = card_html.replace(f'id="user-card-{user.uuid}"', f'id="user-card-{user.uuid}" hx-swap-oob="true"')
 
                 # 4. Combine the modal and card HTML for the response
                 final_html = modal_html + card_html_oob
@@ -583,13 +583,14 @@ def view_service_account(server_nickname, server_username):
     user_service_types = {}
     user_server_names = {}
     # For standalone service users, we already have the access records from above
-    user_service_types[user.id] = []
-    user_server_names[user.id] = []
+    # Use UUID as key to match template expectations
+    user_service_types[user.uuid] = []
+    user_server_names[user.uuid] = []
     for access_record in user_access_records:
-        if access_record.server.service_type not in user_service_types[user.id]:
-            user_service_types[user.id].append(access_record.server.service_type)
-        if access_record.server.name not in user_server_names[user.id]:
-            user_server_names[user.id].append(access_record.server.name)
+        if access_record.server.service_type not in user_service_types[user.uuid]:
+            user_service_types[user.uuid].append(access_record.server.service_type)
+        if access_record.server.name not in user_server_names[user.uuid]:
+            user_server_names[user.uuid].append(access_record.server.name)
 
     if request.headers.get('HX-Request') and tab == 'history':
         # UUID is already available on user objects for the delete function
