@@ -59,7 +59,7 @@
                 {% set primary_service = None %}
             {% else %}
                 {# Service users use their service-specific colors #}
-                {% set service_types = user_service_types.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+                {% set service_types = user_service_types.get(user.uuid, []) %}
                 {% set primary_service = service_types[0] if service_types else None %}
                 {% if primary_service %}
                     {% if primary_service.value == 'plex' %}
@@ -94,7 +94,7 @@
             {% endif %}
             <tr id="user-row-{{ user.id }}" class="hover:bg-base-300 user-row user-row-clickable cursor-pointer" data-user-id="{{ user.id }}" data-service-color="{{ service_color }}" data-service-class="{{ service_bg_class }}">
                 <td class="text-center">
-                    <input type="checkbox" class="checkbox checkbox-xs sm:checkbox-sm user-select-checkbox" data-user-id="{{ user._prefixed_id if user._prefixed_id is defined else user.id }}" style="--input-color: {{ service_color }}; --chkfg: white;">
+                    <input type="checkbox" class="checkbox checkbox-xs sm:checkbox-sm user-select-checkbox" data-user-id="{{ user.uuid }}" style="--input-color: {{ service_color }}; --chkfg: white;">
                 </td>
                 <td data-col="user">
                     <div class="flex items-center space-x-3">
@@ -167,13 +167,14 @@
                             {% if current_user.has_permission('view_user') %}
                                 {% if user._user_type is defined and user._user_type == 'local' %}
                                     <!-- Local user profile link -->
-                                    <a href="{{ url_for('user.view_app_user', username=user.username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="App User Profile" class="link link-hover">
+                                    <!-- Local user profile link -->
+                                    <a href="{{ url_for('user.view_app_user', username=user.username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="User Profile" class="link link-hover">
                                         <div class="font-bold truncate max-w-[150px] sm:max-w-xs {{ username_class }}" title="{{ user.get_display_name() }}">{{ user.get_display_name() }}</div>
                                     </a>
                                 {% else %}
                                     <!-- Service user profile link -->
                                     {% if user._user_type is defined and user._user_type == 'service' %}
-                                        {% set user_servers = user_server_names.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+                                        {% set user_servers = user_server_names.get(user.uuid if user.uuid is defined else user.id, []) %}
                                         {% if user_servers %}
                                             {% set server_name = user_servers[0] %}
                                             {% if user.plex_username %}
@@ -183,7 +184,7 @@
                                             {% else %}
                                                 {% set username = user.primary_username %}
                                             {% endif %}
-                                            <a href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="User Profile" class="link link-hover">
+                                            <a href="{{ url_for('user.view_app_user', username=user.username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="App User Profile" class="link link-hover">
                                                 <div class="font-bold truncate max-w-[150px] sm:max-w-xs {{ username_class }}" title="{{ user.get_display_name() }}">{{ user.get_display_name() }}</div>
                                             </a>
                                         {% else %}
@@ -206,7 +207,7 @@
                                 </span>
                             {% else %}
                                 {# Server name badge with service icon and color for service users #}
-                                {% set user_servers = user_server_names.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+                                {% set user_servers = user_server_names.get(user.uuid, []) %}
                                 {% if user_servers %}
                                     {% if primary_service %}
                                         {% if primary_service.value == 'plex' %}
@@ -304,10 +305,10 @@
                         {% endfor %}
                     {% endif %}
                 </td>
-                <td data-col="libraries" class="text-xs" data-user-id-for-libs="{{ user._prefixed_id if user._prefixed_id is defined else user.id }}">
-                    {% set sorted_libraries = user_sorted_libraries.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+                <td data-col="libraries" class="text-xs" data-user-id-for-libs="{{ user.uuid if user.uuid is defined else user.id }}">
+                    {% set sorted_libraries = user_sorted_libraries.get(user.uuid if user.uuid is defined else user.id, []) %}
                     {% if sorted_libraries %}
-                        <div id="libraries-{{ user._prefixed_id if user._prefixed_id is defined else user.id }}" class="flex flex-col space-y-1">
+                        <div id="libraries-{{ user.uuid if user.uuid is defined else user.id }}" class="flex flex-col space-y-1">
                         {% set initially_visible_count = 3 %}
                         {% for lib_name in sorted_libraries[:initially_visible_count] %}
                             {# Library badge colors: Service-specific for local users, blue for service users #}
@@ -347,7 +348,7 @@
                             </span>
                         {% endfor %}
                         {% if sorted_libraries|length > initially_visible_count %}
-                            <button id="more-libs-{{ user._prefixed_id if user._prefixed_id is defined else user.id }}" onclick='showMoreTableLibraries("{{ user._prefixed_id if user._prefixed_id is defined else user.id }}", {{ sorted_libraries|tojson|safe }}, {{ user_library_service_mapping.get(user._prefixed_id if user._prefixed_id is defined else user.id, {})|tojson|safe }})' class="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-400/10 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 ring-1 ring-inset ring-indigo-600/20 dark:ring-indigo-500/20 gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-400/20 transition-colors cursor-pointer">
+                            <button id="more-libs-{{ user.uuid if user.uuid is defined else user.id }}" onclick='showMoreTableLibraries("{{ user.uuid if user.uuid is defined else user.id }}", {{ sorted_libraries|tojson|safe }}, {{ user_library_service_mapping.get(user.uuid if user.uuid is defined else user.id, {})|tojson|safe }})' class="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-400/10 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 ring-1 ring-inset ring-indigo-600/20 dark:ring-indigo-500/20 gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-400/20 transition-colors cursor-pointer">
                                 +{{ sorted_libraries|length - initially_visible_count }} more
                             </button>
                         {% endif %}
@@ -405,7 +406,7 @@
                             {% else %}
                                 <!-- Service user profile link -->
                                 {% if user._user_type is defined and user._user_type == 'service' %}
-                                    {% set user_servers = user_server_names.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+                                    {% set user_servers = user_server_names.get(user.uuid if user.uuid is defined else user.id, []) %}
                                     {% if user_servers %}
                                         {% set server_name = user_servers[0] %}
                                         {% if user.plex_username %}
@@ -415,7 +416,7 @@
                                         {% else %}
                                             {% set username = user.primary_username %}
                                         {% endif %}
-                                        <a href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-user"></i></a>
+                                        <a href="{{ url_for('user.view_app_user', username=user.username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="App User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-user"></i></a>
                                     {% else %}
                                         <span title="No server info available" class="btn btn-xs btn-ghost text-gray-500"><i class="fa-solid fa-eye-slash"></i></span>
                                     {% endif %}
@@ -430,7 +431,7 @@
                         {% if user._user_type is defined and user._user_type == 'local' %}
                         <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 card-action-button"
                                 title="Quick Edit Settings"
-                                hx-get="{{ url_for('users.get_quick_edit_form', user_id=user.id, view='table', page=users.page, per_page=current_per_page) }}"
+                                hx-get="{{ url_for('users.get_quick_edit_form', user_uuid=user.uuid, view='table', page=users.page, per_page=current_per_page) }}"
                                 hx-target="#quick_edit_modal_content_div"
                                 hx-swap="innerHTML"
                                 onclick="quick_edit_user_modal.showModal()">
@@ -441,7 +442,7 @@
                         {% if current_user.has_permission('delete_user') %}
                         <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Remove User"
                                 hx-confirm="Are you sure you want to remove '{{ user.get_display_name() }}' from MUM and media servers?"
-                                hx-delete="{{ url_for('users.delete_user', user_id=user.id) }}"
+                                hx-delete="{{ url_for('users.delete_user', user_uuid=user.uuid) }}"
                                 hx-target="#user-row-{{ user.id }}" hx-swap="outerHTML swap:0.5s" hx-indicator="this">
                             <i class="fa-solid fa-trash-can htmx-indicator-hide"></i>
                             <span class="htmx-indicator loading loading-spinner loading-xs"></span>

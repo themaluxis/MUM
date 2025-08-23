@@ -10,16 +10,7 @@ from app.utils.helpers import log_event, format_duration
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
 
-def parse_user_id(user_id):
-    """Parse prefixed user ID and return (user_type, actual_id)"""
-    if ":" not in str(user_id):
-        raise ValueError(f"Invalid user ID format: {user_id}. Must be 'type:id'")
-    
-    user_type, actual_id = str(user_id).split(":", 1)
-    if user_type not in ["user_app_access", "user_media_access"]:
-        raise ValueError(f"Invalid user type: {user_type}")
-    
-    return user_type, int(actual_id)
+# parse_user_id function completely removed - now using UUID-based identification only
 
 def sync_users_from_plex():
     current_app.logger.info("User_Service.py - sync_users_from_plex(): Starting Plex user synchronization.")
@@ -214,19 +205,26 @@ def update_user_details(user_id, notes=None, new_library_ids=None,
     """
     Updates a user's details in the MUM database and syncs relevant changes to the Plex server.
     This function now correctly handles partial updates by sending the full final state to Plex.
+    Uses UUID-based user identification only.
     """
-    # Parse prefixed user ID
-    user_type, actual_id = parse_user_id(user_id)
+    # Get user by UUID
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_id))
+    
+    if not user_obj:
+        raise Exception(f"User not found: {user_id}")
     
     if user_type == "user_app_access":
-        user = UserAppAccess.query.get_or_404(actual_id)
-    else:
+        user = user_obj
+    elif user_type == "user_media_access":
         # For user_media_access, get the associated UserAppAccess if it exists
-        media_access = UserMediaAccess.query.get_or_404(actual_id)
-        if media_access.user_app_access_id:
-            user = UserAppAccess.query.get_or_404(media_access.user_app_access_id)
+        if user_obj.user_app_access_id:
+            user = UserAppAccess.query.get_or_404(user_obj.user_app_access_id)
         else:
             raise Exception(f"Cannot update details for standalone service user {user_id}")
+    else:
+        raise Exception(f"Invalid user type: {user_type}")
+    
     changes_made_to_mum = False
     
     plex_servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX)
@@ -305,18 +303,24 @@ def update_user_details(user_id, notes=None, new_library_ids=None,
     return user
 
 def delete_user_from_mum_and_plex(user_id, admin_id: int = None):
-    """Universal user deletion function that works with all media services"""
-    # Parse prefixed user ID
-    user_type, actual_id = parse_user_id(user_id)
+    """Universal user deletion function that works with all media services. Uses UUID-based identification only."""
+    # Get user by UUID
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_id))
+    
+    if not user_obj:
+        raise Exception(f"User not found: {user_id}")
     
     if user_type == "user_app_access":
-        user = UserAppAccess.query.get_or_404(actual_id)
+        user = user_obj
         username = user.get_display_name()
-    else:
-        # For user_media_access, handle standalone service user
-        media_access = UserMediaAccess.query.get_or_404(actual_id)
-        username = media_access.external_username or f"Service User {actual_id}"
+        media_access = None
+    elif user_type == "user_media_access":
+        media_access = user_obj
+        username = media_access.external_username or f"Service User {user_obj.id}"
         user = None  # No UserAppAccess for standalone users
+    else:
+        raise Exception(f"Invalid user type: {user_type}")
     
     # Determine which service this user belongs to based on their data
     service_type = None
@@ -412,16 +416,18 @@ def delete_user_from_mum_and_plex(user_id, admin_id: int = None):
 def mass_update_user_libraries(user_ids: list, new_library_ids: list, admin_id: int = None):
     processed_count = 0; error_count = 0;
     
-    # Parse prefixed user IDs and separate by type
+    # Convert UUIDs to actual user IDs for local users only
     local_user_ids = []
+    from app.utils.helpers import get_user_by_uuid
+    
     for user_id in user_ids:
         try:
-            user_type, actual_id = parse_user_id(user_id)
-            if user_type == "user_app_access":
-                local_user_ids.append(actual_id)
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                local_user_ids.append(user_obj.id)
             # Note: mass library updates only apply to local users with UserAppAccess
-        except ValueError as e:
-            current_app.logger.error(f"Mass Update Error: Invalid user ID format {user_id}: {e}")
+        except Exception as e:
+            current_app.logger.error(f"Mass Update Error: Invalid user UUID {user_id}: {e}")
             error_count += 1
     
     users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
@@ -474,16 +480,18 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
     processed_count = 0
     error_count = 0
     
-    # Parse prefixed user IDs and separate by type
+    # Convert UUIDs to actual user IDs for local users only
     local_user_ids = []
+    from app.utils.helpers import get_user_by_uuid
+    
     for user_id in user_ids:
         try:
-            user_type, actual_id = parse_user_id(user_id)
-            if user_type == "user_app_access":
-                local_user_ids.append(actual_id)
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                local_user_ids.append(user_obj.id)
             # Note: mass library updates by server only apply to local users
-        except ValueError as e:
-            current_app.logger.error(f"Mass Update by Server Error: Invalid user ID format {user_id}: {e}")
+        except Exception as e:
+            current_app.logger.error(f"Mass Update by Server Error: Invalid user UUID {user_id}: {e}")
             error_count += 1
     
     users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
@@ -543,15 +551,17 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
 
 
 def mass_update_bot_whitelist(user_ids: list, should_whitelist: bool, admin_id: int = None):
-    # Parse prefixed user IDs and get local user IDs
+    # Convert UUIDs to actual user IDs for local users only
     local_user_ids = []
+    from app.utils.helpers import get_user_by_uuid
+    
     for user_id in user_ids:
         try:
-            user_type, actual_id = parse_user_id(user_id)
-            if user_type == "user_app_access":
-                local_user_ids.append(actual_id)
-        except ValueError:
-            continue  # Skip invalid IDs
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                local_user_ids.append(user_obj.id)
+        except Exception:
+            continue  # Skip invalid UUIDs
     
     users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
     updated_count = 0
@@ -565,15 +575,17 @@ def mass_update_bot_whitelist(user_ids: list, should_whitelist: bool, admin_id: 
     return updated_count
 
 def mass_update_purge_whitelist(user_ids: list, should_whitelist: bool, admin_id: int = None):
-    # Parse prefixed user IDs and get local user IDs
+    # Convert UUIDs to actual user IDs for local users only
     local_user_ids = []
+    from app.utils.helpers import get_user_by_uuid
+    
     for user_id in user_ids:
         try:
-            user_type, actual_id = parse_user_id(user_id)
-            if user_type == "user_app_access":
-                local_user_ids.append(actual_id)
-        except ValueError:
-            continue  # Skip invalid IDs
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                local_user_ids.append(user_obj.id)
+        except Exception:
+            continue  # Skip invalid UUIDs
     
     users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
     updated_count = 0
@@ -592,20 +604,21 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
     
     # Import required models
     from app.models_media_services import UserMediaAccess
+    from app.utils.helpers import get_user_by_uuid
     
-    # Parse prefixed user IDs and separate by type
+    # Convert UUIDs to actual user IDs and separate by type
     local_user_ids = []
     standalone_user_ids = []
     
     for user_id in user_ids:
         try:
-            user_type, actual_id = parse_user_id(user_id)
-            if user_type == "user_app_access":
-                local_user_ids.append(actual_id)
-            else:  # user_media_access
-                standalone_user_ids.append(actual_id)
-        except ValueError as e:
-            current_app.logger.error(f"Mass Delete Error: Invalid user ID format {user_id}: {e}")
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                local_user_ids.append(user_obj.id)
+            elif user_obj and user_type == "user_media_access":
+                standalone_user_ids.append(user_obj.id)
+        except Exception as e:
+            current_app.logger.error(f"Mass Delete Error: Invalid user UUID {user_id}: {e}")
             error_count += 1
     
     # Delete UserAppAccess users (local users)
@@ -759,23 +772,26 @@ def update_user_last_streamed(plex_user_id_or_uuid, last_streamed_at_datetime: d
     return False
 
 def update_user_last_streamed_by_id(user_id, last_streamed_at_datetime: datetime):
-    """Universal function to update last_streamed_at for any user by their MUM user ID"""
-    # Parse prefixed user ID
-    try:
-        user_type, actual_id = parse_user_id(user_id)
-        
-        if user_type == "user_app_access":
-            user = UserAppAccess.query.get(actual_id)
+    """Universal function to update last_streamed_at for any user by their MUM user ID. Uses UUID-based identification only."""
+    # Get user by UUID
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_id))
+    
+    if not user_obj:
+        current_app.logger.warning(f"User_Service.py - update_user_last_streamed_by_id(): User not found with ID: {user_id}")
+        return False
+    
+    if user_type == "user_app_access":
+        user = user_obj
+    elif user_type == "user_media_access":
+        # For user_media_access, get the associated UserAppAccess if it exists
+        if user_obj.user_app_access_id:
+            user = UserAppAccess.query.get(user_obj.user_app_access_id)
         else:
-            # For user_media_access, get the associated UserAppAccess if it exists
-            media_access = UserMediaAccess.query.get(actual_id)
-            if media_access and media_access.user_app_access_id:
-                user = UserAppAccess.query.get(media_access.user_app_access_id)
-            else:
-                current_app.logger.warning(f"User_Service.py - update_user_last_streamed_by_id(): Cannot update last streamed for standalone service user {user_id}")
-                return False
-    except ValueError as e:
-        current_app.logger.warning(f"User_Service.py - update_user_last_streamed_by_id(): Invalid user ID format {user_id}: {e}")
+            current_app.logger.warning(f"User_Service.py - update_user_last_streamed_by_id(): Cannot update last streamed for standalone service user {user_id}")
+            return False
+    else:
+        current_app.logger.warning(f"User_Service.py - update_user_last_streamed_by_id(): Invalid user type {user_type} for user {user_id}")
         return False
     
     if not user:
@@ -894,25 +910,30 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
     return eligible_users_list
 
 def get_user_stream_stats(user_id):
-    """Aggregates stream history for a user to produce Tautulli-like stats."""
+    """Aggregates stream history for a user to produce Tautulli-like stats. Uses UUID-based identification only."""
     now = datetime.now(timezone.utc)
     day_ago = now - timedelta(days=1)
     week_ago = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
 
-    # Parse prefixed user ID to determine query filter
-    try:
-        user_type, actual_id = parse_user_id(user_id)
-        current_app.logger.info(f"DEBUG STATS SERVICE: Parsed user_id {user_id} -> type: {user_type}, actual_id: {actual_id}")
-    except ValueError as e:
-        current_app.logger.error(f"Invalid user ID format in get_user_stream_stats: {user_id}: {e}")
+    # Get user by UUID
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_id))
+    
+    if not user_obj:
+        current_app.logger.error(f"User not found in get_user_stream_stats: {user_id}")
         return {'global': {}, 'players': []}
-
+    
     # Build query filter based on user type
     if user_type == "user_app_access":
-        filter_condition = MediaStreamHistory.user_app_access_id == actual_id
-    else:  # user_media_access
-        filter_condition = MediaStreamHistory.user_media_access_id == actual_id
+        filter_condition = MediaStreamHistory.user_app_access_id == user_obj.id
+        current_app.logger.info(f"DEBUG STATS SERVICE: UUID lookup successful for {user_id} -> user_app_access_id: {user_obj.id}")
+    elif user_type == "user_media_access":
+        filter_condition = MediaStreamHistory.user_media_access_id == user_obj.id
+        current_app.logger.info(f"DEBUG STATS SERVICE: UUID lookup successful for {user_id} -> user_media_access_id: {user_obj.id}")
+    else:
+        current_app.logger.error(f"Invalid user type {user_type} for user ID: {user_id}")
+        return {'global': {}, 'players': []}
 
     # --- Global Stats ---
     # Perform all aggregations in a single query for efficiency
@@ -970,12 +991,29 @@ def get_bulk_user_stream_stats(user_ids: list[int]) -> dict:
         for user_id, plays, duration in results
     }
 
-def get_bulk_last_known_ips(user_ids: list[int]) -> dict:
+def get_bulk_last_known_ips(user_uuids: list) -> dict:
     """
-    Efficiently gets the most recent IP address for a list of user IDs.
-    Returns a dictionary mapping user_id to the last known IP address.
+    Efficiently gets the most recent IP address for a list of user UUIDs.
+    Returns a dictionary mapping user_uuid to the last known IP address.
     """
-    if not user_ids:
+    if not user_uuids:
+        return {}
+
+    # Convert UUIDs to actual user IDs
+    from app.utils.helpers import get_user_by_uuid
+    uuid_to_db_id = {}
+    actual_user_ids = []
+    
+    for user_uuid in user_uuids:
+        try:
+            user_obj, user_type = get_user_by_uuid(str(user_uuid))
+            if user_obj and user_type == "user_app_access":
+                uuid_to_db_id[str(user_uuid)] = user_obj.id
+                actual_user_ids.append(user_obj.id)
+        except Exception:
+            continue  # Skip invalid UUIDs
+    
+    if not actual_user_ids:
         return {}
 
     # Use a subquery to rank history entries by date for each user
@@ -986,12 +1024,20 @@ def get_bulk_last_known_ips(user_ids: list[int]) -> dict:
             partition_by=MediaStreamHistory.user_app_access_id,
             order_by=MediaStreamHistory.started_at.desc()
         ).label('rn')
-    ).filter(MediaStreamHistory.user_app_access_id.in_(user_ids)).filter(MediaStreamHistory.ip_address.isnot(None)).subquery()
+    ).filter(MediaStreamHistory.user_app_access_id.in_(actual_user_ids)).filter(MediaStreamHistory.ip_address.isnot(None)).subquery()
 
     # Select only the most recent entry (rank = 1) for each user
     results = db.session.query(subquery.c.user_app_access_id, subquery.c.ip_address).filter(subquery.c.rn == 1).all()
 
-    return {user_id: ip_address for user_id, ip_address in results}
+    # Map back to UUIDs
+    uuid_to_ip = {}
+    for user_uuid, db_id in uuid_to_db_id.items():
+        for result_db_id, ip_address in results:
+            if result_db_id == db_id:
+                uuid_to_ip[user_uuid] = ip_address
+                break
+    
+    return uuid_to_ip
 
 def mass_extend_access(user_ids: list, days_to_extend: int, admin_id: int = None):
     """Extend access expiration for multiple users by a specified number of days"""
@@ -999,14 +1045,16 @@ def mass_extend_access(user_ids: list, days_to_extend: int, admin_id: int = None
     processed_count = 0
     error_count = 0
     
-    # Parse prefixed user IDs and get local user IDs
+    # Convert UUIDs to actual user IDs for local users only
     local_user_ids = []
+    from app.utils.helpers import get_user_by_uuid
+    
     for user_id in user_ids:
         try:
-            user_type, actual_id = parse_user_id(user_id)
-            if user_type == "user_app_access":
-                local_user_ids.append(actual_id)
-        except ValueError:
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                local_user_ids.append(user_obj.id)
+        except Exception:
             error_count += 1
             continue
     
@@ -1044,14 +1092,16 @@ def mass_set_expiration(user_ids: list, expiration_date, admin_id: int = None):
     processed_count = 0
     error_count = 0
     
-    # Parse prefixed user IDs and get local user IDs
+    # Convert UUIDs to actual user IDs for local users only
     local_user_ids = []
+    from app.utils.helpers import get_user_by_uuid
+    
     for user_id in user_ids:
         try:
-            user_type, actual_id = parse_user_id(user_id)
-            if user_type == "user_app_access":
-                local_user_ids.append(actual_id)
-        except ValueError:
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                local_user_ids.append(user_obj.id)
+        except Exception:
             error_count += 1
             continue
     
@@ -1090,14 +1140,16 @@ def mass_clear_expiration(user_ids: list, admin_id: int = None):
     processed_count = 0
     error_count = 0
     
-    # Parse prefixed user IDs and get local user IDs
+    # Convert UUIDs to actual user IDs for local users only
     local_user_ids = []
+    from app.utils.helpers import get_user_by_uuid
+    
     for user_id in user_ids:
         try:
-            user_type, actual_id = parse_user_id(user_id)
-            if user_type == "user_app_access":
-                local_user_ids.append(actual_id)
-        except ValueError:
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                local_user_ids.append(user_obj.id)
+        except Exception:
             error_count += 1
             continue
     

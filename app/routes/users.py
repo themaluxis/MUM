@@ -18,16 +18,7 @@ from sqlalchemy.exc import IntegrityError
 
 bp = Blueprint('users', __name__)
 
-def parse_user_id(user_id):
-    """Parse prefixed user ID and return (user_type, actual_id)"""
-    if ":" not in str(user_id):
-        raise ValueError(f"Invalid user ID format: {user_id}. Must be 'type:id'")
-    
-    user_type, actual_id = str(user_id).split(":", 1)
-    if user_type not in ["user_app_access", "user_media_access"]:
-        raise ValueError(f"Invalid user type: {user_type}")
-    
-    return user_type, int(actual_id)
+# parse_user_id function removed - now using UUID-based identification only
 
 # Library data is now fetched from database instead of API calls
 
@@ -203,8 +194,8 @@ def list_users():
             # Create a mock user object with the necessary attributes for display
             class MockUser:
                 def __init__(self, access):
-                    # Use prefixed ID format for service users to avoid conflicts with local users
-                    self._prefixed_id = f"user_media_access:{access.id}"  # Prefixed format: "user_media_access:1"
+                    # Store UUID for identification
+                    self.uuid = access.uuid
                     self.id = access.id  # Keep original numeric ID
                     self.username = access.external_username or 'Unknown'
                     self.email = access.external_email
@@ -245,7 +236,7 @@ def list_users():
             mock_user = MockUser(access)
             mock_user._user_type = 'service'  # Add type for processing
             service_users.append(mock_user)
-            current_app.logger.info(f"DEBUG: Added service user {mock_user.username} (ID: {mock_user._prefixed_id}) to list")
+            current_app.logger.info(f"DEBUG: Added service user {mock_user.username} (UUID: {mock_user.uuid}) to list")
         
         current_app.logger.info(f"Found {len(service_users)} standalone service users")
         for service_user in service_users:
@@ -262,10 +253,9 @@ def list_users():
     current_app.logger.info(f"DEBUG: Found {len(app_users)} local users")
     for app_user in app_users:
         app_user._user_type = 'local'
-        # Store prefixed ID in a separate attribute, keep original ID intact
-        app_user._prefixed_id = f"user_app_access:{app_user.id}"
+        # UUID is already available on the user object
         all_users.append(app_user)
-        current_app.logger.info(f"DEBUG: Local user {app_user.username} (ID: {app_user._prefixed_id}) added to list")
+        current_app.logger.info(f"DEBUG: Local user {app_user.username} (UUID: {app_user.uuid}) added to list")
     
     # Add service users with a type indicator  
     for service_user in service_users:
@@ -304,7 +294,7 @@ def list_users():
     current_app.logger.info(f"DEBUG: Found {len(allgas_users)} AllGas users in total list")
     for user in allgas_users:
         server_name = getattr(user._access_record, 'server', {}).name if hasattr(user, '_access_record') else 'N/A'
-        current_app.logger.info(f"DEBUG: AllGas user - ID: {getattr(user, '_prefixed_id', user.id)}, type: {getattr(user, '_user_type', 'unknown')}, server: {server_name}")
+        current_app.logger.info(f"DEBUG: AllGas user - UUID: {getattr(user, 'uuid', user.id)}, type: {getattr(user, '_user_type', 'unknown')}, server: {server_name}")
     
     allgas_on_page = [user for user in users_on_page if user.username == 'AllGas']
     if 'last_streamed' in sort_by_param:
@@ -312,7 +302,7 @@ def list_users():
     else:
         current_app.logger.info(f"DEBUG: Found {len(allgas_on_page)} AllGas users on current page (start: {start_idx}, end: {end_idx})")
     for user in allgas_on_page:
-        current_app.logger.info(f"DEBUG: AllGas on page - ID: {getattr(user, '_prefixed_id', user.id)}, type: {getattr(user, '_user_type', 'unknown')}")
+        current_app.logger.info(f"DEBUG: AllGas on page - UUID: {getattr(user, 'uuid', user.id)}, type: {getattr(user, '_user_type', 'unknown')}")
     
     # Create a mock pagination object
     class MockPagination:
@@ -360,15 +350,11 @@ def list_users():
     
     for user in users_on_page:
         if hasattr(user, '_user_type'):
-            try:
-                user_id_to_parse = getattr(user, '_prefixed_id', user.id)
-                user_type, actual_id = parse_user_id(user_id_to_parse)
-                if user._user_type == 'service' and user_type == 'user_media_access':
-                    user_ids_on_page.append(actual_id)
-                elif user._user_type == 'local' and user_type == 'user_app_access':
-                    app_user_ids_on_page.append(actual_id)
-            except ValueError as e:
-                current_app.logger.error(f"Error parsing user ID {user_id_to_parse} for stats: {e}")
+            # Use actual database IDs directly since we're working with real user objects
+            if user._user_type == 'service':
+                user_ids_on_page.append(user.id)
+            elif user._user_type == 'local':
+                app_user_ids_on_page.append(user.id)
 
     # Fetch additional data for service users only (using actual IDs)
     stream_stats = {}
@@ -380,19 +366,11 @@ def list_users():
     # Attach the additional data directly to each user object
     for user in users_on_page:
         if hasattr(user, '_user_type') and user._user_type == 'service':
-            try:
-                # Extract actual ID for stats lookup
-                user_id_to_parse = getattr(user, '_prefixed_id', user.id)
-                user_type, actual_id = parse_user_id(user_id_to_parse)
-                stats = stream_stats.get(actual_id, {})
-                user.total_plays = stats.get('play_count', 0)
-                user.total_duration = stats.get('total_duration', 0)
-                user.last_known_ip = last_ips.get(actual_id, 'N/A')
-            except ValueError as e:
-                current_app.logger.error(f"Error parsing user ID {user_id_to_parse} for stats attachment: {e}")
-                user.total_plays = 0
-                user.total_duration = 0
-                user.last_known_ip = 'N/A'
+            # Use actual database ID directly
+            stats = stream_stats.get(user.id, {})
+            user.total_plays = stats.get('play_count', 0)
+            user.total_duration = stats.get('total_duration', 0)
+            user.last_known_ip = last_ips.get(user.id, 'N/A')
         else:
             # Local users don't have stream stats from the service-specific logic above
             user.total_plays = 0
@@ -413,7 +391,7 @@ def list_users():
     current_app.logger.info(f"DEBUG: Processing {len(users_on_page)} users for library access")
     
     for user in users_on_page:
-        user_id = getattr(user, '_prefixed_id', user.id)
+        user_id = user.uuid
         user_library_access_by_server[user_id] = {}
         user_library_service_mapping[user_id] = {}  # NEW: Initialize library-to-service mapping
         user_service_types[user_id] = []
@@ -421,27 +399,22 @@ def list_users():
         
         current_app.logger.info(f"DEBUG: Processing user ID {user_id}, username: {user.username}, type: {getattr(user, '_user_type', 'unknown')}")
         
-        # Parse prefixed user ID to get type and actual database ID
-        try:
-            user_type, actual_id = parse_user_id(user_id)
-            current_app.logger.info(f"DEBUG: Parsed user ID - Type: {user_type}, Actual ID: {actual_id}")
-            
-            if user_type == "user_app_access":
+        # Use user type and actual database ID directly from user object
+        if hasattr(user, '_user_type'):
+            if user._user_type == 'local':
                 # Local user - get all their UserMediaAccess records via user_app_access_id
-                access_records = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id == actual_id).all()
-                current_app.logger.info(f"DEBUG: Local user {user.username} (ID: {user_id}) has {len(access_records)} access records")
-            elif user_type == "user_media_access":
+                access_records = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id == user.id).all()
+                current_app.logger.info(f"DEBUG: Local user {user.username} (ID: {user.id}) has {len(access_records)} access records")
+            elif user._user_type == 'service':
                 # Service user - get the specific UserMediaAccess record
-                access_records = UserMediaAccess.query.filter(UserMediaAccess.id == actual_id).all()
-                current_app.logger.info(f"DEBUG: Service user {user.username} (ID: {user_id}) has {len(access_records)} access records")
+                access_records = UserMediaAccess.query.filter(UserMediaAccess.id == user.id).all()
+                current_app.logger.info(f"DEBUG: Service user {user.username} (ID: {user.id}) has {len(access_records)} access records")
             else:
-                # This shouldn't happen with our validation, but just in case
                 access_records = []
-                current_app.logger.warning(f"DEBUG: Unknown user type: {user_type}")
-        except ValueError as e:
-            # Handle malformed user IDs
-            current_app.logger.error(f"DEBUG: Error parsing user ID {user_id}: {e}")
+                current_app.logger.warning(f"DEBUG: Unknown user type: {user._user_type}")
+        else:
             access_records = []
+            current_app.logger.warning(f"DEBUG: User {user.username} has no _user_type attribute")
         
         # Process the access records for this user
         for access in access_records:
@@ -477,7 +450,7 @@ def list_users():
     media_service_manager = MediaServiceManager()
     
     # Create a mapping of user_id to User object for easy lookup
-    users_by_id = {getattr(user, '_prefixed_id', user.id): user for user in users_pagination.items}
+    users_by_id = {user.uuid: user for user in users_pagination.items}
     
     # Get all servers for library lookups
     all_servers = media_service_manager.get_all_servers(active_only=True)
@@ -564,13 +537,8 @@ def list_users():
     # Extract actual UserAppAccess IDs for local users (MediaStreamHistory only tracks local users)
     for user in users_pagination.items:
         if hasattr(user, '_user_type') and user._user_type == 'local':
-            try:
-                user_id_to_parse = getattr(user, '_prefixed_id', user.id)
-                user_type, actual_id = parse_user_id(user_id_to_parse)
-                if user_type == 'user_app_access':
-                    local_user_ids_on_page.append(actual_id)
-            except ValueError as e:
-                current_app.logger.error(f"Error parsing user ID {user_id_to_parse} for last played: {e}")
+            # Use actual database ID directly for local users
+            local_user_ids_on_page.append(user.id)
     
     if local_user_ids_on_page:
         # Get the most recent stream for each local user from MediaStreamHistory table
@@ -584,9 +552,10 @@ def list_users():
         seen_users = set()
         for stream in last_streams:
             if stream.user_app_access_id not in seen_users:
-                # Create prefixed ID for template lookup
-                prefixed_user_id = f"user_app_access:{stream.user_app_access_id}"
-                user_last_played[prefixed_user_id] = {
+                # Find the user by database ID to get their UUID
+                user_for_stream = next((u for u in users_on_page if hasattr(u, '_user_type') and u._user_type == 'local' and u.id == stream.user_app_access_id), None)
+                if user_for_stream:
+                    user_last_played[user_for_stream.uuid] = {
                     'media_title': stream.media_title,
                     'media_type': stream.media_type,
                     'grandparent_title': stream.grandparent_title,
@@ -596,13 +565,9 @@ def list_users():
                     'server_id': stream.server_id if hasattr(stream, 'server_id') else None
                 }
                 
-                # Also set last_streamed_at on the user object for table display
-                # When sorting by last_streamed, users_on_page contains all users, not just paginated ones
-                for user in users_on_page:
-                    if (hasattr(user, '_user_type') and user._user_type == 'local' and 
-                        hasattr(user, '_prefixed_id') and user._prefixed_id == prefixed_user_id):
-                        user.last_streamed_at = stream.started_at
-                        break
+                    # Also set last_streamed_at on the user object for table display
+                    # When sorting by last_streamed, users_on_page contains all users, not just paginated ones
+                    user_for_stream.last_streamed_at = stream.started_at
                 
                 seen_users.add(stream.user_app_access_id)
 
@@ -634,7 +599,7 @@ def list_users():
         for service_user in service_users:
             if hasattr(service_user, '_is_standalone') and service_user._is_standalone:
                 # Add the service type for this standalone user
-                user_service_types[getattr(service_user, '_prefixed_id', service_user.id)] = [service_user._access_record.server.service_type]
+                user_service_types[service_user.uuid] = [service_user._access_record.server.service_type]
     
     # Check if user accounts feature is enabled
     allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
@@ -793,26 +758,28 @@ def sync_all_users():
         }
         return make_response(modal_html, 200, headers)
 
-@bp.route('/delete/<user_id>', methods=['DELETE'])
+@bp.route('/delete/<uuid:user_uuid>', methods=['DELETE'])
 @login_required
 @setup_required
 @permission_required('delete_user')
-def delete_user(user_id):
-    # Parse prefixed user ID to determine type and get actual database ID
-    try:
-        user_type, actual_id = parse_user_id(user_id)
-        current_app.logger.info(f"Delete user request - Type: {user_type}, Actual ID: {actual_id}")
-    except ValueError as e:
-        current_app.logger.error(f"Invalid user ID format for deletion: {user_id} - {e}")
+def delete_user(user_uuid):
+    # Get user by uuid
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_uuid))
+    
+    if not user_obj:
+        current_app.logger.error(f"User not found with uuid: {user_uuid}")
         toast = {
             "showToastEvent": {
-                "message": f"Invalid user ID format: {user_id}",
+                "message": f"User not found: {user_uuid}",
                 "category": "error"
             }
         }
-        response = make_response("", 400)
+        response = make_response("", 404)
         response.headers['HX-Trigger'] = json.dumps(toast)
         return response
+    
+    actual_id = user_obj.id
     
     if user_type == "user_app_access":
         # This is a local UserAppAccess user
@@ -945,45 +912,22 @@ def mass_edit_libraries_form():
         if not uid_str:
             continue
         
-        # Try to parse as prefixed ID first
+        # Try to parse as UUID first
         try:
-            user_type, actual_id = parse_user_id(uid_str)
-            current_app.logger.info(f"DEBUG: Parsed prefixed ID - type: {user_type}, id: {actual_id}")
-            # Mass edit libraries only applies to service users (UserMediaAccess)
-            if user_type == "user_media_access":
-                service_user_ids.append(actual_id)
-                current_app.logger.info(f"DEBUG: Added service user ID {actual_id} from prefixed ID {uid_str}")
-            else:
+            from app.utils.helpers import get_user_by_uuid
+            user_obj, user_type = get_user_by_uuid(uid_str)
+            
+            if user_obj and user_type == "user_media_access":
+                service_user_ids.append(user_obj.id)
+                current_app.logger.info(f"DEBUG: Added service user ID {user_obj.id} from uuid {uid_str}")
+            elif user_obj and user_type == "user_app_access":
                 current_app.logger.warning(f"Mass edit libraries attempted on local user {uid_str} - not supported")
-        except ValueError as e:
-            current_app.logger.info(f"DEBUG: Failed to parse as prefixed ID: {e}")
-            # If parsing fails, treat as plain numeric ID and assume it's a UserMediaAccess ID
-            # This handles the case where frontend passes plain IDs like "1" instead of "user_media_access_1"
-            try:
-                actual_id = int(uid_str)
-                current_app.logger.info(f"DEBUG: Treating as plain numeric ID: {actual_id}")
-                
-                # Check both UserMediaAccess and UserAppAccess to see which one exists
-                from app.models_media_services import UserMediaAccess
-                uma_record = UserMediaAccess.query.get(actual_id)
-                uaa_record = UserAppAccess.query.get(actual_id)
-                
-                current_app.logger.info(f"DEBUG: UserMediaAccess record with ID {actual_id}: {'EXISTS' if uma_record else 'NOT FOUND'}")
-                current_app.logger.info(f"DEBUG: UserAppAccess record with ID {actual_id}: {'EXISTS' if uaa_record else 'NOT FOUND'}")
-                
-                if uma_record and uaa_record:
-                    current_app.logger.error(f"DEBUG: ID COLLISION! Both UserMediaAccess and UserAppAccess have ID {actual_id}")
-                    current_app.logger.error(f"DEBUG: UserMediaAccess: {uma_record.external_username} on {uma_record.server.name}")
-                    current_app.logger.error(f"DEBUG: UserAppAccess: {uaa_record.username}")
-                    current_app.logger.error(f"DEBUG: This is why we need prefixed IDs!")
-                
-                if uma_record:
-                    service_user_ids.append(actual_id)
-                    current_app.logger.info(f"DEBUG: Added service user ID {actual_id} from plain ID {uid_str}")
-                else:
-                    current_app.logger.warning(f"Plain ID {uid_str} does not correspond to a valid UserMediaAccess record")
-            except (ValueError, TypeError) as e:
-                current_app.logger.error(f"Invalid user ID format in mass edit libraries: {uid_str} - {e}")
+            else:
+                current_app.logger.warning(f"No user found for uuid {uid_str}")
+        except Exception as e:
+            current_app.logger.info(f"DEBUG: Failed to parse as uuid: {e}")
+            # No fallback - UUID-only identification
+            current_app.logger.error(f"Invalid user UUID in mass edit libraries: {uid_str} - {e}")
     
     if not service_user_ids:
         return '<div class="alert alert-warning">Mass edit libraries is only available for service users. No valid service users were selected.</div>'
@@ -1123,19 +1067,22 @@ def mass_edit_users():
         
         # Parse prefixed user IDs and extract actual database IDs
         user_ids = []
+        # Convert UUIDs to actual user IDs for local users only
+        from app.utils.helpers import get_user_by_uuid
+        
         for uid_str in user_ids_str.split(','):
             uid_str = uid_str.strip()
             if not uid_str:
                 continue
             try:
-                user_type, actual_id = parse_user_id(uid_str)
+                user_obj, user_type = get_user_by_uuid(uid_str)
                 # For mass edit operations, we only support local users (UserAppAccess)
-                if user_type == "user_app_access":
-                    user_ids.append(actual_id)
+                if user_obj and user_type == "user_app_access":
+                    user_ids.append(user_obj.id)
                 else:
-                    current_app.logger.warning(f"Mass edit attempted on service user {uid_str} - not supported")
-            except ValueError as e:
-                current_app.logger.error(f"Invalid user ID format in mass edit: {uid_str} - {e}")
+                    current_app.logger.warning(f"Mass edit attempted on non-local user {uid_str} - not supported")
+            except Exception as e:
+                current_app.logger.error(f"Invalid user UUID in mass edit: {uid_str} - {e}")
         
         if not user_ids:
             toast_message = "No valid local users selected for mass edit operation."
@@ -1862,17 +1809,19 @@ def delete_app_user(username):
         response.headers['HX-Trigger'] = json.dumps(toast)
         return response
 
-@bp.route('/debug_info/<user_id>')
+@bp.route('/debug_info/<uuid:user_uuid>')
 @login_required
-def get_user_debug_info(user_id):
+def get_user_debug_info(user_uuid):
     """Get raw user data for debugging purposes - ONLY uses stored data, NO API calls"""
-    # Parse prefixed user ID to determine type and get actual database ID
-    try:
-        user_type, actual_id = parse_user_id(user_id)
-        current_app.logger.info(f"Debug info request - Type: {user_type}, Actual ID: {actual_id}")
-    except ValueError as e:
-        current_app.logger.error(f"Invalid user ID format for debug info: {user_id} - {e}")
-        return f"<p class='text-error'>Invalid user ID format: {user_id}</p>"
+    # Get user by uuid
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_uuid))
+    
+    if not user_obj:
+        current_app.logger.error(f"User not found with uuid: {user_uuid}")
+        return f"<p class='text-error'>User not found: {user_uuid}</p>"
+    
+    actual_id = user_obj.id
     
     if user_type == "user_app_access":
         # This is a local UserAppAccess user
@@ -1963,17 +1912,19 @@ def get_user_debug_info(user_id):
         current_app.logger.error(f"Error getting debug info for user {user_id}: {e}", exc_info=True)
         return f"<p class='text-error'>Error fetching user data: {str(e)}</p>"
 
-@bp.route('/quick_edit_form/<user_id>')
+@bp.route('/quick_edit_form/<uuid:user_uuid>')
 @login_required
 @permission_required('edit_user')
-def get_quick_edit_form(user_id):
-    # Parse prefixed user ID to determine type and get actual database ID
-    try:
-        user_type, actual_id = parse_user_id(user_id)
-        current_app.logger.info(f"Quick edit form request - Type: {user_type}, Actual ID: {actual_id}")
-    except ValueError as e:
-        current_app.logger.error(f"Invalid user ID format for quick edit: {user_id} - {e}")
-        return '<div class="alert alert-error">Invalid user ID format. Quick edit is only available for local users.</div>'
+def get_quick_edit_form(user_uuid):
+    # Get user by uuid
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_uuid))
+    
+    if not user_obj:
+        current_app.logger.error(f"User not found with uuid: {user_uuid}")
+        return '<div class="alert alert-error">User not found.</div>'
+    
+    actual_id = user_obj.id
     
     if user_type == "user_app_access":
         # Local user - get UserAppAccess record

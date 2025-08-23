@@ -1,6 +1,7 @@
 # File: app/models_media_services.py
 import enum
 import json
+import uuid
 from datetime import datetime
 from app.utils.timezone_utils import utcnow
 from sqlalchemy.types import TypeDecorator, TEXT
@@ -140,6 +141,7 @@ class UserMediaAccess(db.Model):
     __tablename__ = 'user_media_access'
     
     id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     
     # Updated foreign key to UserAppAccess (nullable to support standalone server users)
     user_app_access_id = db.Column(db.Integer, db.ForeignKey('user_app_access.id'), nullable=True, index=True)

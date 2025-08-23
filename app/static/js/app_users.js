@@ -12,15 +12,13 @@ function viewAppUser(username) {
 
 /**
  * Navigate to service user profile/details
- * @param {number} serviceUserId - The ID of the service user
+ * @param {string} serverNickname - The server nickname
+ * @param {string} serverUsername - The username on the server
  */
-function viewServiceAccount(serviceUserId) {
-    console.log('Viewing service account:', serviceUserId);
-    // For now, we'll show an alert - later this can navigate to a profile page
-    showToast(`Viewing service account (ID: ${serviceUserId})`, 'info');
-    
-    // TODO: Implement actual navigation
-    // window.location.href = `/users/service/${serviceUserId}`;
+function viewServiceAccount(serverNickname, serverUsername) {
+    console.log('Viewing service account:', serverUsername, 'on', serverNickname);
+    // Navigate to the service account profile page
+    window.location.href = `/user/${encodeURIComponent(serverNickname)}/${encodeURIComponent(serverUsername)}`;
 }
 
 /**

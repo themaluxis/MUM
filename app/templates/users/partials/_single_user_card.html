@@ -1,7 +1,7 @@
 {# File: app/templates/users/partials/_single_user_card.html #}
 {# Expects 'user' object and other context variables like 'user_sorted_libraries', 'admins_by_uuid' etc. #}
 {# Determine service-specific background tint and selection colors #}
-{% set service_types = user_service_types.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+{% set service_types = user_service_types.get(user.uuid, []) %}
 {% set primary_service = service_types[0] if service_types else None %}
 {% if primary_service %}
     {% if primary_service.value == 'plex' %}
@@ -44,13 +44,13 @@
 {% endif %}
 <div id="user-card-{{ user.id }}" class="card {{ card_bg_class }} shadow-lg hover:shadow-xl transition-all duration-200 ease-in-out relative group user-card-clickable user-card" data-user-id-for-card="{{ user.id }}" data-service-color="{{ service_color }}" data-service-class="{{ service_color_class }}">
     <!-- User Selection Checkbox -->
-    <input type="checkbox" id="user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-user-id="{{ user._prefixed_id if user._prefixed_id is defined else user.id }}" title="Select user" style="--input-color: {{ service_color }}; --chkfg: white;">
+    <input type="checkbox" id="user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-user-id="{{ user.uuid }}" title="Select user" style="--input-color: {{ service_color }}; --chkfg: white;">
     
     <div class="card-body p-4">
         <div class="flex flex-row items-center mb-3">
             <div class="avatar mr-3">
                 <div class="w-10 rounded-full">
-                    {% set service_types = user_service_types.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+                    {% set service_types = user_service_types.get(user.uuid, []) %}
                     {% set primary_service = service_types[0] if service_types else None %}
                     
                     {# Always use colored circular avatars with service-specific colors #}
@@ -132,7 +132,7 @@
                         {% set service_name = primary_service.value|title %}
                     {% endif %}
                     {# Server name badge with service icon and color (Discord-style) #}
-                        {% set user_servers = user_server_names.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+                        {% set user_servers = user_server_names.get(user.uuid if user.uuid is defined else user.id, []) %}
                         {% if user_servers %}
                             {% if primary_service %}
                                 {% if primary_service.value == 'plex' %}
@@ -225,10 +225,10 @@
         </div>
 
         <div class="mb-3">
-            <p class="text-xs font-semibold mb-2">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user._prefixed_id if user._prefixed_id is defined else user.id, [])|length }}</span>):</p>
-            {% if user_sorted_libraries.get(user._prefixed_id if user._prefixed_id is defined else user.id) %}
+            <p class="text-xs font-semibold mb-2">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.uuid if user.uuid is defined else user.id, [])|length }}</span>):</p>
+            {% if user_sorted_libraries.get(user.uuid if user.uuid is defined else user.id) %}
                 <div class="flex flex-wrap gap-1">
-                    {% for lib_name in user_sorted_libraries.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
+                    {% for lib_name in user_sorted_libraries.get(user.uuid if user.uuid is defined else user.id, []) %}
                         <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1" title="{{ lib_name }}">
                             <i class="fa-solid fa-folder w-2.5 h-2.5 mr-1 bottom-px relative"></i>
                             {{ lib_name }}
@@ -237,7 +237,7 @@
                 </div>
             {% else %}
                 <span class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1">
-                    <i class="fa-solid fa-folder-open w-2.5 h-2.5"></i>
+                    <i class="fa-solid fa-folder-open w-2.5 h-2.5 mr-1 bottom-px relative"></i>
                     No libraries specifically shared
                 </span>
             {% endif %}
@@ -262,7 +262,7 @@
         <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">
             <button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" 
                     title="Show Raw User Data"
-                    hx-get="{{ url_for('users.get_user_debug_info', user_id=user._prefixed_id if user._prefixed_id is defined else user.id) }}"
+                    hx-get="{{ url_for('users.get_user_debug_info', user_uuid=user.uuid) }}"
                     hx-target="#user_debug_modal_content"
                     hx-swap="innerHTML"
                     onclick="user_debug_modal.showModal()">
@@ -291,7 +291,7 @@
             {% if current_user.has_permission('edit_user') %}
             <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 card-action-button"
                     title="Quick Edit Settings"
-                    hx-get="{{ url_for('users.get_quick_edit_form', user_id=user._prefixed_id if user._prefixed_id is defined else user.id) }}"
+                    hx-get="{{ url_for('users.get_quick_edit_form', user_uuid=user.uuid) }}"
                     hx-target="#quick_edit_modal_content_div"
                     hx-swap="innerHTML"
                     onclick="quick_edit_user_modal.showModal()">
@@ -301,7 +301,7 @@
             {% if current_user.has_permission('delete_user') %}
             <button class="btn btn-xs btn-ghost text-error hover:bg-error/10 card-action-button" title="Remove User"
                     hx-confirm="Are you sure you want to remove '{{ user.get_display_name() }}' from MUM and media servers?"
-                    hx-delete="{{ url_for('users.delete_user', user_id=user._prefixed_id if user._prefixed_id is defined else user.id) }}"
+                    hx-delete="{{ url_for('users.delete_user', user_uuid=user.uuid) }}"
                     hx-target="closest .card" 
                     hx-swap="outerHTML swap:0.5s"
                     hx-indicator="this">

@@ -190,16 +190,16 @@
                     {# Determine the correct route based on user type #}
                     {% if is_local_user is defined and is_local_user %}
                         {# Local User - use username route #}
-                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='profile', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'profile' else '' }}">
+                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='profile', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'profile' else '' }}">
                             <i class="fa-solid fa-user mr-2"></i>Profile
                         </a>
-                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='history', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'history' else '' }}">
+                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='history', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'history' else '' }}">
                             <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
                         </a>
-                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='settings', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'settings' else '' }}">
+                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
                             <i class="fa-solid fa-cog mr-2"></i>Settings
                         </a>
-                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='security', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'security' else '' }}">
+                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
                             <i class="fa-solid fa-shield-alt mr-2"></i>Security
                         </a>
                     {% else %}
@@ -208,17 +208,17 @@
                         {% if user_servers %}
                             {% set server_name = user_servers[0] %}
                             {% set username = user.get_display_name() %}
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='profile', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'profile' else '' }}">
+                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='profile', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'profile' else '' }}">
                                 <i class="fa-solid fa-user mr-2"></i>Profile
                             </a>
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='history', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'history' else '' }}">
+                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='history', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'history' else '' }}">
                                 <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
                             </a>
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='settings', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'settings' else '' }}">
+                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
                                 <i class="fa-solid fa-cog mr-2"></i>Settings
                             </a>
                             {% if user.password_hash and user.used_invite_id %}
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='security', **tab_params) }}" class="tab {{ 'tab-active' if active_tab == 'security' else '' }}">
+                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
                                 <i class="fa-solid fa-shield-alt mr-2"></i>Security
                             </a>
                             {% endif %}

@@ -107,18 +107,18 @@ def log_event(event_type, message: str, details: dict = None, # Removed type hin
 
 
         if user_id: 
-            # Parse prefixed user ID if provided
+            # Handle UUID or numeric user ID
             try:
-                if isinstance(user_id, str) and ":" in user_id:
-                    from app.services.user_service import parse_user_id
-                    user_type, actual_id = parse_user_id(user_id)
+                if isinstance(user_id, str) and len(str(user_id)) > 10:
+                    # Likely a UUID, try to get the user and extract numeric ID
+                    user_obj, user_type = get_user_by_uuid(str(user_id))
                     # Only store local user IDs in the log
-                    if user_type == "user_app_access":
-                        log_entry.user_id = actual_id
+                    if user_obj and user_type == "user_app_access":
+                        log_entry.user_id = user_obj.id
                 else:
                     # Assume it's already a numeric ID (backward compatibility)
                     log_entry.user_id = int(user_id)
-            except (ValueError, ImportError) as e:
+            except Exception as e:
                 current_app.logger.warning(f"Invalid user_id format in log_event: {user_id}: {e}")
                 # Don't set user_id if parsing fails
         if invite_id: log_entry.invite_id = invite_id
@@ -286,6 +286,23 @@ def get_text_color_for_bg(hex_color):
         return '#000000' if luminance > 0.5 else '#FFFFFF'
     except Exception:
         return '#FFFFFF' # Fallback
+
+def get_user_by_uuid(user_uuid):
+    """Get user (either type) by uuid"""
+    from app.models import UserAppAccess
+    from app.models_media_services import UserMediaAccess
+    
+    # Try UserMediaAccess first
+    user = UserMediaAccess.query.filter_by(uuid=user_uuid).first()
+    if user:
+        return user, 'user_media_access'
+    
+    # Try UserAppAccess
+    user = UserAppAccess.query.filter_by(uuid=user_uuid).first()
+    if user:
+        return user, 'user_app_access'
+    
+    return None, None
     
 def format_duration(total_seconds):
     """Formats a duration in seconds into a human-readable string like '1d 4h 5m'."""

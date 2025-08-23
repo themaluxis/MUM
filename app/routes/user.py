@@ -106,6 +106,7 @@ def view_service_account(server_nickname, server_username):
     class MockServiceUser:
         def __init__(self, access):
             self.id = access.id
+            self.uuid = access.uuid
             self.username = access.external_username
             self.email = access.external_email
             self.notes = access.notes
@@ -447,24 +448,17 @@ def view_service_account(server_nickname, server_username):
         # Remove the old access_expires_in_days logic since we're now using DateField
         # The form will automatically populate access_expires_at from the user object via obj=user
 
-    # Create prefixed user ID for user_service calls based on user type
-    if hasattr(user, '_is_service_user') and user._is_service_user:
-        # This is a standalone service user
-        prefixed_user_id = f"user_media_access:{user.id}"
-    else:
-        # This is a regular UserAppAccess user
-        prefixed_user_id = f"user_app_access:{user.id}"
-    
-    current_app.logger.info(f"DEBUG STATS: Getting stats for {prefixed_user_id}")
+    # Use UUID for user_service calls
+    current_app.logger.info(f"DEBUG STATS: Getting stats for {user.uuid}")
     current_app.logger.info(f"DEBUG STATS: User type check - _is_service_user: {getattr(user, '_is_service_user', 'N/A')}")
     
-    stream_stats = user_service.get_user_stream_stats(prefixed_user_id)
+    stream_stats = user_service.get_user_stream_stats(user.uuid)
     current_app.logger.info(f"DEBUG STATS: Raw stream_stats returned: {stream_stats}")
     
-    last_ip_map = user_service.get_bulk_last_known_ips([prefixed_user_id])
+    last_ip_map = user_service.get_bulk_last_known_ips([user.uuid])
     current_app.logger.info(f"DEBUG STATS: Last IP map: {last_ip_map}")
     
-    last_ip = last_ip_map.get(prefixed_user_id)
+    last_ip = last_ip_map.get(str(user.uuid))
     user.stream_stats = stream_stats
     user.total_plays = stream_stats.get('global', {}).get('all_time_plays', 0)
     user.total_duration = stream_stats.get('global', {}).get('all_time_duration_seconds', 0)
@@ -478,7 +472,7 @@ def view_service_account(server_nickname, server_username):
     current_app.logger.info(f"DEBUG STATS: Direct DB check - MediaStreamHistory records for user_media_access_id={user.id}: {db_records}")
     
     # Check if user_service is looking in the right place
-    current_app.logger.info(f"DEBUG STATS: Checking user_service logic for prefixed_user_id: {prefixed_user_id}")
+    current_app.logger.info(f"DEBUG STATS: Checking user_service logic for user UUID: {user.uuid}")
     
     stream_history_pagination = None
     kavita_reading_stats = None
@@ -598,11 +592,7 @@ def view_service_account(server_nickname, server_username):
             user_server_names[user.id].append(access_record.server.name)
 
     if request.headers.get('HX-Request') and tab == 'history':
-        # For standalone service users, we need to set a prefixed user ID for the delete function
-        if hasattr(user, '_is_service_user') and user._is_service_user:
-            user._prefixed_id = f"user_media_access:{user.id}"
-        else:
-            user._prefixed_id = f"user_app_access:{user.id}"
+        # UUID is already available on user objects for the delete function
             
         return render_template('user/partials/history_tab_content.html', 
                              user=user, 
@@ -632,21 +622,39 @@ def view_service_account(server_nickname, server_username):
     )
 
 
-@bp.route('/<user_id>/delete_history', methods=['POST'])
+@bp.route('/<username>/delete_history', methods=['POST'])
+@bp.route('/<server_nickname>/<server_username>/delete_history', methods=['POST'])
 @login_required
 @permission_required('edit_user') # Or a more specific permission if you add one
-def delete_stream_history(user_id):
-    # Parse prefixed user ID
-    from app.services.user_service import parse_user_id
-    try:
-        user_type, actual_id = parse_user_id(user_id)
+def delete_stream_history(username=None, server_nickname=None, server_username=None):
+    # Determine if this is a local user or service user based on parameters
+    if username and not server_nickname and not server_username:
+        # Local user route
+        user = UserAppAccess.query.filter_by(username=urllib.parse.unquote(username)).first()
+        if not user:
+            current_app.logger.error(f"Local user not found: {username}")
+            return make_response("<!-- error -->", 400)
+        actual_id = user.id
+        user_type = "user_app_access"
+    elif server_nickname and server_username:
+        # Service user route
+        from app.models_media_services import MediaServer
+        server = MediaServer.query.filter_by(name=urllib.parse.unquote(server_nickname)).first()
+        if not server:
+            current_app.logger.error(f"Server not found: {server_nickname}")
+            return make_response("<!-- error -->", 400)
         
-        if user_type not in ["user_app_access", "user_media_access"]:
-            # Only UserAppAccess and UserMediaAccess users have stream history
-            return make_response("<!-- no-op -->", 200)
-            
-    except ValueError as e:
-        current_app.logger.error(f"Invalid user ID format in delete_stream_history: {user_id}: {e}")
+        access = UserMediaAccess.query.filter_by(
+            server_id=server.id,
+            external_username=urllib.parse.unquote(server_username)
+        ).first()
+        if not access:
+            current_app.logger.error(f"Service user not found: {server_username} on {server_nickname}")
+            return make_response("<!-- error -->", 400)
+        actual_id = access.id
+        user_type = "user_media_access"
+    else:
+        current_app.logger.error(f"Invalid parameters for delete_stream_history")
         return make_response("<!-- error -->", 400)
     
     history_ids_to_delete = request.form.getlist('history_ids[]')
@@ -705,28 +713,31 @@ def delete_stream_history(user_id):
         response.headers['HX-Trigger'] = json.dumps(toast_payload)
         return response
 
-@bp.route('/<user_id>/reset_password', methods=['GET', 'POST'])
+@bp.route('/<username>/reset_password', methods=['GET', 'POST'])
+@bp.route('/<server_nickname>/<server_username>/reset_password', methods=['GET', 'POST'])
 @login_required
 @permission_required('edit_user')
-def reset_password(user_id):
-    # Parse prefixed user ID
-    from app.services.user_service import parse_user_id
-    try:
-        user_type, actual_id = parse_user_id(user_id)
+def reset_password(username=None, server_nickname=None, server_username=None):
+    # Determine if this is a local user or service user based on parameters
+    if username and not server_nickname and not server_username:
+        # Local user route
+        user = UserAppAccess.query.filter_by(username=urllib.parse.unquote(username)).first_or_404()
+    elif server_nickname and server_username:
+        # Service user route - get the associated UserAppAccess if it exists
+        from app.models_media_services import MediaServer
+        server = MediaServer.query.filter_by(name=urllib.parse.unquote(server_nickname)).first_or_404()
         
-        if user_type == "user_app_access":
-            user = UserAppAccess.query.get_or_404(actual_id)
+        media_access = UserMediaAccess.query.filter_by(
+            server_id=server.id,
+            external_username=urllib.parse.unquote(server_username)
+        ).first_or_404()
+        
+        if media_access.user_app_access_id:
+            user = UserAppAccess.query.get_or_404(media_access.user_app_access_id)
         else:
-            # For user_media_access, get the associated UserAppAccess if it exists
-            media_access = UserMediaAccess.query.get_or_404(actual_id)
-            if media_access.user_app_access_id:
-                user = UserAppAccess.query.get_or_404(media_access.user_app_access_id)
-            else:
-                flash('Password reset is only available for local user accounts.', 'danger')
-                return redirect(url_for('users.list'))
-                
-    except ValueError as e:
-        current_app.logger.error(f"Invalid user ID format in reset_password: {user_id}: {e}")
+            flash('Password reset is only available for local user accounts.', 'danger')
+            return redirect(url_for('users.list'))
+    else:
         abort(400)
     
     # Only allow reset for local accounts created through invites (have password_hash and used_invite_id)
@@ -857,9 +868,10 @@ def view_app_user(username):
     from app.services import user_service
     try:
         # Create prefixed user ID for service calls
-        prefixed_user_id = f"user_app_access:{user_app_access.id}"
-        stream_stats = user_service.get_user_stream_stats(prefixed_user_id)
-        last_ip_map = user_service.get_bulk_last_known_ips([prefixed_user_id])
+        # Use UUID for user identification
+        user_uuid = user_app_access.uuid
+        stream_stats = user_service.get_user_stream_stats(user_uuid)
+        last_ip_map = user_service.get_bulk_last_known_ips([user_uuid])
         
         # Attach stats to the user object
         user_app_access.stream_stats = stream_stats

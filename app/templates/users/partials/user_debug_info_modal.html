@@ -10,7 +10,8 @@
             <h4 class="font-medium text-base-content mb-1">User Information</h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 <div><span class="text-base-content/60">Username:</span> <span class="font-mono">{{ user.get_display_name() }}</span></div>
-                <div><span class="text-base-content/60">User ID:</span> <span class="font-mono">{{ user.id }}</span></div>
+                <div><span class="text-base-content/60">User UUID:</span> <span class="font-mono">{{ user.uuid }}</span></div>
+                <div><span class="text-base-content/60">Internal ID:</span> <span class="font-mono">{{ user.id }}</span></div>
                 {% if user._is_standalone and user._access_record.external_user_id %}
                     {% if user._access_record.server.service_type.value == 'plex' %}
                         <div><span class="text-base-content/60">Plex UUID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
@@ -85,7 +86,7 @@
                         <span class="font-medium text-sm">{{ access.server.name }} ({{ access.server.service_type.value|title }})</span>
                     </div>
                     <div class="p-3">
-                        <div class="mockup-code bg-base-300/50 border border-base-300" id="userRawDataContent-{{ user.id }}-{{ access.server.id }}">
+                        <div class="mockup-code bg-base-300/50 border border-base-300" id="userRawDataContent-{{ user.uuid }}-{{ access.server.id }}">
                             <pre class="text-xs text-base-content"><code>{{ access.user_raw_data | format_json }}</code></pre>
                         </div>
                     </div>
@@ -101,7 +102,7 @@
     <button type="button" class="btn btn-ghost" onclick="user_debug_modal.close()">
         Close
     </button>
-    <button type="button" class="btn btn-secondary gap-2" onclick="copyUserRawData('{{ user.id }}')">
+    <button type="button" class="btn btn-secondary gap-2" onclick="copyUserRawData('{{ user.uuid }}')">
         <i class="fa-solid fa-copy"></i>
         Copy to Clipboard
     </button>
@@ -148,27 +149,28 @@
 {% endif %}
 
 <script>
-function copyUserRawData(userId) {
-    const contentElement = document.querySelector(`#userRawDataContent-${userId} pre code`);
+function copyUserRawData(userUuid) {
+    // Find the first content element that matches the user UUID pattern
+    const contentElement = document.querySelector(`[id^="userRawDataContent-${userUuid}"] pre code`);
     if (contentElement) {
         const textToCopy = contentElement.textContent;
         
         // Try modern clipboard API first
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(textToCopy).then(() => {
-                showUserDataCopySuccess(userId);
+                showUserDataCopySuccess(userUuid);
             }).catch(err => {
                 console.error('Clipboard API failed:', err);
-                fallbackCopyUserData(textToCopy, userId);
+                fallbackCopyUserData(textToCopy, userUuid);
             });
         } else {
             // Fallback for older browsers or non-secure contexts
-            fallbackCopyUserData(textToCopy, userId);
+            fallbackCopyUserData(textToCopy, userUuid);
         }
     }
 }
 
-function fallbackCopyUserData(text, userId) {
+function fallbackCopyUserData(text, userUuid) {
     try {
         // Create a temporary textarea element
         const textArea = document.createElement('textarea');
@@ -186,18 +188,18 @@ function fallbackCopyUserData(text, userId) {
         document.body.removeChild(textArea);
         
         if (successful) {
-            showUserDataCopySuccess(userId);
+            showUserDataCopySuccess(userUuid);
         } else {
-            showUserDataCopyError(userId);
+            showUserDataCopyError(userUuid);
         }
     } catch (err) {
         console.error('Fallback copy failed:', err);
-        showUserDataCopyError(userId);
+        showUserDataCopyError(userUuid);
     }
 }
 
-function showUserDataCopySuccess(userId) {
-    const copyButton = document.querySelector(`button[onclick="copyUserRawData('${userId}')"]`);
+function showUserDataCopySuccess(userUuid) {
+    const copyButton = document.querySelector(`button[onclick="copyUserRawData('${userUuid}')"]`);
     if (copyButton) {
         const originalHTML = copyButton.innerHTML;
         copyButton.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
@@ -212,8 +214,8 @@ function showUserDataCopySuccess(userId) {
     }
 }
 
-function showUserDataCopyError(userId) {
-    const copyButton = document.querySelector(`button[onclick="copyUserRawData('${userId}')"]`);
+function showUserDataCopyError(userUuid) {
+    const copyButton = document.querySelector(`button[onclick="copyUserRawData('${userUuid}')"]`);
     if (copyButton) {
         const originalHTML = copyButton.innerHTML;
         copyButton.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Copy Failed';
@@ -227,7 +229,7 @@ function showUserDataCopyError(userId) {
         }, 2000);
         
         // Also show the text in a prompt as a last resort
-        const contentElement = document.querySelector(`#userRawDataContent-${userId} pre code`);
+        const contentElement = document.querySelector(`[id^="userRawDataContent-${userUuid}"] pre code`);
         if (contentElement) {
             prompt('Copy failed. Please manually copy this text:', contentElement.textContent);
         }

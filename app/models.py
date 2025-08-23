@@ -1,6 +1,7 @@
 # File: app/models.py
 import enum
 import json
+import uuid
 from datetime import datetime, timedelta
 from app.utils.timezone_utils import utcnow
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -216,6 +217,7 @@ class UserAppAccess(db.Model, UserMixin):
     """User app access accounts for MUM login and management"""
     __tablename__ = 'user_app_access'
     id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     
     # Core account info
     username = db.Column(db.String(255), unique=True, nullable=False, index=True)

@@ -219,35 +219,42 @@ def create_app(config_name=None):
 
     @login_manager.user_loader
     def load_user(user_id):
-        # Clean user loader - only supports Owner and UserAppAccess
+        # Clean user loader - supports Owner and UserAppAccess with UUID-based identification
         try:
             with app.app_context():
-                # Parse user_id to determine user type and actual ID
-                # Format: "type:id" (e.g., "owner:1", "user_app_access:1")
+                # Try UUID format first for UserAppAccess
+                try:
+                    from app.utils.helpers import get_user_by_uuid
+                    user_obj, user_type = get_user_by_uuid(str(user_id))
+                    if user_obj and user_type == 'user_app_access':
+                        return user_obj
+                except Exception:
+                    pass  # Not a valid UUID, try other formats
+                
+                # Check if it's a prefixed format for Owner or legacy support
                 if ':' in str(user_id):
                     user_type, actual_id = str(user_id).split(':', 1)
                     actual_id = int(actual_id)
                     
                     if user_type == 'owner':
                         return Owner.query.get(actual_id)
-                    elif user_type == 'user_app_access':
-                        return UserAppAccess.query.get(actual_id)
-                    # Legacy support for old prefixes
-                    elif user_type in ['app', 'service']:
-                        return UserAppAccess.query.get(actual_id)
-                else:
-                    # Legacy format without prefix - try Owner first, then UserAppAccess
-                    actual_id = int(user_id)
-                    
-                    # Try Owner first (highest priority)
-                    owner = Owner.query.get(actual_id)
-                    if owner:
-                        return owner
-                    
-                    # Then try UserAppAccess
-                    user_app_access = UserAppAccess.query.get(actual_id)
-                    if user_app_access:
+                    elif user_type in ['user_app_access', 'app', 'service']:
+                        # Legacy support - convert to UUID lookup if possible
+                        user_app_access = UserAppAccess.query.get(actual_id)
                         return user_app_access
+                else:
+                    # Fallback: try as numeric ID for Owner first, then UserAppAccess
+                    try:
+                        actual_id = int(user_id)
+                        owner = Owner.query.get(actual_id)
+                        if owner:
+                            return owner
+                        
+                        user_app_access = UserAppAccess.query.get(actual_id)
+                        if user_app_access:
+                            return user_app_access
+                    except ValueError:
+                        pass  # Not a numeric ID
                 
                 return None
         except Exception as e_load_user:

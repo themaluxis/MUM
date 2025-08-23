@@ -11,7 +11,11 @@
 {# Expects 'user' and 'history_logs' (pagination object) in context #}
 
 <form id="history-delete-form"
-      hx-post="{{ url_for('user.delete_stream_history', user_id=user._prefixed_id if user._prefixed_id else user.id) }}"
+      {% if user._is_service_user %}
+        hx-post="{{ url_for('user.delete_stream_history', server_nickname=user._access_record.server.name, server_username=user.username) }}"
+      {% else %}
+        hx-post="{{ url_for('user.delete_stream_history', username=user.username) }}"
+      {% endif %}
       hx-on::after-request="if(event.detail.successful) htmx.trigger('#user-history-container', 'load');">
       
     <div id="history-actions-header" class="mb-4 hidden">
