@@ -2,7 +2,7 @@
 {# Expects set_password_form and change_password_form in context #}
 
 {# --- Set Initial Credentials Form --- #}
-{% if current_user.is_plex_sso_only %}
+{% if current_user.__class__.__name__ == 'Owner' and not current_user.password_hash %}
 <div class="card bg-base-200 shadow-xl">
     <div class="card-body">
         <h3 class="card-title text-warning"><i class="fa-solid fa-key mr-2"></i> Set Local Credentials</h3>
@@ -36,7 +36,7 @@
 {% endif %}
 
 {# --- Change Password Form --- #}
-{% if not current_user.is_plex_sso_only %}
+{% if current_user.password_hash %}
 <div class="card bg-base-200 shadow-xl">
     <div class="card-body">
         <h3 class="card-title"><i class="fa-solid fa-lock mr-2"></i> Change Password</h3>

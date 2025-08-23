@@ -2,6 +2,9 @@
 {% block title %}{{ super() }} - Managed Users{% endblock %}
 
 {% block content %}
+
+<!-- Local Users JavaScript -->
+<script src="{{ url_for('static', filename='js/app_users.js') }}"></script>
 <div class="container mx-auto px-4 py-2">
     <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">Managed Users ({{ users_count or 0 }})</h1>
@@ -111,6 +114,20 @@
                             <select name="server_id" class="select select-bordered">
                                 {% for server in server_dropdown_options %}
                                 <option value="{{ server.id }}" {% if request.args.get('server_id', 'all') == server.id %}selected{% endif %}>{{ server.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- User Type Filter -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium">
+                                    <i class="fa-solid fa-users mr-2"></i>User Type
+                                </span>
+                            </label>
+                            <select name="user_type" class="select select-bordered">
+                                {% for user_type in user_type_options %}
+                                <option value="{{ user_type.id }}" {% if request.args.get('user_type', 'all') == user_type.id %}selected{% endif %}>{{ user_type.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -1303,4 +1320,18 @@
         }
     }
 </script>
+
+<!-- Modal Containers for Local User Management -->
+<dialog id="localUserEditModal" class="modal modal-bottom sm:modal-middle">
+    <div id="localUserEditModalContainer">
+        <!-- Content will be loaded here via HTMX -->
+    </div>
+</dialog>
+
+<dialog id="linkedAccountsModal" class="modal modal-bottom sm:modal-middle">
+    <div id="linkedAccountsModalContainer">
+        <!-- Content will be loaded here via HTMX -->
+    </div>
+</dialog>
+
 {% endblock %}

@@ -257,8 +257,43 @@ class PlexMediaService(BaseMediaService):
                 user_share_details = detailed_shares_by_userid.get(plex_user_id_int)
                 accepted_at_val = user_share_details.get('acceptedAt') if user_share_details else None
 
-                # Store raw XML data for debugging
+                # Store raw data for debugging - only JSON-serializable data
                 import json
+                
+                # Safely extract server info without non-serializable objects
+                safe_servers = []
+                for s in getattr(plex_user_obj, 'servers', []):
+                    try:
+                        safe_servers.append({
+                            'name': getattr(s, 'name', None),
+                            'machineIdentifier': getattr(s, 'machineIdentifier', None),
+                            'product': getattr(s, 'product', None),
+                            'version': getattr(s, 'version', None),
+                            'owned': getattr(s, 'owned', None),
+                            'pending': getattr(s, 'pending', None)
+                        })
+                    except Exception:
+                        safe_servers.append({'error': 'Could not serialize server object'})
+                
+                # Safely extract user attributes - only basic serializable types
+                safe_attrs = {}
+                for attr in dir(plex_user_obj):
+                    if not attr.startswith('_'):
+                        try:
+                            value = getattr(plex_user_obj, attr, None)
+                            # Test if the value is actually JSON serializable
+                            try:
+                                json.dumps(value)
+                                safe_attrs[attr] = value
+                            except (TypeError, ValueError):
+                                # If not serializable, store just the type name
+                                if hasattr(value, 'strftime'):  # datetime objects
+                                    safe_attrs[attr] = str(value)
+                                else:
+                                    safe_attrs[attr] = str(type(value).__name__)
+                        except Exception:
+                            safe_attrs[attr] = '<Error accessing attribute>'
+                
                 raw_user_data = {
                     'plex_user_obj_attrs': {
                         'id': getattr(plex_user_obj, 'id', None),
@@ -268,8 +303,8 @@ class PlexMediaService(BaseMediaService):
                         'thumb': getattr(plex_user_obj, 'thumb', None),
                         'home': getattr(plex_user_obj, 'home', None),
                         'friend': getattr(plex_user_obj, 'friend', None),
-                        'servers': [getattr(s, '__dict__', str(s)) for s in getattr(plex_user_obj, 'servers', [])],
-                        'all_attrs': {attr: getattr(plex_user_obj, attr, None) for attr in dir(plex_user_obj) if not attr.startswith('_')}
+                        'servers': safe_servers,
+                        'all_attrs': safe_attrs
                     },
                     'share_details': user_share_details,
                     'users_sharing_back_ids': list(users_sharing_back_ids),
@@ -286,7 +321,7 @@ class PlexMediaService(BaseMediaService):
                     'shares_back': plex_user_id_int in users_sharing_back_ids,
                     'library_ids': [],
                     'accepted_at': accepted_at_val,
-                    'raw_data': json.dumps(raw_user_data, default=str, indent=2)
+                    'raw_data': raw_user_data
                 }
 
                 user_share_details = detailed_shares_by_userid.get(plex_user_id_int)
@@ -456,7 +491,7 @@ class PlexMediaService(BaseMediaService):
 
     def get_formatted_sessions(self) -> List[Dict[str, Any]]:
         """Get active Plex sessions formatted for display"""
-        from app.models import User
+        from app.models import UserAppAccess
         from flask import url_for
         import re
         
@@ -464,9 +499,36 @@ class PlexMediaService(BaseMediaService):
         if not raw_sessions:
             return []
         
-        # Get user mapping for Plex users
+        # Get user mapping for Plex users via UserMediaAccess
         user_ids_in_session = {int(session.user.id) for session in raw_sessions if hasattr(session, 'user') and session.user and hasattr(session.user, 'id')}
-        mum_users_map_by_plex_id = {u.plex_user_id: u for u in User.query.filter(User.plex_user_id.in_(list(user_ids_in_session)))} if user_ids_in_session else {}
+        
+        # Get users from UserMediaAccess for this Plex server
+        from app.models_media_services import UserMediaAccess
+        if user_ids_in_session:
+            user_id_strings = [str(uid) for uid in user_ids_in_session]
+            plex_accesses = UserMediaAccess.query.filter(
+                UserMediaAccess.server_id == self.server_id,
+                UserMediaAccess.external_user_id.in_(user_id_strings)
+            ).all()
+            # Create mapping for both linked and standalone users
+            mum_users_map_by_plex_id = {}
+            for access in plex_accesses:
+                if access.external_user_id:
+                    plex_id = int(access.external_user_id)
+                    if access.user_app_access:
+                        # Linked user - use the UserAppAccess record
+                        mum_users_map_by_plex_id[plex_id] = access.user_app_access
+                    else:
+                        # Standalone user - create a mock user object with negative ID
+                        class MockStandaloneUser:
+                            def __init__(self, access_record):
+                                self.id = -(access_record.id + 1000000)  # Negative ID for standalone users
+                                self.username = access_record.external_username or 'Unknown'
+                                self._access_record = access_record
+                        
+                        mum_users_map_by_plex_id[plex_id] = MockStandaloneUser(access)
+        else:
+            mum_users_map_by_plex_id = {}
         
         formatted_sessions = []
         
@@ -489,7 +551,7 @@ class PlexMediaService(BaseMediaService):
         for raw_session in raw_sessions:
             try:
                 # Basic session info
-                user_name = getattr(raw_session.user, 'title', 'Unknown User')
+                user_name = getattr(raw_session.user, 'username', None) or getattr(raw_session.user, 'title', 'Unknown User')
                 player = raw_session.player
                 player_title = getattr(player, 'title', 'Unknown Player')
                 player_platform = getattr(player, 'platform', '')

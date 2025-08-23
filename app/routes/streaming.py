@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, current_app
-from flask_login import login_required
+from flask import Blueprint, render_template, request, current_app, flash, redirect, url_for
+from flask_login import login_required, current_user
 from app.utils.helpers import setup_required, permission_required
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
@@ -12,6 +12,12 @@ bp = Blueprint('streaming', __name__)
 @setup_required
 @permission_required('view_streaming')
 def index():
+    # Redirect UserAppAccess without admin permissions away from admin pages
+    from app.models import UserAppAccess
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_streaming'):
+        flash('You do not have permission to access the streaming monitoring page.', 'danger')
+        return redirect(url_for('user.index'))
+    
     # Fetch the session monitoring interval from settings
     default_interval = 30  # Default fallback - don't use config, get from database
     try:
@@ -39,6 +45,12 @@ def index():
 @setup_required
 @permission_required('view_streaming')
 def sessions_partial():
+    # Redirect UserAppAccess without admin permissions away from admin pages
+    from app.models import UserAppAccess
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_streaming'):
+        flash('You do not have permission to access the streaming monitoring page.', 'danger')
+        return redirect(url_for('user.index'))
+    
     view_mode = request.args.get('view', 'merged')
     
     active_sessions_data = []

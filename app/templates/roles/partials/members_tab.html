@@ -84,37 +84,36 @@
                                 <div class="flex items-center gap-4">
                                     <div class="avatar">
                                         <div class="w-12 h-12 rounded-full">
-                                            {% if admin.plex_thumb %}
-                                                <img src="{{ admin.plex_thumb }}" alt="{{ admin.username or admin.plex_username }} avatar" class="rounded-full"/>
+                                            {% if admin.get_avatar and admin.get_avatar() %}
+                                                <img src="{{ admin.get_avatar() }}" alt="{{ admin.get_display_name() }} avatar" class="rounded-full"/>
                                             {% else %}
                                                 <div class="bg-primary text-primary-content w-12 h-12 rounded-full flex items-center justify-center">
-                                                    <span class="text-sm font-bold">{{ (admin.username or admin.plex_username)[0]|upper if (admin.username or admin.plex_username) else 'A' }}</span>
+                                                    <span class="text-sm font-bold">{{ admin.get_display_name()[0]|upper if admin.get_display_name() else 'A' }}</span>
                                                 </div>
                                             {% endif %}
                                         </div>
                                     </div>
                                     <div>
-                                        <div class="font-semibold text-base-content">{{ admin.username or admin.plex_username }}</div>
-                                        {% if admin.plex_username and admin.username %}
-                                            <div class="text-sm text-base-content/60">Plex: {{ admin.plex_username }}</div>
-                                        {% endif %}
-                                        {% if admin.id == 1 %}
-                                            <div class="badge badge-primary badge-sm mt-1">Primary Admin</div>
+                                        <div class="font-semibold text-base-content">{{ admin.get_display_name() }}</div>
+                                        {% if admin.__class__.__name__ == 'Owner' %}
+                                            <div class="badge badge-primary badge-sm mt-1">Owner</div>
+                                        {% elif admin.__class__.__name__ == 'AppUser' %}
+                                            <div class="badge badge-secondary badge-sm mt-1">Admin</div>
                                         {% endif %}
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    {% if admin.id != 1 %}
+                                    {% if admin.__class__.__name__ != 'Owner' %}
                                         <button class="btn btn-sm btn-ghost text-error hover:bg-error/10"
                                                 hx-post="{{ url_for('role_management.remove_member', role_id=role.id, admin_id=admin.id) }}"
                                                 hx-target="closest div"
                                                 hx-swap="outerHTML"
-                                                hx-confirm="Remove {{ admin.username or admin.plex_username }} from this role?">
+                                                hx-confirm="Remove {{ admin.get_display_name() }} from this role?">
                                             <i class="fa-solid fa-user-minus mr-1"></i>
                                             Remove
                                         </button>
                                     {% else %}
-                                        <span class="text-xs text-base-content/60">Cannot remove primary admin</span>
+                                        <span class="text-xs text-base-content/60">Cannot remove owner</span>
                                     {% endif %}
                                 </div>
                             </div>

@@ -66,7 +66,7 @@ def setup_required(f):
 
 
 def log_event(event_type, message: str, details: dict = None, # Removed type hint for EventType to avoid import here
-              admin_id: int = None, user_id: int = None, invite_id: int = None):
+              admin_id: int = None, user_id = None, invite_id: int = None):
     """Logs an event to the HistoryLog. Gracefully handles DB not ready."""
     from app.models import HistoryLog, EventType as EventTypeEnum # Local import for models and Enum
     from app.extensions import db # Local import for db
@@ -99,14 +99,28 @@ def log_event(event_type, message: str, details: dict = None, # Removed type hin
         )
 
         if admin_id is None and current_user and current_user.is_authenticated and hasattr(current_user, 'id'):
-            from app.models import AdminAccount # Local import
-            if isinstance(current_user, AdminAccount):
+            from app.models import Owner # Local import
+            if isinstance(current_user, Owner):
                 log_entry.admin_id = current_user.id
         elif admin_id: # Ensure explicitly passed admin_id is used
              log_entry.admin_id = admin_id
 
 
-        if user_id: log_entry.user_id = user_id
+        if user_id: 
+            # Parse prefixed user ID if provided
+            try:
+                if isinstance(user_id, str) and ":" in user_id:
+                    from app.services.user_service import parse_user_id
+                    user_type, actual_id = parse_user_id(user_id)
+                    # Only store local user IDs in the log
+                    if user_type == "user_app_access":
+                        log_entry.user_id = actual_id
+                else:
+                    # Assume it's already a numeric ID (backward compatibility)
+                    log_entry.user_id = int(user_id)
+            except (ValueError, ImportError) as e:
+                current_app.logger.warning(f"Invalid user_id format in log_event: {user_id}: {e}")
+                # Don't set user_id if parsing fails
         if invite_id: log_entry.invite_id = invite_id
 
         db.session.add(log_entry)
@@ -208,10 +222,22 @@ def permission_required(permission_name):
         def decorated_function(*args, **kwargs):
             if not current_user.is_authenticated:
                 return redirect(url_for('auth.app_login'))
-            if not current_user.has_permission(permission_name):
-                flash("You do not have permission to access this page.", "danger")
-                return redirect(url_for('dashboard.index'))
-            return f(*args, **kwargs)
+            
+            # Import user types locally to avoid circular imports
+            from app.models import Owner, UserAppAccess
+            
+            # Owner always has all permissions
+            if isinstance(current_user, Owner):
+                return f(*args, **kwargs)
+            
+            # Check permissions for UserAppAccess (role-based)
+            if isinstance(current_user, UserAppAccess):
+                if current_user.has_permission(permission_name):
+                    return f(*args, **kwargs)
+            
+            # Other user types don't have admin permissions
+            flash("You do not have permission to access this page.", "danger")
+            return redirect(url_for('dashboard.index'))
         return decorated_function
     return decorator
 
@@ -225,14 +251,21 @@ def any_permission_required(permissions):
         def decorated_function(*args, **kwargs):
             if not current_user.is_authenticated:
                 return redirect(url_for('auth.app_login'))
-            # Super admin always passes
-            if current_user.id == 1:
+            
+            # Import user types locally to avoid circular imports
+            from app.models import Owner, UserAppAccess
+            
+            # Owner always has all permissions
+            if isinstance(current_user, Owner):
                 return f(*args, **kwargs)
-            # Check if user has ANY of the permissions in the list
-            for perm in permissions:
-                if current_user.has_permission(perm):
-                    return f(*args, **kwargs)
-            # If loop finishes without returning, user has none of the permissions
+            
+            # Check if UserAppAccess has ANY of the permissions in the list
+            if isinstance(current_user, UserAppAccess):
+                for perm in permissions:
+                    if current_user.has_permission(perm):
+                        return f(*args, **kwargs)
+            
+            # If no permissions found, deny access
             flash("You do not have permission to access this page.", "danger")
             return redirect(url_for('dashboard.index'))
         return decorated_function
@@ -274,16 +307,23 @@ def format_duration(total_seconds):
         
     return " ".join(parts[:3]) # Show at most 3 parts (e.g., d, h, m)
 
-def format_json(json_string):
-    """Format a JSON string with proper indentation for display"""
+def format_json(data):
+    """Format JSON data with proper indentation for display"""
     try:
         import json
-        # Parse the JSON string and format it with indentation
-        parsed = json.loads(json_string)
-        return json.dumps(parsed, indent=2, ensure_ascii=False)
+        # If it's already a dict/list, format it directly
+        if isinstance(data, (dict, list)):
+            return json.dumps(data, indent=2, ensure_ascii=False)
+        # If it's a string, try to parse it first
+        elif isinstance(data, str):
+            parsed = json.loads(data)
+            return json.dumps(parsed, indent=2, ensure_ascii=False)
+        else:
+            # For other types, convert to string
+            return str(data)
     except (json.JSONDecodeError, TypeError):
         # If it's not valid JSON, return as-is
-        return json_string
+        return str(data) if data is not None else ""
 
 def extract_jellyfin_user_info(raw_data_str):
     """Extract Jellyfin user ID and PrimaryImageTag from raw JSON string"""
@@ -319,8 +359,292 @@ def super_admin_required(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.id == 1:
+        # Import user types locally to avoid circular imports
+        from app.models import Owner, UserAppAccess
+        
+        if not current_user.is_authenticated:
             flash("You do not have permission to access this page.", "danger")
             return redirect(url_for('dashboard.index'))
-        return f(*args, **kwargs)
+        
+        # For Owner, check if ID is 1
+        if isinstance(current_user, Owner):
+            if current_user.id == 1:
+                return f(*args, **kwargs)
+        # For UserAppAccess, check if ID is 1 (super admin local user)
+        elif isinstance(current_user, UserAppAccess):
+            if current_user.id == 1:
+                return f(*args, **kwargs)
+        
+        flash("You do not have permission to access this page.", "danger")
+        return redirect(url_for('dashboard.index'))
     return decorated_function
+
+
+def get_user_profile_url(user, **kwargs):
+    """
+    Generate the correct profile URL for any user type.
+    
+    Args:
+        user: AppUser or ServiceAccount instance
+        **kwargs: Additional URL parameters (tab, back, back_view, etc.)
+    
+    Returns:
+        str: The appropriate URL for the user's profile
+    """
+    from flask import url_for
+    from app.models import UserAppAccess
+    import urllib.parse
+    
+    if isinstance(user, UserAppAccess):
+        # URL encode the username to handle special characters
+        encoded_username = urllib.parse.quote(user.username, safe='')
+        return url_for('user.view_app_user', username=encoded_username, **kwargs)
+    else:
+        # Service Account - need to determine server and username
+        server_info = get_primary_server_for_user(user)
+        if server_info:
+            server_name, username = server_info
+            # URL encode both server nickname and username
+            encoded_server_name = urllib.parse.quote(server_name, safe='')
+            encoded_username = urllib.parse.quote(username, safe='')
+            return url_for('user.view_service_account', 
+                          server_nickname=encoded_server_name, 
+                          server_username=encoded_username, 
+                          **kwargs)
+    return None
+
+
+def get_primary_server_for_user(service_account):
+    """
+    Get the primary server and username for a service account.
+    
+    Args:
+        service_account: ServiceAccount instance
+        
+    Returns:
+        tuple: (server_name, username) or None if no server found
+    """
+    from app.models_media_services import UserMediaAccess
+    
+    # Get the first server this user has access to
+    user_access = UserMediaAccess.query.filter_by(service_account_id=service_account.id).first()
+    if not user_access:
+        return None
+    
+    server = user_access.server
+    server_name = server.name
+    
+    # Extract the appropriate username for this server
+    username = extract_username_for_server(service_account, server)
+    
+    return (server_name, username)
+
+
+def extract_username_for_server(service_account, server):
+    """
+    Extract the appropriate username for a specific server.
+    
+    Args:
+        service_account: ServiceAccount instance
+        server: MediaServer instance
+        
+    Returns:
+        str: The username to use for this server
+    """
+    from app.models_media_services import UserMediaAccess
+    
+    # First, try to get the clean username from UserMediaAccess
+    user_access = UserMediaAccess.query.filter_by(
+        service_account_id=service_account.id,
+        server_id=server.id
+    ).first()
+    
+    if user_access and user_access.external_username:
+        return user_access.external_username
+    
+    # Fallback to service account username (now universal for all services)
+    username = service_account.username
+    if '@' in username:
+        # Handle any remaining legacy data with @service suffix
+        return username.split('@')[0]
+    return username
+
+
+def get_user_type_display(user):
+    """
+    Get a human-readable display string for the user type.
+    
+    Args:
+        user: AppUser or ServiceAccount instance
+        
+    Returns:
+        str: Display string like "App User" or "Plex User"
+    """
+    from app.models import UserAppAccess
+    
+    if isinstance(user, UserAppAccess):
+        return "App User"
+    else:
+        # Service Account - determine service type
+        server_info = get_primary_server_for_user(user)
+        if server_info:
+            server_name, _ = server_info
+            return f"{server_name} User"
+        return "Service User"
+
+
+def get_user_servers_and_types(user):
+    """
+    Get server names and service types for a user.
+    
+    Args:
+        user: UserAppAccess instance or MockUser instance
+        
+    Returns:
+        tuple: (server_names_list, service_types_list)
+    """
+    from app.models_media_services import UserMediaAccess
+    from app.models import UserAppAccess
+    
+    # Handle UserAppAccess (local users)
+    if isinstance(user, UserAppAccess):
+        user_access_records = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
+    # Handle MockUser or service users (check for _user_type attribute)
+    elif hasattr(user, '_user_type') and user._user_type == 'service':
+        # This is a standalone service user - get their direct access record
+        user_access_records = UserMediaAccess.query.filter_by(id=user.id, user_app_access_id=None).all()
+    else:
+        # Unknown user type or no access records
+        return ([], [])
+    
+    server_names = []
+    service_types = []
+    
+    for access in user_access_records:
+        if access.server and access.server.name not in server_names:
+            server_names.append(access.server.name)
+        if access.server and access.server.service_type not in service_types:
+            service_types.append(access.server.service_type)
+    
+    return (server_names, service_types)
+
+
+def validate_username_for_routing(username, user_type='app'):
+    """
+    Validate a username for use in URL routing and check for conflicts.
+    
+    Args:
+        username: The username to validate
+        user_type: 'app' for app users, 'server' for server nicknames
+        
+    Returns:
+        dict: {'valid': bool, 'conflicts': list, 'warnings': list}
+    """
+    result = {
+        'valid': True,
+        'conflicts': [],
+        'warnings': []
+    }
+    
+    # Basic validation
+    if not username or not username.strip():
+        result['valid'] = False
+        result['conflicts'].append('Username cannot be empty')
+        return result
+    
+    username = username.strip()
+    
+    # Check for problematic characters that could cause URL issues
+    problematic_chars = ['/', '\\', '?', '#', '%', '&', '+', ' ']
+    found_chars = [char for char in problematic_chars if char in username]
+    if found_chars:
+        result['warnings'].append(f"Username contains characters that may cause URL issues: {', '.join(found_chars)}")
+    
+    # Check for conflicts based on user type
+    if user_type == 'app':
+        # Check if username conflicts with existing server nicknames
+        from app.models_media_services import MediaServer
+        server_conflict = MediaServer.query.filter_by(name=username).first()
+        if server_conflict:
+            result['conflicts'].append(f"Username '{username}' conflicts with existing server nickname")
+            result['valid'] = False
+    
+    elif user_type == 'server':
+        # Check if server nickname conflicts with existing app usernames
+        from app.models import UserAppAccess
+        app_user_conflict = UserAppAccess.query.filter_by(username=username).first()
+        if app_user_conflict:
+            result['conflicts'].append(f"Server nickname '{username}' conflicts with existing app user username")
+            result['valid'] = False
+    
+    # Check for case sensitivity issues
+    if user_type == 'app':
+        from app.models import UserAppAccess
+        case_conflicts = UserAppAccess.query.filter(UserAppAccess.username.ilike(username)).filter(UserAppAccess.username != username).all()
+        if case_conflicts:
+            conflicting_usernames = [user.username for user in case_conflicts]
+            result['warnings'].append(f"Similar usernames exist with different case: {', '.join(conflicting_usernames)}")
+    
+    return result
+
+
+def get_safe_username_for_url(username):
+    """
+    Get a URL-safe version of a username.
+    
+    Args:
+        username: The original username
+        
+    Returns:
+        str: URL-encoded username
+    """
+    import urllib.parse
+    if not username:
+        return ''
+    return urllib.parse.quote(str(username), safe='')
+
+
+def resolve_user_route_conflict(path_segment):
+    """
+    Resolve potential conflicts when a URL path could be either an app user or server nickname.
+    
+    Args:
+        path_segment: The URL path segment to resolve
+        
+    Returns:
+        dict: {'type': 'app_user'|'server'|'ambiguous'|'none', 'user': user_obj, 'server': server_obj}
+    """
+    from app.models import UserAppAccess
+    from app.models_media_services import MediaServer
+    import urllib.parse
+    
+    # URL decode the path segment
+    try:
+        decoded_segment = urllib.parse.unquote(path_segment)
+    except:
+        decoded_segment = path_segment
+    
+    result = {
+        'type': 'none',
+        'user': None,
+        'server': None
+    }
+    
+    # Check for app user
+    app_user = UserAppAccess.query.filter_by(username=decoded_segment).first()
+    
+    # Check for server
+    server = MediaServer.query.filter_by(name=decoded_segment).first()
+    
+    if app_user and server:
+        result['type'] = 'ambiguous'
+        result['user'] = app_user
+        result['server'] = server
+    elif app_user:
+        result['type'] = 'app_user'
+        result['user'] = app_user
+    elif server:
+        result['type'] = 'server'
+        result['server'] = server
+    
+    return result

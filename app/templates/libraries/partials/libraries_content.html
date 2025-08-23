@@ -19,8 +19,8 @@
                         <tr class="hover">
                             <td class="font-semibold">{{ lib.name }}</td>
                             <td>
-                                <span class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20 gap-1">
-                                    <i class="fa-solid fa-tag w-2.5 h-2.5"></i>
+                                <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1">
+                                    <i class="fa-solid fa-folder w-2.5 h-2.5 mr-1 bottom-px relative"></i>
                                     {{ lib.type }}
                                 </span>
                             </td>
@@ -67,8 +67,8 @@
                     <i class="fa-solid fa-server mr-2"></i>
                 {% endif %}
                 {{ service_data.service_display_name }} 
-                <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1">
-                    <i class="fa-solid fa-folder w-2.5 h-2.5"></i>
+                <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <i class="fa-solid fa-list w-3 h-3"></i>
                     {{ service_data.total_libraries }} libraries
                 </span>
             </h2>
@@ -85,12 +85,12 @@
                         </span>
                         {% elif server_data.online %}
                         <span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-400/10 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/20 gap-1 ml-2">
-                            <i class="fa-solid fa-check-circle w-2.5 h-2.5"></i>
+                            <i class="fa-solid fa-check-circle w-2.5 h-2.5 mr-1"></i>
                             {{ server_data.libraries|length }} libraries
                         </span>
                         {% else %}
                         <span class="inline-flex items-center rounded-md bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20 gap-1 ml-2">
-                            <i class="fa-solid fa-times-circle w-2.5 h-2.5"></i>
+                            <i class="fa-solid fa-times-circle w-2.5 h-2.5 mr-1"></i>
                             Offline
                         </span>
                         {% endif %}
@@ -113,8 +113,8 @@
                             <tr class="hover">
                                 <td class="font-semibold">{{ lib.name }}</td>
                                 <td>
-                                    <span class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-400/10 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20 gap-1">
-                                        <i class="fa-solid fa-tag w-2 h-2"></i>
+                                    <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1">
+                                        <i class="fa-solid fa-folder w-2.5 h-2.5 mr-1 bottom-px relative"></i>
                                         {{ lib.type or 'Unknown' }}
                                     </span>
                                 </td>

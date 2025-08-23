@@ -20,12 +20,12 @@
             <div class="dropdown dropdown-end">
                 <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                     <div class="w-8 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                        {% if current_user.plex_thumb %}
-                            <img src="{{ current_user.plex_thumb }}" alt="Admin avatar" />
+                        {% if current_user.get_avatar and current_user.get_avatar() %}
+                            <img src="{{ current_user.get_avatar() }}" alt="Admin avatar" />
                         {% else %}
                             <span class="avatar placeholder">
                               <div class="bg-neutral-focus text-neutral-content rounded-full w-8">
-                                <span class="text-xs">{{ (current_user.username or current_user.plex_username)[0]|upper if (current_user.username or current_user.plex_username) else 'A' }}</span>
+                                <span class="text-xs">{{ current_user.get_display_name()[0]|upper if current_user.get_display_name() else 'A' }}</span>
                               </div>
                             </span>
                         {% endif %}
@@ -33,7 +33,7 @@
                 </label>
                 <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[50] p-2 shadow bg-base-100 rounded-box w-52">
                     <li class="menu-title">
-                        <span>{{ current_user.username or current_user.plex_username }}</span>
+                        <span>{{ current_user.get_display_name() }}</span>
                     </li>
                     <li>
                         <a href="{{ url_for('auth.logout_setup') }}"> <!-- Special logout during setup -->

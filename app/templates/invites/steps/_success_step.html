@@ -70,17 +70,18 @@
         </div>
     </div>
 
-    <!-- Continue Button -->
+    <!-- Accept Invite Button -->
     <div class="text-center space-y-4">
-        {% set success_username = already_authenticated_plex_user.username if already_authenticated_plex_user else 'User' %}
-        {% set server_names = invite.servers|map(attribute='name')|join(', ') %}
-        <a href="{{ url_for('invites.invite_success', username=success_username, servers=server_names) }}" 
-           class="btn btn-primary w-full h-14 text-lg font-medium">
-            <i class="fa-solid fa-arrow-right mr-2"></i>
-            Continue to Success Page
-        </a>
+        <form method="post" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
+            {{ form.hidden_tag() }}
+            <button name="action" value="accept_invite" type="submit" 
+                    class="btn btn-primary w-full h-14 text-lg font-medium">
+                <i class="fa-solid fa-check mr-2"></i>
+                Create All Accounts & Complete Setup
+            </button>
+        </form>
         <p class="text-xs text-base-content/60">
-            Get your server access links and start streaming
+            This will create your accounts on all selected media servers
         </p>
     </div>
 </div>

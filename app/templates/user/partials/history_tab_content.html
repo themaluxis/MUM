@@ -39,6 +39,7 @@
                         <th>Reading Time</th>
                         <th>Progress</th>
                     {% else %}
+                        <th class="w-20">Poster</th>
                         <th>Media Title</th>
                         <th>Player / Platform</th>
                         <th>IP Address</th>
@@ -55,6 +56,18 @@
                     <tr class="hover">
                         <td class="text-center">
                             <input type="checkbox" name="history_ids[]" value="{{ entry.id }}" class="checkbox checkbox-sm history-checkbox">
+                        </td>
+                        <td>
+                            {% if entry.rating_key %}
+                                <img src="{{ url_for('api.plex_image_proxy', path=('/library/metadata/' + entry.rating_key + '/thumb')) }}" 
+                                     class="w-12 h-18 rounded object-cover" 
+                                     alt="Media poster"
+                                     onerror="this.src='{{ url_for('static', filename='default_media_thumb.png') }}'">
+                            {% else %}
+                                <div class="w-12 h-18 rounded bg-base-300 flex items-center justify-center">
+                                    <i class="fa-solid fa-play text-base-content/40"></i>
+                                </div>
+                            {% endif %}
                         </td>
                         <td>
                             <div class="font-bold">{{ entry.media_title or 'Unknown Title' }}</div>

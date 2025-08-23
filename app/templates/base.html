@@ -33,7 +33,7 @@
     <div class="drawer">
         <input id="main-sidebar-drawer-toggle" type="checkbox" class="drawer-toggle" />
         <div class="drawer-content flex flex-col min-h-screen">
-            {% if current_user.__class__.__name__ == 'User' and current_user.password_hash %}
+            {% if current_user.__class__.__name__ == 'AppUser' and current_user.password_hash %}
                 {% include 'components/navigation/user_navbar.html' %}
             {% else %}
                 {% include 'components/navigation/admin_navbar.html' %}
@@ -82,7 +82,7 @@
                     <li><a href="{{ url_for('libraries.index') }}" class="{{ 'active menu-active' if request.endpoint == 'libraries.index' else '' }}"><i class="fa-solid fa-layer-group fa-fw mr-2"></i> Libraries</a></li>
                     <li><a href="{{ url_for('streaming.index') }}" class="{{ 'active menu-active' if request.endpoint == 'streaming.index' else '' }}"><i class="fa-solid fa-tower-broadcast fa-fw mr-2"></i> Streaming <span id="streaming-badge-mobile" class="badge badge-primary badge-sm ml-1" style="display: none;">0</span></a></li>
                     
-                    {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') or current_user.has_permission('manage_discord_settings') or current_user.has_permission('manage_advanced_settings') or current_user.has_permission('view_admins_tab')  %}
+                    {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_general_settings') or current_user.has_permission('manage_discord_settings') or current_user.has_permission('manage_advanced_settings') or current_user.has_permission('view_admins_tab')  %}
                     {% set settings_is_active = request.endpoint and (request.endpoint.startswith('settings.') or request.endpoint.startswith('admin_management.') or request.endpoint.startswith('role_management.') or request.endpoint.startswith('plugin_management.')) %}
                     <li>
                         <details {% if settings_is_active %}open{% endif %}>
@@ -90,10 +90,10 @@
                                 <i class="fa-solid fa-cog fa-fw mr-2"></i> Settings
                             </summary>
                             <ul class="ml-4">
-                                {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
+                                {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_general_settings') %}
                                 <li><a href="{{ url_for('settings.general') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.general' else '' }}"><i class="fa-solid fa-sliders fa-fw"></i> General</a></li>
                                 {% endif %}
-                                {% if current_user.id == 1 or current_user.has_permission('view_admins_tab') %}
+                                {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('view_admins_tab') %}
                                     {% set admin_area_active = request.endpoint and (request.endpoint.startswith('admin_management.') or request.endpoint.startswith('role_management.')) %}
                                     <li>
                                         <details {% if admin_area_active %}open{% endif %}>
@@ -101,26 +101,26 @@
                                                 <i class="fa-solid fa-user-shield fa-fw mr-2"></i> Manage Admins
                                             </summary>
                                             <ul class="ml-4">
-                                                {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
+                                                {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
                                                 <li><a href="{{ url_for('admin_management.index') }}" class="{{ 'active menu-active' if request.endpoint and request.endpoint.startswith('admin_management.') else '' }}"><i class="fa-solid fa-shield-halved mr-2"></i> Admins</a></li>
                                                 {% endif %}
-                                                {% if current_user.id == 1 or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
+                                                {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
                                                 <li><a href="{{ url_for('role_management.index') }}" class="{{ 'active menu-active' if request.endpoint and request.endpoint.startswith('role_management.') else '' }}"><i class="fa-solid fa-shield mr-2"></i> Roles</a></li>
                                                 {% endif %}
                                             </ul>
                                         </details>
                                     </li>
                                 {% endif %}
-                                {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
+                                {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_plugins') %}
                                 <li><a href="{{ url_for('plugin_management.index') }}" class="{{ 'active menu-active' if request.endpoint and request.endpoint.startswith('plugin_management.') else '' }}"><i class="fa-solid fa-puzzle-piece fa-fw"></i> Plugins</a></li>
                                 {% endif %}
-                                {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
+                                {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_discord_settings') %}
                                 <li><a href="{{ url_for('settings.discord') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.discord' else '' }}"><i class="fa-brands fa-discord fa-fw"></i> Discord</a></li>
                                 {% endif %}
-                                {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
+                                {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('view_logs') %}
                                 <li><a href="{{ url_for('settings.logs') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.logs' else '' }}"><i class="fa-solid fa-timeline fa-fw"></i> Logs</a></li>
                                 {% endif %}
-                                {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
+                                {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_advanced_settings') %}
                                 <li><a href="{{ url_for('settings.advanced') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.advanced' else '' }}"><i class="fa-solid fa-gears fa-fw"></i> Advanced</a></li>
                                 {% endif %}
                             </ul>

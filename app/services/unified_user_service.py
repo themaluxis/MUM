@@ -3,8 +3,8 @@ from typing import List, Dict, Any, Optional
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
-from app.models import User
-from app.models_media_services import MediaServer, UserMediaAccess
+from app.models import UserAppAccess
+from app.models_media_services import MediaServer, UserMediaAccess, ServiceType
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
 from app.extensions import db
@@ -89,6 +89,11 @@ class UnifiedUserService:
                 })
                 current_app.logger.error(f"Error syncing users from {server.name}: {e}", exc_info=True)
 
+        # Group linked accounts for better display
+        grouped_results = UnifiedUserService._group_linked_accounts(
+            all_added_details, all_updated_details, all_removed_details
+        )
+
         return {
             'success': total_errors == 0,
             'added': total_added,
@@ -101,13 +106,116 @@ class UnifiedUserService:
             'failed_servers': failed_servers,
             'updated_details': all_updated_details,
             'added_details': all_added_details,
-            'removed_details': all_removed_details
+            'removed_details': all_removed_details,
+            'grouped_updated_details': grouped_results['updated'],
+            'grouped_added_details': grouped_results['added'],
+            'grouped_removed_details': grouped_results['removed']
         }
+    
+    @staticmethod
+    def _group_linked_accounts(added_details, updated_details, removed_details):
+        """Group service account changes by local user for better display"""
+        from app.models import UserAppAccess
+        from app.models_media_services import UserMediaAccess
+        
+        grouped = {
+            'added': [],
+            'updated': [],
+            'removed': []
+        }
+        
+        # Helper function to group details by local user
+        def group_details_by_local_user(details_list, action_type):
+            local_user_groups = {}
+            standalone_accounts = []
+            
+            for detail in details_list:
+                username = detail.get('username', 'Unknown')
+                server_name = detail.get('server_name', 'Unknown')
+                service_type = detail.get('service_type', 'Unknown')
+                changes = detail.get('changes', [])
+                
+                # Find the UserAppAccess record by username
+                # In the new architecture, the username in sync details comes from user.get_display_name()
+                # which is the UserAppAccess.username
+                local_user = None
+                if action_type != 'removed':  # For removed users, they might already be deleted
+                    # Try to find UserAppAccess by username directly
+                    local_user = UserAppAccess.query.filter_by(username=username).first()
+                    
+                    # If not found by direct username match, try finding by external_username in UserMediaAccess
+                    if not local_user:
+                        # Get the server to help with the search
+                        from app.models_media_services import MediaServer
+                        server = MediaServer.query.filter_by(name=server_name).first()
+                        if server:
+                            # Look for UserMediaAccess records on this server with this external_username
+                            user_access = UserMediaAccess.query.filter_by(
+                                server_id=server.id,
+                                external_username=username
+                            ).first()
+                            local_user = user_access.user_app_access if user_access else None
+                
+                if local_user:
+                    # Group by the local user
+                    local_username = local_user.username
+                    local_user_id = local_user.id
+                    
+                    if local_user_id not in local_user_groups:
+                        local_user_groups[local_user_id] = {
+                            'app_username': local_username,
+                            'app_user_id': local_user_id,
+                            'service_accounts': [],
+                            'total_services': 0
+                        }
+                    
+                    local_user_groups[local_user_id]['service_accounts'].append({
+                        'username': username,
+                        'server_name': server_name,
+                        'service_type': service_type,
+                        'changes': changes
+                    })
+                    local_user_groups[local_user_id]['total_services'] = len(local_user_groups[local_user_id]['service_accounts'])
+                else:
+                    # No local user found, treat as standalone
+                    standalone_accounts.append(detail)
+            
+            # Convert grouped accounts to list format
+            result = []
+            
+            # Add grouped accounts (linked accounts)
+            for local_user_id, group_data in local_user_groups.items():
+                result.append({
+                    'type': 'linked_group',
+                    'app_username': group_data['app_username'],
+                    'app_user_id': group_data['app_user_id'],
+                    'service_accounts': group_data['service_accounts'],
+                    'total_services': group_data['total_services']
+                })
+            
+            # Add standalone accounts
+            for detail in standalone_accounts:
+                result.append({
+                    'type': 'standalone',
+                    'username': detail.get('username'),
+                    'server_name': detail.get('server_name'),
+                    'service_type': detail.get('service_type'),
+                    'changes': detail.get('changes', [])
+                })
+            
+            return result
+        
+        # Group each type of change
+        grouped['added'] = group_details_by_local_user(added_details, 'added')
+        grouped['updated'] = group_details_by_local_user(updated_details, 'updated')
+        grouped['removed'] = group_details_by_local_user(removed_details, 'removed')
+        
+        return grouped
     
     @staticmethod
     def get_user_with_access_info(user_id: int) -> Optional[Dict[str, Any]]:
         """Get user with their access information across all servers"""
-        user = User.query.get(user_id)
+        user = UserAppAccess.query.get(user_id)
         if not user:
             return None
         
@@ -152,7 +260,7 @@ class UnifiedUserService:
                                    allow_downloads: bool = None,
                                    admin_id: int = None) -> bool:
         """Update user's access on a specific server"""
-        user = User.query.get(user_id)
+        user = UserAppAccess.query.get(user_id)
         server = MediaServiceManager.get_server_by_id(server_id)
         
         if not user or not server:
@@ -160,7 +268,7 @@ class UnifiedUserService:
         
         # Get or create UserMediaAccess
         access = UserMediaAccess.query.filter_by(
-            user_id=user_id,
+            user_app_access_id=user_id,
             server_id=server_id
         ).first()
         
@@ -220,7 +328,7 @@ class UnifiedUserService:
     @staticmethod
     def remove_user_from_server(user_id: int, server_id: int, admin_id: int = None) -> bool:
         """Remove user's access from a specific server"""
-        user = User.query.get(user_id)
+        user = UserAppAccess.query.get(user_id)
         server = MediaServiceManager.get_server_by_id(server_id)
         
         if not user or not server:
@@ -228,7 +336,7 @@ class UnifiedUserService:
         
         # Get access record
         access = UserMediaAccess.query.filter_by(
-            user_id=user_id,
+            user_app_access_id=user_id,
             server_id=server_id
         ).first()
         
@@ -265,7 +373,7 @@ class UnifiedUserService:
     @staticmethod
     def delete_user_completely(user_id: int, admin_id: int = None) -> bool:
         """Delete user from all services and MUM database"""
-        user = User.query.get(user_id)
+        user = UserAppAccess.query.get(user_id)
         if not user:
             return False
         
@@ -299,15 +407,14 @@ class UnifiedUserService:
     def get_users_with_pagination(page: int = 1, per_page: int = 12, 
                                 search: str = None) -> Dict[str, Any]:
         """Get users with pagination and search"""
-        query = User.query
+        query = UserAppAccess.query
         
         if search:
             search_term = f"%{search}%"
             query = query.filter(
                 db.or_(
-                    User.primary_username.ilike(search_term),
-                    User.primary_email.ilike(search_term),
-                    User.plex_email.ilike(search_term)
+                    UserAppAccess.username.ilike(search_term),
+                    UserAppAccess.email.ilike(search_term)
                 )
             )
         
@@ -320,11 +427,11 @@ class UnifiedUserService:
         # Add access info for each user
         users_with_access = []
         for user in pagination.items:
-            access_count = user.media_accesses.filter_by(is_active=True).count()
+            access_count = len([access for access in user.media_accesses if access.is_active])
             users_with_access.append({
                 'user': user,
                 'active_servers': access_count,
-                'last_activity': user.last_activity_at or user.last_streamed_at
+                'last_activity': user.last_login_at  # UserAppAccess uses last_login_at
             })
         
         return {

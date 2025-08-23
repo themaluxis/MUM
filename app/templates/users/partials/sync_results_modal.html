@@ -1,4 +1,4 @@
-{# File: app/templates/users/_sync_results_modal_content.html #}
+{# New Simplified Sync Results Modal #}
 {# Expects added_users, updated_users, removed_users, error_count, error_messages #}
 
 <div class="modal-box max-w-3xl bg-base-100 border border-base-300 shadow-2xl p-0">
@@ -39,161 +39,51 @@
                             {% if sync_result.added > 0 %}<span class="text-success font-medium">{{ sync_result.added }} users added</span>{% endif %}{% if sync_result.added > 0 and (sync_result.updated > 0 or sync_result.removed > 0) %}, {% endif %}
                             {% if sync_result.updated > 0 %}<span class="text-warning font-medium">{{ sync_result.updated }} users updated</span>{% endif %}{% if sync_result.updated > 0 and sync_result.removed > 0 %}, and {% endif %}
                             {% if sync_result.removed > 0 %}<span class="text-error font-medium">{{ sync_result.removed }} users removed</span>{%endif%}. 
-                            <span class="text-success font-medium">{{ sync_result.successful_servers|length }} servers synced successfully</span> while 
-                            <span class="text-error font-medium">{{ sync_result.failed_servers|length }} servers failed</span> to connect during the process.
+                            {% if sync_result.errors > 0 %}
+                                <span class="text-error font-medium">{{ sync_result.errors }} errors occurred</span> during the process.
+                            {% endif %}
                         {% endif %}
                     </p>
                 </div>
             </div>
         </div>
 
+        <!-- Error Messages -->
         {% if sync_result.errors > 0 %}
-        <!-- Error Card -->
-        <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+        <div class="bg-error/10 border border-error/20 rounded-lg p-4 mb-6">
             <div class="flex items-start gap-3">
-                <div class="w-8 h-8 rounded-full bg-error/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <i class="fa-solid fa-exclamation-triangle text-error text-sm"></i>
+                <div class="w-6 h-6 rounded-full bg-error/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-exclamation-triangle text-error text-xs"></i>
                 </div>
                 <div>
-                    <h4 class="font-medium text-base-content mb-1">Sync Errors</h4>
-                    {% if sync_result.error_messages %}
-                        <div class="text-sm text-base-content/70 leading-relaxed">
-                            {% for msg in sync_result.error_messages[:2] %}
-                                <div class="mb-1">• {{ msg | truncate(100) }}</div>
-                            {% endfor %}
-                            {% if sync_result.error_messages|length > 2 %}
-                                <div class="text-xs text-base-content/60 mt-1">... and {{ sync_result.error_messages|length - 2 }} more errors occurred</div>
-                            {% endif %}
-                        </div>
-                    {% endif %}
+                    <h4 class="font-medium text-error mb-2">Synchronization Errors</h4>
+                    <ul class="text-sm text-base-content/80 space-y-1">
+                        {% for error in sync_result.error_messages %}
+                            <li class="flex items-start gap-2">
+                                <i class="fa-solid fa-circle text-error text-[6px] mt-1.5"></i>
+                                {{ error }}
+                            </li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
         </div>
         {% endif %}
 
+        <!-- Sync Results Sections -->
         {% if sync_result.added > 0 or sync_result.updated > 0 or sync_result.removed > 0 %}
-            <div class="mb-4">
-                <h4 class="font-medium text-base-content text-lg mb-3">Sync Results:</h4>
-                <div class="max-h-[60vh] overflow-y-auto space-y-3">
-                    {% if sync_result.added > 0 %}
-                    <!-- Added Users Card -->
-                    <div class="bg-base-200 border border-base-300 rounded-lg overflow-hidden">
-                        <div class="p-4 border-b border-base-300 cursor-pointer" onclick="toggleCollapse('added-users')">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
-                                        <i class="fa-solid fa-user-plus text-success text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-medium text-success">Added Users</h4>
-                                        <p class="text-xs text-base-content/60">{{ sync_result.added }} new users were added</p>
-                                    </div>
-                                </div>
-                                <i class="fa-solid fa-chevron-down text-base-content/60 transition-transform" id="added-users-icon"></i>
-                            </div>
-                        </div>
-                        <div class="p-4 bg-base-300/50" id="added-users" style="display: block;">
-                            {% if sync_result.added_details %}
-                                <div class="space-y-3">
-                                    {% for detail in sync_result.added_details %}
-                                        <div class="bg-base-100 rounded p-3 border border-base-300">
-                                            <div class="flex items-center justify-between">
-                                                <h5 class="font-medium text-base-content text-sm">{{ detail.username }}</h5>
-                                                <span class="px-2 py-1 bg-success/20 text-success text-xs rounded font-medium">
-                                                    {{ detail.service_type }}
-                                                </span>
-                                            </div>
-                                            <p class="text-xs text-base-content/60 mt-1">Added from {{ detail.server_name }}</p>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="text-xs text-base-content/60">{{ sync_result.added }} new users were successfully added from media servers.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
+            <div class="space-y-4">
+                <!-- Added Users Section -->
+                {% set section_type = 'added' %}
+                {% include 'users/partials/sync_section.html' with context %}
 
-                    {% if sync_result.updated > 0 %}
-                    <!-- Updated Users Card -->
-                    <div class="bg-base-200 border border-base-300 rounded-lg overflow-hidden">
-                        <div class="p-4 border-b border-base-300 cursor-pointer" onclick="toggleCollapse('updated-users')">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center">
-                                        <i class="fa-solid fa-user-pen text-warning text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-medium text-warning">Updated Users</h4>
-                                        <p class="text-xs text-base-content/60">{{ sync_result.updated }} users were updated</p>
-                                    </div>
-                                </div>
-                                <i class="fa-solid fa-chevron-down text-base-content/60 transition-transform" id="updated-users-icon"></i>
-                            </div>
-                        </div>
-                        <div class="p-4 bg-base-300/50" id="updated-users" style="display: block;">
-                            {% if sync_result.updated_details %}
-                                <div class="space-y-3">
-                                    {% for detail in sync_result.updated_details %}
-                                        <div class="bg-base-100 rounded p-3 border border-base-300">
-                                            <h5 class="font-medium text-base-content text-sm mb-2">{{ detail.username }}</h5>
-                                            <div class="space-y-1">
-                                                {% for change in detail.changes %}
-                                                    <div class="text-xs text-base-content/70 flex items-center gap-2">
-                                                        <i class="fa-solid fa-circle text-primary text-[6px]"></i>
-                                                        {{ change }}
-                                                    </div>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="text-xs text-base-content/60">{{ sync_result.updated }} existing users were updated with new information.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
+                <!-- Updated Users Section -->
+                {% set section_type = 'updated' %}
+                {% include 'users/partials/sync_section.html' with context %}
 
-                    {% if sync_result.removed > 0 %}
-                    <!-- Removed Users Card -->
-                    <div class="bg-base-200 border border-base-300 rounded-lg overflow-hidden">
-                        <div class="p-4 border-b border-base-300 cursor-pointer" onclick="toggleCollapse('removed-users')">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-error/20 flex items-center justify-center">
-                                        <i class="fa-solid fa-user-minus text-error text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-medium text-error">Removed Users</h4>
-                                        <p class="text-xs text-base-content/60">{{ sync_result.removed }} users were removed</p>
-                                    </div>
-                                </div>
-                                <i class="fa-solid fa-chevron-down text-base-content/60 transition-transform" id="removed-users-icon"></i>
-                            </div>
-                        </div>
-                        <div class="p-4 bg-base-300/50" id="removed-users" style="display: block;">
-                            {% if sync_result.removed_details %}
-                                <div class="space-y-3">
-                                    {% for detail in sync_result.removed_details %}
-                                        <div class="bg-base-100 rounded p-3 border border-base-300">
-                                            <div class="flex items-center justify-between">
-                                                <h5 class="font-medium text-base-content text-sm">{{ detail.username }}</h5>
-                                                <span class="px-2 py-1 bg-error/20 text-error text-xs rounded font-medium">
-                                                    {{ detail.service_type }}
-                                                </span>
-                                            </div>
-                                            <p class="text-xs text-base-content/60 mt-1">Removed from {{ detail.server_name }}</p>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="text-xs text-base-content/60">{{ sync_result.removed }} users were removed from media servers.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
+                <!-- Removed Users Section -->
+                {% set section_type = 'removed' %}
+                {% include 'users/partials/sync_section.html' with context %}
             </div>
         {% endif %}
 
@@ -211,15 +101,34 @@
 
 <script>
 function toggleCollapse(elementId) {
-    const content = document.getElementById(elementId);
-    const icon = document.getElementById(elementId + '-icon');
-    
-    if (content.style.display === 'none') {
-        content.style.display = 'block';
-        icon.style.transform = 'rotate(0deg)';
+    // Handle nested groups (linked accounts)
+    if (elementId.includes('group-')) {
+        const content = document.getElementById(elementId + '-content');
+        const icon = document.getElementById(elementId + '-icon');
+        
+        if (!content || !icon) return;
+        
+        if (content.classList.contains('hidden')) {
+            content.classList.remove('hidden');
+            icon.style.transform = 'rotate(0deg)';
+        } else {
+            content.classList.add('hidden');
+            icon.style.transform = 'rotate(-90deg)';
+        }
     } else {
-        content.style.display = 'none';
-        icon.style.transform = 'rotate(-90deg)';
+        // Handle regular sections (added/updated/removed)
+        const content = document.getElementById(elementId);
+        const icon = document.getElementById(elementId + '-icon');
+        
+        if (!content || !icon) return;
+        
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            icon.style.transform = 'rotate(0deg)';
+        } else {
+            content.style.display = 'none';
+            icon.style.transform = 'rotate(-90deg)';
+        }
     }
 }
 </script>

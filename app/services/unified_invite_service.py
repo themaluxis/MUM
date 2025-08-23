@@ -2,7 +2,7 @@
 from typing import List, Dict, Any, Optional
 from flask import current_app
 from datetime import datetime, timedelta
-from app.models import Invite, User, Setting
+from app.models import Invite, UserAppAccess, Setting
 from app.models_media_services import MediaServer, UserMediaAccess
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
@@ -50,7 +50,7 @@ class UnifiedInviteService:
             force_guild_membership=force_guild_membership,
             grant_purge_whitelist=grant_purge_whitelist,
             grant_bot_whitelist=grant_bot_whitelist,
-            created_by_admin_id=admin_id
+            created_by_owner_id=admin_id
         )
         
         # Store server configurations in the invite's grant_library_ids as JSON
@@ -130,15 +130,21 @@ class UnifiedInviteService:
                     
                     # Create or update UserMediaAccess
                     access = UserMediaAccess.query.filter_by(
-                        user_id=user.id,
+                        service_account_id=user.id,
                         server_id=server_id
                     ).first()
                     
                     if not access:
+                        # Prepare external_user_alt_id for Plex servers
+                        external_user_alt_id = None
+                        if server.service_type == ServiceType.PLEX and user_data.get('plex_uuid'):
+                            external_user_alt_id = user_data.get('plex_uuid')
+                        
                         access = UserMediaAccess(
-                            user_id=user.id,
+                            service_account_id=user.id,
                             server_id=server_id,
                             external_user_id=external_user_id,
+                            external_user_alt_id=external_user_alt_id,
                             external_username=user_data.get('username'),
                             external_email=user_data.get('email'),
                             allowed_library_ids=library_ids,
@@ -207,7 +213,7 @@ class UnifiedInviteService:
             }
     
     @staticmethod
-    def _find_or_create_user_from_invite(user_data: Dict[str, Any], invite: Invite) -> User:
+    def _find_or_create_user_from_invite(user_data: Dict[str, Any], invite: Invite) -> ServiceAccount:
         """Find existing user or create new one from invite data"""
         username = user_data.get('username')
         email = user_data.get('email')
@@ -217,34 +223,46 @@ class UnifiedInviteService:
         # Try to find existing user
         user = None
         
-        # Try by Plex UUID first
+        # Try by Plex UUID first via UserMediaAccess
         if plex_uuid:
-            user = User.query.filter_by(plex_uuid=plex_uuid).first()
+            from app.models_media_services import UserMediaAccess, ServiceType, MediaServer
+            plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
+            if plex_server:
+                access = UserMediaAccess.query.filter_by(
+                    server_id=plex_server.id,
+                    external_user_alt_id=plex_uuid
+                ).first()
+                if access:
+                    user = access.service_account
+                else:
+                    user = None
+            else:
+                user = None
         
         # Try by Discord user ID
         if not user and discord_user_id:
-            user = User.query.filter_by(discord_user_id=discord_user_id).first()
+            user = UserAppAccess.query.filter_by(discord_user_id=discord_user_id).first()
         
         # Try by primary username
         if not user and username:
-            user = User.query.filter_by(primary_username=username).first()
+            user = UserAppAccess.query.filter_by(username=username).first()
         
         # Try by primary email
         if not user and email:
-            user = User.query.filter_by(primary_email=email).first()
+            user = UserAppAccess.query.filter_by(email=email).first()
         
         if not user:
             # Create new user
             user = User(
-                primary_username=username or email or f"user_{datetime.utcnow().timestamp()}",
-                primary_email=email,
+                username=username or email or f"user_{datetime.utcnow().timestamp()}",
+                email=email,
                 avatar_url=user_data.get('avatar_url')
             )
             
             # Set service-specific fields
             if plex_uuid:
-                user.plex_uuid = plex_uuid
-                user.primary_username = username
+                # Plex UUID is now stored in UserMediaAccess.external_user_alt_id
+                user.username = username
                 user.plex_email = email
                 user.plex_thumb_url = user_data.get('plex_thumb_url')
             

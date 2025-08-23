@@ -18,40 +18,54 @@ from .extensions import (
     babel, 
     htmx
 )
-from .models import AdminAccount, User, Setting, EventType
+from .models import UserAppAccess, Owner, Setting, EventType
 from .utils import helpers 
 
 def get_locale_for_babel():
     return 'en'
 
 def initialize_settings_from_db(app_instance):
+    """Initialize settings from database, with robust error handling for missing tables"""
+    # Set a default SECRET_KEY first
+    if not app_instance.config.get('SECRET_KEY'): 
+        app_instance.config['SECRET_KEY'] = secrets.token_hex(32)
+    
     engine_conn = None
     try:
-        engine_conn = db.engine.connect() 
+        # Check if we can even connect to the database
+        engine_conn = db.engine.connect()
+        
+        # Check if the settings table exists
         if not db.engine.dialect.has_table(engine_conn, Setting.__tablename__):
-            app_instance.logger.warning("Settings table not found during init. Skipping DB config load.")
-            if not app_instance.config.get('SECRET_KEY'): app_instance.config['SECRET_KEY'] = secrets.token_hex(32)
+            app_instance.logger.warning("Settings table not found during init. Using defaults.")
             return
+            
+        # Try to query settings
+        with app_instance.app_context():
+            all_settings = Setting.query.all()
+            settings_dict = {s.key: s.get_value() for s in all_settings}
+            
+            # Apply settings to app config
+            for k, v in settings_dict.items():
+                if k.isupper(): 
+                    app_instance.config[k] = v
+            
+            # Handle SECRET_KEY specifically
+            db_sk = settings_dict.get('SECRET_KEY')
+            if db_sk: 
+                app_instance.config['SECRET_KEY'] = db_sk
+                
+            app_instance.logger.info("Application settings loaded from database.")
+            
     except Exception as e: 
-        app_instance.logger.error(f"Cannot connect to DB or check settings table in init: {e}")
-        if not app_instance.config.get('SECRET_KEY'): app_instance.config['SECRET_KEY'] = secrets.token_hex(32)
-        return
+        app_instance.logger.warning(f"Could not load settings from database: {e}. Using defaults.")
+        # Continue with defaults - don't fail the app startup
     finally:
-        if engine_conn: engine_conn.close()
-    try:
-        all_settings = Setting.query.all()
-        settings_dict = {s.key: s.get_value() for s in all_settings}
-        for k, v in settings_dict.items():
-            if k.isupper(): app_instance.config[k] = v
-        db_sk = settings_dict.get('SECRET_KEY')
-        if db_sk: app_instance.config['SECRET_KEY'] = db_sk
-        elif not app_instance.config.get('SECRET_KEY'): 
-            app_instance.config['SECRET_KEY'] = secrets.token_hex(32)
-            app_instance.logger.warning("SECRET_KEY created temporarily. Complete setup.")
-        app_instance.logger.info("Application settings loaded/refreshed from database.")
-    except Exception as e:
-        app_instance.logger.error(f"Error querying settings from database: {e}. Using defaults.")
-        if not app_instance.config.get('SECRET_KEY'): app_instance.config['SECRET_KEY'] = secrets.token_hex(32)
+        if engine_conn: 
+            try:
+                engine_conn.close()
+            except:
+                pass
 
 def register_error_handlers(app):
     @app.errorhandler(403)
@@ -205,31 +219,39 @@ def create_app(config_name=None):
 
     @login_manager.user_loader
     def load_user(user_id):
-        # Ensure tables exist before querying, critical during first `flask db upgrade`
+        # Clean user loader - only supports Owner and UserAppAccess
         try:
-            with app.app_context(): # Ensure context for db operations if called early
-                engine_conn_lu = db.engine.connect()
-                admin_table_exists = db.engine.dialect.has_table(engine_conn_lu, AdminAccount.__tablename__)
-                user_table_exists = db.engine.dialect.has_table(engine_conn_lu, User.__tablename__)
-                engine_conn_lu.close()
-                
-                if admin_table_exists and user_table_exists:
-                    # Try to load as AdminAccount first
-                    admin = AdminAccount.query.get(int(user_id))
-                    if admin:
-                        return admin
+            with app.app_context():
+                # Parse user_id to determine user type and actual ID
+                # Format: "type:id" (e.g., "owner:1", "user_app_access:1")
+                if ':' in str(user_id):
+                    user_type, actual_id = str(user_id).split(':', 1)
+                    actual_id = int(actual_id)
                     
-                    # If not found as admin, try as regular User
-                    user = User.query.get(int(user_id))
-                    if user:
-                        return user
-                elif admin_table_exists:
-                    # Fallback to admin-only for backward compatibility
-                    return AdminAccount.query.get(int(user_id))
+                    if user_type == 'owner':
+                        return Owner.query.get(actual_id)
+                    elif user_type == 'user_app_access':
+                        return UserAppAccess.query.get(actual_id)
+                    # Legacy support for old prefixes
+                    elif user_type in ['app', 'service']:
+                        return UserAppAccess.query.get(actual_id)
+                else:
+                    # Legacy format without prefix - try Owner first, then UserAppAccess
+                    actual_id = int(user_id)
+                    
+                    # Try Owner first (highest priority)
+                    owner = Owner.query.get(actual_id)
+                    if owner:
+                        return owner
+                    
+                    # Then try UserAppAccess
+                    user_app_access = UserAppAccess.query.get(actual_id)
+                    if user_app_access:
+                        return user_app_access
                 
                 return None
         except Exception as e_load_user:
-            app.logger.error(f"Init.py - load_user(): Error checking/loading user: {e_load_user}")
+            app.logger.error(f"Init.py - load_user(): Error loading user: {e_load_user}")
             return None
 
     @app.before_request
@@ -249,11 +271,10 @@ def create_app(config_name=None):
         # Debug endpoint tracking removed for cleaner logs
 
         try:
-            engine_conn_br = None; settings_table_exists = False; admin_table_exists = False
+            engine_conn_br = None; settings_table_exists = False
             try:
                 engine_conn_br = db.engine.connect()
                 settings_table_exists = db.engine.dialect.has_table(engine_conn_br, Setting.__tablename__)
-                admin_table_exists = db.engine.dialect.has_table(engine_conn_br, AdminAccount.__tablename__)
             except Exception as e_db_check:
                 current_app.logger.warning(f"Init.py - before_request_tasks(): DB connection/table check error: {e_db_check}")
             finally:
@@ -266,12 +287,19 @@ def create_app(config_name=None):
                 discord_setting_val = Setting.get('DISCORD_OAUTH_ENABLED', False)
                 g.discord_oauth_enabled_for_invite = discord_setting_val if isinstance(discord_setting_val, bool) else str(discord_setting_val).lower() == 'true'
 
-                admin_account_present = AdminAccount.query.first() is not None if admin_table_exists else False
+                # Check if Owner exists
+                owner_present = False
+                try:
+                    owner_present = Owner.query.first() is not None
+                except Exception as e:
+                    current_app.logger.debug(f"Error checking owner presence: {e}")
+                    owner_present = False
+                
                 app_config_done = bool(g.app_base_url)
                 
-                # Setup is complete if admin account exists and basic app config is done
+                # Setup is complete if owner account exists and basic app config is done
                 # Plugin configuration is handled separately and doesn't affect setup completion
-                g.setup_complete = admin_account_present and app_config_done
+                g.setup_complete = owner_present and app_config_done
                 
                 # Check if at least one plugin is enabled (separate from setup completion)
                 plugins_configured = False
@@ -324,18 +352,17 @@ def create_app(config_name=None):
             
             # Setup redirect logging removed for cleaner logs
             try:
-                # Re-check table existence for redirection logic, as it's critical
-                engine_conn_sr, admin_table_exists_sr_redir, settings_table_exists_sr_redir = None, False, False
+                # Check if Owner exists for setup redirection
+                owner_exists = False
                 try:
-                    engine_conn_sr = db.engine.connect()
-                    admin_table_exists_sr_redir = db.engine.dialect.has_table(engine_conn_sr, AdminAccount.__tablename__)
-                    settings_table_exists_sr_redir = db.engine.dialect.has_table(engine_conn_sr, Setting.__tablename__)
-                finally:
-                    if engine_conn_sr: engine_conn_sr.close()
-
-                if not (admin_table_exists_sr_redir and AdminAccount.query.first()):
+                    owner_exists = Owner.query.first() is not None
+                except Exception as e:
+                    current_app.logger.debug(f"Error checking owner for redirect: {e}")
+                    owner_exists = False
+                
+                if not owner_exists:
                     if request.endpoint != 'setup.account_setup' and request.endpoint != 'setup.plex_sso_callback_setup_admin':
-                        current_app.logger.info(f"Init.py - before_request_tasks(): Redirecting to account_setup (no admin).")
+                        current_app.logger.info(f"Init.py - before_request_tasks(): Redirecting to account_setup (no owner).")
                         return redirect(url_for('setup.account_setup'))
             except Exception as e_setup_redirect:
                 current_app.logger.error(f"Init.py - before_request_tasks(): DB error during setup redirection logic: {e_setup_redirect}", exc_info=True)

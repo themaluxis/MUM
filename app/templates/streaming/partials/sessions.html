@@ -146,13 +146,9 @@
                                         </div>
                                     </div>
                                 {% endif %}
-                                {% if session.mum_user_id %}
-                                    <a href="{{ url_for('user.view_user', user_id=session.mum_user_id, back='streaming') }}" class="link link-hover text-info">
-                                        {{ session.user }}
-                                    </a>
-                                {% else %}
+                                <a href="{{ url_for('user.view_service_account', server_nickname=session.server_name, server_username=session.user) }}" class="link link-hover text-info" title="View user profile">
                                     {{ session.user }}
-                                {% endif %}
+                                </a>
                             </p>
                             <p class="text-base-content/70 flex items-center" title="{{ session.player_title }} ({{session.player_platform}} via {{session.product}})">
                                 <i class="fa-solid fa-play fa-fw mr-1.5 text-info w-4 text-center"></i> 

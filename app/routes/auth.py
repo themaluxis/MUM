@@ -7,7 +7,7 @@ import datetime
 import time
 from app.utils.helpers import log_event
 from app.utils.timeout_helper import get_api_timeout
-from app.models import AdminAccount, User, Setting, EventType, SettingValueType 
+from app.models import UserAppAccess, Owner, Setting, EventType, SettingValueType 
 from app.forms import LoginForm, UserLoginForm
 from app.extensions import db, csrf # <<< IMPORT CSRF
 from plexapi.myplex import MyPlexAccount 
@@ -29,13 +29,13 @@ def app_login():
     if current_user.is_authenticated and getattr(g, 'setup_complete', False):
         return redirect(url_for('dashboard.index'))
     
-    # Check if any admin account exists at all for the setup redirect
+    # Check if owner account exists for the setup redirect
     try:
-        if not AdminAccount.query.first():
-            flash('App setup not complete. Please set up an admin account.', 'warning')
+        if not Owner.query.first():
+            flash('App setup not complete. Please set up an owner account.', 'warning')
             return redirect(url_for('setup.account_setup'))
     except Exception as e_db:
-        current_app.logger.warning(f"Could not query AdminAccount in login: {e_db}")
+        current_app.logger.warning(f"Could not query Owner in login: {e_db}")
         # Allow rendering the login page even if DB check fails, it will likely fail on submit anyway
     
     # Check if user accounts are enabled
@@ -49,15 +49,15 @@ def app_login():
         input_username = (form.username.data or '').strip()
         input_password = (form.password.data or '')
         
-        # First, try to find an admin by username
-        admin = AdminAccount.query.filter_by(username=input_username).first()
+        # First, try to find an owner by username
+        owner = Owner.query.filter_by(username=input_username).first()
         
-        if admin and admin.check_password(input_password):
-            # Admin login successful
-            login_user(admin, remember=True)
-            admin.last_login_at = db.func.now()
+        if owner and owner.check_password(input_password):
+            # Owner login successful
+            login_user(owner, remember=True)
+            owner.last_login_at = db.func.now()
             db.session.commit()
-            log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Admin '{admin.username}' logged in (password).")
+            log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Owner '{owner.username}' logged in (password).")
             
             # Check if setup is complete, if not redirect to appropriate setup step
             if not getattr(g, 'setup_complete', False):
@@ -86,37 +86,38 @@ def app_login():
                 next_page = url_for('dashboard.index')
             return redirect(next_page)
             
-        # If admin login failed, try user login (if user accounts are enabled)
+        # If owner login failed, try user login (if user accounts are enabled)
         elif allow_user_accounts:
-            # Try to find a user account
+            # First try to find a UserAppAccess account
             try:
                 from sqlalchemy import func
-                user = User.query.filter(func.lower(User.primary_username) == func.lower(input_username)).first()
+                user_app_access = UserAppAccess.query.filter(func.lower(UserAppAccess.username) == func.lower(input_username)).first()
             except Exception:
-                user = User.query.filter_by(primary_username=input_username).first()
+                user_app_access = UserAppAccess.query.filter_by(username=input_username).first()
             
-            # If no exact match, try display name fallback
-            if not user:
-                potential_users = User.query.filter(User.password_hash.isnot(None)).all()
-                for potential_user in potential_users:
-                    if potential_user.get_display_name() == input_username:
-                        user = potential_user
-                        break
+            # Also try email for UserAppAccess
+            if not user_app_access and input_username:
+                try:
+                    user_app_access = UserAppAccess.query.filter(func.lower(UserAppAccess.email) == func.lower(input_username)).first()
+                except Exception:
+                    user_app_access = UserAppAccess.query.filter_by(email=input_username).first()
             
-            if user and user.check_password(input_password):
-                # User login successful
-                login_user(user, remember=True)
-                user.updated_at = datetime.utcnow()
+            if user_app_access and user_app_access.check_password(input_password):
+                # UserAppAccess login successful
+                login_user(user_app_access, remember=True)
+                user_app_access.last_login_at = datetime.utcnow()
+                user_app_access.updated_at = datetime.utcnow()
                 db.session.commit()
                 
-                log_event(EventType.ADMIN_LOGIN_SUCCESS, f"User '{user.primary_username}' logged in.", user_id=user.id)
+                log_event(EventType.ADMIN_LOGIN_SUCCESS, f"App user '{user_app_access.username}' logged in.")
                 
                 next_page = request.args.get('next')
                 if not next_page or not is_safe_url(next_page):
                     next_page = url_for('user.index')
                 return redirect(next_page)
+            
         
-        # If both admin and user login failed
+        # If owner and app user login failed
         log_event(EventType.ADMIN_LOGIN_FAIL, f"Failed login attempt for username '{input_username}'.")
         flash('Invalid username or password.', 'danger')
             
@@ -273,10 +274,11 @@ def plex_sso_callback_admin():
         
         # Determine if we're linking an existing account or logging in a new one
         if current_user.is_authenticated:
-            admin_to_update = AdminAccount.query.get(current_user.id)
+            admin_to_update = current_user
             log_message = f"Admin '{admin_to_update.username}' linked their Plex account '{plex_account.username}'."
         else:
-            admin_to_update = AdminAccount.query.filter_by(plex_uuid=plex_account.uuid).first()
+            # Find Owner by plex_uuid (UserAppAccess don't have plex_uuid)
+            admin_to_update = Owner.query.filter_by(plex_uuid=plex_account.uuid).first()
             log_message = f"Admin '{plex_account.username}' logged in via Plex SSO."
         
         if not admin_to_update:
@@ -327,15 +329,19 @@ def plex_sso_callback_admin():
 @bp.route('/logout')
 @login_required
 def logout():
-    # Handle both AdminAccount and User objects
-    if hasattr(current_user, 'username'):
-        # AdminAccount
-        user_name = current_user.username or current_user.plex_username
-        log_event(EventType.ADMIN_LOGOUT, f"Admin '{user_name}' logged out.", admin_id=current_user.id)
+    # Handle Owner and UserAppAccess objects only
+    if isinstance(current_user, Owner):
+        # Owner
+        user_name = current_user.username
+        log_event(EventType.ADMIN_LOGOUT, f"Owner '{user_name}' logged out.")
+    elif isinstance(current_user, UserAppAccess):
+        # UserAppAccess
+        user_name = current_user.username
+        log_event(EventType.ADMIN_LOGOUT, f"App user '{user_name}' logged out.")
     else:
-        # User
-        user_name = current_user.get_display_name()
-        log_event(EventType.ADMIN_LOGOUT, f"User '{user_name}' logged out.", user_id=current_user.id)
+        # Unknown user type
+        user_name = getattr(current_user, 'username', 'Unknown')
+        log_event(EventType.ADMIN_LOGOUT, f"Unknown user type '{user_name}' logged out.")
     
     logout_user()
     flash('You have been logged out.', 'success')
@@ -460,17 +466,22 @@ def discord_callback_admin():
         discord_user = user_response.json()
 
         # Ensure we are working with the correct admin account instance from the DB
-        admin_to_update = AdminAccount.query.get(current_user.id)
+        admin_to_update = current_user
         if not admin_to_update:
             # Should not happen if @login_required is working
             flash('Admin account not found. Please log in again.', 'danger')
             return redirect(url_for('auth.app_login'))
 
-        # Check if this Discord ID is already linked to a *different* admin account
-        existing_link = AdminAccount.query.filter(
-            AdminAccount.id != admin_to_update.id, 
-            AdminAccount.discord_user_id == discord_user['id']
+        # Check if this Discord ID is already linked to a *different* user account
+        existing_owner = Owner.query.filter(
+            Owner.id != admin_to_update.id,
+            Owner.discord_user_id == discord_user['id']
         ).first()
+        existing_user = UserAppAccess.query.filter(
+            UserAppAccess.id != admin_to_update.id,
+            UserAppAccess.discord_user_id == discord_user['id']
+        ).first()
+        existing_link = existing_owner or existing_user
 
         if existing_link:
             flash(f"Discord account '{discord_user['username']}' is already linked to another admin account ({existing_link.username or existing_link.plex_username}).", 'danger')
@@ -492,14 +503,18 @@ def discord_callback_admin():
         
         # --- KEY CHANGE: Re-login the user to refresh the session's user object ---
         # Fetch the updated user from the database to ensure all fields are current
-        fresh_admin_user = AdminAccount.query.get(admin_to_update.id)
-        if fresh_admin_user:
+        if isinstance(admin_to_update, Owner):
+            fresh_user = Owner.query.get(admin_to_update.id)
+        else:
+            fresh_user = UserAppAccess.query.get(admin_to_update.id)
+            
+        if fresh_user:
             # Flask-Login's login_user function will update the user in the session
-            login_user(fresh_admin_user, remember=current_user.is_remembered if hasattr(current_user, 'is_remembered') else True) 
-            current_app.logger.info(f"ADMIN DISCORD LINK: User {fresh_admin_user.id} re-logged in to refresh session data.")
+            login_user(fresh_user, remember=current_user.is_remembered if hasattr(current_user, 'is_remembered') else True) 
+            current_app.logger.info(f"DISCORD LINK: User {fresh_user.id} re-logged in to refresh session data.")
         else:
             # This would be very unusual if the commit succeeded
-            current_app.logger.error(f"ADMIN DISCORD LINK: Could not re-fetch admin user {admin_to_update.id} after commit for re-login.")
+            current_app.logger.error(f"DISCORD LINK: Could not re-fetch user {admin_to_update.id} after commit for re-login.")
         # --- END KEY CHANGE ---
 
         log_event(EventType.DISCORD_ADMIN_LINK_SUCCESS, f"Admin '{admin_to_update.username or admin_to_update.plex_username}' linked Discord '{admin_to_update.discord_username}'.", admin_id=admin_to_update.id)

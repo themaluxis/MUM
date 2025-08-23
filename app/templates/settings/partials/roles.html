@@ -7,7 +7,7 @@
             <h1 class="text-2xl font-bold text-base-content mb-2">Role Management</h1>
             <p class="text-base-content/70 text-sm">Create and manage administrator roles with custom permissions</p>
         </div>
-        {% if current_user.id == 1 or current_user.has_permission('create_role') %}
+        {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('create_role') %}
         <a href="{{ url_for('role_management.create') }}" class="btn btn-primary">
             <i class="fa-solid fa-plus mr-2"></i> Create New Role
         </a>
@@ -104,7 +104,7 @@
                     </td>
                     <td class="py-4 text-right">
                         <div class="flex items-center justify-end gap-2">
-                            {% if current_user.id == 1 or current_user.has_permission('edit_role') and current_user not in role.admins %}
+                            {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('edit_role') and current_user not in role.admins %}
                                 <a href="{{ url_for('role_management.edit', role_id=role.id) }}" 
                                    class="btn btn-sm btn-ghost hover:bg-primary/10" 
                                    title="Edit Role">
@@ -120,7 +120,7 @@
                                 </div>
                             {% endif %}
                             
-                            {% if current_user.id == 1 or current_user.has_permission('delete_role') and current_user not in role.admins %}
+                            {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('delete_role') and current_user not in role.admins %}
                                 <form action="{{ url_for('role_management.delete', role_id=role.id) }}" 
                                       method="POST" 
                                       class="inline" 
@@ -160,7 +160,7 @@
         <p class="text-sm text-base-content/70 mb-6">
             Create your first role to start organizing administrator permissions and access control.
         </p>
-        {% if current_user.id == 1 or current_user.has_permission('create_role') %}
+        {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('create_role') %}
         <a href="{{ url_for('role_management.create') }}" class="btn btn-primary">
             <i class="fa-solid fa-plus mr-2"></i> Create First Role
         </a>

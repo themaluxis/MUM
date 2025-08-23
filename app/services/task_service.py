@@ -1,8 +1,8 @@
 # File: app/services/task_service.py
 from flask import current_app
 from app.extensions import scheduler 
-from app.models import Setting, EventType, User, StreamHistory
-from app.models_media_services import ServiceType
+from app.models import Setting, EventType, UserAppAccess
+from app.models_media_services import ServiceType, MediaStreamHistory, UserMediaAccess
 from app.utils.helpers import log_event
 from . import user_service # user_service is needed for deleting users
 from app.services.media_service_manager import MediaServiceManager
@@ -16,25 +16,43 @@ _active_stream_sessions = {}
 def monitor_media_sessions_task():
     """
     Statefully monitors media sessions from all services (Plex, Jellyfin, etc.), with corrected session tracking and duration calculation.
-    - Creates a new StreamHistory record when a new session starts.
+    - Creates a new MediaStreamHistory record when a new session starts.
     - Continuously updates the view offset (progress) on the SAME record for an ongoing session.
     - Correctly calculates final playback duration from the last known viewOffset when the session stops.
     - Enforces "No 4K Transcoding" user setting with improved detection.
     """
     global _active_stream_sessions
     with scheduler.app.app_context():
-        current_app.logger.info("--- Running Media Session Monitor Task ---")
+        current_app.logger.info("=== MEDIA SESSION MONITOR TASK STARTING ===")
         
         # Check for any active media servers from the database
         all_servers = MediaServiceManager.get_all_servers(active_only=True)
+        current_app.logger.info(f"DEBUG: Found {len(all_servers)} active media servers in database")
+        
+        for server in all_servers:
+            current_app.logger.info(f"DEBUG: Server - Name: {server.name}, Type: {server.service_type.value}, Active: {server.is_active}")
+        
         if not all_servers:
             current_app.logger.warning("No active media servers configured in the database. Skipping task.")
             return
 
         try:
             # This gets sessions from all active servers (Plex, Jellyfin, etc.)
+            current_app.logger.info("DEBUG: Calling MediaServiceManager.get_all_active_sessions()...")
             active_sessions = MediaServiceManager.get_all_active_sessions()
             now_utc = datetime.now(timezone.utc)
+            current_app.logger.info(f"DEBUG: Retrieved {len(active_sessions)} active sessions from MediaServiceManager")
+            
+            if len(active_sessions) == 0:
+                current_app.logger.info("DEBUG: No active sessions found - this could be normal if no one is streaming")
+            else:
+                current_app.logger.info(f"DEBUG: Active sessions details:")
+                for i, session in enumerate(active_sessions):
+                    if isinstance(session, dict):
+                        current_app.logger.info(f"  Session {i+1}: Jellyfin session ID {session.get('Id', 'unknown')}")
+                    else:
+                        current_app.logger.info(f"  Session {i+1}: Plex session key {getattr(session, 'sessionKey', 'unknown')}")
+            
             current_app.logger.info(f"Found {len(active_sessions)} active sessions across all servers.")
 
             # Handle both Plex and Jellyfin session formats
@@ -51,6 +69,7 @@ def monitor_media_sessions_task():
                 if session_key:
                     current_sessions_dict[session_key] = session
                 else:
+                    session_type = "Jellyfin" if isinstance(session, dict) else "Plex"
                     current_app.logger.warning(f"Session missing key: {session_type} - {type(session)}")
             
             current_session_keys = set(current_sessions_dict.keys())
@@ -62,7 +81,7 @@ def monitor_media_sessions_task():
                 for session_key in stopped_session_keys:
                     stream_history_id = _active_stream_sessions.pop(session_key, None)
                     if stream_history_id:
-                        history_record = db.session.get(StreamHistory, stream_history_id)
+                        history_record = db.session.get(MediaStreamHistory, stream_history_id)
                         if history_record and not history_record.stopped_at:
                             final_duration = history_record.view_offset_at_end_seconds
                             history_record.duration_seconds = final_duration if final_duration and final_duration > 0 else 0
@@ -77,23 +96,33 @@ def monitor_media_sessions_task():
             else:
                 current_app.logger.info(f"Processing {len(current_sessions_dict)} new or ongoing sessions...")
 
+            # Import MediaServer for both Plex and Jellyfin session handling
+            from app.models_media_services import MediaServer
+            
             for session_key, session in current_sessions_dict.items():
                 # Handle different session formats for user lookup
                 mum_user = None
+                user_media_access = None
                 
                 if isinstance(session, dict):
-                    # Jellyfin session - look up by primary_username
+                    # Jellyfin session - look up by username
                     jellyfin_username = session.get('UserName')
                     if jellyfin_username:
-                        mum_user = User.query.filter_by(primary_username=jellyfin_username).first()
-                        if not mum_user:
-                            current_app.logger.warning(f"No MUM user found for Jellyfin username '{jellyfin_username}'. Skipping session.")
+                        # Find UserMediaAccess for Jellyfin username
+                        user_media_access = UserMediaAccess.query.filter_by(external_username=jellyfin_username).first()
+                        if user_media_access:
+                            # Check if it's linked to a UserAppAccess account
+                            mum_user = user_media_access.user_app_access
+                            if not mum_user:
+                                current_app.logger.info(f"Found standalone UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}). Processing as standalone user.")
+                        else:
+                            current_app.logger.warning(f"No UserMediaAccess found for Jellyfin username '{jellyfin_username}'. Skipping session.")
                             continue
                     else:
                         current_app.logger.warning(f"Jellyfin session {session_key} is missing UserName. Skipping.")
                         continue
                 else:
-                    # Plex session - look up by plex_user_id
+                    # Plex session - look up by user ID via UserMediaAccess
                     user_id_from_session = None
                     
                     # Try different ways to get user ID from Plex session
@@ -109,9 +138,23 @@ def monitor_media_sessions_task():
                         continue
                     
                     if user_id_from_session:
-                        mum_user = User.query.filter_by(plex_user_id=user_id_from_session).first()
-                        if not mum_user:
-                            current_app.logger.warning(f"Could not find MUM user for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
+                        # Look up user by external_user_id in UserMediaAccess for Plex server
+                        plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
+                        if plex_server:
+                            user_media_access = UserMediaAccess.query.filter_by(
+                                server_id=plex_server.id,
+                                external_user_id=str(user_id_from_session)
+                            ).first()
+                            if user_media_access:
+                                # Check if it's linked to a UserAppAccess account
+                                mum_user = user_media_access.user_app_access
+                                if not mum_user:
+                                    current_app.logger.info(f"Found standalone UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id}). Processing as standalone user.")
+                            else:
+                                current_app.logger.warning(f"Could not find UserMediaAccess for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
+                                continue
+                        else:
+                            current_app.logger.warning(f"No Plex server configured. Skipping session {session_key}.")
                             continue
                     else:
                         current_app.logger.warning(f"Could not extract user ID from Plex session {session_key}. Skipping.")
@@ -165,8 +208,44 @@ def monitor_media_sessions_task():
                         position_ticks = play_state.get('PositionTicks', 0)
                         view_offset_s = int(position_ticks / 10000000) if position_ticks else 0  # Convert ticks to seconds
 
-                    new_history_record = StreamHistory(
-                        user_id=mum_user.id,
+                    # Determine which server this session belongs to
+                    if isinstance(session, dict):
+                        # Jellyfin session - find Jellyfin server
+                        jellyfin_server = MediaServer.query.filter_by(service_type=ServiceType.JELLYFIN).first()
+                        current_server = jellyfin_server
+                    else:
+                        # Plex session - find Plex server
+                        plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
+                        current_server = plex_server
+                    
+                    if not current_server:
+                        current_app.logger.warning(f"Could not find server for session {session_key}. Skipping.")
+                        continue
+                    
+                    # Safety check to ensure we have either a linked user or standalone user
+                    if not mum_user and not user_media_access:
+                        current_app.logger.warning(f"No user found for session {session_key}. Skipping.")
+                        continue
+                    
+                    if mum_user:
+                        current_app.logger.info(f"DEBUG: Creating new MediaStreamHistory record for linked user session {session_key}")
+                        current_app.logger.info(f"DEBUG: Linked User: {mum_user.username} (ID: {mum_user.id})")
+                        user_display_name = mum_user.username
+                        user_id = mum_user.id
+                    else:
+                        current_app.logger.info(f"DEBUG: Creating new MediaStreamHistory record for standalone user session {session_key}")
+                        current_app.logger.info(f"DEBUG: Standalone User: {user_media_access.get_display_name()} (UserMediaAccess ID: {user_media_access.id})")
+                        user_display_name = user_media_access.get_display_name()
+                        user_id = user_media_access.id
+                    
+                    current_app.logger.info(f"DEBUG: Server: {current_server.name} (ID: {current_server.id})")
+                    current_app.logger.info(f"DEBUG: Media: {media_title} ({media_type})")
+                    current_app.logger.info(f"DEBUG: Platform: {platform}, Player: {player_title}")
+                    
+                    new_history_record = MediaStreamHistory(
+                        user_app_access_id=mum_user.id if mum_user else None,
+                        user_media_access_id=user_media_access.id if not mum_user else None,
+                        server_id=current_server.id,
                         session_key=str(session_key),
                         rating_key=rating_key,
                         started_at=now_utc,
@@ -182,16 +261,24 @@ def monitor_media_sessions_task():
                         media_duration_seconds=media_duration_s,
                         view_offset_at_end_seconds=view_offset_s
                     )
+                    
+                    current_app.logger.info(f"DEBUG: About to add MediaStreamHistory record to database...")
                     db.session.add(new_history_record)
+                    
+                    current_app.logger.info(f"DEBUG: About to flush database session...")
                     db.session.flush() # Flush to get the ID
+                    
                     _active_stream_sessions[session_key] = new_history_record.id
-                    current_app.logger.info(f"Successfully created StreamHistory record (ID: {new_history_record.id}) for session {session_key}.")
+                    current_app.logger.info(f"DEBUG: Successfully created MediaStreamHistory record (ID: {new_history_record.id}) for session {session_key}.")
+                    current_app.logger.info(f"DEBUG: Added session {session_key} to _active_stream_sessions tracking")
                 
                 # If the session is ongoing, update its progress
                 else:
+                    current_app.logger.info(f"DEBUG: Updating existing session {session_key}")
                     history_record_id = _active_stream_sessions.get(session_key)
                     if history_record_id:
-                        history_record = db.session.get(StreamHistory, history_record_id)
+                        current_app.logger.info(f"DEBUG: Found history record ID {history_record_id} for session {session_key}")
+                        history_record = db.session.get(MediaStreamHistory, history_record_id)
                         if history_record:
                             # Handle different session formats for progress updates
                             if hasattr(session, 'player'):
@@ -204,24 +291,30 @@ def monitor_media_sessions_task():
                                 position_ticks = play_state.get('PositionTicks', 0)
                                 current_offset_s = int(position_ticks / 10000000) if position_ticks else 0  # Convert ticks to seconds
                             
+                            current_app.logger.info(f"DEBUG: Updating progress from {history_record.view_offset_at_end_seconds}s to {current_offset_s}s")
                             history_record.view_offset_at_end_seconds = current_offset_s
+                            current_app.logger.info(f"DEBUG: Successfully updated existing MediaStreamHistory record (ID: {history_record_id})")
                         else:
-                            current_app.logger.warning(f"Could not find existing StreamHistory record with ID {history_record_id} for ongoing session {session_key}.")
+                            current_app.logger.warning(f"DEBUG: Could not find existing MediaStreamHistory record with ID {history_record_id} for ongoing session {session_key}.")
                     else:
-                        current_app.logger.error(f"CRITICAL: Session {session_key} was in tracked keys but had no DB ID!")
+                        current_app.logger.error(f"DEBUG: CRITICAL: Session {session_key} was in tracked keys but had no DB ID!")
 
-                # Update the user's main 'last_streamed_at' field
-                # Update last streamed for all users (Plex, Jellyfin, etc.)
-                if mum_user.plex_user_id:
-                    # Use existing Plex-specific function for Plex users
-                    user_service.update_user_last_streamed(mum_user.plex_user_id, now_utc)
-                else:
-                    # Use universal function for non-Plex users (Jellyfin, Emby, etc.)
+                # Update the user's last activity/streamed time
+                if mum_user:
+                    # For linked users, update the UserAppAccess last_streamed_at
+                    current_app.logger.info(f"DEBUG: Updating last_streamed_at for linked user {mum_user.username} (ID: {mum_user.id})")
                     user_service.update_user_last_streamed_by_id(mum_user.id, now_utc)
+                else:
+                    # For standalone users, update the UserMediaAccess last_activity_at
+                    current_app.logger.info(f"DEBUG: Updating last_activity_at for standalone user {user_media_access.get_display_name()} (UserMediaAccess ID: {user_media_access.id})")
+                    user_media_access.last_activity_at = now_utc
+                    db.session.add(user_media_access)
 
             # Commit all changes for this cycle
+            current_app.logger.info("DEBUG: About to commit all database changes...")
             db.session.commit()
-            current_app.logger.info("--- Media Session Monitor Task Finished ---")
+            current_app.logger.info("DEBUG: Database commit successful!")
+            current_app.logger.info("=== MEDIA SESSION MONITOR TASK FINISHED ===")
             
         except Exception as e:
             db.session.rollback()
@@ -235,9 +328,9 @@ def check_user_access_expirations_task():
     with scheduler.app.app_context():
         # Check for expired users
         now_naive = datetime.utcnow()
-        expired_users = User.query.filter(
-            User.access_expires_at.isnot(None), 
-            User.access_expires_at <= now_naive
+        expired_users = UserAppAccess.query.filter(
+            UserAppAccess.access_expires_at.isnot(None), 
+            UserAppAccess.access_expires_at <= now_naive
         ).all()
 
         if not expired_users:
@@ -247,8 +340,8 @@ def check_user_access_expirations_task():
         
         system_admin_id = None
         try:
-            from app.models import AdminAccount
-            admin = AdminAccount.query.first()
+            from app.models import Owner
+            admin = Owner.query.first()
             if admin:
                 system_admin_id = admin.id
             pass

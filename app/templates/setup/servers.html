@@ -83,7 +83,7 @@ function deleteServer(serverId, serverName) {
     document.getElementById('serverName').textContent = serverName;
     // The action URL needs to be set dynamically
     const form = document.getElementById('deleteForm');
-    form.action = `/admin/servers/${serverId}/delete`;
+    form.action = `/media_servers/${serverId}/delete`;
     document.getElementById('deleteModal').classList.add('modal-open');
 }
 

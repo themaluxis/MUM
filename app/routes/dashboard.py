@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, current_app
 from flask_login import login_required
-from app.models import User, Invite, HistoryLog
+from app.models import UserAppAccess, Invite, HistoryLog
 from app.extensions import db
 from app.utils.helpers import setup_required, permission_required
 from app.services.media_service_factory import MediaServiceFactory
@@ -16,9 +16,21 @@ bp = Blueprint('dashboard', __name__)
 def index():
     current_app.logger.info("=== ADMIN DASHBOARD ROUTE START ===")
     
-    current_app.logger.debug("Dashboard: Fetching total users count")
-    total_users = User.query.count()
-    current_app.logger.debug(f"Dashboard: Total users: {total_users}")
+    current_app.logger.debug("Dashboard: Fetching total users count (local + service users)")
+    
+    # Count local users (UserAppAccess)
+    local_users_count = UserAppAccess.query.count()
+    current_app.logger.debug(f"Dashboard: Local users: {local_users_count}")
+    
+    # Count ALL service users (UserMediaAccess records - both standalone AND linked)
+    # This matches the /users page logic which shows each UserMediaAccess as a separate card
+    from app.models_media_services import UserMediaAccess
+    all_service_users_count = UserMediaAccess.query.count()
+    current_app.logger.debug(f"Dashboard: All service users (standalone + linked): {all_service_users_count}")
+    
+    # Total managed users (matches /users page logic exactly)
+    total_users = local_users_count + all_service_users_count
+    current_app.logger.debug(f"Dashboard: Total managed users: {total_users}")
     
     current_app.logger.debug("Dashboard: Fetching active invites count")
     active_invites_count = Invite.query.filter(

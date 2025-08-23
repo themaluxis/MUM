@@ -1,9 +1,9 @@
 <!-- File: app/templates/setup/account_setup.html -->
 {% extends "layouts/setup.html" %}
 
-{% set setup_step_title = "Admin Account Setup" %}
-{% set setup_page_title = "Create Administrator Account" %}
-{% set setup_page_subtitle = "Choose how you'll log in to manage this application." %}
+{% set setup_step_title = "Owner Account Setup" %}
+{% set setup_page_title = "Create Owner Account" %}
+{% set setup_page_subtitle = "Set up the primary owner account to manage this application." %}
 {% set current_step_id = 'account' %} {# For stepper highlighting #}
 
 {% block setup_content %}
@@ -13,7 +13,7 @@
         <div class="card-body">
             <h3 class="card-title text-lg mb-4">
                 <i class="fa-solid fa-user-shield mr-2"></i>
-                Create Admin Account (Required)
+                Create Owner Account (Required)
             </h3>
             <form method="POST" action="{{ url_for('setup.account_setup') }}" id="usernamePasswordForm">
                 {{ form.hidden_tag() }}
@@ -56,7 +56,7 @@
                 </div>
 
                 <button type="submit" name="submit_type" value="username_password" class="btn btn-primary w-full">
-                    <i class="fa-solid fa-user-plus mr-2"></i> Create Admin Account
+                    <i class="fa-solid fa-crown mr-2"></i> Create Owner Account
                 </button>
             </form>
         </div>

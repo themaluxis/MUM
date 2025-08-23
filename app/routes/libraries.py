@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, current_app, request, make_response, json
+from flask import Blueprint, render_template, current_app, request, make_response, json, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app.utils.helpers import setup_required, permission_required
 from app.services.media_service_manager import MediaServiceManager
@@ -15,6 +15,12 @@ bp = Blueprint('libraries', __name__)
 @permission_required('view_libraries')
 def index():
     """Display libraries from stored database data instead of live API calls"""
+    # Redirect AppUsers without admin permissions away from admin pages
+    from app.models import UserAppAccess
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_libraries'):
+        flash('You do not have permission to access the libraries management page.', 'danger')
+        return redirect(url_for('user.index'))
+    
     libraries_by_service = {}
     
     # Get all servers and their stored libraries from database

@@ -34,25 +34,58 @@ class JellyfinMediaService(BaseMediaService):
             self._client.config.data['auth.ssl'] = parsed_url.scheme == 'https'
             self.log_info(f"Client configured - SSL: {parsed_url.scheme == 'https'}")
             
-            # Authenticate with API key
+            # Authenticate with API key or username/password
             try:
                 self.log_info("Attempting to connect to Jellyfin server...")
                 self._client.auth.connect_to_address(server_url)
                 self.log_info("Connection established, attempting authentication...")
                 
-                # Try different authentication methods based on the library version
-                if hasattr(self._client.auth, 'login_manual'):
-                    self.log_info("Using login_manual method")
-                    self._client.auth.login_manual(server_url, self.api_key)
-                elif hasattr(self._client.auth, 'authenticate_by_name'):
-                    self.log_info("Using authenticate_by_name method with API key")
-                    # For API key authentication, we need to set it directly
-                    self._client.config.data['auth.token'] = self.api_key
-                    self._client.auth.authenticate_by_name('', '', save_credentials=False)
+                # Check if we have API key or username/password
+                has_api_key = self.api_key and self.api_key.strip() != ''
+                has_credentials = self.username and self.password and self.username.strip() != '' and self.password.strip() != ''
+                
+                if has_api_key:
+                    self.log_info("Using API key authentication")
+                    # Try different authentication methods based on the library version
+                    if hasattr(self._client.auth, 'login_manual'):
+                        self.log_info("Using login_manual method")
+                        self._client.auth.login_manual(server_url, self.api_key)
+                    elif hasattr(self._client.auth, 'authenticate_by_name'):
+                        self.log_info("Using authenticate_by_name method with API key")
+                        # For API key authentication, we need to set it directly
+                        self._client.config.data['auth.token'] = self.api_key
+                        self._client.auth.authenticate_by_name('', '', save_credentials=False)
+                    else:
+                        self.log_info("Setting API token directly in client configuration")
+                        # Direct token setting for newer versions
+                        self._client.config.data['auth.token'] = self.api_key
+                elif has_credentials:
+                    self.log_info(f"Using username/password authentication for user: {self.username}")
+                    # Authenticate with username and password
+                    if hasattr(self._client.auth, 'authenticate_by_name'):
+                        self.log_info("Using authenticate_by_name method with username/password")
+                        self._client.auth.authenticate_by_name(self.username, self.password, save_credentials=False)
+                    else:
+                        # Fallback: try to get token via login API
+                        self.log_info("Fallback: attempting to get token via login API")
+                        login_data = {
+                            'Username': self.username,
+                            'Pw': self.password
+                        }
+                        # Make direct login request to get token
+                        import requests
+                        login_url = f"{server_url}/Users/authenticatebyname"
+                        response = requests.post(login_url, json=login_data, timeout=10)
+                        response.raise_for_status()
+                        auth_result = response.json()
+                        access_token = auth_result.get('AccessToken')
+                        if access_token:
+                            self._client.config.data['auth.token'] = access_token
+                            self.log_info("Successfully obtained access token via username/password")
+                        else:
+                            raise Exception("Failed to obtain access token from login response")
                 else:
-                    self.log_info("Setting API token directly in client configuration")
-                    # Direct token setting for newer versions
-                    self._client.config.data['auth.token'] = self.api_key
+                    raise Exception("No valid authentication method available")
                     
                 self.log_info("Authentication successful")
             except Exception as auth_error:
@@ -72,18 +105,33 @@ class JellyfinMediaService(BaseMediaService):
             if hasattr(client, 'http') and hasattr(client.http, 'session') and client.http.session is not None:
                 self.log_info("Using official client's HTTP session")
                 session = client.http.session
-                # Ensure the session has the API key header
-                if 'X-Emby-Token' not in session.headers:
-                    session.headers['X-Emby-Token'] = self.api_key
-                    self.log_info("Added API key to official client session")
+                # Ensure the session has the authentication token
+                auth_token = None
+                if hasattr(client.config, 'data') and client.config.data.get('auth.token'):
+                    auth_token = client.config.data.get('auth.token')
+                elif self.api_key and self.api_key.strip() != '':
+                    auth_token = self.api_key
+                
+                if auth_token and 'X-Emby-Token' not in session.headers:
+                    session.headers['X-Emby-Token'] = auth_token
+                    self.log_info("Added authentication token to official client session")
             else:
                 # Fallback to requests if client structure is different or session is None
                 self.log_info("Falling back to requests session with manual headers (client session is None or unavailable)")
                 session = requests.Session()
-                session.headers.update({
-                    'X-Emby-Token': self.api_key,
-                    'Content-Type': 'application/json'
-                })
+                
+                # Determine authentication token
+                auth_token = None
+                if hasattr(client, 'config') and hasattr(client.config, 'data') and client.config.data.get('auth.token'):
+                    auth_token = client.config.data.get('auth.token')
+                elif self.api_key and self.api_key.strip() != '':
+                    auth_token = self.api_key
+                
+                headers = {'Content-Type': 'application/json'}
+                if auth_token:
+                    headers['X-Emby-Token'] = auth_token
+                
+                session.headers.update(headers)
             
             url = f"{self.url.rstrip('/')}/{endpoint.lstrip('/')}"
             self.log_info(f"Full request URL: {url}")
@@ -179,6 +227,19 @@ class JellyfinMediaService(BaseMediaService):
     def test_connection(self) -> Tuple[bool, str]:
         """Test connection to Jellyfin server"""
         try:
+            # Check if we have either API key or username/password
+            has_api_key = self.api_key and self.api_key.strip() != ''
+            has_credentials = self.username and self.password and self.username.strip() != '' and self.password.strip() != ''
+            
+            if not has_api_key and not has_credentials:
+                return False, "Either API key or username and password are required for Jellyfin connection"
+            
+            self.log_info(f"Testing Jellyfin connection to: {self.url}")
+            if has_api_key:
+                self.log_info(f"Using API key: {self.api_key[:8]}..." if len(self.api_key) > 8 else "***")
+            else:
+                self.log_info(f"Using username/password authentication for user: {self.username}")
+            
             # Get system info from System/Info endpoint (this contains the version)
             info = self._make_request('System/Info')
             
@@ -196,9 +257,24 @@ class JellyfinMediaService(BaseMediaService):
             self.log_info(f"Jellyfin system info keys: {list(info.keys())}")
             self.log_info(f"Jellyfin server name: '{server_name}', version: '{version}'")
             
-            return True, f"Connected to {server_name} (v{version})"
+            auth_method = "API key" if has_api_key else "username/password"
+            return True, f"Connected to {server_name} (v{version}) using {auth_method}"
         except Exception as e:
-            return False, f"Connection failed: {str(e)}"
+            error_msg = str(e)
+            self.log_error(f"Jellyfin connection test failed: {error_msg}")
+            
+            # Provide more helpful error messages
+            if "401" in error_msg or "Unauthorized" in error_msg:
+                auth_method = "API key" if (self.api_key and self.api_key.strip() != '') else "username/password"
+                return False, f"Connection failed: Invalid {auth_method} or insufficient permissions"
+            elif "404" in error_msg or "Not Found" in error_msg:
+                return False, "Connection failed: Server URL not found or invalid endpoint"
+            elif "timeout" in error_msg.lower():
+                return False, "Connection failed: Request timed out - check server URL and network connectivity"
+            elif "connection" in error_msg.lower():
+                return False, f"Connection failed: Unable to reach server - check URL and network connectivity"
+            else:
+                return False, f"Connection failed: {error_msg}"
     
     def get_libraries(self) -> List[Dict[str, Any]]:
         """Get all Jellyfin libraries"""
@@ -570,7 +646,7 @@ class JellyfinMediaService(BaseMediaService):
 
     def get_formatted_sessions(self) -> List[Dict[str, Any]]:
         """Get active Jellyfin sessions formatted for display"""
-        from app.models import User
+        from app.models import UserAppAccess
         from flask import url_for
         import json
         
@@ -580,7 +656,16 @@ class JellyfinMediaService(BaseMediaService):
         
         # Get user mapping for Jellyfin users
         jellyfin_usernames = {session.get('UserName') for session in raw_sessions if session.get('UserName')}
-        mum_users_map_by_username = {u.primary_username: u for u in User.query.filter(User.primary_username.in_(list(jellyfin_usernames)))} if jellyfin_usernames else {}
+        # Get UserAppAccess via UserMediaAccess for Jellyfin usernames
+        from app.models_media_services import UserMediaAccess
+        if jellyfin_usernames:
+            jellyfin_accesses = UserMediaAccess.query.filter(
+                UserMediaAccess.server_id == self.server_id,
+                UserMediaAccess.external_username.in_(list(jellyfin_usernames))
+            ).all()
+            mum_users_map_by_username = {access.external_username: access.user_app_access for access in jellyfin_accesses}
+        else:
+            mum_users_map_by_username = {}
         
         formatted_sessions = []
         

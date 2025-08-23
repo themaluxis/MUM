@@ -256,9 +256,9 @@ def test_new_server():
     """Test connection to a new server"""
     # Allow during setup, but require auth after setup is complete
     if not current_user.is_authenticated:
-        from app.models import AdminAccount
+        from app.models import Owner
         try:
-            admin_exists = AdminAccount.query.first() is not None
+            admin_exists = Owner.query.first() is not None
             if admin_exists:
                 return jsonify({'success': False, 'message': 'Authentication required'}), 401
         except:

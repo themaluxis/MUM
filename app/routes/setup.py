@@ -6,7 +6,7 @@ from plexapi.exceptions import Unauthorized, NotFound, PlexApiException
 from plexapi.myplex import MyPlexAccount 
 import secrets
 import urllib.parse 
-from app.models import AdminAccount, Setting, EventType, SettingValueType
+from app.models import Owner, Setting, EventType, SettingValueType
 from app.forms import AccountSetupForm, AppBaseUrlForm, DiscordConfigForm
 from app.extensions import db
 from app.utils.helpers import log_event
@@ -21,11 +21,11 @@ def get_completed_steps():
     engine_conn_steps, admin_table_exists_steps = None, False
     try:
         engine_conn_steps = db.engine.connect()
-        if engine_conn_steps: admin_table_exists_steps = db.engine.dialect.has_table(engine_conn_steps, AdminAccount.__tablename__)
+        if engine_conn_steps: owner_table_exists_steps = db.engine.dialect.has_table(engine_conn_steps, Owner.__tablename__)
     except Exception as e: current_app.logger.error(f"DB connection error in get_completed_steps: {e}")
     finally:
         if engine_conn_steps: engine_conn_steps.close()
-    if admin_table_exists_steps and AdminAccount.query.first(): completed.add('account')
+    if owner_table_exists_steps and Owner.query.first(): completed.add('account')
     if Setting.get('APP_BASE_URL'): completed.add('app')
     
     # Check if plugins have been configured (enabled AND have servers)
@@ -184,19 +184,19 @@ def account_setup():
             
             if form.validate_on_submit():
                 try:
-                    if AdminAccount.query.first(): # This will fail if table doesn't exist
+                    if Owner.query.first(): # This will fail if table doesn't exist
                         flash('Admin account already exists. If you need to reset, consult documentation.', 'warning')
                         return redirect(url_for('setup.plugins'))
                 except Exception: # Table admin_accounts likely doesn't exist, proceed with creation
                     pass
 
-                admin = AdminAccount(username=form.username.data, is_plex_sso_only=False)
-                admin.set_password(form.password.data)
+                owner = Owner(username=form.username.data)
+                owner.set_password(form.password.data)
                 try:
-                    db.session.add(admin)
+                    db.session.add(owner)
                     db.session.commit()
-                    login_user(admin, remember=True) # Log in the newly created admin
-                    log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Admin '{admin.username}' created and logged in (setup).", admin_id=admin.id) # Use admin.id
+                    login_user(owner, remember=True) # Log in the newly created owner
+                    log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Owner '{owner.username}' created and logged in (setup).", admin_id=owner.id) # Use owner.id
                     flash('Admin account created successfully.', 'success')
                     current_app.logger.info(f"Account setup complete, redirecting to plugins setup: {url_for('setup.plugins')}")
                     return redirect(url_for('setup.plugins'))
@@ -254,17 +254,17 @@ def plex_sso_callback_setup_admin():
             return redirect(url_for('setup.account_setup', show_pin_retry_message=True, pin_code_to_display=session.get('plex_pin_code_admin_setup')))
         plex_account = MyPlexAccount(token=plex_auth_token)
         engine_conn_cb, admin_table_exists_cb = None, False
-        try: engine_conn_cb = db.engine.connect(); admin_table_exists_cb = db.engine.dialect.has_table(engine_conn_cb, AdminAccount.__tablename__)
+        try: engine_conn_cb = db.engine.connect(); owner_table_exists_cb = db.engine.dialect.has_table(engine_conn_cb, Owner.__tablename__)
         finally:
             if engine_conn_cb: engine_conn_cb.close()
-        if admin_table_exists_cb and AdminAccount.query.first():
-            flash('Admin account already exists.', 'warning'); existing_admin = AdminAccount.query.filter_by(plex_uuid=plex_account.uuid).first()
-            if existing_admin: login_user(existing_admin, remember=True); return redirect(url_for('setup.plugins'))
-            else: flash("Admin account exists but doesn't match this Plex account.", "danger"); return redirect(url_for('setup.account_setup'))
-        admin = AdminAccount(plex_uuid=plex_account.uuid, plex_username=plex_account.username, plex_thumb=plex_account.thumb, email=plex_account.email, is_plex_sso_only=True)
-        db.session.add(admin); db.session.commit(); login_user(admin, remember=True)
-        log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Admin '{admin.plex_username}' created (Plex SSO setup).")
-        flash(f'Admin account for {admin.plex_username} created successfully using Plex.', 'success')
+        if owner_table_exists_cb and Owner.query.first():
+            flash('Owner account already exists.', 'warning'); existing_owner = Owner.query.filter_by(plex_uuid=plex_account.uuid).first()
+            if existing_owner: login_user(existing_owner, remember=True); return redirect(url_for('setup.plugins'))
+            else: flash("Owner account exists but doesn't match this Plex account.", "danger"); return redirect(url_for('setup.account_setup'))
+        owner = Owner(plex_uuid=plex_account.uuid, plex_username=plex_account.username, plex_thumb=plex_account.thumb, email=plex_account.email, is_plex_sso_only=True)
+        db.session.add(owner); db.session.commit(); login_user(owner, remember=True)
+        log_event(EventType.ADMIN_LOGIN_SUCCESS, f"Owner '{owner.plex_username}' created (Plex SSO setup).")
+        flash(f'Owner account for {owner.plex_username} created successfully using Plex.', 'success')
         session.pop('plex_pin_id_admin_setup', None); session.pop('plex_pin_code_admin_setup', None); session.pop('plex_headers_admin_setup', None)
         return redirect(url_for('setup.plugins'))
     except PlexApiException as e_plex:
@@ -361,10 +361,10 @@ def toggle_discord_partial():
 @bp.route('/finish')
 @login_required
 def finish_setup():
-    required_steps_complete = (AdminAccount.query.first() and Setting.get('APP_BASE_URL'))
+    required_steps_complete = (Owner.query.first() and Setting.get('APP_BASE_URL'))
     if not required_steps_complete:
         flash("Not all required setup steps are complete.", "warning")
-        if not AdminAccount.query.first(): return redirect(url_for('setup.account_setup'))
+        if not Owner.query.first(): return redirect(url_for('setup.account_setup'))
         if not Setting.get('APP_BASE_URL'): return redirect(url_for('setup.app_config'))
     if not Setting.get('SECRET_KEY'):
         app_secret_key = secrets.token_hex(32)

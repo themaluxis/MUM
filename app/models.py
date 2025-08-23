@@ -13,9 +13,9 @@ from flask import current_app
 from sqlalchemy import Table, Column, Integer, ForeignKey
 from app.models_media_services import MediaServer
 
-# This is a standard SQLAlchemy pattern for a many-to-many relationship.
-admin_roles = db.Table('admin_roles',
-    db.Column('admin_id', db.Integer, db.ForeignKey('admin_accounts.id'), primary_key=True),
+# Many-to-many relationship table for user app access and roles
+app_user_roles = db.Table('app_user_roles',
+    db.Column('app_user_id', db.Integer, db.ForeignKey('user_app_access.id'), primary_key=True),
     db.Column('role_id', db.Integer, db.ForeignKey('roles.id'), primary_key=True)
 )
 
@@ -72,6 +72,88 @@ class Role(db.Model):
 
     def __repr__(self):
         return f'<Role {self.name}>'
+
+class Owner(db.Model, UserMixin):
+    """Single app owner with ultimate permissions"""
+    __tablename__ = 'owners'
+    
+    # Should always be ID 1 - only one owner allowed
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core account info
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    password_hash = db.Column(db.String(256), nullable=False)
+    
+    # Plex integration (optional)
+    plex_uuid = db.Column(db.String(255), unique=True, nullable=True)
+    plex_username = db.Column(db.String(255), nullable=True)
+    plex_thumb = db.Column(db.String(512), nullable=True)
+    
+    # Discord integration (optional)
+    discord_user_id = db.Column(db.String(255), unique=True, nullable=True)
+    discord_username = db.Column(db.String(255), nullable=True)
+    discord_avatar_hash = db.Column(db.String(255), nullable=True)
+    discord_access_token = db.Column(db.String(255), nullable=True)
+    discord_refresh_token = db.Column(db.String(255), nullable=True)
+    discord_token_expires_at = db.Column(db.DateTime, nullable=True)
+    discord_email = db.Column(db.String(255), nullable=True)
+    discord_email_verified = db.Column(db.Boolean, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    
+    # Owner preferences
+    preferred_user_list_view = db.Column(db.String(10), default='cards', nullable=False)
+    force_password_change = db.Column(db.Boolean, default=False, nullable=False)
+    
+    def __repr__(self):
+        return f'<Owner {self.username}>'
+    
+    def set_password(self, password):
+        """Set password hash for owner account"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check password for owner account"""
+        return check_password_hash(self.password_hash, password) if self.password_hash else False
+    
+    def get_display_name(self):
+        """Get the display name for the owner"""
+        return self.username or self.plex_username or self.email or 'Owner'
+    
+    def get_avatar(self):
+        """Get the avatar URL for the owner"""
+        return self.plex_thumb
+    
+    def has_permission(self, permission_name):
+        """Owner always has all permissions"""
+        return True
+    
+    def get_id(self):
+        """Return user ID with type prefix for Flask-Login"""
+        return f"owner:{self.id}"
+    
+    @staticmethod
+    def get_owner():
+        """Get the single owner account (should always be ID 1)"""
+        return Owner.query.first()
+    
+    @staticmethod
+    def create_owner(username, email, password):
+        """Create the owner account (should only be called once during setup)"""
+        if Owner.query.first():
+            raise ValueError("Owner account already exists")
+        
+        owner = Owner(
+            username=username,
+            email=email
+        )
+        owner.set_password(password)
+        db.session.add(owner)
+        db.session.commit()
+        return owner
     
 class Setting(db.Model): # ... (Setting model remains the same structure, new keys will be added via UI/code) ...
     __tablename__ = 'settings'; id = db.Column(db.Integer, primary_key=True)
@@ -127,157 +209,112 @@ class Setting(db.Model): # ... (Setting model remains the same structure, new ke
         return str(val_str).lower() in ['true', '1', 'yes', 'on']
     # --- END OF get_bool ---
 
-class AdminAccount(db.Model, UserMixin): # ... (no changes needed for bot feature yet) ...
-    __tablename__ = 'admin_accounts'; id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=True, index=True)
+# AdminAccount model removed - replaced by Owner and AppUser models
+
+
+class UserAppAccess(db.Model, UserMixin):
+    """User app access accounts for MUM login and management"""
+    __tablename__ = 'user_app_access'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Core account info
+    username = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(255), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(256), nullable=True)
-    plex_uuid = db.Column(db.String(255), unique=True, nullable=True); plex_username = db.Column(db.String(255), nullable=True)
-    plex_thumb = db.Column(db.String(512), nullable=True); email = db.Column(db.String(120), unique=True, nullable=True)
-    is_plex_sso_only = db.Column(db.Boolean, default=False); created_at = db.Column(db.DateTime, default=utcnow)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=utcnow)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
     last_login_at = db.Column(db.DateTime, nullable=True)
-    discord_user_id = db.Column(db.String(255), unique=True, nullable=True); discord_username = db.Column(db.String(255), nullable=True)
-    discord_avatar_hash = db.Column(db.String(255), nullable=True); discord_access_token = db.Column(db.String(255), nullable=True)
-    discord_refresh_token = db.Column(db.String(255), nullable=True); discord_token_expires_at = db.Column(db.DateTime, nullable=True)
+    
+    # Account status
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # Additional info
+    notes = db.Column(db.Text, nullable=True)
+    # avatar_url removed - UserAppAccess will never have avatars
+    
+    # Invite relationship
+    used_invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True)
+    invite = db.relationship('Invite', backref='user_app_access_created')
+    
+    # Global expiration (across all services)
+    access_expires_at = db.Column(db.DateTime, nullable=True, index=True)
+    
+    # Global Discord integration
+    discord_user_id = db.Column(db.String(255), unique=True, nullable=True, index=True)
+    discord_username = db.Column(db.String(255), nullable=True)
+    discord_avatar_hash = db.Column(db.String(255), nullable=True)
+    discord_access_token = db.Column(db.String(255), nullable=True)
+    discord_refresh_token = db.Column(db.String(255), nullable=True)
+    discord_token_expires_at = db.Column(db.DateTime, nullable=True)
     discord_email = db.Column(db.String(255), nullable=True)
     discord_email_verified = db.Column(db.Boolean, nullable=True)
-    force_password_change = db.Column(db.Boolean, default=False, nullable=False)
-    preferred_user_list_view = db.Column(db.String(10), default='cards', nullable=False)
-    roles = db.relationship('Role', secondary=admin_roles, lazy='subquery',
-                            backref=db.backref('admins', lazy=True))
+    
+    # Role relationship (updated to reference new table name)
+    roles = db.relationship('Role', secondary=app_user_roles, lazy='subquery',
+                            backref=db.backref('user_app_access', lazy=True))
+    
+    # User media access (reverse relationship to UserMediaAccess)
+    media_accesses = db.relationship('UserMediaAccess', back_populates='user_app_access', cascade="all, delete-orphan")
+    
+    
+    def __repr__(self):
+        return f'<UserAppAccess {self.username}>'
+    
+    def set_password(self, password):
+        """Set password hash for user app access account"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check password for user app access account"""
+        return check_password_hash(self.password_hash, password) if self.password_hash else False
+    
     def has_permission(self, permission_name):
-        # The primary admin (ID 1) is always a superuser.
-        if self.id == 1:
-            return True
-        
-        # Check if any of the user's roles contain the required permission.
-        # It iterates through `self.roles` now, not the non-existent `self.permissions`
+        """Check if user has a specific permission through their roles"""
+        # Check if any of the user's roles contain the required permission
         for role in self.roles:
             if permission_name in (role.permissions or []):
                 return True
         return False
-    def __repr__(self): return f'<AdminAccount {self.username or self.plex_username}>'
-    def set_password(self, password): self.password_hash = generate_password_hash(password)
-    def check_password(self, password): return check_password_hash(self.password_hash, password) if self.password_hash else False
-    def __repr__(self): return f'<AdminAccount {self.username or self.plex_username}>'
-
-
-class User(db.Model, UserMixin):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True) 
     
-    # Primary identifier - can be username, email, or service-specific ID
-    primary_username = db.Column(db.String(255), nullable=False, index=True)
-    primary_email = db.Column(db.String(255), nullable=True, index=True)
-    
-    # Legacy Plex fields (kept for backward compatibility)
-    plex_user_id = db.Column(db.Integer, unique=True, nullable=True, index=True)
-    plex_email = db.Column(db.String(255), nullable=True)
-    plex_thumb_url = db.Column(db.String(512), nullable=True) 
-    plex_uuid = db.Column(db.String(255), unique=True, nullable=True, index=True)  # Made nullable
-    is_home_user = db.Column(db.Boolean, default=False, nullable=False)
-    shares_back = db.Column(db.Boolean, default=False, nullable=False)
-    is_plex_friend = db.Column(db.Boolean, default=False, nullable=False)
-    
-    # Discord integration
-    discord_email = db.Column(db.String(255), nullable=True)
-    discord_email_verified = db.Column(db.Boolean, nullable=True)
-    discord_user_id = db.Column(db.String(255), unique=True, nullable=True) 
-    discord_username = db.Column(db.String(255), nullable=True)
-    discord_avatar_hash = db.Column(db.String(255), nullable=True)
-    
-    # Legacy fields (deprecated in favor of UserMediaAccess)
-    allowed_library_ids = db.Column(MutableList.as_mutable(JSONEncodedDict), default=list)
-    allowed_servers = db.Column(MutableList.as_mutable(JSONEncodedDict), default=list) 
-    allow_downloads = db.Column(db.Boolean, default=False, nullable=False)
-    allow_4k_transcode = db.Column(db.Boolean, default=True, nullable=False)
-    
-    # General user fields
-    notes = db.Column(db.Text, nullable=True)
-    avatar_url = db.Column(db.String(512), nullable=True)  # Generic avatar URL
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=utcnow) 
-    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
-    last_synced_with_plex = db.Column(db.DateTime, nullable=True)  # Legacy
-    last_activity_at = db.Column(db.DateTime, nullable=True)  # Last activity across all services
-    last_streamed_at = db.Column(db.DateTime, nullable=True)  # Legacy
-    plex_join_date = db.Column(db.DateTime, nullable=True)  # Legacy - use service_join_date instead
-    service_join_date = db.Column(db.DateTime, nullable=True)  # Generic join date for any service
-    
-    # Access control
-    access_expires_at = db.Column(db.DateTime, nullable=True, index=True)
-    is_discord_bot_whitelisted = db.Column(db.Boolean, default=False, nullable=False)
-    is_purge_whitelisted = db.Column(db.Boolean, default=False, nullable=False)
-    
-    # Raw data storage
-    raw_service_data = db.Column(db.Text, nullable=True)  # Store raw XML/JSON data from media service APIs
-    
-    # User account authentication (for user accounts created via invites)
-    password_hash = db.Column(db.String(256), nullable=True)  # For user account login
-    
-    # Invite relationship
-    used_invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True)
-    invite = db.relationship('Invite', back_populates='redeemed_users')
-
-    def __repr__(self): 
-        return f'<User {self.primary_username}>'
-    
-    def get_avatar(self, fallback='/static/img/default_avatar.png'): 
-        return self.avatar_url or self.plex_thumb_url or fallback
+    def get_avatar(self, fallback='/static/img/default_avatar.png'):
+        """UserAppAccess never has avatars - always return fallback"""
+        return fallback
     
     def get_display_name(self):
         """Get the best display name for this user"""
-        username = self.primary_username or self.primary_email or 'Unknown User'
-        
-        # If username has service suffix (e.g., "AllGas@jellyfin"), remove it for display
-        if '@' in username and username.count('@') == 1:
-            display_name, service = username.split('@', 1)
-            # Only remove suffix if it's a known service type
-            known_services = ['plex', 'jellyfin', 'emby', 'kavita', 'audiobookshelf', 'komga', 'romm']
-            if service.lower() in known_services:
-                return display_name
-        
-        return username
+        return self.username or self.email or 'Unknown User'
     
-    def get_primary_email(self):
-        """Get the primary email for this user"""
-        # Prioritize primary_email for all users, fallback to legacy fields for backward compatibility
-        return self.primary_email or self.plex_email or self.discord_email
+    def get_id(self):
+        """Return user ID with type prefix for Flask-Login"""
+        return f"user_app_access:{self.id}"
     
-    def has_access_to_server(self, server_id: int) -> bool:
+    def get_media_accesses_by_service_type(self):
+        """Get media accesses grouped by service type"""
+        from app.models_media_services import UserMediaAccess
+        
+        accesses_by_type = {}
+        for access in self.media_accesses:
+            service_type = access.server.service_type.value if access.server else 'unknown'
+            if service_type not in accesses_by_type:
+                accesses_by_type[service_type] = []
+            accesses_by_type[service_type].append(access)
+        return accesses_by_type
+    
+    def get_all_servers(self):
+        """Get all media servers this user has access to"""
+        return [access.server for access in self.media_accesses if access.server and access.is_active]
+    
+    def has_access_to_server(self, server_id):
         """Check if user has access to a specific media server"""
-        from app.models_media_services import UserMediaAccess
-        access = UserMediaAccess.query.filter_by(
-            user_id=self.id, 
-            server_id=server_id, 
-            is_active=True
-        ).first()
-        return access is not None
+        return any(access.server_id == server_id and access.is_active for access in self.media_accesses)
     
-    def get_server_access(self, server_id: int):
+    def get_server_access(self, server_id):
         """Get UserMediaAccess object for a specific server"""
-        from app.models_media_services import UserMediaAccess
-        return UserMediaAccess.query.filter_by(
-            user_id=self.id, 
-            server_id=server_id
-        ).first()
-    
-    def set_password(self, password):
-        """Set password hash for user account"""
-        self.password_hash = generate_password_hash(password)
-    
-    def check_password(self, password):
-        """Check password for user account"""
-        return check_password_hash(self.password_hash, password) if self.password_hash else False
-    
-    def has_permission(self, permission_name):
-        """Regular users don't have admin permissions"""
-        return False
-    
-    @property
-    def preferred_user_list_view(self):
-        """Regular users default to cards view"""
-        return 'cards'
+        return next((access for access in self.media_accesses if access.server_id == server_id), None)
+
+# ServiceAccount model removed - replaced by UserAppAccess + UserMediaAccess architecture
 
 # (Invite, InviteUsage, HistoryLog models as before - no immediate changes for bot setup yet)
 class Invite(db.Model):
@@ -287,9 +324,9 @@ class Invite(db.Model):
     max_uses = db.Column(db.Integer, nullable=True); current_uses = db.Column(db.Integer, default=0, nullable=False) # Added nullable=False
     grant_library_ids = db.Column(MutableList.as_mutable(JSONEncodedDict), default=list)
     allow_downloads = db.Column(db.Boolean, default=False, nullable=False)
-    created_by_admin_id = db.Column(db.Integer, db.ForeignKey('admin_accounts.id')); admin_creator = db.relationship('AdminAccount')
+    created_by_owner_id = db.Column(db.Integer, db.ForeignKey('owners.id')); owner_creator = db.relationship('Owner')
     created_at = db.Column(db.DateTime, default=utcnow); updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
-    is_active = db.Column(db.Boolean, default=True, nullable=False, index=True); redeemed_users = db.relationship('User', back_populates='invite') # Added nullable=False
+    is_active = db.Column(db.Boolean, default=True, nullable=False, index=True) # Added nullable=False
     invite_usages = db.relationship('InviteUsage', back_populates='invite', cascade="all, delete-orphan")
     membership_duration_days = db.Column(db.Integer, nullable=True) # Duration in days set at invite creation
     require_discord_auth = db.Column(db.Boolean, nullable=True)
@@ -322,7 +359,7 @@ class InviteUsage(db.Model): # ... (as before)
     plex_email = db.Column(db.String(120), nullable=True); plex_thumb = db.Column(db.String(512), nullable=True)
     plex_auth_successful = db.Column(db.Boolean, default=False, nullable=False); discord_user_id = db.Column(db.String(255), nullable=True) # Added nullable=False
     discord_username = db.Column(db.String(255), nullable=True); discord_auth_successful = db.Column(db.Boolean, default=False, nullable=False) # Added nullable=False
-    mum_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True); mum_user = db.relationship('User')
+    user_app_access_id = db.Column(db.Integer, db.ForeignKey('user_app_access.id'), nullable=True); user_app_access = db.relationship('UserAppAccess')
     accepted_invite = db.Column(db.Boolean, default=False, nullable=False); status_message = db.Column(db.String(255), nullable=True) # Added nullable=False
 
 class HistoryLog(db.Model): # ... (as before)
@@ -330,51 +367,17 @@ class HistoryLog(db.Model): # ... (as before)
     timestamp = db.Column(db.DateTime, default=utcnow, index=True)
     event_type = db.Column(db.Enum(EventType), nullable=False, index=True); message = db.Column(db.Text, nullable=False)
     details = db.Column(MutableDict.as_mutable(JSONEncodedDict), nullable=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('admin_accounts.id'), nullable=True); admin = db.relationship('AdminAccount')
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True); affected_user = db.relationship('User')
+    owner_id = db.Column(db.Integer, db.ForeignKey('owners.id'), nullable=True); owner = db.relationship('Owner')
+    user_app_access_id = db.Column(db.Integer, db.ForeignKey('user_app_access.id'), nullable=True); affected_user_app_access = db.relationship('UserAppAccess')
     invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True); related_invite = db.relationship('Invite')
     def __repr__(self): return f'<HistoryLog {self.timestamp} [{self.event_type.name}]: {self.message[:50]}>'
 
-class StreamHistory(db.Model):
-    __tablename__ = 'stream_history'
-    id = db.Column(db.Integer, primary_key=True)
-    
-    # Relationships
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    user = db.relationship('User', backref=db.backref('stream_history', lazy='dynamic', cascade="all, delete-orphan"))
-
-    # Session Details
-    session_key = db.Column(db.String(255), nullable=True) # Plex's key for the streaming session
-    rating_key = db.Column(db.String(255), nullable=True) # The key for the media item
-    
-    # Stream Timestamps
-    started_at = db.Column(db.DateTime, nullable=False, default=utcnow)
-    stopped_at = db.Column(db.DateTime, nullable=True)
-    duration_seconds = db.Column(db.Integer, nullable=True)
-    
-    # Client Info
-    platform = db.Column(db.String(255), nullable=True)
-    product = db.Column(db.String(255), nullable=True)
-    player = db.Column(db.String(255), nullable=True)
-    ip_address = db.Column(db.String(45), nullable=True)
-    is_lan = db.Column(db.Boolean, default=False)
-    
-    # Media Info
-    media_title = db.Column(db.String(255), nullable=True)
-    media_type = db.Column(db.String(50), nullable=True)
-    grandparent_title = db.Column(db.String(255), nullable=True) # For TV Show name
-    parent_title = db.Column(db.String(255), nullable=True) # For Season name or Album name
-
-    media_duration_seconds = db.Column(db.Integer, nullable=True) # Total duration of the media file
-    view_offset_at_end_seconds = db.Column(db.Integer, nullable=True) # Final known progress in seconds
-
-    def __repr__(self):
-        return f'<StreamHistory {self.id} by {self.user.get_display_name()}>'
+# StreamHistory model removed - replaced by MediaStreamHistory in models_media_services.py
 
 class UserPreferences(db.Model):
     __tablename__ = 'user_preferences'
     id = db.Column(db.Integer, primary_key=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('admin_accounts.id'), unique=True, nullable=False)
+    owner_id = db.Column(db.Integer, db.ForeignKey('owners.id'), unique=True, nullable=False)
     
     # This field will store the user's choice: 'local' or 'utc'
     timezone_preference = db.Column(db.String(10), default='local', nullable=False)
@@ -386,11 +389,11 @@ class UserPreferences(db.Model):
     time_format = db.Column(db.String(2), default='12', nullable=False)
     
     def __repr__(self):
-        return f'<UserPreferences for Admin {self.admin_id}>'
+        return f'<UserPreferences for Owner {self.owner_id}>'
     
     @staticmethod
-    def get_timezone_preference(admin_id):
-        prefs = UserPreferences.query.filter_by(admin_id=admin_id).first()
+    def get_timezone_preference(owner_id):
+        prefs = UserPreferences.query.filter_by(owner_id=owner_id).first()
         if prefs:
             return {
                 "preference": prefs.timezone_preference,
@@ -400,10 +403,10 @@ class UserPreferences(db.Model):
         return {"preference": "local", "local_timezone": None, "time_format": "12"}
     
     @staticmethod
-    def set_timezone_preference(admin_id, preference, local_timezone=None, time_format=None):
-        prefs = UserPreferences.query.filter_by(admin_id=admin_id).first()
+    def set_timezone_preference(owner_id, preference, local_timezone=None, time_format=None):
+        prefs = UserPreferences.query.filter_by(owner_id=owner_id).first()
         if not prefs:
-            prefs = UserPreferences(admin_id=admin_id)
+            prefs = UserPreferences(owner_id=owner_id)
             db.session.add(prefs)
         
         prefs.timezone_preference = preference

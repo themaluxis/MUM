@@ -11,15 +11,40 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 <div><span class="text-base-content/60">Username:</span> <span class="font-mono">{{ user.get_display_name() }}</span></div>
                 <div><span class="text-base-content/60">User ID:</span> <span class="font-mono">{{ user.id }}</span></div>
-                {% if user.plex_uuid %}
-                <div><span class="text-base-content/60">Plex UUID:</span> <span class="font-mono text-xs">{{ user.plex_uuid }}</span></div>
+                {% if user._is_standalone and user._access_record.external_user_id %}
+                    {% if user._access_record.server.service_type.value == 'plex' %}
+                        <div><span class="text-base-content/60">Plex UUID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
+                    {% elif user._access_record.server.service_type.value == 'jellyfin' %}
+                        <div><span class="text-base-content/60">Jellyfin User ID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
+                    {% elif user._access_record.server.service_type.value == 'emby' %}
+                        <div><span class="text-base-content/60">Emby User ID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
+                    {% elif user._access_record.server.service_type.value == 'kavita' %}
+                        <div><span class="text-base-content/60">Kavita User ID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
+                    {% elif user._access_record.server.service_type.value == 'audiobookshelf' %}
+                        <div><span class="text-base-content/60">AudioBookshelf User ID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
+                    {% elif user._access_record.server.service_type.value == 'komga' %}
+                        <div><span class="text-base-content/60">Komga User ID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
+                    {% elif user._access_record.server.service_type.value == 'romm' %}
+                        <div><span class="text-base-content/60">RomM User ID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
+                    {% else %}
+                        <div><span class="text-base-content/60">{{ user._access_record.server.service_type.value|title }} User ID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
+                    {% endif %}
+                {% endif %}
+                {% if user._is_standalone and user._access_record.server.service_type.value == 'plex' and user._access_record.external_user_alt_id %}
+                <div><span class="text-base-content/60">Plex Alt UUID:</span> <span class="font-mono text-xs">{{ user._access_record.external_user_alt_id }}</span></div>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-{% if user.raw_service_data %}
+{% if user.media_accesses is iterable and user.media_accesses is not string %}
+    {% set user_accesses = user.media_accesses %}
+{% else %}
+    {% set user_accesses = user.media_accesses.all() if user.media_accesses else [] %}
+{% endif %}
+{% set has_service_data = user_accesses|selectattr('user_raw_data')|list|length > 0 %}
+{% if has_service_data %}
 <!-- Raw Data Section -->
 <div class="space-y-4 mb-6">
     
@@ -32,15 +57,10 @@
 
             <div class="flex-1 text-sm">
                 <p class="text-base-content/80">
-                    <strong>Data Format:</strong> 
-                    {% if user.raw_service_data.startswith('{') %}
-                        JSON (Structured Data)
-                    {% else %}
-                        Plain Text
-                    {% endif %}
+                    <strong>Data Format:</strong> JSON (Raw User Data)
                 </p>
                 <p class="text-base-content/60 mt-1">
-                    This is the raw data received from the media service API. Use this for debugging user sync issues or service integration problems.
+                    This shows raw user data retrieved from media services and stored in UserMediaAccess records. Use this for debugging user sync and service integration problems.
                 </p>
             </div>
         </div>
@@ -51,16 +71,27 @@
         <div class="flex items-center justify-between p-3 border-b border-base-300 bg-base-200/50">
             <div class="flex items-center gap-2">
                 <i class="fa-solid fa-code text-secondary text-sm"></i>
-                <span class="font-medium text-sm">Raw Data Content</span>
+                <span class="font-medium text-sm">Raw User Data</span>
             </div>
             <div class="text-xs text-base-content/60">
-                Size: {{ user.raw_service_data|length }} characters
+                {{ user_accesses|selectattr('user_raw_data')|list|length }} server(s) with data
             </div>
         </div>
-        <div class="p-4">
-            <div class="mockup-code bg-base-300/50 border border-base-300" id="userRawDataContent-{{ user.id }}">
-                <pre class="text-xs text-base-content"><code>{% if user.raw_service_data.startswith('{') %}{{ user.raw_service_data | format_json }}{% else %}{{ user.raw_service_data }}{% endif %}</code></pre>
-            </div>
+        <div class="p-4 space-y-4">
+            {% for access in user_accesses %}
+                {% if access.user_raw_data %}
+                <div class="border border-base-300 rounded-lg">
+                    <div class="bg-base-200/50 px-3 py-2 border-b border-base-300">
+                        <span class="font-medium text-sm">{{ access.server.name }} ({{ access.server.service_type.value|title }})</span>
+                    </div>
+                    <div class="p-3">
+                        <div class="mockup-code bg-base-300/50 border border-base-300" id="userRawDataContent-{{ user.id }}-{{ access.server.id }}">
+                            <pre class="text-xs text-base-content"><code>{{ access.user_raw_data | format_json }}</code></pre>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
         </div>
     </div>
 </div>

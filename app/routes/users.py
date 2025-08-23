@@ -1,8 +1,8 @@
 # File: app/routes/users.py
-from flask import Blueprint, render_template, request, current_app, session, make_response, redirect, url_for 
+from flask import Blueprint, render_template, request, current_app, session, make_response, redirect, url_for, flash 
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
-from app.models import User, Setting, EventType, AdminAccount, StreamHistory
+from app.models import UserAppAccess, Setting, EventType, Owner
 from app.models_media_services import ServiceType, MediaStreamHistory
 from app.models_media_services import ServiceType
 from app.forms import UserEditForm, MassUserEditForm
@@ -17,6 +17,17 @@ from datetime import datetime, timezone, timedelta # Ensure these are imported
 from sqlalchemy.exc import IntegrityError
 
 bp = Blueprint('users', __name__)
+
+def parse_user_id(user_id):
+    """Parse prefixed user ID and return (user_type, actual_id)"""
+    if ":" not in str(user_id):
+        raise ValueError(f"Invalid user ID format: {user_id}. Must be 'type:id'")
+    
+    user_type, actual_id = str(user_id).split(":", 1)
+    if user_type not in ["user_app_access", "user_media_access"]:
+        raise ValueError(f"Invalid user type: {user_type}")
+    
+    return user_type, int(actual_id)
 
 # Library data is now fetched from database instead of API calls
 
@@ -47,6 +58,11 @@ def get_libraries_from_database(servers):
 @setup_required
 @permission_required('view_users')
 def list_users():
+    # Redirect regular users away from admin pages
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_users'):
+        flash('You do not have permission to access the users management page.', 'danger')
+        return redirect(url_for('user.index'))
+    
     import time
     start_time = time.time()
     current_app.logger.debug(f"Loading users page for user {current_user.id}")
@@ -56,7 +72,11 @@ def list_users():
     # If it's a direct browser load and 'view' is missing from the URL
     if 'view' not in request.args and not is_htmx:
         # Get the preferred view, default to 'cards' if not set
-        preferred_view = current_user.preferred_user_list_view or 'cards'
+        # Only Owner has preferred_user_list_view, AppUser doesn't
+        if hasattr(current_user, 'preferred_user_list_view'):
+            preferred_view = current_user.preferred_user_list_view or 'cards'
+        else:
+            preferred_view = 'cards'  # Default for AppUser
         
         # Preserve other query params and redirect
         args = request.args.to_dict()
@@ -81,7 +101,8 @@ def list_users():
             items_per_page = default_per_page_config
             session[session_per_page_key] = items_per_page
 
-    query = User.query
+    # Check if we should show local users, service users, or both
+    user_type_filter = request.args.get('user_type', 'all')  # 'all', 'local', 'service'
     
     # Handle separate search fields
     search_username = request.args.get('search_username', '').strip()
@@ -91,165 +112,372 @@ def list_users():
     # Legacy search field for backward compatibility with the main search bar
     search_term = request.args.get('search', '').strip()
     
-    # Build search filters
-    search_filters = []
-    if search_username:
-        search_filters.append(User.primary_username.ilike(f"%{search_username}%"))
-    if search_email:
-        search_filters.append(User.plex_email.ilike(f"%{search_email}%"))
-    if search_notes:
-        search_filters.append(User.notes.ilike(f"%{search_notes}%"))
-    if search_term:
-        # Legacy search - search both username and email
-        search_filters.append(or_(User.primary_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
+    # Get both local users and service users
+    current_app.logger.info(f"=== USERS LIST DEBUG: Loading users page ===")
+    current_app.logger.info(f"User type filter: {user_type_filter}")
+    current_app.logger.info(f"Search filters - username: '{search_username}', email: '{search_email}', notes: '{search_notes}', term: '{search_term}'")
     
-    # Apply search filters if any exist
-    if search_filters:
-        query = query.filter(or_(*search_filters))
+    app_users = []
+    service_users = []
+    
+    if user_type_filter in ['all', 'local']:
+        # Query local users (UserAppAccess records)
+        current_app.logger.info("=== QUERYING LOCAL USERS ===")
+        app_user_query = UserAppAccess.query
+        
+        # Build search filters for local users
+        local_search_filters = []
+        if search_username:
+            local_search_filters.append(UserAppAccess.username.ilike(f"%{search_username}%"))
+        if search_email:
+            local_search_filters.append(UserAppAccess.email.ilike(f"%{search_email}%"))
+        if search_notes:
+            local_search_filters.append(UserAppAccess.notes.ilike(f"%{search_notes}%"))
+        if search_term:
+            local_search_filters.append(or_(UserAppAccess.username.ilike(f"%{search_term}%"), UserAppAccess.email.ilike(f"%{search_term}%")))
+        
+        if local_search_filters:
+            app_user_query = app_user_query.filter(or_(*local_search_filters))
+        
+        app_users = app_user_query.all()
+        current_app.logger.info(f"Found {len(app_users)} app users")
+        for app_user in app_users:
+            linked_count = len(app_user.media_accesses)
+            current_app.logger.info(f"  App user: {app_user.username} (ID: {app_user.id}) - {linked_count} media accesses")
+            for media_access in app_user.media_accesses:
+                current_app.logger.info(f"    Media access: {media_access.external_username} (ID: {media_access.id}, Server: {media_access.server.name if media_access.server else 'Unknown'})")
+    
+    if user_type_filter in ['all', 'service']:
+        # Query service users - these are standalone UserMediaAccess records without linked UserAppAccess
+        current_app.logger.info("=== QUERYING SERVICE USERS ===")
+        from app.models_media_services import UserMediaAccess
+        
+        # Get ALL UserMediaAccess records (both standalone and linked)
+        # We want to show each service account as a separate card
+        all_access_query = UserMediaAccess.query
+        
+        if user_type_filter == 'service':
+            # If only service users requested, get standalone access records
+            pass  # We'll process the query below
+        else:
+            # If 'all' users requested, we still need to get standalone service users
+            pass  # We'll process the query below
+        
+        # Build search filters for standalone service users
+        search_filters = []
+        if search_username:
+            search_filters.append(UserMediaAccess.external_username.ilike(f"%{search_username}%"))
+        if search_email:
+            search_filters.append(UserMediaAccess.external_email.ilike(f"%{search_email}%"))
+        if search_notes:
+            search_filters.append(UserMediaAccess.notes.ilike(f"%{search_notes}%"))
+        if search_term:
+            # Legacy search - search both username and email
+            search_filters.append(or_(
+                UserMediaAccess.external_username.ilike(f"%{search_term}%"), 
+                UserMediaAccess.external_email.ilike(f"%{search_term}%")
+            ))
+    
+        # Apply search filters if any exist
+        if search_filters:
+            all_access_query = all_access_query.filter(or_(*search_filters))
 
-    server_filter_id = request.args.get('server_id', 'all')
-    if server_filter_id != 'all':
-        # Ensure server_filter_id is an integer for the join
-        try:
-            server_filter_id_int = int(server_filter_id)
-            from app.models_media_services import UserMediaAccess
-            query = query.join(UserMediaAccess).filter(UserMediaAccess.server_id == server_filter_id_int)
-        except ValueError:
-            current_app.logger.warning(f"Invalid server_id received: {server_filter_id}")
-            # Optionally, handle this error more gracefully, e.g., by showing an alert
+        # Apply server filter
+        server_filter_id = request.args.get('server_id', 'all')
+        if server_filter_id != 'all':
+            try:
+                server_filter_id_int = int(server_filter_id)
+                all_access_query = all_access_query.filter(UserMediaAccess.server_id == server_filter_id_int)
+            except ValueError:
+                current_app.logger.warning(f"Invalid server_id received: {server_filter_id}")
 
-    filter_type = request.args.get('filter_type', '')
-    if filter_type == 'home_user': query = query.filter(User.is_home_user == True)
-    elif filter_type == 'shares_back': query = query.filter(User.shares_back == True)
-    elif filter_type == 'has_discord': query = query.filter(User.discord_user_id != None)
-    elif filter_type == 'no_discord': query = query.filter(User.discord_user_id == None)
-   
-    # --- START OF ENHANCED SORTING LOGIC ---
+        # Get the standalone access records
+        all_access_records = all_access_query.all()
+        
+        # Convert UserMediaAccess records to a user-like format for display
+        service_users = []
+        current_app.logger.info(f"DEBUG: Found {len(all_access_records)} total access records (standalone + linked)")
+        
+        for access in all_access_records:
+            current_app.logger.info(f"DEBUG: Creating mock user for access ID {access.id}, username: {access.external_username}, server: {access.server.name}")
+            # Create a mock user object with the necessary attributes for display
+            class MockUser:
+                def __init__(self, access):
+                    # Use prefixed ID format for service users to avoid conflicts with local users
+                    self._prefixed_id = f"user_media_access:{access.id}"  # Prefixed format: "user_media_access:1"
+                    self.id = access.id  # Keep original numeric ID
+                    self.username = access.external_username or 'Unknown'
+                    self.email = access.external_email
+                    self.notes = access.notes
+                    self.created_at = access.created_at
+                    self.last_login_at = access.last_activity_at
+                    self.media_accesses = [access]  # This user has only this one access
+                    self.access_expires_at = access.access_expires_at
+                    self.discord_user_id = access.discord_user_id
+                    self.is_active = access.is_active
+                    self._is_standalone = True  # Flag to identify standalone users
+                    self._access_record = access  # Store the original access record
+                    
+                    # Add last_streamed_at property for template compatibility
+                    self.last_streamed_at = None
+                    from app.models_media_services import MediaStreamHistory
+                    
+                    if access.user_app_access_id:
+                        # This is a linked service account, get streaming history from UserAppAccess
+                        last_stream = MediaStreamHistory.query.filter_by(
+                            user_app_access_id=access.user_app_access_id
+                        ).order_by(MediaStreamHistory.started_at.desc()).first()
+                        self.last_streamed_at = last_stream.started_at if last_stream else None
+                    else:
+                        # This is a standalone service account, get streaming history from UserMediaAccess
+                        last_stream = MediaStreamHistory.query.filter_by(
+                            user_media_access_id=access.id
+                        ).order_by(MediaStreamHistory.started_at.desc()).first()
+                        self.last_streamed_at = last_stream.started_at if last_stream else None
+                
+                def get_display_name(self):
+                    return self._access_record.external_username or 'Unknown'
+                
+                def get_avatar(self, default_url=None):
+                    """Return avatar URL for MockUser - service users typically don't have avatars"""
+                    return default_url
+            
+            mock_user = MockUser(access)
+            mock_user._user_type = 'service'  # Add type for processing
+            service_users.append(mock_user)
+            current_app.logger.info(f"DEBUG: Added service user {mock_user.username} (ID: {mock_user._prefixed_id}) to list")
+        
+        current_app.logger.info(f"Found {len(service_users)} standalone service users")
+        for service_user in service_users:
+            current_app.logger.info(f"  Standalone service user: {service_user.username} (Access ID: {service_user._access_record.id}, Server: {service_user._access_record.server.name})")
+            
+            # Add service type information for standalone users so they get proper colors
+            if not hasattr(service_user, '_user_type'):
+                service_user._user_type = 'service'
+    
+    # Combine and paginate results
+    all_users = []
+    
+    # Add local users with a type indicator and prefixed IDs
+    current_app.logger.info(f"DEBUG: Found {len(app_users)} local users")
+    for app_user in app_users:
+        app_user._user_type = 'local'
+        # Store prefixed ID in a separate attribute, keep original ID intact
+        app_user._prefixed_id = f"user_app_access:{app_user.id}"
+        all_users.append(app_user)
+        current_app.logger.info(f"DEBUG: Local user {app_user.username} (ID: {app_user._prefixed_id}) added to list")
+    
+    # Add service users with a type indicator  
+    for service_user in service_users:
+        service_user._user_type = 'service'
+        all_users.append(service_user)
+    
+    # Store sort parameters for later use (after we populate streaming data)
+    sort_by_param = request.args.get('sort_by', 'username_asc')
+    
+    # For last_streamed sorting, we need to populate streaming data first before sorting
+    # For other sorts, we can sort immediately
+    if 'last_streamed' not in sort_by_param:
+        # Sort combined results immediately for non-streaming sorts
+        reverse_sort = 'desc' in sort_by_param
+        if 'username' in sort_by_param:
+            all_users.sort(key=lambda u: getattr(u, 'username', '').lower(), reverse=reverse_sort)
+        elif 'created_at' in sort_by_param:
+            all_users.sort(key=lambda u: getattr(u, 'created_at', datetime.min.replace(tzinfo=timezone.utc)) or datetime.min.replace(tzinfo=timezone.utc), reverse=reverse_sort)
+        elif 'email' in sort_by_param:
+            all_users.sort(key=lambda u: getattr(u, 'email', '').lower(), reverse=reverse_sort)
+    
+    # For last_streamed sorting, we need to process ALL users before pagination
+    # For other sorts, we can paginate first to improve performance
+    total_users = len(all_users)
+    
+    if 'last_streamed' in sort_by_param:
+        users_on_page = all_users  # Process all users for streaming data
+    else:
+        # Manual pagination for combined results
+        start_idx = (page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        users_on_page = all_users[start_idx:end_idx]
+    
+    # Debug: Check for AllGas users specifically
+    allgas_users = [user for user in all_users if user.username == 'AllGas']
+    current_app.logger.info(f"DEBUG: Found {len(allgas_users)} AllGas users in total list")
+    for user in allgas_users:
+        server_name = getattr(user._access_record, 'server', {}).name if hasattr(user, '_access_record') else 'N/A'
+        current_app.logger.info(f"DEBUG: AllGas user - ID: {getattr(user, '_prefixed_id', user.id)}, type: {getattr(user, '_user_type', 'unknown')}, server: {server_name}")
+    
+    allgas_on_page = [user for user in users_on_page if user.username == 'AllGas']
+    if 'last_streamed' in sort_by_param:
+        current_app.logger.info(f"DEBUG: Found {len(allgas_on_page)} AllGas users on current page (processing all users for last_streamed sort)")
+    else:
+        current_app.logger.info(f"DEBUG: Found {len(allgas_on_page)} AllGas users on current page (start: {start_idx}, end: {end_idx})")
+    for user in allgas_on_page:
+        current_app.logger.info(f"DEBUG: AllGas on page - ID: {getattr(user, '_prefixed_id', user.id)}, type: {getattr(user, '_user_type', 'unknown')}")
+    
+    # Create a mock pagination object
+    class MockPagination:
+        def __init__(self, items, page, per_page, total):
+            self.items = items
+            self.page = page
+            self.per_page = per_page
+            self.total = total
+            self.pages = (total + per_page - 1) // per_page
+            self.has_prev = page > 1
+            self.has_next = page < self.pages
+            self.prev_num = page - 1 if self.has_prev else None
+            self.next_num = page + 1 if self.has_next else None
+        
+        def iter_pages(self, left_edge=2, right_edge=2, left_current=2, right_current=3):
+            """Generate page numbers for pagination, similar to Flask-SQLAlchemy's pagination"""
+            last = self.pages
+            
+            # Generate the page numbers to show
+            for num in range(1, last + 1):
+                if num <= left_edge or \
+                   (self.page - left_current - 1 < num < self.page + right_current) or \
+                   num > last - right_edge:
+                    yield num
+                elif num == left_edge + 1 or num == last - right_edge:
+                    # Add None to represent ellipsis
+                    yield None
+    
+    users_pagination = MockPagination(users_on_page, page, items_per_page, total_users)
+    
+    # Extract sort information for template
     sort_by_param = request.args.get('sort_by', 'username_asc')
     sort_parts = sort_by_param.rsplit('_', 1)
     sort_column = sort_parts[0]
     sort_direction = 'desc' if len(sort_parts) > 1 and sort_parts[1] == 'desc' else 'asc'
-    
 
-    # Handle sorting that requires joins and aggregation
-    if sort_column in ['total_plays', 'total_duration']:
-        # For stats sorting, we must join and group
-        query = query.outerjoin(User.stream_history).group_by(User.id)
-        
-        # Select the User object and the aggregated columns
-        sort_field = func.count(StreamHistory.id) if sort_column == 'total_plays' else func.sum(func.coalesce(StreamHistory.duration_seconds, 0))
-        query = query.add_columns(sort_field.label('sort_value'))
-        
-        if sort_direction == 'desc':
-            query = query.order_by(db.desc('sort_value').nullslast(), User.id.asc())
-        else:
-            query = query.order_by(db.asc('sort_value').nullsfirst(), User.id.asc())
-    else:
-        # Standard sorting on direct User model fields
-        sort_map = {
-            'username': User.primary_username,
-            'email': User.plex_email,
-            'last_streamed': User.last_streamed_at,
-            'plex_join_date': User.plex_join_date,
-            'created_at': User.created_at
-        }
-        
-        # Default to sorting by username if the column is invalid
-        sort_field = sort_map.get(sort_column, User.primary_username)
-
-        # For string fields, use case-insensitive sorting to ensure consistent pagination
-        if sort_column in ['username', 'email']:
-            if sort_direction == 'desc':
-                # Use func.lower() for case-insensitive sorting, with nullslast() and secondary sort by ID
-                query = query.order_by(func.lower(sort_field).desc().nullslast(), User.id.asc())
-            else:
-                # Use func.lower() for case-insensitive sorting, with nullsfirst() and secondary sort by ID
-                query = query.order_by(func.lower(sort_field).asc().nullsfirst(), User.id.asc())
-        else:
-            # For non-string fields (dates, etc.), use regular sorting
-            if sort_direction == 'desc':
-                # Use .nullslast() to ensure users with no data appear at the end
-                # Add secondary sort by ID for consistent ordering
-                query = query.order_by(sort_field.desc().nullslast(), User.id.asc())
-            else:
-                # Use .nullsfirst() to ensure users with no data appear at the beginning  
-                # Add secondary sort by ID for consistent ordering
-                query = query.order_by(sort_field.asc().nullsfirst(), User.id.asc())
-    # --- END OF ENHANCED SORTING LOGIC ---
-
-    admin_accounts = AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()
+    # Get Owner with plex_uuid for filtering (AppUsers don't have plex_uuid)
+    owner = Owner.query.filter(Owner.plex_uuid.isnot(None)).first()
+    admin_accounts = [owner] if owner else []
     admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts}
     
-    # Calculate count before pagination to ensure consistency
-    # For complex queries with joins/aggregations, we need to count differently
-    if sort_column in ['total_plays', 'total_duration']:
-        # For aggregated queries, count the distinct users
-        count_query = User.query
-        # Apply the same filters as the main query
-        if search_filters:
-            count_query = count_query.filter(or_(*search_filters))
-        if server_filter_id != 'all':
-            try:
-                server_filter_id_int = int(server_filter_id)
-                from app.models_media_services import UserMediaAccess
-                count_query = count_query.join(UserMediaAccess).filter(UserMediaAccess.server_id == server_filter_id_int)
-            except ValueError:
-                pass
-        if filter_type == 'home_user': 
-            count_query = count_query.filter(User.is_home_user == True)
-        elif filter_type == 'shares_back': 
-            count_query = count_query.filter(User.shares_back == True)
-        elif filter_type == 'has_discord': 
-            count_query = count_query.filter(User.discord_user_id != None)
-        elif filter_type == 'no_discord': 
-            count_query = count_query.filter(User.discord_user_id == None)
-        
-        users_count = count_query.count()
-    else:
-        # For simple queries, use the existing query
-        users_count = query.count()
+    # Get user IDs for additional data - extract actual IDs from prefixed format
+    user_ids_on_page = []  # Actual UserMediaAccess IDs for service users
+    app_user_ids_on_page = []  # Actual UserAppAccess IDs for local users
     
-    users_pagination = query.paginate(page=page, per_page=items_per_page, error_out=False)
+    for user in users_on_page:
+        if hasattr(user, '_user_type'):
+            try:
+                user_id_to_parse = getattr(user, '_prefixed_id', user.id)
+                user_type, actual_id = parse_user_id(user_id_to_parse)
+                if user._user_type == 'service' and user_type == 'user_media_access':
+                    user_ids_on_page.append(actual_id)
+                elif user._user_type == 'local' and user_type == 'user_app_access':
+                    app_user_ids_on_page.append(actual_id)
+            except ValueError as e:
+                current_app.logger.error(f"Error parsing user ID {user_id_to_parse} for stats: {e}")
 
-    # Extract users from pagination results (handling complex queries that return tuples)
-    users_on_page = [item[0] if isinstance(item, tuple) else item for item in users_pagination.items]
-    user_ids_on_page = [user.id for user in users_on_page]
-
-    # Fetch additional data for the current page
-    stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
-    last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
+    # Fetch additional data for service users only (using actual IDs)
+    stream_stats = {}
+    last_ips = {}
+    if user_ids_on_page:
+        stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
+        last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
 
     # Attach the additional data directly to each user object
     for user in users_on_page:
-        stats = stream_stats.get(user.id, {})
-        user.total_plays = stats.get('play_count', 0)
-        user.total_duration = stats.get('total_duration', 0)
-        user.last_known_ip = last_ips.get(user.id, 'N/A')
+        if hasattr(user, '_user_type') and user._user_type == 'service':
+            try:
+                # Extract actual ID for stats lookup
+                user_id_to_parse = getattr(user, '_prefixed_id', user.id)
+                user_type, actual_id = parse_user_id(user_id_to_parse)
+                stats = stream_stats.get(actual_id, {})
+                user.total_plays = stats.get('play_count', 0)
+                user.total_duration = stats.get('total_duration', 0)
+                user.last_known_ip = last_ips.get(actual_id, 'N/A')
+            except ValueError as e:
+                current_app.logger.error(f"Error parsing user ID {user_id_to_parse} for stats attachment: {e}")
+                user.total_plays = 0
+                user.total_duration = 0
+                user.last_known_ip = 'N/A'
+        else:
+            # Local users don't have stream stats from the service-specific logic above
+            user.total_plays = 0
+            user.total_duration = 0
+            user.last_known_ip = 'N/A'
+            # Initialize last_streamed_at for local users - will be set below if streaming history exists
+            user.last_streamed_at = None
     
     # Get library access info for each user, organized by server to prevent ID collisions
     user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
     user_sorted_libraries = {}
+    user_library_service_mapping = {}  # NEW: user_id -> {lib_name: service_type}
     user_service_types = {}  # Track which services each user belongs to
     user_server_names = {}  # Track which server names each user belongs to
     from app.models_media_services import UserMediaAccess
-    access_records = UserMediaAccess.query.filter(UserMediaAccess.user_id.in_(user_ids_on_page)).all()
-    for access in access_records:
-        if access.user_id not in user_library_access_by_server:
-            user_library_access_by_server[access.user_id] = {}
-            user_service_types[access.user_id] = []
-            user_server_names[access.user_id] = []
-        user_library_access_by_server[access.user_id][access.server_id] = access.allowed_library_ids
-        # Track which service types this user has access to
-        if access.server.service_type not in user_service_types[access.user_id]:
-            user_service_types[access.user_id].append(access.server.service_type)
-        # Track which server names this user has access to
-        if access.server.name not in user_server_names[access.user_id]:
-            user_server_names[access.user_id].append(access.server.name)
+    
+    # Process each user individually based on their type
+    current_app.logger.info(f"DEBUG: Processing {len(users_on_page)} users for library access")
+    
+    for user in users_on_page:
+        user_id = getattr(user, '_prefixed_id', user.id)
+        user_library_access_by_server[user_id] = {}
+        user_library_service_mapping[user_id] = {}  # NEW: Initialize library-to-service mapping
+        user_service_types[user_id] = []
+        user_server_names[user_id] = []
+        
+        current_app.logger.info(f"DEBUG: Processing user ID {user_id}, username: {user.username}, type: {getattr(user, '_user_type', 'unknown')}")
+        
+        # Parse prefixed user ID to get type and actual database ID
+        try:
+            user_type, actual_id = parse_user_id(user_id)
+            current_app.logger.info(f"DEBUG: Parsed user ID - Type: {user_type}, Actual ID: {actual_id}")
+            
+            if user_type == "user_app_access":
+                # Local user - get all their UserMediaAccess records via user_app_access_id
+                access_records = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id == actual_id).all()
+                current_app.logger.info(f"DEBUG: Local user {user.username} (ID: {user_id}) has {len(access_records)} access records")
+            elif user_type == "user_media_access":
+                # Service user - get the specific UserMediaAccess record
+                access_records = UserMediaAccess.query.filter(UserMediaAccess.id == actual_id).all()
+                current_app.logger.info(f"DEBUG: Service user {user.username} (ID: {user_id}) has {len(access_records)} access records")
+            else:
+                # This shouldn't happen with our validation, but just in case
+                access_records = []
+                current_app.logger.warning(f"DEBUG: Unknown user type: {user_type}")
+        except ValueError as e:
+            # Handle malformed user IDs
+            current_app.logger.error(f"DEBUG: Error parsing user ID {user_id}: {e}")
+            access_records = []
+        
+        # Process the access records for this user
+        for access in access_records:
+            current_app.logger.info(f"DEBUG: User {user.username} access to server {access.server.name} (ID: {access.server_id}) with libraries: {access.allowed_library_ids}")
+            
+            # Special handling for AllGas users to debug library issues
+            if user.username == 'AllGas':
+                current_app.logger.info(f"DEBUG: AllGas library processing - Server: {access.server.name}, Raw libraries: {access.allowed_library_ids}")
+                # Check if libraries need filtering for this specific server
+                if access.allowed_library_ids:
+                    server_specific_libs = []
+                    for lib_id in access.allowed_library_ids:
+                        if isinstance(lib_id, str) and lib_id.startswith(f'[{access.server.service_type.value.upper()}]-{access.server.name}-'):
+                            # Extract the actual library ID from the prefixed format
+                            actual_lib_id = lib_id.split('-', 2)[-1]
+                            server_specific_libs.append(actual_lib_id)
+                        elif not isinstance(lib_id, str) or not lib_id.startswith('['):
+                            # This is already a clean library ID
+                            server_specific_libs.append(lib_id)
+                    current_app.logger.info(f"DEBUG: AllGas filtered libraries for {access.server.name}: {server_specific_libs}")
+                    user_library_access_by_server[user_id][access.server_id] = server_specific_libs
+                else:
+                    user_library_access_by_server[user_id][access.server_id] = access.allowed_library_ids
+            else:
+                user_library_access_by_server[user_id][access.server_id] = access.allowed_library_ids
+            # Track which service types this user has access to
+            if access.server.service_type not in user_service_types[user_id]:
+                user_service_types[user_id].append(access.server.service_type)
+            # Track which server names this user has access to
+            if access.server.name not in user_server_names[user_id]:
+                user_server_names[user_id].append(access.server.name)
 
     media_service_manager = MediaServiceManager()
     
     # Create a mapping of user_id to User object for easy lookup
-    users_by_id = {user.id: user for user in users_pagination.items}
+    users_by_id = {getattr(user, '_prefixed_id', user.id): user for user in users_pagination.items}
     
     # Get all servers for library lookups
     all_servers = media_service_manager.get_all_servers(active_only=True)
@@ -263,14 +491,23 @@ def list_users():
         all_lib_names = []
         
         for server_id, lib_ids in servers_access.items():
+            # Get the server object to determine service type
+            server = next((s for s in all_servers if s.id == server_id), None)
+            service_type = server.service_type.value if server else 'unknown'
+            
             # Handle special case for Jellyfin users with '*' (all libraries access)
             if lib_ids == ['*']:
                 lib_names = ['All Libraries']
+                # Map "All Libraries" to the service type
+                user_library_service_mapping[user_id]['All Libraries'] = service_type
             else:
                 # Check if this user has library_names available (for services like Kavita)
                 if user_obj and hasattr(user_obj, 'library_names') and user_obj.library_names:
                     # Use library_names from the user object
                     lib_names = user_obj.library_names
+                    # Map each library to the service type
+                    for lib_name in lib_names:
+                        user_library_service_mapping[user_id][lib_name] = service_type
                 else:
                     # Look up library names from the correct server to prevent ID collisions
                     server_libraries = libraries_by_server.get(server_id, {})
@@ -280,10 +517,14 @@ def list_users():
                             # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
                             lib_name = str(lib_id).split('_', 1)[1]
                             lib_names.append(lib_name)
+                            # Map library to service type
+                            user_library_service_mapping[user_id][lib_name] = service_type
                         else:
                             # Regular library ID lookup from the correct server
                             lib_name = server_libraries.get(str(lib_id), f'Unknown Lib {lib_id}')
                             lib_names.append(lib_name)
+                            # Map library to service type
+                            user_library_service_mapping[user_id][lib_name] = service_type
             
             all_lib_names.extend(lib_names)
         
@@ -308,41 +549,106 @@ def list_users():
             "id": server.id,
             "name": f"{server.name} ({server.service_type.value.capitalize()})"
         })
+    
+    # Add user type filter options
+    user_type_options = [
+        {"id": "all", "name": "All Users"},
+        {"id": "local", "name": "Local Users Only"},
+        {"id": "service", "name": "Service Users Only"}
+    ]
 
-    # Get last played content for each user
+    # Get last played content for each user - extract actual IDs for local users only
     user_last_played = {}
-    user_ids_on_page = [user.id for user in users_pagination.items]
-    if user_ids_on_page:
-        # Get the most recent stream for each user from StreamHistory table
+    local_user_ids_on_page = []
+    
+    # Extract actual UserAppAccess IDs for local users (MediaStreamHistory only tracks local users)
+    for user in users_pagination.items:
+        if hasattr(user, '_user_type') and user._user_type == 'local':
+            try:
+                user_id_to_parse = getattr(user, '_prefixed_id', user.id)
+                user_type, actual_id = parse_user_id(user_id_to_parse)
+                if user_type == 'user_app_access':
+                    local_user_ids_on_page.append(actual_id)
+            except ValueError as e:
+                current_app.logger.error(f"Error parsing user ID {user_id_to_parse} for last played: {e}")
+    
+    if local_user_ids_on_page:
+        # Get the most recent stream for each local user from MediaStreamHistory table
         from sqlalchemy import desc
-        last_streams = db.session.query(StreamHistory).filter(
-            StreamHistory.user_id.in_(user_ids_on_page)
-        ).order_by(StreamHistory.user_id, desc(StreamHistory.started_at)).all()
+        last_streams = db.session.query(MediaStreamHistory).filter(
+            MediaStreamHistory.user_app_access_id.in_(local_user_ids_on_page)
+        ).order_by(MediaStreamHistory.user_app_access_id, desc(MediaStreamHistory.started_at)).all()
         
-        # Group by user_id and take the first (most recent) for each user
+        # Group by user_app_access_id and take the first (most recent) for each user
+        # Map back to prefixed IDs for template usage
         seen_users = set()
         for stream in last_streams:
-            if stream.user_id not in seen_users:
-                user_last_played[stream.user_id] = {
+            if stream.user_app_access_id not in seen_users:
+                # Create prefixed ID for template lookup
+                prefixed_user_id = f"user_app_access:{stream.user_app_access_id}"
+                user_last_played[prefixed_user_id] = {
                     'media_title': stream.media_title,
                     'media_type': stream.media_type,
                     'grandparent_title': stream.grandparent_title,
                     'parent_title': stream.parent_title,
                     'started_at': stream.started_at,
                     'rating_key': stream.rating_key,
-                    'server_id': None  # StreamHistory doesn't have server_id
+                    'server_id': stream.server_id if hasattr(stream, 'server_id') else None
                 }
-                seen_users.add(stream.user_id)
+                
+                # Also set last_streamed_at on the user object for table display
+                # When sorting by last_streamed, users_on_page contains all users, not just paginated ones
+                for user in users_on_page:
+                    if (hasattr(user, '_user_type') and user._user_type == 'local' and 
+                        hasattr(user, '_prefixed_id') and user._prefixed_id == prefixed_user_id):
+                        user.last_streamed_at = stream.started_at
+                        break
+                
+                seen_users.add(stream.user_app_access_id)
 
+    # Handle last_streamed sorting after streaming data is populated
+    if 'last_streamed' in sort_by_param:
+        reverse_sort = 'desc' in sort_by_param
+        # Sort ALL users by last_streamed_at field (now that it's populated)
+        def get_sort_key(user):
+            last_streamed = getattr(user, 'last_streamed_at', None)
+            if last_streamed is None:
+                return datetime.min.replace(tzinfo=timezone.utc)
+            # Handle timezone-naive datetimes by assuming UTC
+            if last_streamed.tzinfo is None:
+                return last_streamed.replace(tzinfo=timezone.utc)
+            return last_streamed
+        
+        all_users.sort(key=get_sort_key, reverse=reverse_sort)
+        
+        # Re-paginate after sorting
+        start_idx = (page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        users_on_page = all_users[start_idx:end_idx]
+        
+        # Update the pagination object with the newly sorted and paginated users
+        users_pagination.items = users_on_page
+
+    # Add service types for standalone users to user_service_types
+    if user_type_filter in ['all', 'service'] and service_users:
+        for service_user in service_users:
+            if hasattr(service_user, '_is_standalone') and service_user._is_standalone:
+                # Add the service type for this standalone user
+                user_service_types[getattr(service_user, '_prefixed_id', service_user.id)] = [service_user._access_record.server.service_type]
+    
+    # Check if user accounts feature is enabled
+    allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+    
     template_context = {
         'title': "Managed Users",
         'users': users_pagination,
-        'users_count': users_count,
+        'users_count': total_users,
         'stream_stats': stream_stats,
         'last_ips': last_ips,
         'user_library_access_by_server': user_library_access_by_server,
         'user_last_played': user_last_played,
         'user_sorted_libraries': user_sorted_libraries,
+        'user_library_service_mapping': user_library_service_mapping,
         'user_service_types': user_service_types,
         'user_server_names': user_server_names,
         'current_view': view_mode,
@@ -354,7 +660,12 @@ def list_users():
         'admins_by_uuid': admins_by_uuid,
         'sort_column': sort_column,
         'sort_direction': sort_direction,
-        'server_dropdown_options': server_dropdown_options
+        'server_dropdown_options': server_dropdown_options,
+        'user_type_options': user_type_options,
+        'current_user_type': user_type_filter,
+        'app_users': app_users,
+        'service_users': service_users if user_type_filter in ['all', 'service'] else [],
+        'allow_user_accounts': allow_user_accounts
     }
     
     if is_htmx:
@@ -380,7 +691,7 @@ def save_view_preference():
     
     if view_mode in ['cards', 'table']:
         try:
-            user_to_update = AdminAccount.query.get(current_user.id)
+            user_to_update = current_user
             user_to_update.preferred_user_list_view = view_mode
             db.session.commit()
             current_app.logger.debug(f"View preference AFTER save: '{user_to_update.preferred_user_list_view}'")
@@ -482,50 +793,129 @@ def sync_all_users():
         }
         return make_response(modal_html, 200, headers)
 
-@bp.route('/delete/<int:user_id>', methods=['DELETE'])
+@bp.route('/delete/<user_id>', methods=['DELETE'])
 @login_required
 @setup_required
 @permission_required('delete_user')
 def delete_user(user_id):
-    user = User.query.get_or_404(user_id)
-    
-    # Use the universal display name method instead of legacy plex_username
-    username = user.get_display_name()
-    
+    # Parse prefixed user ID to determine type and get actual database ID
     try:
-        UnifiedUserService.delete_user_completely(user_id, admin_id=current_user.id)
-        
-        # Create a toast message payload
+        user_type, actual_id = parse_user_id(user_id)
+        current_app.logger.info(f"Delete user request - Type: {user_type}, Actual ID: {actual_id}")
+    except ValueError as e:
+        current_app.logger.error(f"Invalid user ID format for deletion: {user_id} - {e}")
         toast = {
             "showToastEvent": {
-                "message": f"User '{username}' has been successfully removed.",
-                "category": "success"
-            }
-        }
-        
-        # Create an empty response and add the HX-Trigger header
-        response = make_response("", 200)
-        response.headers['HX-Trigger'] = json.dumps(toast)
-        return response
-
-    except Exception as e:
-        current_app.logger.error(f"Route Error deleting user {username}: {e}", exc_info=True)
-        log_event(EventType.ERROR_GENERAL, f"Route: Failed to delete user {username}: {e}", user_id=user_id, admin_id=current_user.id)
-        
-        # Create an error toast message payload
-        toast = {
-            "showToastEvent": {
-                "message": f"Error deleting user '{username}': {str(e)[:100]}",
+                "message": f"Invalid user ID format: {user_id}",
                 "category": "error"
             }
         }
-        
-        # Respond with an error status and the trigger header
-        # Note: HTMX will NOT swap the target on a 500 error unless told to.
-        # But it WILL process the trigger header, showing the toast.
-        response = make_response("", 500)
+        response = make_response("", 400)
         response.headers['HX-Trigger'] = json.dumps(toast)
         return response
+    
+    if user_type == "user_app_access":
+        # This is a local UserAppAccess user
+        user = UserAppAccess.query.get(actual_id)
+    
+        if not user:
+            toast = {
+                "showToastEvent": {
+                    "message": f"Local user with ID {actual_id} not found.",
+                    "category": "error"
+                }
+            }
+            response = make_response("", 404)
+            response.headers['HX-Trigger'] = json.dumps(toast)
+            return response
+        
+        # This is a local UserAppAccess user
+        username = user.get_display_name()
+        
+        try:
+            UnifiedUserService.delete_user_completely(actual_id, admin_id=current_user.id)
+            
+            # Create a toast message payload
+            toast = {
+                "showToastEvent": {
+                    "message": f"User '{username}' has been successfully removed.",
+                    "category": "success"
+                }
+            }
+            
+            # Create an empty response and add the HX-Trigger header
+            response = make_response("", 200)
+            response.headers['HX-Trigger'] = json.dumps(toast)
+            return response
+
+        except Exception as e:
+            current_app.logger.error(f"Route Error deleting user {username}: {e}", exc_info=True)
+            log_event(EventType.ERROR_GENERAL, f"Route: Failed to delete user {username}: {e}", user_id=actual_id, admin_id=current_user.id)
+            
+            # Create an error toast message payload
+            toast = {
+                "showToastEvent": {
+                    "message": f"Error deleting user '{username}': {str(e)[:100]}",
+                    "category": "error"
+                }
+            }
+            
+            response = make_response("", 500)
+            response.headers['HX-Trigger'] = json.dumps(toast)
+            return response
+    
+    elif user_type == "user_media_access":
+        # This is a standalone service user, get the UserMediaAccess record
+        from app.models_media_services import UserMediaAccess
+        access = UserMediaAccess.query.filter(
+            UserMediaAccess.id == actual_id,
+            UserMediaAccess.user_app_access_id.is_(None)
+        ).first()
+        
+        if not access:
+            toast = {
+                "showToastEvent": {
+                    "message": f"Service user with ID {actual_id} not found.",
+                    "category": "error"
+                }
+            }
+            response = make_response("", 404)
+            response.headers['HX-Trigger'] = json.dumps(toast)
+            return response
+            
+        username = access.external_username or 'Unknown'
+        
+        try:
+            # Delete the standalone UserMediaAccess record
+            db.session.delete(access)
+            db.session.commit()
+            
+            # Create a toast message payload
+            toast = {
+                "showToastEvent": {
+                    "message": f"Standalone user '{username}' has been successfully removed.",
+                    "category": "success"
+                }
+            }
+            
+            response = make_response("", 200)
+            response.headers['HX-Trigger'] = json.dumps(toast)
+            return response
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error deleting standalone user '{username}': {e}", exc_info=True)
+            
+            toast = {
+                "showToastEvent": {
+                    "message": f"Error deleting standalone user '{username}': {str(e)[:100]}",
+                    "category": "error"
+                }
+            }
+            
+            response = make_response("", 500)
+            response.headers['HX-Trigger'] = json.dumps(toast)
+            return response
 
 @bp.route('/mass_edit_libraries_form')
 @login_required
@@ -538,7 +928,7 @@ def mass_edit_libraries_form():
     user_ids = [int(uid) for uid in user_ids_str.split(',') if uid.isdigit()]
     
     from app.models_media_services import UserMediaAccess, MediaServer
-    access_records = db.session.query(UserMediaAccess, User, MediaServer).join(User, UserMediaAccess.user_id == User.id).join(MediaServer, UserMediaAccess.server_id == MediaServer.id).filter(UserMediaAccess.user_id.in_(user_ids)).all()
+    access_records = db.session.query(UserMediaAccess, UserAppAccess, MediaServer).join(UserAppAccess, UserMediaAccess.user_app_access_id == UserAppAccess.id).join(MediaServer, UserMediaAccess.server_id == MediaServer.id).filter(UserMediaAccess.user_app_access_id.in_(user_ids)).all()
 
     services_data = {}
     for access, user, server in access_records:
@@ -621,8 +1011,28 @@ def mass_edit_users():
         print("[SERVER DEBUG 2] user_ids_str is missing or empty.")
     elif form.validate():
         print(f"[SERVER DEBUG 3] Form validation PASSED. User IDs from request: '{user_ids_str}'")
-        user_ids = [int(uid) for uid in user_ids_str.split(',') if uid.isdigit()]
-        action = form.action.data
+        
+        # Parse prefixed user IDs and extract actual database IDs
+        user_ids = []
+        for uid_str in user_ids_str.split(','):
+            uid_str = uid_str.strip()
+            if not uid_str:
+                continue
+            try:
+                user_type, actual_id = parse_user_id(uid_str)
+                # For mass edit operations, we only support local users (UserAppAccess)
+                if user_type == "user_app_access":
+                    user_ids.append(actual_id)
+                else:
+                    current_app.logger.warning(f"Mass edit attempted on service user {uid_str} - not supported")
+            except ValueError as e:
+                current_app.logger.error(f"Invalid user ID format in mass edit: {uid_str} - {e}")
+        
+        if not user_ids:
+            toast_message = "No valid local users selected for mass edit operation."
+            toast_category = "error"
+        else:
+            action = form.action.data
         try:
             if action == 'update_libraries':
                 # The new logic will parse libraries per server
@@ -699,7 +1109,7 @@ def mass_edit_users():
     view_mode = request.args.get('view', 'cards')
     items_per_page = session.get('users_list_per_page', int(current_app.config.get('DEFAULT_USERS_PER_PAGE', 12)))
     
-    query = User.query
+    query = UserAppAccess.query
     
     # Handle separate search fields (same as main route)
     search_username = request.args.get('search_username', '').strip()
@@ -710,13 +1120,13 @@ def mass_edit_users():
     # Build search filters
     search_filters = []
     if search_username:
-        search_filters.append(User.primary_username.ilike(f"%{search_username}%"))
+        search_filters.append(UserAppAccess.username.ilike(f"%{search_username}%"))
     if search_email:
-        search_filters.append(User.plex_email.ilike(f"%{search_email}%"))
+        search_filters.append(UserAppAccess.email.ilike(f"%{search_email}%"))
     if search_notes:
-        search_filters.append(User.notes.ilike(f"%{search_notes}%"))
+        search_filters.append(UserAppAccess.notes.ilike(f"%{search_notes}%"))
     if search_term:
-        search_filters.append(or_(User.primary_username.ilike(f"%{search_term}%"), User.plex_email.ilike(f"%{search_term}%")))
+        search_filters.append(or_(UserAppAccess.username.ilike(f"%{search_term}%"), UserAppAccess.email.ilike(f"%{search_term}%")))
     
     # Apply search filters if any exist
     if search_filters:
@@ -733,10 +1143,10 @@ def mass_edit_users():
             current_app.logger.warning(f"Invalid server_id received: {server_filter_id}")
     
     filter_type = request.args.get('filter_type', '')
-    if filter_type == 'home_user': query = query.filter(User.is_home_user == True)
-    elif filter_type == 'shares_back': query = query.filter(User.shares_back == True)
-    elif filter_type == 'has_discord': query = query.filter(User.discord_user_id != None)
-    elif filter_type == 'no_discord': query = query.filter(User.discord_user_id == None)
+    # Apply filters for users (updated for new architecture)
+    if filter_type == 'has_discord': query = query.filter(UserAppAccess.discord_user_id != None)
+    elif filter_type == 'no_discord': query = query.filter(UserAppAccess.discord_user_id == None)
+    # Note: home_user and shares_back filters removed as they don't apply to UserAppAccess
     
     # Enhanced sorting logic (same as main route)
     sort_by_param = request.args.get('sort_by', 'username_asc')
@@ -746,39 +1156,39 @@ def mass_edit_users():
     
     # Handle sorting that requires joins and aggregation
     if sort_column in ['total_plays', 'total_duration']:
-        query = query.outerjoin(User.stream_history).group_by(User.id)
-        sort_field = func.count(StreamHistory.id) if sort_column == 'total_plays' else func.sum(func.coalesce(StreamHistory.duration_seconds, 0))
+        # Join with MediaStreamHistory for sorting by stream stats
+        query = query.outerjoin(MediaStreamHistory, MediaStreamHistory.user_app_access_id == UserAppAccess.id).group_by(UserAppAccess.id)
+        sort_field = func.count(MediaStreamHistory.id) if sort_column == 'total_plays' else func.sum(func.coalesce(MediaStreamHistory.duration_seconds, 0))
         query = query.add_columns(sort_field.label('sort_value'))
         
         if sort_direction == 'desc':
-            query = query.order_by(db.desc('sort_value').nullslast(), User.id.asc())
+            query = query.order_by(db.desc('sort_value').nullslast(), UserAppAccess.id.asc())
         else:
-            query = query.order_by(db.asc('sort_value').nullsfirst(), User.id.asc())
+            query = query.order_by(db.asc('sort_value').nullsfirst(), UserAppAccess.id.asc())
     else:
         sort_map = {
-            'username': User.primary_username,
-            'email': User.plex_email,
-            'last_streamed': User.last_streamed_at,
-            'plex_join_date': User.plex_join_date,
-            'created_at': User.created_at
+            'username': UserAppAccess.username,
+            'email': UserAppAccess.email,
+            'last_streamed': UserAppAccess.last_login_at,  # UserAppAccess uses last_login_at
+            'created_at': UserAppAccess.created_at
         }
         
-        sort_field = sort_map.get(sort_column, User.primary_username)
+        sort_field = sort_map.get(sort_column, UserAppAccess.username)
 
         if sort_column in ['username', 'email']:
             if sort_direction == 'desc':
-                query = query.order_by(func.lower(sort_field).desc().nullslast(), User.id.asc())
+                query = query.order_by(func.lower(sort_field).desc().nullslast(), UserAppAccess.id.asc())
             else:
-                query = query.order_by(func.lower(sort_field).asc().nullsfirst(), User.id.asc())
+                query = query.order_by(func.lower(sort_field).asc().nullsfirst(), UserAppAccess.id.asc())
         else:
             if sort_direction == 'desc':
-                query = query.order_by(sort_field.desc().nullslast(), User.id.asc())
+                query = query.order_by(sort_field.desc().nullslast(), UserAppAccess.id.asc())
             else:
-                query = query.order_by(sort_field.asc().nullsfirst(), User.id.asc())
+                query = query.order_by(sort_field.asc().nullsfirst(), UserAppAccess.id.asc())
     
     # Calculate count properly for complex queries
     if sort_column in ['total_plays', 'total_duration']:
-        count_query = User.query
+        count_query = UserAppAccess.query
         if search_filters:
             count_query = count_query.filter(or_(*search_filters))
         if server_filter_id != 'all':
@@ -788,14 +1198,11 @@ def mass_edit_users():
                 count_query = count_query.join(UserMediaAccess).filter(UserMediaAccess.server_id == server_filter_id_int)
             except ValueError:
                 pass
-        if filter_type == 'home_user': 
-            count_query = count_query.filter(User.is_home_user == True)
-        elif filter_type == 'shares_back': 
-            count_query = count_query.filter(User.shares_back == True)
-        elif filter_type == 'has_discord': 
-            count_query = count_query.filter(User.discord_user_id != None)
+        # Note: home_user and shares_back filters removed as they don't apply to UserAppAccess
+        if filter_type == 'has_discord': 
+            count_query = count_query.filter(UserAppAccess.discord_user_id != None)
         elif filter_type == 'no_discord': 
-            count_query = count_query.filter(User.discord_user_id == None)
+            count_query = count_query.filter(UserAppAccess.discord_user_id == None)
         users_count = count_query.count()
     else:
         users_count = query.count()
@@ -812,11 +1219,11 @@ def mass_edit_users():
     user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
     user_sorted_libraries = {}
     from app.models_media_services import UserMediaAccess
-    access_records = UserMediaAccess.query.filter(UserMediaAccess.user_id.in_(user_ids_on_page)).all()
+    access_records = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id.in_(user_ids_on_page)).all()
     for access in access_records:
-        if access.user_id not in user_library_access_by_server:
-            user_library_access_by_server[access.user_id] = {}
-        user_library_access_by_server[access.user_id][access.server_id] = access.allowed_library_ids
+        if access.user_app_access_id not in user_library_access_by_server:
+            user_library_access_by_server[access.user_app_access_id] = {}
+        user_library_access_by_server[access.user_app_access_id][access.server_id] = access.allowed_library_ids
 
     # Get libraries from all active servers, organized by server to prevent ID collisions
     libraries_by_server = {}  # server_id -> {lib_id: lib_name}
@@ -872,8 +1279,10 @@ def mass_edit_users():
         user_sorted_libraries[user_id] = sorted(all_lib_names, key=str.lower)
 
     # Get additional required context data for the template
-    admin_accounts = AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()
-    admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts}
+    # Get Owner with plex_uuid for filtering (AppUsers don't have plex_uuid)
+    owner = Owner.query.filter(Owner.plex_uuid.isnot(None)).first()
+    admin_accounts = [owner] if owner else []
+    admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts if admin.plex_uuid}
     
     # Get stream stats and other data
     user_ids_on_page = [user.id for user in users_on_page]
@@ -893,19 +1302,19 @@ def mass_edit_users():
     
     # Get all user access records to determine service types
     all_user_access = UserMediaAccess.query.filter(
-        UserMediaAccess.user_id.in_([user.id for user in users_pagination.items])
+        UserMediaAccess.user_app_access_id.in_([user.id for user in users_pagination.items])
     ).all()
     
     for access in all_user_access:
-        if access.user_id not in user_service_types:
-            user_service_types[access.user_id] = []
-            user_server_names[access.user_id] = []
+        if access.user_app_access_id not in user_service_types:
+            user_service_types[access.user_app_access_id] = []
+            user_server_names[access.user_app_access_id] = []
         
-        if access.server.service_type not in user_service_types[access.user_id]:
-            user_service_types[access.user_id].append(access.server.service_type)
+        if access.server.service_type not in user_service_types[access.user_app_access_id]:
+            user_service_types[access.user_app_access_id].append(access.server.service_type)
         
-        if access.server.name not in user_server_names[access.user_id]:
-            user_server_names[access.user_id].append(access.server.name)
+        if access.server.name not in user_server_names[access.user_app_access_id]:
+            user_server_names[access.user_app_access_id].append(access.server.name)
 
     # Get server dropdown options for template
     media_service_manager = MediaServiceManager()
@@ -1024,27 +1433,416 @@ def preview_purge_inactive_users():
         current_app.logger.error(f"User_Routes.py - preview_purge_inactive_users(): Error generating purge preview: {e}", exc_info=True)
         return render_template('partials/_alert_message.html', message=f"An unexpected error occurred generating purge preview: {e}", category='error'), 500
     
-@bp.route('/debug_info/<int:user_id>')
+@bp.route('/local/<int:local_user_id>/edit')
+@login_required
+@permission_required('edit_user')
+def get_local_user_edit_form(local_user_id):
+    """Get edit form for local user"""
+    local_user = UserAppAccess.query.get_or_404(local_user_id)
+    
+    # For now, return a simple form - this can be expanded later
+    return f"""
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Edit Local User: {local_user.username}</h3>
+        <p class="py-4">Local user editing functionality coming soon...</p>
+        <div class="modal-action">
+            <button class="btn" onclick="this.closest('dialog').close()">Close</button>
+        </div>
+    </div>
+    """
+
+@bp.route('/local/<int:local_user_id>/linked-accounts')
+@login_required
+@permission_required('view_users')
+def get_linked_accounts(local_user_id):
+    """Get linked accounts view for local user"""
+    local_user = UserAppAccess.query.get_or_404(local_user_id)
+    
+    linked_accounts_html = ""
+    # Get linked UserMediaAccess records for this local user
+    from app.models_media_services import UserMediaAccess
+    linked_accounts = UserMediaAccess.query.filter_by(user_app_access_id=local_user_id).all()
+    
+    for access in linked_accounts:
+        # Get service badge info based on server type
+        service_type = access.server.service_type.value if access.server else 'unknown'
+        badge_info = {
+            'plex': {'name': 'Plex', 'icon': 'fa-solid fa-play', 'color': 'bg-plex'},
+            'jellyfin': {'name': 'Jellyfin', 'icon': 'fa-solid fa-cube', 'color': 'bg-jellyfin'},
+            'emby': {'name': 'Emby', 'icon': 'fa-solid fa-play-circle', 'color': 'bg-emby'},
+            'kavita': {'name': 'Kavita', 'icon': 'fa-solid fa-book', 'color': 'bg-kavita'},
+            'audiobookshelf': {'name': 'AudioBookshelf', 'icon': 'fa-solid fa-headphones', 'color': 'bg-audiobookshelf'},
+            'komga': {'name': 'Komga', 'icon': 'fa-solid fa-book-open', 'color': 'bg-komga'},
+            'romm': {'name': 'RomM', 'icon': 'fa-solid fa-gamepad', 'color': 'bg-romm'}
+        }.get(service_type, {'name': 'Unknown', 'icon': 'fa-solid fa-server', 'color': 'bg-gray-500'})
+        
+        # Get additional account info
+        join_date = access.created_at
+        join_date_str = join_date.strftime('%b %Y') if join_date else 'Unknown'
+        
+        # Server info is already available from access.server
+        server_name = access.server.name if access.server else 'Unknown Server'
+        
+        linked_accounts_html += f"""
+        <div class="group relative bg-base-100 rounded-xl border border-base-300/60 hover:border-base-300 transition-all duration-200 hover:shadow-lg hover:shadow-base-300/20">
+            <div class="p-5">
+                <div class="flex items-start justify-between gap-4">
+                    <!-- Left Content -->
+                    <div class="flex items-start gap-4 flex-1 min-w-0">
+                        <!-- Service Avatar -->
+                        <div class="relative flex-shrink-0">
+                            <div class="w-12 h-12 rounded-xl {badge_info['color']} flex items-center justify-center shadow-lg">
+                                <i class="{badge_info['icon']} text-white text-lg"></i>
+                            </div>
+                            <!-- Connection Status Indicator -->
+                            <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-success rounded-full border-2 border-base-100 flex items-center justify-center">
+                                <i class="fa-solid fa-check text-white text-xs"></i>
+                            </div>
+                        </div>
+                        
+                        <!-- Account Details -->
+                        <div class="flex-1 min-w-0">
+                            <!-- Header Row -->
+                            <div class="flex items-center gap-3 mb-2">
+                                <h4 class="font-semibold text-base-content text-lg truncate">{access.external_username or 'Unknown User'}</h4>
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success/15 text-success border border-success/20">
+                                    <div class="w-1.5 h-1.5 bg-success rounded-full"></div>
+                                    Connected
+                                </div>
+                            </div>
+                            
+                            <!-- Service & Server Info -->
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-medium bg-base-200/80 text-base-content/80">
+                                    <i class="{badge_info['icon']} text-xs"></i>
+                                    {badge_info['name']}
+                                </span>
+                                <span class="text-base-content/40">•</span>
+                                <span class="text-sm text-base-content/70 font-medium">{server_name}</span>
+                            </div>
+                            
+                            <!-- Metadata Row -->
+                            <div class="flex items-center gap-4 text-xs text-base-content/50">
+                                <div class="flex items-center gap-1.5">
+                                    <i class="fa-solid fa-hashtag text-xs"></i>
+                                    <span class="font-mono">{access.id}</span>
+                                </div>
+                                {f'''<div class="flex items-center gap-1.5">
+                                    <i class="fa-solid fa-envelope text-xs"></i>
+                                    <span class="truncate max-w-[120px]">{access.external_email}</span>
+                                </div>''' if access.external_email else ''}
+                                <div class="flex items-center gap-1.5">
+                                    <i class="fa-solid fa-calendar-plus text-xs"></i>
+                                    <span>Joined {join_date_str}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="flex-shrink-0">
+                        <button class="btn btn-sm btn-ghost text-error/70 hover:text-error hover:bg-error/10 border border-transparent hover:border-error/20 transition-all duration-200 group/btn" 
+                                onclick="unlinkServiceAccount({access.id})"
+                                title="Unlink this account">
+                            <i class="fa-solid fa-unlink text-sm group-hover/btn:scale-110 transition-transform duration-200"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+    
+    if not linked_accounts_html:
+        linked_accounts_html = f"""
+        <div class="bg-base-100 rounded-xl border border-base-300/60 text-center overflow-hidden">
+            <!-- Empty State Content -->
+            <div class="p-8">
+                <div class="w-16 h-16 rounded-2xl bg-base-200/80 flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-link-slash text-base-content/40 text-2xl"></i>
+                </div>
+                <h4 class="font-semibold text-base-content text-lg mb-2">No Linked Accounts</h4>
+                <p class="text-sm text-base-content/60 mb-6 max-w-sm mx-auto leading-relaxed">This user hasn't linked any service accounts yet.</p>
+                
+                <!-- Info Card -->
+                <div class="bg-info/8 border border-info/15 rounded-xl p-4 max-w-md mx-auto">
+                    <div class="flex items-start gap-3 text-left">
+                        <div class="w-6 h-6 rounded-lg bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-info text-info text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-base-content/70 leading-relaxed">
+                                Service accounts are automatically linked when users accept invites to access media servers.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+    
+    return f"""
+    <div class="modal-box max-w-3xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Professional Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <i class="fa-solid fa-link text-primary text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Linked Accounts</h3>
+                    <p class="text-sm text-base-content/60">{local_user.username} • {len(linked_accounts)} connected service accounts</p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200" type="button" 
+                        onclick="this.closest('dialog').close()">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <!-- Description Card -->
+            <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-info text-primary text-sm"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-base-content mb-1">Account Linking Overview</h4>
+                        <p class="text-sm text-base-content/70 leading-relaxed">
+                            {f"This local user account is linked to {len(linked_accounts)} service accounts across your media servers." if len(linked_accounts) > 0 else "This local user account has no linked service accounts yet."}
+                            Service accounts are automatically created and linked when users accept invites to access media servers.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Linked Accounts List -->
+            <div class="space-y-3">
+                {linked_accounts_html}
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 p-6 border-t border-base-300">
+            <button type="button" class="btn btn-ghost" 
+                    onclick="this.closest('dialog').close()">
+                <i class="fa-solid fa-times mr-2"></i>
+                Close
+            </button>
+        </div>
+    </div>
+    """
+
+@bp.route('/local/<int:local_user_id>/link/<int:service_user_id>', methods=['POST'])
+@login_required
+@permission_required('edit_user')
+def link_service_to_local(local_user_id, service_user_id):
+    """Link a service account to a local user"""
+    local_user = UserAppAccess.query.get_or_404(local_user_id)
+    service_user = UserAppAccess.query.get_or_404(service_user_id)
+    
+    try:
+        # Check if service user is already linked to another local user
+        if service_user.local_user_id and service_user.local_user_id != local_user_id:
+            return make_response("Service account is already linked to another local user", 400)
+        
+        # Link the accounts
+        service_user.local_user_id = local_user_id
+        db.session.commit()
+        
+        log_event(EventType.SETTING_CHANGE, 
+                  f"Service account '{service_user.get_display_name()}' linked to local user '{local_user.username}'",
+                  admin_id=current_user.id)
+        
+        return make_response("", 200)
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error linking accounts: {e}")
+        return make_response(f"Error linking accounts: {str(e)}", 500)
+
+@bp.route('/service/<int:service_user_id>/unlink', methods=['POST'])
+@login_required
+@permission_required('edit_user')
+def unlink_service_from_local(service_user_id):
+    """Unlink a service account from its local user"""
+    service_user = UserAppAccess.query.get_or_404(service_user_id)
+    
+    try:
+        old_local_user = service_user.app_user
+        service_user.app_user_id = None
+        db.session.commit()
+        
+        log_event(EventType.SETTING_CHANGE, 
+                  f"Service account '{service_user.get_display_name()}' unlinked from local user '{old_local_user.username if old_local_user else 'Unknown'}'",
+                  admin_id=current_user.id)
+        
+        return make_response("", 200)
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error unlinking account: {e}")
+        return make_response(f"Error unlinking account: {str(e)}", 500)
+
+@bp.route('/app/<username>/delete', methods=['DELETE'])
+@login_required
+@permission_required('delete_user')
+def delete_app_user(username):
+    """Delete an app user and all linked service accounts"""
+    from app.models import UserAppAccess
+    from app.services.unified_user_service import UnifiedUserService
+    
+    app_user = UserAppAccess.query.filter_by(username=username).first_or_404()
+    username = app_user.username
+    
+    try:
+        # Get all linked media access accounts before deletion
+        linked_accounts = app_user.media_accesses
+        linked_account_names = [access.external_username or 'Unknown' for access in linked_accounts]
+        
+        current_app.logger.info(f"Deleting app user '{username}' and {len(linked_accounts)} linked service accounts")
+        
+        # Delete all linked media access accounts first
+        for access in linked_accounts:
+            try:
+                access_name = access.external_username or 'Unknown'
+                current_app.logger.debug(f"Deleting linked media access: {access_name} on {access.server.name}")
+                # Delete the UserMediaAccess record - this will handle server deletion if needed
+                db.session.delete(access)
+            except Exception as e:
+                current_app.logger.error(f"Error deleting linked media access {access.external_username or 'Unknown'}: {e}")
+                # Continue with other accounts even if one fails
+        
+        # Delete the local user
+        db.session.delete(app_user)
+        db.session.commit()
+        
+        # Log the deletion
+        log_event(EventType.MUM_USER_DELETED_FROM_MUM, 
+                  f"Local user '{username}' deleted along with {len(linked_account_names)} linked service accounts: {', '.join(linked_account_names) if linked_account_names else 'none'}",
+                  admin_id=current_user.id)
+        
+        # Create a toast message payload
+        toast = {
+            "showToastEvent": {
+                "message": f"Local user '{username}' and all linked accounts have been successfully deleted.",
+                "category": "success"
+            }
+        }
+        
+        # Create an empty response and add the HX-Trigger header
+        response = make_response("", 200)
+        response.headers['HX-Trigger'] = json.dumps(toast)
+        return response
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting local user '{username}': {e}", exc_info=True)
+        log_event(EventType.ERROR_GENERAL, f"Failed to delete app user '{username}': {e}", admin_id=current_user.id)
+        
+        # Create an error toast message payload
+        toast = {
+            "showToastEvent": {
+                "message": f"Error deleting local user '{username}': {str(e)[:100]}",
+                "category": "error"
+            }
+        }
+        
+        response = make_response("", 500)
+        response.headers['HX-Trigger'] = json.dumps(toast)
+        return response
+
+@bp.route('/debug_info/<user_id>')
 @login_required
 def get_user_debug_info(user_id):
     """Get raw user data for debugging purposes - ONLY uses stored data, NO API calls"""
-    user = User.query.get_or_404(user_id)
+    # Parse prefixed user ID to determine type and get actual database ID
+    try:
+        user_type, actual_id = parse_user_id(user_id)
+        current_app.logger.info(f"Debug info request - Type: {user_type}, Actual ID: {actual_id}")
+    except ValueError as e:
+        current_app.logger.error(f"Invalid user ID format for debug info: {user_id} - {e}")
+        return f"<p class='text-error'>Invalid user ID format: {user_id}</p>"
+    
+    if user_type == "user_app_access":
+        # This is a local UserAppAccess user
+        user = UserAppAccess.query.get(actual_id)
+    
+        if not user:
+            return f"<p class='text-error'>Local user with ID {actual_id} not found</p>"
+        
+        # This is a local UserAppAccess user - user variable already set above
+        pass
+    
+    elif user_type == "user_media_access":
+        # This is a standalone service user, get the UserMediaAccess record
+        from app.models_media_services import UserMediaAccess
+        access = UserMediaAccess.query.filter(
+            UserMediaAccess.id == actual_id,
+            UserMediaAccess.user_app_access_id.is_(None)
+        ).first()
+        
+        if not access:
+            return f"<p class='text-error'>Service user with ID {actual_id} not found</p>"
+        
+        # Create a mock user object for the template
+        class MockUser:
+            def __init__(self, access):
+                self.id = user_id  # Keep the prefixed ID for display
+                self.username = access.external_username or 'Unknown'
+                self.email = access.external_email
+                self.notes = access.notes
+                self.created_at = access.created_at
+                self.last_login_at = access.last_activity_at
+                self.media_accesses = [access]
+                self.access_expires_at = access.access_expires_at
+                self.discord_user_id = access.discord_user_id
+                self.is_active = access.is_active
+                self._is_standalone = True
+                self._access_record = access
+            
+            def get_display_name(self):
+                return self._access_record.external_username or 'Unknown'
+            
+            def get_avatar(self, default_url=None):
+                """Return avatar URL for MockUser - service users typically don't have avatars"""
+                return default_url
+        
+        user = MockUser(access)
     
     try:
         # Enhanced debugging for raw service data
         current_app.logger.info(f"=== DEBUG INFO REQUEST FOR USER {user_id} ===")
         current_app.logger.info(f"Username: {user.get_display_name()}")
-        current_app.logger.info(f"Raw service data exists: {user.raw_service_data is not None}")
-        current_app.logger.info(f"Raw service data type: {type(user.raw_service_data)}")
-        if user.raw_service_data:
-            current_app.logger.info(f"Raw service data length: {len(str(user.raw_service_data))}")
-            current_app.logger.info(f"Raw service data preview: {str(user.raw_service_data)[:100]}...")
+        
+        # Check for service-specific data in UserMediaAccess records
+        from app.models_media_services import UserMediaAccess
+        if hasattr(user, '_is_standalone') and user._is_standalone:
+            # For standalone users, the access record is stored in _access_record
+            user_accesses = [user._access_record]
         else:
-            current_app.logger.warning(f"No stored raw data for user {user.get_display_name()} - user needs to sync")
+            # For regular users, query by user_app_access_id using actual_id
+            user_accesses = UserMediaAccess.query.filter_by(user_app_access_id=actual_id).all()
+        
+        has_service_data = False
+        for access in user_accesses:
+            if access.service_settings:
+                has_service_data = True
+                current_app.logger.info(f"Service data found for {access.server.service_type.value} server: {access.server.name}")
+                current_app.logger.info(f"Service settings type: {type(access.service_settings)}")
+                current_app.logger.info(f"Service settings preview: {str(access.service_settings)[:100]}...")
+        
+        if not has_service_data:
+            current_app.logger.warning(f"No stored service data for user {user.get_display_name()} - user needs to sync")
             
         # Check which services this user belongs to
-        from app.models_media_services import UserMediaAccess
-        user_access = UserMediaAccess.query.filter_by(user_id=user.id).all()
+        if hasattr(user, '_is_standalone') and user._is_standalone:
+            # For standalone users, use the access record we already have
+            user_access = [user._access_record]
+        else:
+            # For regular users, query by user_app_access_id
+            user_access = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
         current_app.logger.info(f"User has access to {len(user_access)} servers:")
         for access in user_access:
             current_app.logger.info(f"  - Server: {access.server.name} (Type: {access.server.service_type.value})")
@@ -1056,16 +1854,59 @@ def get_user_debug_info(user_id):
         current_app.logger.error(f"Error getting debug info for user {user_id}: {e}", exc_info=True)
         return f"<p class='text-error'>Error fetching user data: {str(e)}</p>"
 
-@bp.route('/quick_edit_form/<int:user_id>')
+@bp.route('/quick_edit_form/<user_id>')
 @login_required
 @permission_required('edit_user')
 def get_quick_edit_form(user_id):
-    user = User.query.get_or_404(user_id)
+    # Parse prefixed user ID to determine type and get actual database ID
+    try:
+        user_type, actual_id = parse_user_id(user_id)
+        current_app.logger.info(f"Quick edit form request - Type: {user_type}, Actual ID: {actual_id}")
+    except ValueError as e:
+        current_app.logger.error(f"Invalid user ID format for quick edit: {user_id} - {e}")
+        return '<div class="alert alert-error">Invalid user ID format. Quick edit is only available for local users.</div>'
+    
+    if user_type == "user_app_access":
+        # Local user - get UserAppAccess record
+        user = UserAppAccess.query.get_or_404(actual_id)
+    elif user_type == "user_media_access":
+        # Service user - get UserMediaAccess record and create a compatible object
+        from app.models_media_services import UserMediaAccess
+        access = UserMediaAccess.query.get_or_404(actual_id)
+        
+        # Create a mock user object that's compatible with the form
+        class MockUser:
+            def __init__(self, access):
+                self.id = actual_id  # Use actual ID for form processing
+                self.username = access.external_username or 'Unknown'
+                self.email = access.external_email
+                self.notes = access.notes
+                self.created_at = access.created_at
+                self.last_login_at = access.last_activity_at
+                self.access_expires_at = access.access_expires_at
+                self.discord_user_id = access.discord_user_id
+                self.is_discord_bot_whitelisted = False  # Service users don't have this
+                self.is_purge_whitelisted = False  # Service users don't have this
+                self._access_record = access
+                self._is_service_user = True
+            
+            def get_display_name(self):
+                return self.username or 'Unknown'
+        
+        user = MockUser(access)
+    else:
+        return '<div class="alert alert-error">Unknown user type.</div>'
     form = UserEditForm(obj=user) # Pre-populate form with existing data
 
     # Populate dynamic choices - only show libraries from servers this user has access to
     from app.models_media_services import UserMediaAccess
-    user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
+    
+    if user_type == "user_app_access":
+        # Local user - get all their UserMediaAccess records
+        user_access_records = UserMediaAccess.query.filter_by(user_app_access_id=actual_id).all()
+    elif user_type == "user_media_access":
+        # Service user - get their specific UserMediaAccess record
+        user_access_records = [user._access_record]
     
     available_libraries = {}
     current_library_ids = []
@@ -1146,8 +1987,16 @@ def get_quick_edit_form(user_id):
         
         form.libraries.data = list(set(validated_library_ids))  # Remove duplicates
         current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Final form.libraries.data: {form.libraries.data}")
-    form.allow_downloads.data = user.allow_downloads
-    form.allow_4k_transcode.data = user.allow_4k_transcode
+
+    # Get allow_downloads and allow_4k_transcode from UserMediaAccess records
+    # Use the first access record's values, or default to False if no access records
+    if user_access_records:
+        first_access = user_access_records[0]
+        form.allow_downloads.data = first_access.allow_downloads
+        form.allow_4k_transcode.data = first_access.allow_4k_transcode
+    else:
+        form.allow_downloads.data = False
+        form.allow_4k_transcode.data = True  # Default to True for 4K transcode
     form.is_discord_bot_whitelisted.data = user.is_discord_bot_whitelisted
     form.is_purge_whitelisted.data = user.is_purge_whitelisted
     
@@ -1157,9 +2006,17 @@ def get_quick_edit_form(user_id):
         # Convert datetime to date for the DateField
         form.access_expires_at.data = user.access_expires_at.date()
     
+    # Build user_server_names for the template
+    user_server_names = {}
+    user_server_names[actual_id] = []
+    for access in user_access_records:
+        if access.server.name not in user_server_names[actual_id]:
+            user_server_names[actual_id].append(access.server.name)
+    
     # We pass the _settings_tab partial, which contains the form we need.
     return render_template(
         'users/partials/settings_tab.html',
         form=form,
-        user=user
+        user=user,
+        user_server_names=user_server_names
     )

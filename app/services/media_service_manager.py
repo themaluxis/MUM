@@ -2,7 +2,7 @@
 from typing import List, Dict, Any, Optional
 from flask import current_app
 from app.models_media_services import MediaServer, MediaLibrary, UserMediaAccess, ServiceType
-from app.models import User, Setting
+from app.models import UserAppAccess, Setting
 from app.services.media_service_factory import MediaServiceFactory
 from app.extensions import db
 from datetime import datetime
@@ -156,38 +156,98 @@ class MediaServiceManager:
 
             for user_data in users_data:
                 user = MediaServiceManager._find_or_create_user(user_data, server)
-                if not user:
-                    continue
-
-                access = UserMediaAccess.query.filter_by(user_id=user.id, server_id=server_id).first()
+                
+                # Check if UserMediaAccess already exists for this server user
+                access = None
+                external_user_id = user_data.get('id')
+                if external_user_id:
+                    access = UserMediaAccess.query.filter_by(
+                        server_id=server_id,
+                        external_user_id=external_user_id
+                    ).first()
+                
+                # For Plex, also check by UUID
+                if not access and server.service_type == ServiceType.PLEX:
+                    uuid = user_data.get('uuid')
+                    if uuid:
+                        access = UserMediaAccess.query.filter_by(
+                            server_id=server_id,
+                            external_user_alt_id=uuid
+                        ).first()
                 
                 if not access:
+                    # Prepare fields based on server type
+                    external_user_alt_id = None
+                    if server.service_type == ServiceType.PLEX:
+                        external_user_alt_id = user_data.get('uuid')  # Store Plex UUID in alt_id
+                    
+                    # Store service-specific raw data in UserMediaAccess
+                    user_raw_data = user_data.get('raw_data') or {}
+                    
                     access = UserMediaAccess(
-                        user_id=user.id,
+                        user_app_access_id=user.id if user else None,  # May be None for standalone server users
                         server_id=server_id,
-                        external_user_id=user_data.get('id'),
+                        external_user_id=user_data.get('id'),  # For Plex: plex_user_id ; 
+                        external_user_alt_id=external_user_alt_id,  # For Plex: plex_uuid
                         external_username=user_data.get('username'),
                         external_email=user_data.get('email'),
                         allowed_library_ids=user_data.get('library_ids', []),
+                        user_raw_data=user_raw_data,  # Store raw data here instead of UserAppAccess
                         is_active=True
                     )
+                    
+                    # Set service-specific fields
+                    if server.service_type == ServiceType.PLEX:
+                        # Parse and set service_join_date from acceptedAt timestamp
+                        accepted_at_str = user_data.get('accepted_at')
+                        if accepted_at_str and str(accepted_at_str).isdigit():
+                            try:
+                                from datetime import timezone
+                                join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
+                                access.service_join_date = join_date_dt.replace(tzinfo=None)
+                            except (ValueError, TypeError) as e:
+                                current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {user_data.get('username')}: {e}")
+                    
+                    elif server.service_type == ServiceType.KAVITA:
+                        # Parse and set service_join_date from join_date field
+                        if user_data.get('join_date'):
+                            try:
+                                access.service_join_date = user_data.get('join_date')
+                            except Exception as e:
+                                current_app.logger.warning(f"Failed to set join date for Kavita user {user_data.get('username')}: {e}")
+                    
                     db.session.add(access)
                     added_count += 1
+                    
+                    # Use external_username for display since there might not be a linked UserAppAccess
+                    display_name = user.get_display_name() if user else user_data.get('username', 'Unknown')
                     added_details.append({
-                        'username': user.get_display_name(),
+                        'username': display_name,
                         'server_name': server.name,
-                        'service_type': server.service_type.value.capitalize()
+                        'service_type': server.service_type.value.capitalize(),
+                        'linked_to_mum_account': user is not None
                     })
                 else:
                     changes = []
+                    if access.external_user_id != user_data.get('id'):
+                        changes.append(f"External user ID changed from '{access.external_user_id}' to '{user_data.get('id')}'")
+                        access.external_user_id = user_data.get('id')
+                    
+                    # Update Plex UUID if this is a Plex server
+                    if server.service_type == ServiceType.PLEX:
+                        plex_uuid = user_data.get('uuid')
+                        if access.external_user_alt_id != plex_uuid:
+                            changes.append(f"Plex UUID changed from '{access.external_user_alt_id}' to '{plex_uuid}'")
+                            access.external_user_alt_id = plex_uuid
+                    
                     if access.external_username != user_data.get('username'):
                         changes.append(f"Username changed from '{access.external_username}' to '{user_data.get('username')}'")
                         access.external_username = user_data.get('username')
                         
                         # For services like Kavita where username is the primary identifier,
-                        # also update the user's primary_username to keep them in sync
+                        # also update the user's username to keep them in sync
                         if server.service_type.value in ['kavita', 'jellyfin', 'emby', 'audiobookshelf', 'komga', 'romm']:
-                            user.primary_username = user_data.get('username')
+                            user.username = user_data.get('username')
                     if access.external_email != user_data.get('email'):
                         changes.append(f"Email changed from '{access.external_email}' to '{user_data.get('email')}'")
                         access.external_email = user_data.get('email')
@@ -228,7 +288,15 @@ class MediaServiceManager:
                     
                     if changes:
                         updated_count += 1
-                        updated_details.append({'username': user.get_display_name(), 'changes': changes})
+                        # Use external_username for display since there might not be a linked UserAppAccess
+                        display_name = user.get_display_name() if user else access.external_username or 'Unknown'
+                        updated_details.append({
+                            'username': display_name, 
+                            'changes': changes,
+                            'server_name': server.name,
+                            'service_type': server.service_type.value.capitalize(),
+                            'linked_to_mum_account': user is not None
+                        })
                         access.updated_at = datetime.utcnow()
 
             # Process removals - only if we successfully got user data and it's not empty
@@ -237,28 +305,34 @@ class MediaServiceManager:
                 access_records_to_check = UserMediaAccess.query.filter_by(server_id=server_id).all()
                 for access in access_records_to_check:
                     if str(access.external_user_id) not in external_user_ids_from_service:
-                        user_to_check = User.query.get(access.user_id)
-                        current_app.logger.info(f"Removing user access: {user_to_check.get_display_name() if user_to_check else 'Unknown'} from server {server.name}")
+                        user_to_check = access.user_app_access
+                        display_name = user_to_check.get_display_name() if user_to_check else access.external_username or 'Unknown'
+                        current_app.logger.info(f"Removing user access: {display_name} from server {server.name}")
                         
                         # Track removal details before deleting
-                        if user_to_check:
-                            removed_details.append({
-                                'username': user_to_check.get_display_name(),
-                                'server_name': server.name,
-                                'service_type': server.service_type.value.capitalize()
-                            })
+                        removed_details.append({
+                            'username': display_name,
+                            'server_name': server.name,
+                            'service_type': server.service_type.value.capitalize(),
+                            'linked_to_mum_account': user_to_check is not None
+                        })
                         
                         db.session.delete(access)
                         removed_count += 1
                         
-                        # Only delete the user if they have NO other server access
-                        # Use a fresh query to get accurate count after the deletion above
-                        remaining_access_count = UserMediaAccess.query.filter_by(user_id=access.user_id).count()
-                        if user_to_check and remaining_access_count == 0:
-                            current_app.logger.info(f"User {user_to_check.get_display_name()} has no remaining server access, deleting user completely")
-                            db.session.delete(user_to_check)
-                        elif user_to_check:
-                            current_app.logger.info(f"User {user_to_check.get_display_name()} still has access to {remaining_access_count} other server(s), keeping user")
+                        # Only delete the UserAppAccess if:
+                        # 1. There is a linked UserAppAccess (user_to_check is not None)
+                        # 2. They have NO other server access
+                        if user_to_check:
+                            # Use a fresh query to get accurate count after the deletion above
+                            remaining_access_count = UserMediaAccess.query.filter_by(user_app_access_id=access.user_app_access_id).count()
+                            if remaining_access_count == 0:
+                                current_app.logger.info(f"User {user_to_check.get_display_name()} has no remaining server access, deleting user completely")
+                                db.session.delete(user_to_check)
+                            else:
+                                current_app.logger.info(f"User {user_to_check.get_display_name()} still has access to {remaining_access_count} other server(s), keeping user")
+                        else:
+                            current_app.logger.info(f"Standalone server user {display_name} removed (no linked MUM account)")
             else:
                 current_app.logger.warning(f"Skipping user removal processing for {server.name} - no valid user data received")
 
@@ -281,13 +355,20 @@ class MediaServiceManager:
             return {'success': False, 'message': f'Sync failed: {str(e)}'}
     
     @staticmethod
-    def _find_or_create_user(user_data: Dict[str, Any], server: MediaServer) -> User:
-        """Find existing user or create new one based on user data"""
+    def _find_or_create_user(user_data: Dict[str, Any], server: MediaServer) -> Optional[UserAppAccess]:
+        """Find existing UserAppAccess that should be linked to this server user.
+        
+        IMPORTANT: This method should NOT create new UserAppAccess records.
+        UserAppAccess records should only be created when users manually create 
+        accounts via /settings/user_accounts. This method only finds existing ones.
+        """
+        from app.models_media_services import UserMediaAccess
+        
         username = user_data.get('username')
         email = user_data.get('email')
         external_user_id = str(user_data.get('id')) if user_data.get('id') else None
         
-        # Try to find existing user by checking if they already have access to this specific server
+        # Try to find existing UserAppAccess by checking if they already have access to this specific server
         user = None
         
         # First, check if this user already exists for this specific server
@@ -297,161 +378,65 @@ class MediaServiceManager:
                 external_user_id=external_user_id
             ).first()
             if existing_access:
-                user = User.query.get(existing_access.user_id)
+                user = existing_access.user_app_access
                 current_app.logger.debug(f"Found existing user via server access: {user.get_display_name() if user else 'None'}")
         
-        # For Plex, also try to match by UUID (for legacy compatibility)
+        # For Plex, also try to match by UUID via UserMediaAccess
         if not user and server.service_type == ServiceType.PLEX:
             uuid = user_data.get('uuid')
             if uuid:
-                user = User.query.filter_by(plex_uuid=uuid).first()
-                current_app.logger.debug(f"Found existing Plex user via UUID: {user.get_display_name() if user else 'None'}")
-        
-        # If no existing user found, we'll create a new one
-        # This ensures users with the same username on different services remain separate
-        
-        if not user:
-            # Create new user - make username unique per service to avoid conflicts
-            if username:
-                # For non-Plex services, append service type to make username unique
-                if server.service_type != ServiceType.PLEX:
-                    primary_username_value = f"{username}@{server.service_type.value}"
+                # Look for existing UserMediaAccess with this Plex UUID
+                access = UserMediaAccess.query.filter_by(
+                    server_id=server.id,
+                    external_user_alt_id=uuid
+                ).first()
+                if access:
+                    user = access.user_app_access
+                    if user:
+                        current_app.logger.debug(f"Found existing Plex user via UUID: {user.get_display_name()}")
+                    else:
+                        current_app.logger.debug(f"Found access record with Plex UUID {uuid} but no linked UserAppAccess")
                 else:
-                    primary_username_value = username
-            else:
-                primary_username_value = email or f"user_{user_data.get('id', 'unknown')}@{server.service_type.value}"
+                    current_app.logger.debug(f"No existing user found with Plex UUID: {uuid}")
+        
+        # If no existing UserAppAccess found, try to find one by username or email
+        # This allows linking server users to existing MUM accounts
+        if not user:
+            # Try to find by username first
+            if username:
+                user = UserAppAccess.query.filter_by(username=username).first()
+                if user:
+                    current_app.logger.info(f"Found existing UserAppAccess by username: {username}")
             
-            current_app.logger.info(f"Creating new user with primary_username='{primary_username_value}', username='{username}', email='{email}', service='{server.service_type.value}'")
-            
-            user = User(
-                primary_username=primary_username_value,
-                primary_email=email,
-                avatar_url=user_data.get('thumb'),  # Use generic avatar_url for all services
-                shares_back=user_data.get('shares_back', False)
-            )
-            
-            current_app.logger.info(f"Created user object: primary_username='{user.primary_username}', display_name='{user.get_display_name()}'")
-            
-            # Set service-specific fields based on server type
-            if server.service_type == ServiceType.JELLYFIN:
-                current_app.logger.info(f"Setting Jellyfin-specific fields for user '{username}'")
-                # Store raw Jellyfin data for debugging purposes
-                if user_data.get('raw_data'):
-                    import json
-                    user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
-                    current_app.logger.info(f"Stored raw Jellyfin data for user '{username}'")
-            
-            # Set Kavita-specific fields if this is a Kavita server
-            elif server.service_type == ServiceType.KAVITA:
-                current_app.logger.info(f"Setting Kavita-specific fields for user '{username}'")
-                
-                # Parse and set service_join_date from join_date field (unified field)
-                if user_data.get('join_date'):
-                    try:
-                        join_date = user_data.get('join_date')
-                        user.service_join_date = join_date
-                        current_app.logger.debug(f"Set service_join_date for Kavita user {username}: {user.service_join_date}")
-                    except Exception as e:
-                        current_app.logger.warning(f"Failed to set join date for Kavita user {username}: {e}")
-                
-                # Store raw Kavita data for debugging purposes
-                if user_data.get('raw_data'):
-                    import json
-                    user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
-                    current_app.logger.info(f"Stored raw Kavita data for user '{username}'")
-            
-            # Set Plex-specific fields if this is a Plex server
-            elif server.service_type == ServiceType.PLEX:
-                user.plex_user_id = user_data.get('id')
-                # Keep plex_username for API compatibility, but primary_username is already set above
-                user.primary_username = username
-                user.plex_uuid = user_data.get('uuid')
-                user.is_home_user = user_data.get('is_home_user', False)
-                user.raw_service_data = user_data.get('raw_data')  # Store raw data for new users
-                
-                # Parse and set service_join_date from acceptedAt timestamp (unified field)
-                accepted_at_str = user_data.get('accepted_at')
-                if accepted_at_str and str(accepted_at_str).isdigit():
-                    try:
-                        from datetime import timezone
-                        join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
-                        user.service_join_date = join_date_dt.replace(tzinfo=None)
-                        # Also set legacy field for backward compatibility
-                        user.plex_join_date = join_date_dt.replace(tzinfo=None)
-                        current_app.logger.debug(f"Set plex_join_date for new user {username}: {user.plex_join_date}")
-                    except (ValueError, TypeError) as e:
-                        current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {username}: {e}")
-            
-            db.session.add(user)
-            db.session.flush()  # Get the ID
-            current_app.logger.info(f"User added to session and flushed: ID={user.id}, primary_username='{user.primary_username}', display_name='{user.get_display_name()}'")
-            current_app.logger.info(f"User object after flush: {user.__dict__}")
-        else:
-            # Update existing user
-            user.shares_back = user_data.get('shares_back', False)
+            # If not found by username, try by email
+            if not user and email:
+                user = UserAppAccess.query.filter_by(email=email).first()
+                if user:
+                    current_app.logger.info(f"Found existing UserAppAccess by email: {email}")
+        
+        # If still no UserAppAccess found, this server user will be standalone
+        # (not linked to any MUM account)
+        if not user:
+            current_app.logger.info(f"No existing UserAppAccess found for server user '{username}' (email: {email}). "
+                                  f"This user will exist only as server access without MUM account.")
+            return None
+        
+        # Update existing user with server data if found
+        if user:
+            current_app.logger.info(f"Updating existing UserAppAccess '{user.get_display_name()}' with server data")
             
             # Update raw data based on server type
             if server.service_type == ServiceType.PLEX and user_data.get('raw_data'):
-                user.raw_service_data = user_data.get('raw_data')
+                # Store raw data in UserMediaAccess instead of UserAppAccess
+                pass  # Will be handled in UserMediaAccess creation
                 
-                # Migrate plex_email to primary_email for existing users
-                email = user_data.get('email')
-                if email and not user.primary_email and user.plex_email == email:
-                    user.primary_email = email
-                    current_app.logger.info(f"Migrated plex_email to primary_email for user {user.get_display_name()}")
-                elif email and not user.primary_email:
-                    user.primary_email = email
-                
-                # Migrate plex_thumb_url to avatar_url for existing users
-                thumb_url = user_data.get('thumb')
-                if thumb_url and not user.avatar_url and user.plex_thumb_url == thumb_url:
-                    user.avatar_url = thumb_url
-                    current_app.logger.info(f"Migrated plex_thumb_url to avatar_url for user {user.get_display_name()}")
-                elif thumb_url and not user.avatar_url:
-                    user.avatar_url = thumb_url
-                
-                # Migrate and update join date (unified field)
-                accepted_at_str = user_data.get('accepted_at')
-                if accepted_at_str and str(accepted_at_str).isdigit():
-                    try:
-                        from datetime import timezone
-                        join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
-                        new_join_date = join_date_dt.replace(tzinfo=None)
-                        
-                        # Migrate plex_join_date to service_join_date for existing users
-                        if not user.service_join_date and user.plex_join_date:
-                            user.service_join_date = user.plex_join_date
-                            current_app.logger.info(f"Migrated plex_join_date to service_join_date for user {user.get_display_name()}")
-                        
-                        # Update service_join_date if different
-                        if user.service_join_date != new_join_date:
-                            user.service_join_date = new_join_date
-                            # Also update legacy field for backward compatibility
-                            user.plex_join_date = new_join_date
-                            current_app.logger.debug(f"Updated service_join_date for user {user.get_display_name()}: {user.service_join_date}")
-                    except (ValueError, TypeError) as e:
-                        current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {user.get_display_name()}: {e}")
-            
             elif server.service_type == ServiceType.JELLYFIN and user_data.get('raw_data'):
-                # Update raw Jellyfin data for existing users
-                import json
-                user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
-                current_app.logger.info(f"Updated raw Jellyfin data for existing user '{user.get_display_name()}'")
+                # Store raw data in UserMediaAccess instead of UserAppAccess
+                pass  # Will be handled in UserMediaAccess creation
             
             elif server.service_type == ServiceType.KAVITA and user_data.get('raw_data'):
-                # Update raw Kavita data for existing users
-                import json
-                user.raw_service_data = json.dumps(user_data.get('raw_data'))  # Convert dict to JSON string
-                current_app.logger.info(f"Updated raw Kavita data for existing user '{user.get_display_name()}'")
-                
-                # Parse and set service_join_date from join_date field for existing users
-                if user_data.get('join_date') and not user.service_join_date:
-                    try:
-                        join_date = user_data.get('join_date')
-                        user.service_join_date = join_date
-                        current_app.logger.info(f"Set service_join_date for existing Kavita user {user.get_display_name()}: {user.service_join_date}")
-                    except Exception as e:
-                        current_app.logger.warning(f"Failed to set join date for existing Kavita user {user.get_display_name()}: {e}")
+                # Store raw data in UserMediaAccess instead of UserAppAccess
+                pass  # Will be handled in UserMediaAccess creation
 
         return user
     

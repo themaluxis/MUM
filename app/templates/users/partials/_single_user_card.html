@@ -1,7 +1,7 @@
 {# File: app/templates/users/partials/_single_user_card.html #}
 {# Expects 'user' object and other context variables like 'user_sorted_libraries', 'admins_by_uuid' etc. #}
 {# Determine service-specific background tint and selection colors #}
-{% set service_types = user_service_types.get(user.id, []) %}
+{% set service_types = user_service_types.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
 {% set primary_service = service_types[0] if service_types else None %}
 {% if primary_service %}
     {% if primary_service.value == 'plex' %}
@@ -50,44 +50,60 @@
         <div class="flex flex-row items-center mb-3">
             <div class="avatar mr-3">
                 <div class="w-10 rounded-full">
-                    {% set avatar_url = user.get_avatar(url_for('static', filename='img/default_avatar.png')) %}
-                    {% set service_types = user_service_types.get(user.id, []) %}
+                    {% set service_types = user_service_types.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
                     {% set primary_service = service_types[0] if service_types else None %}
                     
-                    {# Check if this is a Jellyfin user and try to get their avatar #}
-                    {% if primary_service and primary_service.value == 'jellyfin' and user.raw_service_data and user.raw_service_data.startswith('{') %}
-                        {# Extract Jellyfin user info using the custom filter #}
-                        {% set jellyfin_info = user.raw_service_data | extract_jellyfin_user_info %}
-                        {% if jellyfin_info[0] and jellyfin_info[1] %}
-                            {% set jellyfin_avatar_url = url_for('api.jellyfin_user_avatar_proxy', user_id=jellyfin_info[0]) %}
-                            <img src="{{ jellyfin_avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                            {# Jellyfin fallback avatar with purple theme #}
-                            <div class="bg-jellyfin text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal" style="display: none;">
-                                {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
-                            </div>
-                        {% else %}
-                            {# No Jellyfin user ID found, show purple fallback directly #}
-                            <div class="bg-jellyfin text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
-                                {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
-                            </div>
-                        {% endif %}
-                    {# Check if this is a Kavita user and show fallback avatar #}
+                    {# Always use colored circular avatars with service-specific colors #}
+                    {% if primary_service and primary_service.value == 'plex' %}
+                        <div class="bg-plex text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
+                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'P' }}
+                        </div>
+                    {% elif primary_service and primary_service.value == 'jellyfin' %}
+                        <div class="bg-jellyfin text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
+                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'J' }}
+                        </div>
+                    {% elif primary_service and primary_service.value == 'emby' %}
+                        <div class="bg-emby text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
+                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'E' }}
+                        </div>
                     {% elif primary_service and primary_service.value == 'kavita' %}
-                        {# Kavita users don't have avatars, show fallback with Kavita theme color #}
                         <div class="bg-kavita text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
                             {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
                         </div>
+                    {% elif primary_service and primary_service.value == 'audiobookshelf' %}
+                        <div class="bg-audiobookshelf text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
+                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'A' }}
+                        </div>
+                    {% elif primary_service and primary_service.value == 'komga' %}
+                        <div class="bg-komga text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
+                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
+                        </div>
+                    {% elif primary_service and primary_service.value == 'romm' %}
+                        <div class="bg-romm text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
+                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'R' }}
+                        </div>
                     {% else %}
-                        <img src="{{ avatar_url }}" alt="{{ user.get_display_name() }} avatar" 
-                             onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default_avatar.png') }}'; this.classList.add('object-scale-down');" />
+                        <div class="bg-gray-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
+                            {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
+                        </div>
                     {% endif %}
                 </div>
             </div>
-            <div class="flex flex-col">
-                <h2 class="card-title text-lg truncate" title="{{ user.get_display_name() }}">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h2 class="card-title text-lg truncate" title="{{ user.get_display_name() }}">
                     {{ user.get_display_name() }}
-                </h2>
+                    </h2>
+                    
+                    <!-- Linked Account Badge -->
+                    {# Only show linked account badge if user accounts feature is enabled AND user has a linked account #}
+                    {% if allow_user_accounts and user.user_app_access %}
+                    <span class="badge badge-sm badge-primary">
+                        <i class="fa-solid fa-link mr-1"></i>
+                        {{ user.user_app_access.username }}
+                    </span>
+                    {% endif %}
+                </div>
                 {# Service type badge #}
                 {% if primary_service %}
                     {% if primary_service.value == 'plex' %}
@@ -116,7 +132,7 @@
                         {% set service_name = primary_service.value|title %}
                     {% endif %}
                     {# Server name badge with service icon and color (Discord-style) #}
-                        {% set user_servers = user_server_names.get(user.id, []) %}
+                        {% set user_servers = user_server_names.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
                         {% if user_servers %}
                             {% if primary_service %}
                                 {% if primary_service.value == 'plex' %}
@@ -168,11 +184,23 @@
                             {% endif %}
                     {% endif %}
                 {% endif %}
+                
+                {# Linked Account Badge - Show for service users that have a linked local account #}
+                {% if user._user_type is defined and user._user_type == 'service' and user._access_record and user._access_record.user_app_access_id %}
+                    {% set linked_user = user._access_record.user_app_access %}
+                    {% if linked_user %}
+                        <span class="inline-flex items-center rounded-md px-2 py-1 bg-primary/10 text-primary ring-primary/20 hover:bg-primary/20 text-xs font-medium ring-1 ring-inset gap-1 mt-1" title="Linked to local account: {{ linked_user.username }}">
+                            <i class="fa-solid fa-link w-3 h-3"></i>
+                            {{ linked_user.username }}
+                        </span>
+                    {% endif %}
+                {% endif %}
             </div>
         </div>
         
         <div class="text-xs space-y-1 mb-3">
-            <p class="text-xs text-base-content/70 truncate" title="{{ user.get_primary_email() or 'No email' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.get_primary_email() or 'No email available' }}</p>
+            {# For UserAppAccess, show the primary email #}
+            <p class="text-xs text-base-content/70 truncate" title="{{ user.email or 'No E-mail address' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.email or 'No E-mail address' }}</p>
             <div class="tooltip tooltip-top" data-tip="The date {{ user.get_display_name() }} was added to MUM">
                 <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}</p>
             </div>
@@ -197,12 +225,12 @@
         </div>
 
         <div class="mb-3">
-            <p class="text-xs font-semibold mb-2">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.id, [])|length }}</span>):</p>
-            {% if user_sorted_libraries.get(user.id) %}
+            <p class="text-xs font-semibold mb-2">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user._prefixed_id if user._prefixed_id is defined else user.id, [])|length }}</span>):</p>
+            {% if user_sorted_libraries.get(user._prefixed_id if user._prefixed_id is defined else user.id) %}
                 <div class="flex flex-wrap gap-1">
-                    {% for lib_name in user_sorted_libraries.get(user.id, []) %}
+                    {% for lib_name in user_sorted_libraries.get(user._prefixed_id if user._prefixed_id is defined else user.id, []) %}
                         <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1" title="{{ lib_name }}">
-                            <i class="fa-solid fa-folder w-2.5 h-2.5"></i>
+                            <i class="fa-solid fa-folder w-2.5 h-2.5 mr-1 bottom-px relative"></i>
                             {{ lib_name }}
                         </span>
                     {% endfor %}
@@ -234,21 +262,36 @@
         <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">
             <button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" 
                     title="Show Raw User Data"
-                    hx-get="{{ url_for('users.get_user_debug_info', user_id=user.id) }}"
+                    hx-get="{{ url_for('users.get_user_debug_info', user_id=user._prefixed_id if user._prefixed_id is defined else user.id) }}"
                     hx-target="#user_debug_modal_content"
                     hx-swap="innerHTML"
                     onclick="user_debug_modal.showModal()">
                 <i class="fa-solid fa-info"></i>
             </button>
             {% if current_user.has_permission('view_user') %}
-            <a href="{{ url_for('user.view_user', user_id=user.id, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
-                <i class="fa-solid fa-eye"></i>
-            </a>
+            {% if user._user_type is defined and user._user_type == 'local' %}
+                <!-- Local user profile link -->
+                <a href="{{ url_for('user.view_local_user', local_user_id=user.id, back='users', back_view='cards') }}" title="Local User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                    <i class="fa-solid fa-user"></i>
+                </a>
+            {% else %}
+                <!-- User profile link -->
+                {# All users are now UserAppAccess, so use consistent profile link #}
+                {% if user._user_type == 'service' %}
+                    {# Service user - route to /user/{server_nickname}/{username} #}
+                    <a href="{{ url_for('user.view_service_account', server_nickname=user._access_record.server.name, server_username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                {% else %}
+                    {# Local user - route to /user/{username} #}
+                    <a href="{{ url_for('user.view_app_user', username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                {% endif %}
+                    <i class="fa-solid fa-user"></i>
+                </a>
+            {% endif %}
             {% endif %}
             {% if current_user.has_permission('edit_user') %}
             <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 card-action-button"
                     title="Quick Edit Settings"
-                    hx-get="{{ url_for('users.get_quick_edit_form', user_id=user.id) }}"
+                    hx-get="{{ url_for('users.get_quick_edit_form', user_id=user._prefixed_id if user._prefixed_id is defined else user.id) }}"
                     hx-target="#quick_edit_modal_content_div"
                     hx-swap="innerHTML"
                     onclick="quick_edit_user_modal.showModal()">
@@ -258,7 +301,7 @@
             {% if current_user.has_permission('delete_user') %}
             <button class="btn btn-xs btn-ghost text-error hover:bg-error/10 card-action-button" title="Remove User"
                     hx-confirm="Are you sure you want to remove '{{ user.get_display_name() }}' from MUM and media servers?"
-                    hx-delete="{{ url_for('users.delete_user', user_id=user.id) }}"
+                    hx-delete="{{ url_for('users.delete_user', user_id=user._prefixed_id if user._prefixed_id is defined else user.id) }}"
                     hx-target="closest .card" 
                     hx-swap="outerHTML swap:0.5s"
                     hx-indicator="this">

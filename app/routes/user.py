@@ -1,19 +1,43 @@
 # File: app/routes/user.py
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, make_response
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, make_response, abort
 from flask_login import login_required, current_user
 from datetime import datetime, timezone, timedelta
-from app.models import User, AdminAccount, StreamHistory, EventType
+from app.models import UserAppAccess, Owner, EventType
 from app.forms import UserEditForm, UserResetPasswordForm
 from app.extensions import db
 from app.utils.helpers import permission_required, log_event
 from app.services.media_service_factory import MediaServiceFactory
-from app.models_media_services import ServiceType
+from app.models_media_services import ServiceType, UserMediaAccess, MediaStreamHistory
 from app.services.media_service_manager import MediaServiceManager
 from app.services import user_service
 import json
+import urllib.parse
 
 # Note the new blueprint name and singular URL prefix
 bp = Blueprint('user', __name__, url_prefix='/user')
+
+def check_if_user_is_admin(user):
+    """Check if a UserAppAccess user is an admin by looking up their access in UserMediaAccess"""
+    if not isinstance(user, UserAppAccess):
+        return False
+    
+    # Get the user's UserMediaAccess records for Plex servers
+    from app.models_media_services import MediaServer
+    plex_servers = MediaServer.query.filter_by(service_type=ServiceType.PLEX).all()
+    
+    for plex_server in plex_servers:
+        access = UserMediaAccess.query.filter_by(
+            user_app_access_id=user.id,
+            server_id=plex_server.id
+        ).first()
+        
+        if access and access.external_user_alt_id:  # external_user_alt_id is the plex_uuid
+            # Check if this plex_uuid belongs to an Owner
+            owner = Owner.query.filter_by(plex_uuid=access.external_user_alt_id).first()
+            if owner:
+                return True
+    
+    return False
 
 @bp.route('/')
 @bp.route('/index')
@@ -21,14 +45,14 @@ bp = Blueprint('user', __name__, url_prefix='/user')
 @login_required
 def index():
     """User dashboard/index page for regular user accounts - accessible at /user/dashboard"""
-    # Ensure this is a regular user, not an admin
-    if isinstance(current_user, AdminAccount):
+    # Ensure this is a regular user, not an owner
+    if isinstance(current_user, Owner):
         return redirect(url_for('dashboard.index'))
     
-    # Ensure this is a User with password_hash (user account)
-    if not isinstance(current_user, User) or not current_user.password_hash:
+    # Ensure this is an AppUser (local user account)
+    if not isinstance(current_user, UserAppAccess):
         flash('Access denied. Please log in with a valid user account.', 'danger')
-        return redirect(url_for('auth.user_login'))
+        return redirect(url_for('auth.app_login'))
     
     # Get application name for welcome message
     from app.models import Setting
@@ -39,14 +63,73 @@ def index():
                          app_name=app_name,
                          user=current_user)
 
-@bp.route('/<int:user_id>', methods=['GET', 'POST'])
+@bp.route('/<server_nickname>/<server_username>', methods=['GET', 'POST'])
 @login_required
 @permission_required('view_user')
-def view_user(user_id):
+def view_service_account(server_nickname, server_username):
+    """View service account profile by server nickname and username"""
+    from app.models_media_services import MediaServer
+    
+    # URL decode the parameters to handle special characters
+    try:
+        server_nickname = urllib.parse.unquote(server_nickname)
+        server_username = urllib.parse.unquote(server_username)
+    except Exception as e:
+        current_app.logger.warning(f"Error decoding URL parameters: {e}")
+        abort(400)
+    
+    # Validate parameters
+    if not server_nickname or not server_username:
+        abort(400)
+    
+    # Check for potential username conflicts with app users
+    # If server_nickname matches an app user username, this could be ambiguous
+    user_conflict = UserAppAccess.query.filter_by(username=server_nickname).first()
+    if user_conflict:
+        current_app.logger.warning(f"Potential conflict: server nickname '{server_nickname}' matches app user username")
+    
+    # Find the server by nickname (name)
+    server = MediaServer.query.filter_by(name=server_nickname).first_or_404()
+    
+    # Find the service account by server and username
+    # Look for UserMediaAccess record directly (handles both standalone and linked users)
+    access = UserMediaAccess.query.filter_by(
+        server_id=server.id,
+        external_username=server_username
+    ).first()
+    
+    if not access:
+        current_app.logger.warning(f"Service account not found: {server_username} on {server_nickname}")
+        abort(404)
+    
+    # Create a mock user object for the template
+    class MockServiceUser:
+        def __init__(self, access):
+            self.id = access.id
+            self.username = access.external_username
+            self.email = access.external_email
+            self.notes = access.notes
+            self.created_at = access.created_at
+            self.last_login_at = access.last_activity_at
+            self.media_accesses = [access]
+            self.access_expires_at = access.access_expires_at
+            self.discord_user_id = access.discord_user_id
+            self.is_active = access.is_active
+            self._is_service_user = True
+            self._access_record = access
+        
+        def get_display_name(self):
+            return self._access_record.external_username or 'Unknown'
+    
+    user = MockServiceUser(access)
+    
+    # Check if this UserMediaAccess is linked to a UserAppAccess account
+    linked_user_app_access = None
+    if access.user_app_access_id:
+        linked_user_app_access = UserAppAccess.query.get(access.user_app_access_id)
+    
     # Get the active tab from the URL query. Default to 'profile' for GET, 'settings' for POST context.
     tab = request.args.get('tab', 'settings' if request.method == 'POST' else 'profile')
-    
-    user = User.query.get_or_404(user_id)
     
     # Correctly instantiate the form:
     # On POST, it's populated from request.form.
@@ -54,9 +137,8 @@ def view_user(user_id):
     form = UserEditForm(request.form if request.method == 'POST' else None, obj=user)
     
     # Populate dynamic choices for the form - only show libraries from servers this user has access to
-    from app.models_media_services import UserMediaAccess
-    from app.services.media_service_factory import MediaServiceFactory
-    user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
+    # For standalone service users, we only have the single access record
+    user_access_records = [access]
     
     available_libraries = {}
     current_app.logger.info(f"DEBUG KAVITA FORM: Building available libraries for user {user.id}")
@@ -135,7 +217,20 @@ def view_user(user_id):
                             server_lib_ids = [lib.get('external_id') or lib.get('id') for lib in server_libraries]
                             
                             # Filter the new library IDs to only include ones available on this server
-                            new_libs_for_this_server = [lib_id for lib_id in new_library_ids_from_form if lib_id in server_lib_ids]
+                            new_libs_for_this_server = []
+                            for lib_id in new_library_ids_from_form:
+                                if access.server.service_type.value == 'kavita':
+                                    # For Kavita, extract the numeric ID from compound format (e.g., "1_Comics" -> "1")
+                                    if '_' in str(lib_id):
+                                        numeric_id = str(lib_id).split('_')[0]
+                                        if numeric_id in [str(sid) for sid in server_lib_ids]:
+                                            new_libs_for_this_server.append(numeric_id)
+                                    elif str(lib_id) in [str(sid) for sid in server_lib_ids]:
+                                        new_libs_for_this_server.append(str(lib_id))
+                                else:
+                                    # For other services, use direct matching
+                                    if lib_id in server_lib_ids:
+                                        new_libs_for_this_server.append(lib_id)
                             
                             # Special handling for Jellyfin: if all libraries are selected, use '*' wildcard
                             if (access.server.service_type == ServiceType.JELLYFIN and 
@@ -149,8 +244,8 @@ def view_user(user_id):
                             
                             # Update the media service if it supports user access updates
                             if hasattr(service, 'update_user_access'):
-                                # For Plex users, use plex_user_id; for others, use the external_user_id
-                                user_identifier = user.plex_user_id if user.plex_user_id else access.external_user_id
+                                # Use the external_user_id from UserMediaAccess for all services
+                                user_identifier = access.external_user_id
                                 if user_identifier:
                                     service.update_user_access(user_identifier, new_libs_for_this_server)
                     except Exception as e:
@@ -171,7 +266,7 @@ def view_user(user_id):
             
             if request.headers.get('HX-Request'):
                 # Re-fetch user data to ensure the form is populated with the freshest data after save
-                user = User.query.get_or_404(user_id)
+                user = UserAppAccess.query.get_or_404(user.id)
                 form_after_save = UserEditForm(obj=user)
                 
                 # Re-populate the dynamic choices and data for the re-rendered form
@@ -179,7 +274,7 @@ def view_user(user_id):
                 
                 # Get current library IDs from UserMediaAccess records for the re-rendered form
                 current_library_ids_after_save = []
-                updated_user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
+                updated_user_access_records = UserMediaAccess.query.filter_by(service_account_id=user.id).all()
                 for access in updated_user_access_records:
                     current_library_ids_after_save.extend(access.allowed_library_ids or [])
                 
@@ -192,14 +287,20 @@ def view_user(user_id):
 
                 # OOB-SWAP LOGIC
                 # 1. Render the updated form for the modal (the primary target)
-                modal_html = render_template('users/partials/settings_tab.html', form=form_after_save, user=user)
+                # Build user_server_names for the template
+                user_server_names_for_modal = {}
+                user_server_names_for_modal[user.id] = []
+                for access in user_access_records:
+                    if access.server.name not in user_server_names_for_modal[user.id]:
+                        user_server_names_for_modal[user.id].append(access.server.name)
+                
+                modal_html = render_template('users/partials/settings_tab.html', form=form_after_save, user=user, user_server_names=user_server_names_for_modal)
 
                 # 2. Render the updated user card for the OOB swap
                 # We need the same context that the main user list uses for a card
-                from app.models_media_services import UserMediaAccess
                 
                 # Get all user access records for proper library display
-                all_user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
+                all_user_access_records = UserMediaAccess.query.filter_by(service_account_id=user.id).all()
                 user_sorted_libraries = {}
                 user_service_types = {}
                 user_server_names = {}
@@ -240,7 +341,10 @@ def view_user(user_id):
                                 lib_names.append(available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}'))
                 user_sorted_libraries[user.id] = sorted(lib_names, key=str.lower)
                 
-                admins_by_uuid = {admin.plex_uuid: admin for admin in AdminAccount.query.filter(AdminAccount.plex_uuid.isnot(None)).all()}
+                # Get Owner with plex_uuid for filtering (AppUsers don't have plex_uuid)
+                owner = Owner.query.filter(Owner.plex_uuid.isnot(None)).first()
+                admin_accounts = [owner] if owner else []
+                admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts if admin.plex_uuid}
 
                 card_html = render_template(
                     'users/partials/_single_user_card.html',
@@ -271,16 +375,16 @@ def view_user(user_id):
                 response.headers['HX-Trigger'] = json.dumps(toast_payload)
                 return response
             else:
-                # Fallback for standard form submissions remains the same
+                # Fallback for standard form submissions - redirect to service account route
                 flash(f"User '{user.get_display_name()}' updated successfully.", "success")
                 back_param = request.args.get('back')
                 back_view_param = request.args.get('back_view')
-                redirect_params = {'user_id': user.id, 'tab': 'settings'}
+                redirect_params = {'server_nickname': server_nickname, 'server_username': server_username, 'tab': 'settings'}
                 if back_param:
                     redirect_params['back'] = back_param
                 if back_view_param:
                     redirect_params['back_view'] = back_view_param
-                return redirect(url_for('user.view_user', **redirect_params))
+                return redirect(url_for('user.view_service_account', **redirect_params))
             
         except Exception as e:
             db.session.rollback()
@@ -343,13 +447,38 @@ def view_user(user_id):
         # Remove the old access_expires_in_days logic since we're now using DateField
         # The form will automatically populate access_expires_at from the user object via obj=user
 
-    stream_stats = user_service.get_user_stream_stats(user_id)
-    last_ip_map = user_service.get_bulk_last_known_ips([user_id])
-    last_ip = last_ip_map.get(user_id)
+    # Create prefixed user ID for user_service calls based on user type
+    if hasattr(user, '_is_service_user') and user._is_service_user:
+        # This is a standalone service user
+        prefixed_user_id = f"user_media_access:{user.id}"
+    else:
+        # This is a regular UserAppAccess user
+        prefixed_user_id = f"user_app_access:{user.id}"
+    
+    current_app.logger.info(f"DEBUG STATS: Getting stats for {prefixed_user_id}")
+    current_app.logger.info(f"DEBUG STATS: User type check - _is_service_user: {getattr(user, '_is_service_user', 'N/A')}")
+    
+    stream_stats = user_service.get_user_stream_stats(prefixed_user_id)
+    current_app.logger.info(f"DEBUG STATS: Raw stream_stats returned: {stream_stats}")
+    
+    last_ip_map = user_service.get_bulk_last_known_ips([prefixed_user_id])
+    current_app.logger.info(f"DEBUG STATS: Last IP map: {last_ip_map}")
+    
+    last_ip = last_ip_map.get(prefixed_user_id)
     user.stream_stats = stream_stats
     user.total_plays = stream_stats.get('global', {}).get('all_time_plays', 0)
     user.total_duration = stream_stats.get('global', {}).get('all_time_duration_seconds', 0)
     user.last_known_ip = last_ip if last_ip else 'N/A'
+    
+    current_app.logger.info(f"DEBUG STATS: Final stats - plays: {user.total_plays}, duration: {user.total_duration}, IP: {user.last_known_ip}")
+    
+    # Additional debugging - check what's actually in the database for this user
+    from app.models_media_services import MediaStreamHistory
+    db_records = MediaStreamHistory.query.filter_by(user_media_access_id=user.id).count()
+    current_app.logger.info(f"DEBUG STATS: Direct DB check - MediaStreamHistory records for user_media_access_id={user.id}: {db_records}")
+    
+    # Check if user_service is looking in the right place
+    current_app.logger.info(f"DEBUG STATS: Checking user_service logic for prefixed_user_id: {prefixed_user_id}")
     
     stream_history_pagination = None
     kavita_reading_stats = None
@@ -377,7 +506,6 @@ def view_user(user_id):
         if is_kavita_user and kavita_user_id:
             # Get Kavita reading data
             try:
-                from app.services.media_service_factory import MediaServiceFactory
                 kavita_server = None
                 for access in user_access_records:
                     if access.server.service_type.value == 'kavita':
@@ -396,33 +524,85 @@ def view_user(user_id):
         
         if not is_kavita_user:
             # For non-Kavita users, use regular stream history
-            stream_history_pagination = StreamHistory.query.filter_by(user_id=user.id)\
-                .order_by(StreamHistory.started_at.desc())\
-                .paginate(page=page, per_page=15, error_out=False)
+            # Check if this is a service user (MockServiceUser) or a regular UserAppAccess
+            current_app.logger.info(f"DEBUG HISTORY: Processing history for user ID {user.id}, username: {getattr(user, 'username', 'N/A')}")
+            current_app.logger.info(f"DEBUG HISTORY: User type: {type(user).__name__}")
+            current_app.logger.info(f"DEBUG HISTORY: Has _is_service_user: {hasattr(user, '_is_service_user')}")
+            current_app.logger.info(f"DEBUG HISTORY: _is_service_user value: {getattr(user, '_is_service_user', 'N/A')}")
+            
+            if hasattr(user, '_is_service_user') and user._is_service_user:
+                # This is a service user - check if they have a linked local account
+                if access.user_app_access_id:
+                    # Linked service user - their history is stored with user_app_access_id
+                    current_app.logger.info(f"DEBUG HISTORY: Linked service user - querying MediaStreamHistory with user_app_access_id={access.user_app_access_id}")
+                    stream_history_pagination = MediaStreamHistory.query.filter_by(user_app_access_id=access.user_app_access_id)\
+                        .order_by(MediaStreamHistory.started_at.desc())\
+                        .paginate(page=page, per_page=15, error_out=False)
+                    current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for linked service user")
+                else:
+                    # Standalone service user - query by user_media_access_id
+                    current_app.logger.info(f"DEBUG HISTORY: Standalone service user - querying MediaStreamHistory with user_media_access_id={user.id}")
+                    stream_history_pagination = MediaStreamHistory.query.filter_by(user_media_access_id=user.id)\
+                        .order_by(MediaStreamHistory.started_at.desc())\
+                        .paginate(page=page, per_page=15, error_out=False)
+                    current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for standalone service user")
+            else:
+                # This is a regular UserAppAccess - query by user_app_access_id
+                current_app.logger.info(f"DEBUG HISTORY: Regular UserAppAccess - querying MediaStreamHistory with user_app_access_id={user.id}")
+                stream_history_pagination = MediaStreamHistory.query.filter_by(user_app_access_id=user.id)\
+                    .order_by(MediaStreamHistory.started_at.desc())\
+                    .paginate(page=page, per_page=15, error_out=False)
+                current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for regular user")
+            
+            # Additional debugging - check what's actually in the database
+            total_records = MediaStreamHistory.query.count()
+            records_with_user_media_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_media_access_id.isnot(None)).count()
+            records_with_user_app_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_app_access_id.isnot(None)).count()
+            current_app.logger.info(f"DEBUG HISTORY: Total MediaStreamHistory records: {total_records}")
+            current_app.logger.info(f"DEBUG HISTORY: Records with user_media_access_id: {records_with_user_media_access}")
+            current_app.logger.info(f"DEBUG HISTORY: Records with user_app_access_id: {records_with_user_app_access}")
+            
+            # Check specifically for this user's records
+            if hasattr(user, '_is_service_user') and user._is_service_user:
+                specific_records = MediaStreamHistory.query.filter_by(user_media_access_id=user.id).all()
+                current_app.logger.info(f"DEBUG HISTORY: Specific records for user_media_access_id {user.id}: {len(specific_records)}")
+                for record in specific_records:
+                    current_app.logger.info(f"DEBUG HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
+            else:
+                specific_records = MediaStreamHistory.query.filter_by(user_app_access_id=user.id).all()
+                current_app.logger.info(f"DEBUG HISTORY: Specific records for user_app_access_id {user.id}: {len(specific_records)}")
+                for record in specific_records:
+                    current_app.logger.info(f"DEBUG HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
             
     # Get user service types and server names for service-aware display
     user_service_types = {}
     user_server_names = {}
-    from app.models_media_services import UserMediaAccess
-    user_access_records = UserMediaAccess.query.filter_by(user_id=user.id).all()
+    # For standalone service users, we already have the access records from above
     user_service_types[user.id] = []
     user_server_names[user.id] = []
-    for access in user_access_records:
-        if access.server.service_type not in user_service_types[user.id]:
-            user_service_types[user.id].append(access.server.service_type)
-        if access.server.name not in user_server_names[user.id]:
-            user_server_names[user.id].append(access.server.name)
+    for access_record in user_access_records:
+        if access_record.server.service_type not in user_service_types[user.id]:
+            user_service_types[user.id].append(access_record.server.service_type)
+        if access_record.server.name not in user_server_names[user.id]:
+            user_server_names[user.id].append(access_record.server.name)
 
     if request.headers.get('HX-Request') and tab == 'history':
-        return render_template('users/partials/history_tab_content.html', 
+        # For standalone service users, we need to set a prefixed user ID for the delete function
+        if hasattr(user, '_is_service_user') and user._is_service_user:
+            user._prefixed_id = f"user_media_access:{user.id}"
+        else:
+            user._prefixed_id = f"user_app_access:{user.id}"
+            
+        return render_template('user/partials/history_tab_content.html', 
                              user=user, 
                              history_logs=stream_history_pagination,
                              kavita_reading_stats=kavita_reading_stats,
                              kavita_reading_history=kavita_reading_history,
-                             user_service_types=user_service_types)
+                             user_service_types=user_service_types,
+                             user_server_names=user_server_names)
         
     return render_template(
-        'users/profile.html',
+        'user/profile.html',
         title=f"User Profile: {user.get_display_name()}",
         user=user,
         form=form,
@@ -430,17 +610,34 @@ def view_user(user_id):
         kavita_reading_stats=kavita_reading_stats,
         kavita_reading_history=kavita_reading_history,
         active_tab=tab,
-        is_admin=AdminAccount.query.filter_by(plex_uuid=user.plex_uuid).first() is not None if user.plex_uuid else False,
+        is_admin=check_if_user_is_admin(user),
+        is_service_user=True,
+        server=server,
         stream_stats=stream_stats,
         user_service_types=user_service_types,
         user_server_names=user_server_names,  # Add this context variable
+        linked_user_app_access=linked_user_app_access,  # Add linked UserAppAccess info
         now_utc=datetime.now(timezone.utc)
     )
 
-@bp.route('/<int:user_id>/delete_history', methods=['POST'])
+
+@bp.route('/<user_id>/delete_history', methods=['POST'])
 @login_required
 @permission_required('edit_user') # Or a more specific permission if you add one
 def delete_stream_history(user_id):
+    # Parse prefixed user ID
+    from app.services.user_service import parse_user_id
+    try:
+        user_type, actual_id = parse_user_id(user_id)
+        
+        if user_type not in ["user_app_access", "user_media_access"]:
+            # Only UserAppAccess and UserMediaAccess users have stream history
+            return make_response("<!-- no-op -->", 200)
+            
+    except ValueError as e:
+        current_app.logger.error(f"Invalid user ID format in delete_stream_history: {user_id}: {e}")
+        return make_response("<!-- error -->", 400)
+    
     history_ids_to_delete = request.form.getlist('history_ids[]')
     if not history_ids_to_delete:
         # This can happen if the form is submitted with no boxes checked
@@ -450,15 +647,23 @@ def delete_stream_history(user_id):
         # Convert IDs to integers for safe querying
         ids_as_int = [int(id_str) for id_str in history_ids_to_delete]
         
-        # Perform the bulk delete
-        num_deleted = db.session.query(StreamHistory).filter(
-            StreamHistory.user_id == user_id, # Security check: only delete for the specified user
-            StreamHistory.id.in_(ids_as_int)
-        ).delete(synchronize_session=False)
+        # Perform the bulk delete based on user type
+        if user_type == "user_app_access":
+            # For linked users, delete by user_app_access_id
+            num_deleted = db.session.query(MediaStreamHistory).filter(
+                MediaStreamHistory.user_app_access_id == actual_id,
+                MediaStreamHistory.id.in_(ids_as_int)
+            ).delete(synchronize_session=False)
+        else:  # user_media_access
+            # For standalone service users, delete by user_media_access_id
+            num_deleted = db.session.query(MediaStreamHistory).filter(
+                MediaStreamHistory.user_media_access_id == actual_id,
+                MediaStreamHistory.id.in_(ids_as_int)
+            ).delete(synchronize_session=False)
         
         db.session.commit()
         
-        current_app.logger.info(f"Admin {current_user.id} deleted {num_deleted} history entries for user {user_id}.")
+        current_app.logger.info(f"Admin {current_user.id} deleted {num_deleted} history entries for {user_type} user {actual_id}.")
         
         # This payload will show a success toast.
         toast_payload = {
@@ -489,16 +694,36 @@ def delete_stream_history(user_id):
         response.headers['HX-Trigger'] = json.dumps(toast_payload)
         return response
 
-@bp.route('/<int:user_id>/reset_password', methods=['GET', 'POST'])
+@bp.route('/<user_id>/reset_password', methods=['GET', 'POST'])
 @login_required
 @permission_required('edit_user')
 def reset_password(user_id):
-    user = User.query.get_or_404(user_id)
+    # Parse prefixed user ID
+    from app.services.user_service import parse_user_id
+    try:
+        user_type, actual_id = parse_user_id(user_id)
+        
+        if user_type == "user_app_access":
+            user = UserAppAccess.query.get_or_404(actual_id)
+        else:
+            # For user_media_access, get the associated UserAppAccess if it exists
+            media_access = UserMediaAccess.query.get_or_404(actual_id)
+            if media_access.user_app_access_id:
+                user = UserAppAccess.query.get_or_404(media_access.user_app_access_id)
+            else:
+                flash('Password reset is only available for local user accounts.', 'danger')
+                return redirect(url_for('users.list'))
+                
+    except ValueError as e:
+        current_app.logger.error(f"Invalid user ID format in reset_password: {user_id}: {e}")
+        abort(400)
     
     # Only allow reset for local accounts created through invites (have password_hash and used_invite_id)
     if not user.password_hash or not user.used_invite_id:
         flash('Password reset is only available for local user accounts created through invites.', 'danger')
-        return redirect(url_for('user.view_user', user_id=user_id, tab='settings'))
+        # Need to determine the correct route based on user type and server info
+        # For now, redirect to users list since we can't easily determine the username route
+        return redirect(url_for('users.list'))
     
     form = UserResetPasswordForm()
 
@@ -519,18 +744,287 @@ def reset_password(user_id):
     # For GET request, just render the form
     return render_template('users/partials/reset_password_modal.html', form=form, user=user)
 
+@bp.route('/profile')
+@login_required
+def profile():
+    """User profile page - handles both self-profile and admin viewing other users"""
+    
+    # Check if this is an admin viewing another user's profile
+    username = request.args.get('username')
+    
+    if username:
+        # Only Owners can view other users' profiles
+        if not isinstance(current_user, Owner):
+            flash('Access denied. You do not have permission to view user profiles.', 'danger')
+            return redirect(url_for('dashboard.index'))
+        
+        # This is Owner viewing another user - redirect to proper route
+        # You mentioned it should go to /user/plex/username, so let's redirect there
+        return redirect(url_for('user.view_plex_user', username=username, 
+                               back=request.args.get('back', 'users'),
+                               back_view=request.args.get('back_view', 'cards')))
+    
+    else:
+        # User viewing their own profile
+        # Ensure this is an AppUser (local user account)
+        if not isinstance(current_user, UserAppAccess):
+            flash('Access denied. Please log in with a valid user account.', 'danger')
+            return redirect(url_for('auth.app_login'))
+    
+    # Get the active tab from the URL query, default to 'profile'
+    tab = request.args.get('tab', 'profile')
+    
+    # Get linked service accounts if any
+    linked_accounts = []
+    if isinstance(current_user, UserAppAccess):
+        # This is a UserAppAccess, get linked media access accounts directly
+        linked_accounts = current_user.media_accesses
+    else:
+        # No linked accounts for other user types
+        linked_accounts = []
+    
+    # Re-query the user to avoid detached instance issues
+    user = db.session.get(UserAppAccess, current_user.id)
+    if not user:
+        abort(404)
+    
+    return render_template(
+        'admin/account_settings.html',
+        title="Account Settings",
+        user=user
+    )
+
+@bp.route('/<username>')
+@login_required
+@permission_required('view_user')
+def view_app_user(username):
+    """Admin view of a specific app user profile by username"""
+    # URL decode the username to handle special characters
+    try:
+        username = urllib.parse.unquote(username)
+    except Exception as e:
+        current_app.logger.warning(f"Error decoding username parameter: {e}")
+        abort(400)
+    
+    # Validate username
+    if not username:
+        abort(400)
+    
+    # Check for potential conflicts with server nicknames
+    from app.models_media_services import MediaServer
+    server_conflict = MediaServer.query.filter_by(name=username).first()
+    if server_conflict:
+        current_app.logger.warning(f"Potential conflict: app username '{username}' matches server nickname")
+    
+    user_app_access = UserAppAccess.query.filter_by(username=username).first_or_404()
+    
+    # Get the active tab from the URL query, default to 'profile'
+    tab = request.args.get('tab', 'profile')
+    
+    # Get linked media access accounts
+    linked_accounts = user_app_access.media_accesses
+    
+    # Create context variables that the template expects (for local users)
+    user_service_types = {}
+    user_server_names = {}
+    
+    # For local users, collect service types from their linked accounts
+    if linked_accounts:
+        service_types = []
+        server_names = []
+        for access in linked_accounts:
+            if access.server:
+                if access.server.service_type not in service_types:
+                    service_types.append(access.server.service_type)
+                if access.server.name not in server_names:
+                    server_names.append(access.server.name)
+        
+        user_service_types[user_app_access.id] = service_types
+        user_server_names[user_app_access.id] = server_names
+    
+    # Add stream stats for local users
+    from app.services import user_service
+    try:
+        # Create prefixed user ID for service calls
+        prefixed_user_id = f"user_app_access:{user_app_access.id}"
+        stream_stats = user_service.get_user_stream_stats(prefixed_user_id)
+        last_ip_map = user_service.get_bulk_last_known_ips([prefixed_user_id])
+        
+        # Attach stats to the user object
+        user_app_access.stream_stats = stream_stats
+        user_app_access.total_plays = stream_stats.get('global', {}).get('all_time_plays', 0)
+        
+        # Ensure total_duration is a number for the format_duration filter
+        duration_value = stream_stats.get('global', {}).get('all_time_duration_seconds', 0)
+        if isinstance(duration_value, str):
+            try:
+                user_app_access.total_duration = int(duration_value)
+            except (ValueError, TypeError):
+                user_app_access.total_duration = 0
+        else:
+            user_app_access.total_duration = duration_value or 0
+            
+        user_app_access.last_known_ip = last_ip_map.get(prefixed_user_id, 'N/A')
+    except Exception as e:
+        current_app.logger.error(f"Error getting stream stats for local user {user_app_access.id}: {e}")
+        # Provide empty stats as fallback
+        user_app_access.stream_stats = {'global': {}, 'players': []}
+        user_app_access.total_plays = 0
+        user_app_access.total_duration = 0
+        user_app_access.last_known_ip = 'N/A'
+    
+    # Create a form object for the settings tab
+    from app.forms import UserEditForm
+    form = UserEditForm()
+    
+    # Get aggregated streaming history for history tab
+    streaming_history = []
+    if tab == 'history':
+        # Get filter parameters
+        service_filter = request.args.get('service', 'all')
+        days_filter = int(request.args.get('days', 30))
+        
+        # Calculate date range
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days_filter)
+        
+        # Get streaming history for this local user
+        history_query = MediaStreamHistory.query.filter(
+            MediaStreamHistory.user_app_access_id == user_app_access.id,
+            MediaStreamHistory.started_at >= start_date,
+            MediaStreamHistory.started_at <= end_date
+        )
+        
+        # Apply service filter if specified
+        if service_filter != 'all':
+            # Join with UserMediaAccess and MediaServer to filter by service type
+            history_query = history_query.join(
+                UserMediaAccess, 
+                MediaStreamHistory.user_media_access_id == UserMediaAccess.id
+            ).join(
+                UserMediaAccess.server
+            ).filter(
+                UserMediaAccess.server.has(service_type=ServiceType(service_filter))
+            )
+        
+        # Order by most recent first and limit to 100 entries
+        streaming_history = history_query.order_by(
+            MediaStreamHistory.started_at.desc()
+        ).limit(100).all()
+        
+        # Enhance history entries with service account info
+        for entry in streaming_history:
+            current_app.logger.info(f"DEBUG LOCAL HISTORY: Processing entry - user_media_access_id: {entry.user_media_access_id}, server_id: {getattr(entry, 'server_id', 'N/A')}")
+            
+            if entry.user_media_access_id:
+                # Get the service account that was used for this stream
+                service_access = UserMediaAccess.query.get(entry.user_media_access_id)
+                if service_access:
+                    entry.service_account = service_access
+                    entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
+                    entry.server_name = service_access.server.name if service_access.server else 'Unknown Server'
+                    entry.service_username = service_access.external_username or 'Unknown'
+                    current_app.logger.info(f"DEBUG LOCAL HISTORY: Found service account - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
+                else:
+                    current_app.logger.warning(f"DEBUG LOCAL HISTORY: No service account found for user_media_access_id: {entry.user_media_access_id}")
+                    entry.service_account = None
+                    entry.service_type = 'unknown'
+                    entry.server_name = 'Unknown Server'
+                    entry.service_username = 'Unknown'
+            elif hasattr(entry, 'server_id') and entry.server_id:
+                # Try to find service account by server_id for this local user
+                current_app.logger.info(f"DEBUG LOCAL HISTORY: No user_media_access_id, trying server_id: {entry.server_id}")
+                service_access = UserMediaAccess.query.filter_by(
+                    user_app_access_id=user_app_access.id,
+                    server_id=entry.server_id
+                ).first()
+                if service_access:
+                    entry.service_account = service_access
+                    entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
+                    entry.server_name = service_access.server.name if service_access.server else 'Unknown Server'
+                    entry.service_username = service_access.external_username or 'Unknown'
+                    current_app.logger.info(f"DEBUG LOCAL HISTORY: Found service account by server_id - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
+                else:
+                    current_app.logger.warning(f"DEBUG LOCAL HISTORY: No service account found for server_id: {entry.server_id}")
+                    entry.service_account = None
+                    entry.service_type = 'unknown'
+                    entry.server_name = 'Unknown Server'
+                    entry.service_username = 'Unknown'
+            else:
+                current_app.logger.warning(f"DEBUG LOCAL HISTORY: No user_media_access_id or server_id available")
+                entry.service_account = None
+                entry.service_type = 'unknown'
+                entry.server_name = 'Unknown Server'
+                entry.service_username = 'Unknown'
+    
+    return render_template(
+        'user/profile.html',
+        title=f"App User Profile: {user_app_access.get_display_name()}",
+        user=user_app_access,
+        active_tab=tab,
+        is_local_user=True,
+        linked_accounts=linked_accounts,
+        user_service_types=user_service_types,
+        user_server_names=user_server_names,
+        form=form,
+        streaming_history=streaming_history,
+        service_filter=request.args.get('service', 'all'),
+        days_filter=int(request.args.get('days', 30)),
+        now_utc=datetime.now(timezone.utc)
+    )
+
+
+@bp.route('/<username>/reset_password', methods=['GET', 'POST'])
+@login_required
+@permission_required('edit_user')
+def reset_app_user_password(username):
+    """Reset password for an app user (admin only)"""
+    # URL decode the username to handle special characters
+    try:
+        username = urllib.parse.unquote(username)
+    except Exception as e:
+        current_app.logger.warning(f"Error decoding username parameter: {e}")
+        abort(400)
+    
+    # Validate username
+    if not username:
+        abort(400)
+    
+    user_app_access = UserAppAccess.query.filter_by(username=username).first_or_404()
+    
+    from app.forms import UserResetPasswordForm
+    form = UserResetPasswordForm()
+
+    if request.method == 'POST':
+        if form.validate_on_submit():
+            user_app_access.set_password(form.new_password.data)
+            user_app_access.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            log_event(EventType.SETTING_CHANGE, f"Password was reset for app user '{user_app_access.get_display_name()}'.", admin_id=current_user.id)
+            toast = {"showToastEvent": {"message": "Password has been reset successfully.", "category": "success"}}
+            response = make_response("", 204)
+            response.headers['HX-Trigger'] = json.dumps(toast)
+            return response
+        else:
+            # Re-render form with validation errors for HTMX
+            return render_template('users/partials/reset_password_modal.html', form=form, user=user_app_access), 422
+    
+    # For GET request, just render the form
+    return render_template('users/partials/reset_password_modal.html', form=form, user=user_app_access)
+
 @bp.route('/account', methods=['GET', 'POST'])
 @login_required
 def account():
     """User account management page - similar to admin account page"""
-    # Ensure this is a regular user, not an admin
-    if isinstance(current_user, AdminAccount):
+    # Ensure this is a regular user, not an owner
+    if isinstance(current_user, Owner):
         return redirect(url_for('settings.account'))
     
-    # Ensure this is a User with password_hash (user account)
-    if not isinstance(current_user, User) or not current_user.password_hash:
+    # Ensure this is a UserAppAccess (user account)
+    if not isinstance(current_user, UserAppAccess):
         flash('Access denied. Please log in with a valid user account.', 'danger')
-        return redirect(url_for('auth.user_login'))
+        return redirect(url_for('auth.app_login'))
     
     from app.forms import ChangePasswordForm, TimezonePreferenceForm
     from app.models import UserPreferences

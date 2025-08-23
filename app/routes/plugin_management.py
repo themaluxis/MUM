@@ -346,10 +346,24 @@ def test_connection(plugin_id):
         # Services that use credentials instead of API keys
         credential_services = ['romm']
         
+        # Services that can use either API key OR username/password
+        flexible_auth_services = ['jellyfin', 'emby']
+        
+        # Services that require API key
+        api_key_required_services = ['kavita', 'audiobookshelf', 'komga']
+        
         if plugin_id in credential_services:
             if not username or not password:
                 return jsonify({'success': False, 'message': 'URL, username, and password are required'})
+        elif plugin_id in api_key_required_services:
+            if not api_key:
+                return jsonify({'success': False, 'message': 'URL and API key are required'})
+        elif plugin_id in flexible_auth_services:
+            # For Jellyfin/Emby, either API key OR username+password is acceptable
+            if not api_key and not (username and password):
+                return jsonify({'success': False, 'message': 'Either API key OR username and password are required'})
         else:
+            # Default behavior for other services
             if not api_key:
                 return jsonify({'success': False, 'message': 'URL and API key are required'})
         

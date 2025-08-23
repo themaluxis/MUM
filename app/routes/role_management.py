@@ -4,7 +4,7 @@ from flask import (
     flash, request, current_app, make_response
 )
 from flask_login import login_required, current_user
-from app.models import AdminAccount, Role
+from app.models import Owner, UserAppAccess, Role
 from app.forms import RoleEditForm, RoleCreateForm, RoleMemberForm
 from app.extensions import db
 from app.utils.helpers import setup_required, permission_required, any_permission_required
@@ -139,11 +139,10 @@ def edit(role_id):
     form.permissions.choices = all_permission_choices
     
     # Populate choices for the 'Add Members' modal form
-    admins_not_in_role = AdminAccount.query.filter(
-        AdminAccount.id != 1, 
-        ~AdminAccount.roles.any(id=role.id)
-    ).order_by(AdminAccount.username).all()
-    member_form.admins_to_add.choices = [(a.id, a.username or a.plex_username) for a in admins_not_in_role]
+    users_not_in_role = UserAppAccess.query.filter(
+        ~UserAppAccess.roles.any(id=role.id)
+    ).order_by(UserAppAccess.username).all()
+    member_form.admins_to_add.choices = [(u.id, u.username) for u in users_not_in_role]
 
     # Handle form submissions from different tabs
     if request.method == 'POST':
@@ -164,15 +163,15 @@ def edit(role_id):
             return redirect(url_for('role_management.edit', role_id=role_id, tab='permissions'))
             
         elif 'submit_add_members' in request.form and member_form.validate_on_submit():
-            admins_to_add = AdminAccount.query.filter(AdminAccount.id.in_(member_form.admins_to_add.data)).all()
-            if admins_to_add:
-                for admin in admins_to_add:
-                    if admin not in role.admins:
-                        role.admins.append(admin)
+            users_to_add = UserAppAccess.query.filter(UserAppAccess.id.in_(member_form.admins_to_add.data)).all()
+            if users_to_add:
+                for user in users_to_add:
+                    if user not in role.user_app_access:
+                        role.user_app_access.append(user)
                 db.session.commit()
                 
                 # On SUCCESS, send back a trigger for a toast and a list refresh
-                toast = {"showToastEvent": {"message": f"Added {len(admins_to_add)} member(s) to role '{role.name}'.", "category": "success"}}
+                toast = {"showToastEvent": {"message": f"Added {len(users_to_add)} member(s) to role '{role.name}'.", "category": "success"}}
                 # Create an empty 204 response because we don't need to swap any content
                 response = make_response("", 204)
                 # Set the header that HTMX and our JS will listen for
@@ -197,7 +196,7 @@ def edit(role_id):
         edit_form=form,
         form=form,
         member_form=member_form,
-        current_members=role.admins,
+        current_members=role.user_app_access,
         permissions_structure=permissions_structure, # Pass the hierarchy
         active_tab='roles_edit', 
         active_role_tab=tab 
@@ -208,11 +207,11 @@ def edit(role_id):
 @permission_required('edit_role')
 def remove_member(role_id, admin_id):
     role = Role.query.get_or_404(role_id)
-    admin = AdminAccount.query.get_or_404(admin_id)
-    if admin in role.admins:
-        role.admins.remove(admin)
+    user = UserAppAccess.query.get_or_404(admin_id)
+    if user in role.user_app_access:
+        role.user_app_access.remove(user)
         db.session.commit()
-        flash(f"Removed '{admin.username}' from role '{role.name}'.", "success")
+        flash(f"Removed '{user.username}' from role '{role.name}'.", "success")
     # Redirect back to the members tab
     return redirect(url_for('role_management.edit', role_id=role.id, tab='members'))
 
@@ -222,12 +221,13 @@ def remove_member(role_id, admin_id):
 def delete(role_id):
     role = Role.query.get_or_404(role_id)
 
-    if current_user.id != 1 and current_user in role.admins:
+    # Prevent deletion if current user is assigned to this role (unless Owner)
+    if isinstance(current_user, UserAppAccess) and current_user in role.user_app_access:
         flash("You cannot delete a role you are currently assigned to.", "danger")
         return redirect(url_for('role_management.index'))
     
-    if role.admins:
-        flash(f"Cannot delete role '{role.name}' as it is currently assigned to one or more admins.", "danger")
+    if role.user_app_access:
+        flash(f"Cannot delete role '{role.name}' as it is currently assigned to one or more users.", "danger")
         return redirect(url_for('role_management.index'))
     
     db.session.delete(role)

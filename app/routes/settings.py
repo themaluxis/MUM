@@ -5,7 +5,7 @@ from flask import (
 )
 from flask_login import login_required, current_user, logout_user 
 import secrets
-from app.models import User, Invite, HistoryLog, Setting, EventType, SettingValueType, AdminAccount, Role, UserPreferences 
+from app.models import UserAppAccess, Invite, HistoryLog, Setting, EventType, SettingValueType, Owner, Role, UserPreferences 
 from app.forms import (
     GeneralSettingsForm, DiscordConfigForm, SetPasswordForm, ChangePasswordForm, TimezonePreferenceForm
 )
@@ -21,6 +21,11 @@ bp = Blueprint('settings', __name__)
 @login_required
 @setup_required
 def index():
+    # Redirect AppUsers without admin permissions away from admin pages
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_general_settings'):
+        flash('You do not have permission to access the settings page.', 'danger')
+        return redirect(url_for('user.index'))
+    
     # Defines the order of tabs to check for permissions.
     # The first one the user has access to will be their destination.
     permission_map = [
@@ -33,8 +38,8 @@ def index():
         ('manage_advanced_settings', 'settings.advanced'), # A placeholder for a more general 'advanced' perm
     ]
 
-    # Super Admin (ID 1) can see everything, default to general.
-    if current_user.id == 1:
+    # Owner can see everything, default to general.
+    if isinstance(current_user, Owner):
         return redirect(url_for('settings.general'))
 
     # Find the first settings page the user has permission to view.
@@ -51,6 +56,10 @@ def index():
 @setup_required
 @permission_required('manage_general_settings')
 def general():
+    # Redirect AppUsers without admin permissions away from admin pages
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_general_settings'):
+        flash('You do not have permission to access the general settings page.', 'danger')
+        return redirect(url_for('user.index'))
     form = GeneralSettingsForm()
     if form.validate_on_submit():
         # This route now ONLY handles general app settings.
@@ -93,6 +102,10 @@ def general():
 @setup_required
 @permission_required('manage_general_settings')
 def user_accounts():
+    # Redirect AppUsers without admin permissions away from admin pages
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_general_settings'):
+        flash('You do not have permission to access the user accounts settings page.', 'danger')
+        return redirect(url_for('user.index'))
     from app.forms import UserAccountsSettingsForm
     form = UserAccountsSettingsForm()
     if form.validate_on_submit():
@@ -130,11 +143,11 @@ def account():
 
     # --- Handle "Change Password" Form Submission ---
     if 'submit_change_password' in request.form and change_password_form.validate_on_submit():
-        admin = AdminAccount.query.get(current_user.id)
+        user = current_user
         # Verify the current password first
-        if admin.check_password(change_password_form.current_password.data):
-            admin.set_password(change_password_form.new_password.data)
-            admin.force_password_change = False
+        if user.check_password(change_password_form.current_password.data):
+            user.set_password(change_password_form.new_password.data)
+            user.force_password_change = False
             db.session.commit()
             log_event(EventType.ADMIN_PASSWORD_CHANGE, "Admin changed their password.", admin_id=current_user.id)
             flash('Your password has been changed successfully.', 'success')
@@ -144,10 +157,10 @@ def account():
 
     # --- Handle "Set Initial Password" Form Submission (moved from general) ---
     elif 'submit_set_password' in request.form and set_password_form.validate_on_submit():
-        admin = AdminAccount.query.get(current_user.id)
-        admin.username = set_password_form.username.data
-        admin.set_password(set_password_form.password.data)
-        admin.is_plex_sso_only = False
+        user = current_user
+        user.username = set_password_form.username.data
+        user.set_password(set_password_form.password.data)
+        user.is_plex_sso_only = False
         db.session.commit()
         log_event(EventType.ADMIN_PASSWORD_CHANGE, "Admin added username/password to their SSO-only account.", admin_id=current_user.id)
         flash('Username and password have been set successfully!', 'success')
@@ -172,6 +185,11 @@ def account():
 @setup_required
 @permission_required('manage_discord_settings')
 def discord():
+    # Redirect UserAppAccess without admin permissions away from admin pages
+    from app.models import UserAppAccess
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_discord_settings'):
+        flash('You do not have permission to access the Discord settings page.', 'danger')
+        return redirect(url_for('user.index'))
     form = DiscordConfigForm(request.form if request.method == 'POST' else None)
     
     app_base_url_from_settings = Setting.get('APP_BASE_URL')
@@ -315,6 +333,11 @@ def discord():
 @setup_required
 @permission_required('manage_advanced_settings')
 def advanced():
+    # Redirect UserAppAccess without admin permissions away from admin pages
+    from app.models import UserAppAccess
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_advanced_settings'):
+        flash('You do not have permission to access the advanced settings page.', 'danger')
+        return redirect(url_for('user.index'))
     all_db_settings = Setting.query.order_by(Setting.key).all()
     return render_template('settings/index.html', title="Advanced Settings", active_tab='advanced', all_db_settings=all_db_settings)
 
@@ -358,14 +381,15 @@ def _get_history_logs_query():
         except KeyError: flash(f"Invalid event type filter: {event_type_filter}", "warning") # Flash won't show on partial
     if related_user_filter:
         from sqlalchemy import or_ 
-        query = query.join(AdminAccount, AdminAccount.id == HistoryLog.admin_id, isouter=True) \
-                     .join(User, User.id == HistoryLog.user_id, isouter=True) \
+        query = query.join(Owner, Owner.id == HistoryLog.admin_id, isouter=True) \
+                     .join(Owner, Owner.id == HistoryLog.owner_id, isouter=True) \
+                     .join(UserAppAccess, UserAppAccess.id == HistoryLog.user_app_access_id, isouter=True) \
                      .filter(or_(
-                         AdminAccount.username.ilike(f"%{related_user_filter}%"), 
-                         AdminAccount.plex_username.ilike(f"%{related_user_filter}%"), 
-                         User.primary_username.ilike(f"%{related_user_filter}%"), 
-                         HistoryLog.admin_id.cast(db.String).ilike(f"%{related_user_filter}%"), 
-                         HistoryLog.user_id.cast(db.String).ilike(f"%{related_user_filter}%")
+                         Owner.username.ilike(f"%{related_user_filter}%"), 
+                         Owner.plex_username.ilike(f"%{related_user_filter}%"), 
+                         UserAppAccess.username.ilike(f"%{related_user_filter}%"), 
+                         HistoryLog.owner_id.cast(db.String).ilike(f"%{related_user_filter}%"), 
+                         HistoryLog.user_app_access_id.cast(db.String).ilike(f"%{related_user_filter}%")
                      ))
     return query
 
@@ -441,6 +465,10 @@ def clear_logs():
 @setup_required
 @permission_required('view_logs') # Renamed permission
 def logs():
+    # Redirect AppUsers without admin permissions away from admin pages
+    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_logs'):
+        flash('You do not have permission to access the logs page.', 'danger')
+        return redirect(url_for('user.index'))
     # This route now just renders the main settings layout.
     # The content will be loaded via the partial included in settings/index.html
     event_types = list(EventType) 

@@ -93,10 +93,10 @@
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-shield-halved text-warning text-sm"></i>
                     <h5 class="font-medium text-base-content">{{ form.api_key.label.text }}</h5>
-                    {% if plugin.plugin_id in ['emby', 'jellyfin'] %}
-                        <span class="inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-400/10 px-2 py-1 text-xs font-medium text-yellow-700 dark:text-yellow-400 ring-1 ring-inset ring-yellow-600/20 dark:ring-yellow-500/20">Optional</span>
-                    {% else %}
+                    {% if plugin.plugin_id in ['jellyfin', 'emby', 'kavita', 'audiobookshelf', 'komga', 'romm'] %}
                         <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
+                    {% else %}
+                        <span class="inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-400/10 px-2 py-1 text-xs font-medium text-yellow-700 dark:text-yellow-400 ring-1 ring-inset ring-yellow-600/20 dark:ring-yellow-500/20">Optional</span>
                     {% endif %}
                 </div>
             </div>
@@ -104,7 +104,11 @@
             {% if form.api_key.errors %}
                 <span class="text-error text-xs mt-1 block">{{ form.api_key.errors[0] }}</span>
             {% else %}
-                <span class="text-base-content/60 text-xs mt-1 block">API key for server authentication</span>
+                {% if plugin.plugin_id in ['jellyfin', 'emby', 'kavita', 'audiobookshelf', 'komga', 'romm'] %}
+                    <span class="text-base-content/60 text-xs mt-1 block">API key required for {{ plugin.name }} authentication</span>
+                {% else %}
+                    <span class="text-base-content/60 text-xs mt-1 block">API key for server authentication (optional for some services)</span>
+                {% endif %}
             {% endif %}
         </div>
 
@@ -122,7 +126,7 @@
             {% if form.username.errors %}
                 <span class="text-error text-xs mt-1 block">{{ form.username.errors[0] }}</span>
             {% else %}
-                <span class="text-base-content/60 text-xs mt-1 block">Username for server authentication</span>
+                <span class="text-base-content/60 text-xs mt-1 block">Username for server authentication (optional - only needed for some configurations)</span>
             {% endif %}
         </div>
 
@@ -139,7 +143,7 @@
             {% if form.password.errors %}
                 <span class="text-error text-xs mt-1 block">{{ form.password.errors[0] }}</span>
             {% else %}
-                <span class="text-base-content/60 text-xs mt-1 block">Password for server authentication</span>
+                <span class="text-base-content/60 text-xs mt-1 block">Password for server authentication (optional - only needed for some configurations)</span>
             {% endif %}
         </div>
         {% endif %}
@@ -191,19 +195,19 @@ function testConnection() {
     const addBtn = document.getElementById('add-server-btn');
     const originalText = testBtn.innerHTML;
     
-    // Get form data
-    const formData = new FormData();
-    formData.append('name', document.querySelector('input[name="name"]').value);
-    formData.append('url', document.querySelector('input[name="url"]').value);
-    formData.append('api_key', document.querySelector('input[name="api_key"]').value);
+    // Get form data as JSON
+    const formData = {
+        name: document.querySelector('input[name="name"]').value,
+        url: document.querySelector('input[name="url"]').value,
+        api_key: document.querySelector('input[name="api_key"]').value,
+        service_type: '{{ plugin.plugin_id }}'
+    };
     
     // Add username/password if they exist (for Emby/Jellyfin)
     const usernameField = document.querySelector('input[name="username"]');
     const passwordField = document.querySelector('input[name="password"]');
-    if (usernameField) formData.append('username', usernameField.value);
-    if (passwordField) formData.append('password', passwordField.value);
-    
-    formData.append('service_type', '{{ plugin.plugin_id }}');
+    if (usernameField) formData.username = usernameField.value;
+    if (passwordField) formData.password = passwordField.value;
     
     // Update button state
     testBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';
@@ -211,8 +215,9 @@ function testConnection() {
     
     fetch("{{ url_for('plugin_management.test_connection', plugin_id=plugin.plugin_id) }}", {
         method: 'POST',
-        body: formData,
+        body: JSON.stringify(formData),
         headers: {
+            'Content-Type': 'application/json',
             'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
         }
     })

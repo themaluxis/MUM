@@ -1,0 +1,112 @@
+<!-- File: app/templates/user/partials/security_tab.html -->
+<div class="space-y-6">
+    <!-- Password Management Section -->
+    <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="bg-gradient-to-r from-red-50 dark:from-red-900/20 to-red-100 dark:to-red-800/20 p-4 border-b border-base-300">
+            <h3 class="text-lg font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-key text-red-600 dark:text-red-400"></i>
+                Password Management
+            </h3>
+        </div>
+        <div class="p-6 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Password Status:</span>
+                        {% if user.password_hash %}
+                            <span class="badge badge-success">Set</span>
+                        {% else %}
+                            <span class="badge badge-warning">Not Set</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Login Required:</span>
+                        <span class="badge {{ 'badge-success' if user.password_hash else 'badge-warning' }}">
+                            {{ 'Yes' if user.password_hash else 'No' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="bg-base-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h5 class="font-medium text-sm">Reset Password</h5>
+                            <p class="text-xs text-gray-600">Generate a new password for this user</p>
+                        </div>
+                        <button 
+                            class="btn btn-outline btn-warning btn-sm"
+                            onclick="resetAppUserPassword('{{ user.username }}')"
+                            title="Reset user password"
+                        >
+                            <i class="fa-solid fa-key mr-1"></i>
+                            Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Security Section -->
+    <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-50 dark:from-blue-900/20 to-blue-100 dark:to-blue-800/20 p-4 border-b border-base-300">
+            <h3 class="text-lg font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-shield-alt text-blue-600 dark:text-blue-400"></i>
+                Account Security
+            </h3>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Account Type:</span>
+                        <span class="font-medium">Local Account</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Two-Factor Auth:</span>
+                        <span class="badge badge-ghost">Not Available</span>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Last Login:</span>
+                        <span class="font-medium">{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else 'Never' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Login Attempts:</span>
+                        <span class="badge badge-ghost">Not Tracked</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Activity Section -->
+    <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="bg-gradient-to-r from-green-50 dark:from-green-900/20 to-green-100 dark:to-green-800/20 p-4 border-b border-base-300">
+            <h3 class="text-lg font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left text-green-600 dark:text-green-400"></i>
+                Account Activity
+            </h3>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Created:</span>
+                    <span class="font-medium">{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'Unknown' }}</span>
+                </div>
+                {% if user.updated_at %}
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Last Updated:</span>
+                    <span class="font-medium">{{ user.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                {% endif %}
+                {% if user.used_invite_id %}
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Created via Invite:</span>
+                    <span class="font-medium">#{{ user.used_invite_id }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

@@ -3,7 +3,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, IntegerField, TextAreaField, HiddenField, DateField, EmailField
 from wtforms.validators import DataRequired, EqualTo, Length, Optional, URL, NumberRange, Regexp, ValidationError, Email
 from wtforms import SelectMultipleField
-from app.models import Setting, AdminAccount # For custom validator if checking existing secrets
+from app.models import Setting, Owner # For custom validator if checking existing secrets
 from wtforms.widgets import ListWidget, CheckboxInput # <--- ADDED THIS IMPORT
 import urllib.parse 
 from flask_login import current_user
@@ -40,9 +40,9 @@ class MediaServerForm(FlaskForm):
     name = StringField('Server Name', validators=[DataRequired(), Length(min=1, max=100)])
     service_type = SelectField('Service Type', validators=[DataRequired()])
     url = StringField('Server URL', validators=[DataRequired(), URL(message="Invalid URL format. Include http(s)://")])
-    api_key = StringField('API Key/Token', validators=[Optional()])
-    username = StringField('Username', validators=[Optional()])
-    password = PasswordField('Password', validators=[Optional()])
+    api_key = StringField('API Key/Token', validators=[Optional()], description="Required for most services. For Jellyfin/Emby, you can use either API key OR username/password.")
+    username = StringField('Username', validators=[Optional()], description="Optional - can be used instead of API key for Jellyfin/Emby, or required for some services like ROMM")
+    password = PasswordField('Password', validators=[Optional()], description="Optional - can be used instead of API key for Jellyfin/Emby, or required for some services like ROMM")
     is_active = BooleanField('Active', default=True)
     submit = SubmitField('Save Server')
     
@@ -84,6 +84,20 @@ class MediaServerForm(FlaskForm):
         
         if query.first():
             raise ValidationError('A server with this name already exists.')
+    
+    def validate_api_key(self, field):
+        # For certain service types, API key is required
+        # Note: Jellyfin and Emby can work with username/password OR API key, so we make API key optional
+        if self.service_type.data in ['kavita', 'audiobookshelf', 'komga']:
+            if not field.data or field.data.strip() == '':
+                service_name = self.service_type.data.title() if self.service_type.data else 'This service'
+                raise ValidationError(f'{service_name} requires an API key/token for authentication.')
+        
+        # For services that use credentials (romm), username and password are required instead
+        if self.service_type.data in ['romm']:
+            if not field.data or field.data.strip() == '':
+                if not (self.username.data and self.password.data):
+                    raise ValidationError('ROMM requires either an API key or username and password for authentication.')
 
 class AppBaseUrlForm(FlaskForm):
     app_name = StringField("Application Name", validators=[DataRequired(), Length(max=100)])
@@ -181,7 +195,7 @@ class DiscordConfigForm(FlaskForm):
             raise ValidationError('Discord Bot Token is required when bot features are enabled.')
 
 class UserEditForm(FlaskForm): # As updated for whitelist fields
-    primary_username = StringField('Username', render_kw={'readonly': True})
+    username = StringField('Username', render_kw={'readonly': True})
     plex_email = StringField('Plex Email', render_kw={'readonly': True})
     is_home_user = BooleanField('Plex Home User', render_kw={'disabled': True})
     libraries = SelectMultipleField(
@@ -294,8 +308,8 @@ class SetPasswordForm(FlaskForm):
     submit_set_password = SubmitField('Set Username & Password')
 
     def validate_username(self, field):
-        from app.models import AdminAccount
-        if AdminAccount.query.filter_by(username=field.data).first():
+        from app.models import Owner
+        if Owner.query.filter_by(username=field.data).first():
             raise ValidationError('Username already exists. Choose a different one.')
 
 class ChangePasswordForm(FlaskForm):
@@ -314,8 +328,8 @@ class AdminCreateForm(FlaskForm):
     submit = SubmitField('Create Admin')
 
     def validate_username(self, field):
-        from app.models import AdminAccount
-        if AdminAccount.query.filter_by(username=field.data).first():
+        from app.models import Owner
+        if Owner.query.filter_by(username=field.data).first():
             raise ValidationError('Username already exists. Choose a different one.')
 
 class AdminEditForm(FlaskForm):
@@ -497,16 +511,16 @@ class UserAccountCreationForm(FlaskForm):
     submit = SubmitField('Create Account')
 
     def validate_username(self, field):
-        # Check if username already exists
-        from app.models import User
-        existing_user = User.query.filter_by(primary_username=field.data).first()
+        # Check if username already exists in UserAppAccess table
+        from app.models import UserAppAccess
+        existing_user = UserAppAccess.query.filter_by(username=field.data).first()
         if existing_user:
             raise ValidationError('Username already exists. Please choose a different one.')
 
     def validate_email(self, field):
-        # Check if email already exists
-        from app.models import User
-        existing_user = User.query.filter_by(primary_email=field.data).first()
+        # Check if email already exists in UserAppAccess table
+        from app.models import UserAppAccess
+        existing_user = UserAppAccess.query.filter_by(email=field.data).first()
         if existing_user:
             raise ValidationError('Email already registered. Please use a different email address.')
 
@@ -540,3 +554,33 @@ class UserLoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()], render_kw={"placeholder": "Username"})
     password = PasswordField('Password', validators=[DataRequired()], render_kw={"placeholder": "Password"})
     submit = SubmitField('Sign In')
+
+# UserAppAccess forms for admin management
+class UserAppAccessCreateForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
+    email = EmailField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Create User Account')
+
+    def validate_username(self, field):
+        from app.models import UserAppAccess
+        existing_user = UserAppAccess.query.filter_by(username=field.data).first()
+        if existing_user:
+            raise ValidationError('Username already exists. Choose a different one.')
+
+    def validate_email(self, field):
+        from app.models import UserAppAccess
+        existing_user = UserAppAccess.query.filter_by(email=field.data).first()
+        if existing_user:
+            raise ValidationError('Email already exists. Choose a different one.')
+
+class UserAppAccessEditForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
+    email = EmailField('Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Update User Account')
+
+class UserAppAccessResetPasswordForm(FlaskForm):
+    password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
+    confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Reset Password')

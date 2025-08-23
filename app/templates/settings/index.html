@@ -15,31 +15,31 @@
                 <li>
                     <h2 class="menu-title"><span><i class="fa-solid fa-cog fa-fw mr-2"></i> Settings</span></h2>
                     <ul>
-                        {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
+                        {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_general_settings') %}
                         <li><a href="{{ url_for('settings.general') }}" class="{{ 'active menu-active' if active_tab == 'general' else '' }}"><i class="fa-solid fa-sliders mr-2"></i> General</a></li>
                         <li><a href="{{ url_for('settings.user_accounts') }}" class="{{ 'active menu-active' if active_tab == 'user_accounts' else '' }}"><i class="fa-solid fa-user-plus mr-2"></i> User Accounts</a></li>
                         {% endif %}
-                        {% if current_user.id == 1 or current_user.has_permission('view_admins_tab') %}
+                        {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('view_admins_tab') %}
                         <h2 class="menu-title"><span><i class="fa-solid fa-user-shield fa-fw mr-2"></i> Manage Admins</span></h2>
                         <ul>
-                            {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
+                            {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
                                 <li><a href="{{ url_for('admin_management.index') }}" class="{{ 'active menu-active' if active_tab in ['admins', 'admins_edit'] else '' }}"><i class="fa-solid fa-shield-halved mr-2"></i> Admins</a></li>
                             {% endif %}
-                            {% if current_user.id == 1 or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
+                            {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
                                 <li><a href="{{ url_for('role_management.index') }}" class="{{ 'active menu-active' if active_tab in ['roles', 'roles_edit'] else '' }}"><i class="fa-solid fa-shield mr-2"></i> Roles</a></li>
                             {% endif %}
                         </ul>
                         {% endif %}
-                        {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
+                        {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_discord_settings') %}
                         <li><a href="{{ url_for('settings.discord') }}" class="{{ 'active menu-active' if active_tab == 'discord' else '' }}"><i class="fa-brands fa-discord mr-2"></i> Discord</a></li>
                         {% endif %}
-                        {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
+                        {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_plugins') %}
                         <li><a href="{{ url_for('plugin_management.index') }}" class="{{ 'active menu-active' if active_tab == 'plugins' else '' }}"><i class="fa-solid fa-puzzle-piece mr-2"></i> Plugins</a></li>
                         {% endif %}
-                        {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
+                        {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('view_logs') %}
                         <li><a href="{{ url_for('settings.logs') }}" class="{{ 'active menu-active' if active_tab == 'logs' else '' }}"><i class="fa-solid fa-timeline mr-2"></i> Logs</a></li>
                         {% endif %}
-                        {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
+                        {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_advanced_settings') %}
                         <li><a href="{{ url_for('settings.advanced') }}" class="{{ 'active menu-active' if active_tab == 'advanced' else '' }}"><i class="fa-solid fa-cogs mr-2"></i> Advanced</a></li>
                         {% endif %}
                     </ul>
@@ -54,26 +54,26 @@
             <div class="form-control md:hidden mb-6">
                 <label class="label"><span class="label-text">Go to setting:</span></label>
                 <select class="select select-bordered" onchange="if (this.value) window.location.href=this.value;">
-                    {% if current_user.id == 1 or current_user.has_permission('manage_general_settings') %}
+                    {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_general_settings') %}
                     <option value="{{ url_for('settings.general') }}" {% if active_tab == 'general' %}selected{% endif %}>General</option>
                     <option value="{{ url_for('settings.user_accounts') }}" {% if active_tab == 'user_accounts' %}selected{% endif %}>User Accounts</option>
                     {% endif %}
-                    {% if current_user.id == 1 or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
+                    {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('create_admin') or current_user.has_permission('edit_admin') or current_user.has_permission('delete_admin') %}
                     <option value="{{ url_for('admin_management.index') }}" {% if active_tab == 'admins' %}selected{% endif %}>Manage Admins</option>
                     {% endif %}
-                    {% if current_user.id == 1 or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
+                    {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('create_role') or current_user.has_permission('edit_role') or current_user.has_permission('delete_role') %}
                     <option value="{{ url_for('role_management.index') }}" {% if active_tab == 'roles' %}selected{% endif %}>Manage Roles</option>
                     {% endif %}
-                    {% if current_user.id == 1 or current_user.has_permission('manage_discord_settings') %}
+                    {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_discord_settings') %}
                     <option value="{{ url_for('settings.discord') }}" {% if active_tab == 'discord' %}selected{% endif %}>Discord</option>
                     {% endif %}
-                    {% if current_user.id == 1 or current_user.has_permission('manage_plugins') %}
+                    {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_plugins') %}
                     <option value="{{ url_for('plugin_management.index') }}" {% if active_tab == 'plugins' %}selected{% endif %}>Plugins</option>
                     {% endif %}
-                    {% if current_user.id == 1 or current_user.has_permission('view_logs') %}
+                    {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('view_logs') %}
                     <option value="{{ url_for('settings.logs') }}" {% if active_tab == 'logs' %}selected{% endif %}>Logs</option>
                     {% endif %}
-                    {% if current_user.id == 1 or current_user.has_permission('manage_advanced_settings') %}
+                    {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_advanced_settings') %}
                     <option value="{{ url_for('settings.advanced') }}" {% if active_tab == 'advanced' %}selected{% endif %}>Advanced</option>
                     {% endif %}
                 </select>

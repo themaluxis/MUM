@@ -1,0 +1,191 @@
+{# File: app/templates/users/partials/_local_user_card.html #}
+{# Template for local user accounts matching service user card layout #}
+<div id="local-user-card-{{ user.id }}" class="card bg-gradient-to-br from-base-200 to-primary/10 shadow-lg hover:shadow-xl transition-all duration-200 ease-in-out relative group user-card-clickable local-user-card" data-local-user-id="{{ user.id }}" data-service-color="var(--color-primary)" data-service-class="primary">
+    <!-- User Selection Checkbox -->
+    <input type="checkbox" id="local-user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-local-user-id="{{ user.id }}" title="Select local user" style="--input-color: var(--color-primary); --chkfg: white;">
+    
+    <div class="card-body p-4">
+        <div class="flex flex-row items-center mb-3">
+            <!-- Avatar -->
+            <div class="avatar mr-3">
+                <div class="w-10 rounded-full">
+                    <div class="bg-primary text-white w-10 h-10 rounded-full flex items-center justify-center text-2xl font-normal">
+                        {{ user.username[0]|upper if user.username else 'L' }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- User Info -->
+            <div class="flex flex-col">
+                <div class="flex items-center gap-2 mb-1">
+                    <h2 class="card-title text-lg truncate" title="{{ user.username }}">
+                        {{ user.username }}
+                    </h2>
+                </div>
+                
+                {% if user.email %}
+                <p class="text-sm text-base-content/70 truncate mb-1" title="{{ user.email }}">{{ user.email }}</p>
+                {% endif %}
+                
+                <!-- Local User Badge -->
+                <div class="flex items-center gap-1 mb-2">
+                    <span class="inline-flex items-center rounded-md px-2 py-1 bg-primary/10 text-primary ring-primary/20 hover:bg-primary/20 text-xs font-medium ring-1 ring-inset gap-1 mt-1">
+                        <i class="fa-solid fa-user w-3 h-3"></i>
+                        Local Account
+                    </span>
+                </div>
+                
+                <!-- Linked Service Accounts -->
+                {% if user.media_accesses %}
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {% for media_access in user.media_accesses %}
+                        {% set service_type = media_access.get_service_type() %}
+                        {% if service_type == 'plex' %}
+                            <button 
+                                class="inline-flex items-center rounded-md bg-plex-50 dark:bg-plex-400/10 px-2 py-1 text-xs font-medium text-plex-700 dark:text-plex-400 ring-1 ring-inset ring-plex-600/20 dark:ring-plex-500/20 gap-1 hover:scale-105 transition-transform cursor-pointer"
+                                onclick="viewMediaAccess({{ media_access.id }})"
+                                title="View Plex account: {{ media_access.get_display_name() }}"
+                            >
+                                <svg class="w-3 h-3" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="transparent" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
+                                {{ media_access.get_display_name() }}
+                            </button>
+                        {% elif service_type == 'jellyfin' %}
+                            <button 
+                                class="inline-flex items-center rounded-md bg-jellyfin-50 dark:bg-jellyfin-400/10 px-2 py-1 text-xs font-medium text-jellyfin-700 dark:text-jellyfin-400 ring-1 ring-inset ring-jellyfin-600/20 dark:ring-jellyfin-500/20 gap-1 hover:scale-105 transition-transform cursor-pointer"
+                                onclick="viewMediaAccess({{ media_access.id }})"
+                                title="View Jellyfin account: {{ media_access.get_display_name() }}"
+                            >
+                                <i class="fa-solid fa-cube w-3 h-3"></i>
+                                {{ media_access.get_display_name() }}
+                            </button>
+                        {% elif service_type == 'emby' %}
+                            <button 
+                                class="inline-flex items-center rounded-md bg-emby-50 dark:bg-emby-400/10 px-2 py-1 text-xs font-medium text-emby-700 dark:text-emby-400 ring-1 ring-inset ring-emby-600/20 dark:ring-emby-500/20 gap-1 hover:scale-105 transition-transform cursor-pointer"
+                                onclick="viewMediaAccess({{ media_access.id }})"
+                                title="View Emby account: {{ media_access.get_display_name() }}"
+                            >
+                                <i class="fa-solid fa-play-circle w-3 h-3"></i>
+                                {{ media_access.get_display_name() }}
+                            </button>
+                        {% elif service_type == 'kavita' %}
+                            <button 
+                                class="inline-flex items-center rounded-md bg-kavita-50 dark:bg-kavita-400/10 px-2 py-1 text-xs font-medium text-kavita-700 dark:text-kavita-400 ring-1 ring-inset ring-kavita-600/20 dark:ring-kavita-500/20 gap-1 hover:scale-105 transition-transform cursor-pointer"
+                                onclick="viewMediaAccess({{ media_access.id }})"
+                                title="View Kavita account: {{ media_access.get_display_name() }}"
+                            >
+                                <i class="fa-solid fa-book w-3 h-3"></i>
+                                {{ media_access.get_display_name() }}
+                            </button>
+                        {% elif service_type == 'audiobookshelf' %}
+                            <button 
+                                class="inline-flex items-center rounded-md bg-audiobookshelf-50 dark:bg-audiobookshelf-400/10 px-2 py-1 text-xs font-medium text-audiobookshelf-700 dark:text-audiobookshelf-400 ring-1 ring-inset ring-audiobookshelf-600/20 dark:ring-audiobookshelf-500/20 gap-1 hover:scale-105 transition-transform cursor-pointer"
+                                onclick="viewMediaAccess({{ media_access.id }})"
+                                title="View AudioBookshelf account: {{ media_access.get_display_name() }}"
+                            >
+                                <i class="fa-solid fa-headphones w-3 h-3"></i>
+                                {{ media_access.get_display_name() }}
+                            </button>
+                        {% elif service_type == 'komga' %}
+                            <button 
+                                class="inline-flex items-center rounded-md bg-komga-50 dark:bg-komga-400/10 px-2 py-1 text-xs font-medium text-komga-700 dark:text-komga-400 ring-1 ring-inset ring-komga-600/20 dark:ring-komga-500/20 gap-1 hover:scale-105 transition-transform cursor-pointer"
+                                onclick="viewMediaAccess({{ media_access.id }})"
+                                title="View Komga account: {{ media_access.get_display_name() }}"
+                            >
+                                <i class="fa-solid fa-book-open w-3 h-3"></i>
+                                {{ media_access.get_display_name() }}
+                            </button>
+                        {% elif service_type == 'romm' %}
+                            <button 
+                                class="inline-flex items-center rounded-md bg-romm-50 dark:bg-romm-400/10 px-2 py-1 text-xs font-medium text-romm-700 dark:text-romm-400 ring-1 ring-inset ring-romm-600/20 dark:ring-romm-500/20 gap-1 hover:scale-105 transition-transform cursor-pointer"
+                                onclick="viewMediaAccess({{ media_access.id }})"
+                                title="View RomM account: {{ media_access.get_display_name() }}"
+                            >
+                                <i class="fa-solid fa-gamepad w-3 h-3"></i>
+                                {{ media_access.get_display_name() }}
+                            </button>
+                        {% else %}
+                            <button 
+                                class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1 hover:scale-105 transition-transform cursor-pointer"
+                                onclick="viewMediaAccess({{ media_access.id }})"
+                                title="View {{ service_type }} account: {{ media_access.get_display_name() }}"
+                            >
+                                <i class="fa-solid fa-server w-3 h-3"></i>
+                                {{ media_access.get_display_name() }}
+                            </button>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- User Stats Section (matching service cards but local-specific) -->
+        <div class="grid grid-cols-2 gap-3 text-xs mb-3">
+            <div class="bg-base-300/30 rounded-lg p-2 text-center">
+                <div class="font-semibold text-base-content">{{ user.media_accesses|length }}</div>
+                <div class="text-base-content/60">Linked Services</div>
+            </div>
+            <div class="bg-base-300/30 rounded-lg p-2 text-center">
+                <div class="font-semibold text-base-content">{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'Unknown' }}</div>
+                <div class="text-base-content/60">Created</div>
+            </div>
+        </div>
+
+        <!-- Notes Section (if exists) -->
+        {% if user.notes %}
+        <div class="user-notes-container bg-base-300/20 rounded-lg p-3 mb-3">
+            <div class="flex items-start gap-2">
+                <i class="fa-solid fa-sticky-note text-warning text-sm mt-0.5 flex-shrink-0"></i>
+                <div class="text-xs text-base-content/80 leading-relaxed">{{ user.notes }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Footer -->
+        <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">
+            {% if user.media_accesses %}
+            <button 
+                class="btn btn-xs btn-ghost text-info hover:bg-info/10"
+                hx-get="{{ url_for('users.get_linked_accounts', local_user_id=user.id) }}"
+                hx-target="#linkedAccountsModalContainer"
+                hx-swap="innerHTML"
+                onclick="linkedAccountsModal.showModal()"
+                title="View all linked accounts"
+            >
+                <i class="fa-solid fa-link"></i>
+            </button>
+            {% endif %}
+
+            {% if current_user.has_permission('view_user') %}
+            <a href="{{ url_for('user.view_app_user', username=user.username, back='users', back_view='cards') }}" title="App User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                <i class="fa-solid fa-user"></i>
+            </a>
+            {% endif %}
+            
+            {% if current_user.has_permission('edit_user') %}
+            <button 
+                class="btn btn-xs btn-ghost text-primary hover:bg-primary/10"
+                onclick="editAppUser({{ user.id }})"
+                title="Edit local user account"
+            >
+                <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            {% endif %}
+
+            {% if current_user.has_permission('delete_user') %}
+            <button 
+                class="btn btn-xs btn-ghost text-error hover:bg-error/10" 
+                title="Delete Local User"
+                hx-confirm="Are you sure you want to delete local user '{{ user.username }}' and all linked service accounts? This action cannot be undone."
+                hx-delete="{{ url_for('users.delete_app_user', username=user.username) }}"
+                hx-target="closest .card" 
+                hx-swap="outerHTML swap:0.5s"
+                hx-indicator="this"
+            >
+                <i class="fa-solid fa-trash-can htmx-indicator-hide"></i>
+                <span class="htmx-indicator loading loading-spinner loading-xs"></span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>

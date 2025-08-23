@@ -3,9 +3,10 @@
 from flask import current_app
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.exc import IntegrityError
-from app.models import Invite, User, InviteUsage, EventType, Setting
+from app.models import Invite, UserAppAccess, InviteUsage, EventType, Setting
 from app.extensions import db
 from app.utils.helpers import log_event
+from app.models_media_services import ServiceType, UserMediaAccess
 from . import user_service # Use . to import from current package
 from .media_service_factory import MediaServiceFactory
 from .media_service_manager import MediaServiceManager
@@ -67,7 +68,7 @@ def record_invite_usage_attempt(invite_id, ip_address, plex_user_info=None, disc
 
 def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_username: str, plex_email: str, plex_thumb: str,
                                    discord_user_info: dict,
-                                   ip_address: str = None, existing_user_id: int = None):
+                                   ip_address: str = None, app_user=None):
     """
     Processes invite acceptance:
     1. Checks if Plex user already exists in MUM or on Plex server.
@@ -76,11 +77,26 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
     4. Updates Invite usage counts and links MUM user to InviteUsage.
     Returns (True, "Success message" or User object) or (False, "Error message")
     """
+    current_app.logger.info(f"=== ACCEPT INVITE AND GRANT ACCESS STARTED ===")
+    current_app.logger.info(f"Invite ID: {invite.id}, Plex user: {plex_username}, App user: {app_user.username if app_user else 'None'}")
+    current_app.logger.info(f"Invite servers: {[s.name for s in invite.servers]}")
+    current_app.logger.info(f"Invite grant_library_ids: {invite.grant_library_ids}")
     if not invite.is_usable:
         log_event(EventType.INVITE_VIEWED, f"Attempt to use unusable invite '{invite.custom_path or invite.token}' (ID: {invite.id}).", invite_id=invite.id, details={'reason': 'not usable'})
         return False, "This invite is no longer valid (expired, maxed out, or deactivated)."
 
-    existing_mum_user = User.query.filter_by(plex_uuid=plex_user_uuid).first()
+    # Look for existing user by Plex UUID via UserMediaAccess
+    existing_mum_user = None
+    if plex_user_uuid:
+        from app.models_media_services import UserMediaAccess, ServiceType, MediaServer
+        plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
+        if plex_server:
+            access = UserMediaAccess.query.filter_by(
+                server_id=plex_server.id,
+                external_user_alt_id=plex_user_uuid
+            ).first()
+            if access:
+                existing_mum_user = access.user_app_access
     if existing_mum_user:
         updated_existing = False
         # If the user already exists, but re-links their Discord, update their info
@@ -97,7 +113,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
         
         plex_user_info = {'uuid': plex_user_uuid, 'username': plex_username, 'email': plex_email, 'thumb': plex_thumb}
         usage_log = record_invite_usage_attempt(invite.id, ip_address, plex_user_info=plex_user_info, discord_user_info=discord_user_info, status_message="User already managed by MUM.")
-        usage_log.mum_user_id = existing_mum_user.id
+        usage_log.user_app_access_id = existing_mum_user.id
         usage_log.accepted_invite = True 
         
         invite.current_uses += 1
@@ -146,6 +162,39 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
             current_app.logger.debug(f"Invite service - Service has invite_user_to_plex_server: {hasattr(service, 'invite_user_to_plex_server')}")
             current_app.logger.debug(f"Invite service - Service has add_user: {hasattr(service, 'add_user')}")
             
+            # Extract library IDs for this specific server from the invite's grant_library_ids
+            server_library_ids = []
+            if invite.grant_library_ids:
+                current_app.logger.debug(f"Invite service - Processing grant_library_ids: {invite.grant_library_ids}")
+                for lib_id in invite.grant_library_ids:
+                    # Check if this is a unique format library ID for multi-server invites
+                    if isinstance(lib_id, str) and lib_id.startswith('[') and ']-' in lib_id:
+                        # Format: [SERVICE_TYPE]-ServerName-LibraryID
+                        try:
+                            parts = lib_id.split(']-', 1)
+                            if len(parts) == 2:
+                                service_and_server = parts[0][1:]  # Remove the opening bracket
+                                server_and_lib = parts[1]
+                                
+                                # Extract server name and library ID
+                                server_lib_parts = server_and_lib.rsplit('-', 1)
+                                if len(server_lib_parts) == 2:
+                                    server_name_from_lib = server_lib_parts[0]
+                                    raw_lib_id = server_lib_parts[1]
+                                    
+                                    # Check if this library belongs to the current server
+                                    if server_name_from_lib == server.name:
+                                        server_library_ids.append(raw_lib_id)
+                                        current_app.logger.debug(f"Invite service - Added library {raw_lib_id} for server {server.name}")
+                        except Exception as e:
+                            current_app.logger.error(f"Invite service - Error parsing library ID {lib_id}: {e}")
+                    else:
+                        # For legacy single-server invites or raw library IDs, include all
+                        server_library_ids.append(lib_id)
+                        current_app.logger.debug(f"Invite service - Added raw library {lib_id} for server {server.name}")
+            
+            current_app.logger.debug(f"Invite service - Final library IDs for server {server.name}: {server_library_ids}")
+
             # Handle different service types appropriately
             if server.service_type.name.upper() == 'PLEX':
                 # For Plex, we need to grant access to an existing user
@@ -153,7 +202,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                     current_app.logger.debug(f"Invite service - Calling update_user_access for Plex user {plex_username}")
                     success = service.update_user_access(
                         user_id=plex_username,  # Plex uses username as user_id
-                        library_ids=invite.grant_library_ids
+                        library_ids=server_library_ids  # Use filtered library IDs for this server
                     )
                     if not success:
                         raise Exception("Failed to update user access")
@@ -193,7 +242,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                         try:
                             success = service.update_user_access(
                                 user_id=external_user_id,  # Use the external user ID returned from create_user
-                                library_ids=invite.grant_library_ids
+                                library_ids=server_library_ids  # Use filtered library IDs for this server
                             )
                             if success:
                                 current_app.logger.debug(f"Invite service - Successfully set library access for {server.service_type.name} user {external_user_id}")
@@ -235,125 +284,131 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
         current_app.logger.warning(f"Partial success for invite {invite.id}: Access granted to {successful_servers}, but failed for {failed_servers}")
         log_event(EventType.ERROR_GENERAL, f"Partial success for invite {invite.id}: granted access to {successful_servers}, failed for {failed_servers}", invite_id=invite.id)
 
-    # Create or update MUM User
+    # Create service accounts and link them to local user
     try:
         user_access_expires_at = None
         if invite.membership_duration_days and invite.membership_duration_days > 0:
             user_access_expires_at = datetime.now(timezone.utc) + timedelta(days=invite.membership_duration_days)
-            current_app.logger.info(f"User {plex_username} access from invite {invite.id} will expire on {user_access_expires_at}.")
+            current_app.logger.info(f"User access from invite {invite.id} will expire on {user_access_expires_at}.")
 
-        # Check if we should update an existing user (when user accounts are enabled)
-        if existing_user_id:
-            current_app.logger.debug(f"Updating existing user ID {existing_user_id} with Plex info")
-            new_user = User.query.get(existing_user_id)
-            if not new_user:
-                raise Exception(f"Existing user with ID {existing_user_id} not found")
-            
-            # Update the existing user with Plex information
-            new_user.plex_uuid = plex_user_uuid
-            new_user.primary_username = plex_username
-            new_user.plex_email = plex_email
-            new_user.plex_thumb_url = plex_thumb
-            new_user.allowed_library_ids = list(invite.grant_library_ids)
-            new_user.used_invite_id = invite.id
-            
-            # Update Discord info if provided
-            if discord_user_info:
-                new_user.discord_user_id = discord_user_info.get('id')
-                new_user.discord_username = discord_user_info.get('username')
-                new_user.discord_avatar_hash = discord_user_info.get('avatar')
-                new_user.discord_email = discord_user_info.get('email')
-                new_user.discord_email_verified = discord_user_info.get('verified')
-
-            new_user.access_expires_at = user_access_expires_at
-            new_user.last_synced_with_plex = datetime.now(timezone.utc)
-            new_user.is_purge_whitelisted = bool(invite.grant_purge_whitelist)
-            new_user.is_discord_bot_whitelisted = bool(invite.grant_bot_whitelist)
-            
-            current_app.logger.debug(f"Updated existing user: {new_user.primary_username} with Plex username: {plex_username}")
+        # Create single UserAppAccess record for MUM login
+        current_app.logger.info(f"=== INVITE SERVICE DEBUG: Creating UserAppAccess and UserMediaAccess for {len(servers_to_grant_access)} servers ===")
+        current_app.logger.info(f"App user: {app_user.username if app_user else 'None'} (ID: {app_user.id if app_user else 'None'})")
+        current_app.logger.info(f"Plex user: {plex_username} (UUID: {plex_user_uuid})")
+        
+        # Use existing app_user or create new UserAppAccess
+        if app_user:
+            user_app_access = app_user
+            current_app.logger.info(f"Using existing UserAppAccess: {user_app_access.username} (ID: {user_app_access.id})")
         else:
-            # Create new user (legacy flow when user accounts are not enabled)
-            current_app.logger.debug(f"Creating new user for Plex username: {plex_username}")
-            new_user = User(
-                primary_username=plex_username,  # Use Plex username as primary_username to satisfy NOT NULL constraint
-                primary_email=plex_email,  # Use Plex email as primary_email
-                plex_uuid=plex_user_uuid,
-                plex_email=plex_email,
-                plex_thumb_url=plex_thumb,
-                allowed_library_ids=list(invite.grant_library_ids),
+            # Create new UserAppAccess record
+            base_username = plex_username or f"user_{int(datetime.now().timestamp())}"
+            base_email = plex_email or f"{base_username}@example.com"
+            
+            user_app_access = UserAppAccess(
+                username=base_username,
+                email=base_email,
                 used_invite_id=invite.id,
-                
-                discord_user_id=discord_user_info.get('id') if discord_user_info else None,
-                discord_username=discord_user_info.get('username') if discord_user_info else None,
-                discord_avatar_hash=discord_user_info.get('avatar') if discord_user_info else None,
-                discord_email=discord_user_info.get('email') if discord_user_info else None,
-                discord_email_verified=discord_user_info.get('verified') if discord_user_info else None,
-
                 access_expires_at=user_access_expires_at,
-                last_synced_with_plex=datetime.now(timezone.utc),
-                
-                is_purge_whitelisted=bool(invite.grant_purge_whitelist),
-                is_discord_bot_whitelisted=bool(invite.grant_bot_whitelist)
+                notes=f"Created via invite {invite.id}"
             )
-            db.session.add(new_user)
+            
+            # Add Discord info to UserAppAccess if provided (global Discord linking)
+            if discord_user_info:
+                user_app_access.discord_user_id = discord_user_info.get('id')
+                user_app_access.discord_username = discord_user_info.get('username')
+                user_app_access.discord_avatar_hash = discord_user_info.get('avatar')
+                user_app_access.discord_email = discord_user_info.get('email')
+                user_app_access.discord_email_verified = discord_user_info.get('verified')
+            
+            # Add UserAppAccess to session
+            db.session.add(user_app_access)
+            db.session.flush()  # Get the ID
+            current_app.logger.info(f"Created new UserAppAccess: {user_app_access.username} (ID: {user_app_access.id})")
+        
+        created_user_media_accesses = []
+        
+        # Create UserMediaAccess records for each server
+        for server in servers_to_grant_access:
+            current_app.logger.info(f"--- Processing server: {server.name} (Type: {server.service_type.name}) ---")
+            
+            # Determine service-specific username and email
+            if server.service_type.name.upper() == 'PLEX':
+                # For Plex, use the authenticated Plex user info
+                if not plex_username:
+                    current_app.logger.warning(f"No Plex username provided for Plex server {server.name}")
+                    continue
+                service_username = plex_username
+                service_email = plex_email
+                current_app.logger.info(f"Plex server - using username: {service_username}, email: {service_email}")
+            else:
+                # For other services, use the same username as UserAppAccess for consistency
+                service_username = user_app_access.username
+                service_email = user_app_access.email
+                current_app.logger.info(f"Non-Plex server - using username: {service_username}, email: {service_email}")
+            
+            # Create UserMediaAccess record for this specific server
+            user_media_access = UserMediaAccess(
+                user_app_access_id=user_app_access.id,
+                server_id=server.id,
+                external_user_id=str(plex_user_uuid) if server.service_type.name.upper() == 'PLEX' else getattr(server, '_temp_external_user_id', None),
+                external_username=service_username,
+                external_email=service_email,
+                allowed_library_ids=invite.grant_library_ids or [],
+                allow_downloads=bool(invite.allow_downloads),
+                used_invite_id=invite.id,
+                service_join_date=datetime.now(timezone.utc),
+                is_discord_bot_whitelisted=bool(invite.grant_bot_whitelist),
+                is_purge_whitelisted=bool(invite.grant_purge_whitelist)
+            )
+            
+            # Add service-specific fields
+            if server.service_type.name.upper() == 'PLEX':
+                user_media_access.external_user_alt_id = plex_user_uuid
+                user_media_access.external_avatar_url = plex_thumb
+            
+            # Add UserMediaAccess to session
+            db.session.add(user_media_access)
+            created_user_media_accesses.append((user_media_access, server))
+            current_app.logger.info(f"✅ Created UserMediaAccess for {service_username} (UserAppAccess ID: {user_app_access.id}) on server {server.name}")
+            current_app.logger.debug(f"UserMediaAccess details - ID: {user_media_access.id}, username: {user_media_access.external_username}, email: {user_media_access.external_email}")
+        
+        # Use the UserAppAccess as the primary user reference
+        if not created_user_media_accesses:
+            raise Exception("No user media access records created")
+        
+        new_user = user_app_access
         
         invite.current_uses += 1
         
         plex_user_info = {'uuid': plex_user_uuid, 'username': plex_username, 'email': plex_email, 'thumb': plex_thumb}
         usage_log = record_invite_usage_attempt(invite.id, ip_address, plex_user_info=plex_user_info, discord_user_info=discord_user_info, status_message="Invite accepted successfully.")
         
-        db.session.flush()
-        if new_user.id:
-            usage_log.mum_user_id = new_user.id
-            
-            # Create UserMediaAccess records for each server
-            from app.models_media_services import UserMediaAccess
-            for server in servers_to_grant_access:
-                try:
-                    # Check if UserMediaAccess already exists
-                    existing_access = UserMediaAccess.query.filter_by(
-                        user_id=new_user.id, 
-                        server_id=server.id
-                    ).first()
-                    
-                    if not existing_access:
-                        # Get the external user ID if available
-                        external_user_id = getattr(server, '_temp_external_user_id', None)
-                        
-                        # For Plex servers, use the plex username as external_user_id
-                        if server.service_type.name.upper() == 'PLEX':
-                            external_user_id = plex_username
-                            external_username = plex_username
-                        else:
-                            external_username = plex_username  # Use same username for consistency
-                        
-                        user_access = UserMediaAccess(
-                            user_id=new_user.id,
-                            server_id=server.id,
-                            external_user_id=external_user_id,
-                            external_username=external_username,
-                            external_email=plex_email,
-                            allowed_library_ids=list(invite.grant_library_ids),
-                            allow_downloads=bool(invite.allow_downloads),
-                            is_active=True
-                        )
-                        db.session.add(user_access)
-                        current_app.logger.debug(f"Invite service - Created UserMediaAccess for user {new_user.id} on server {server.name} with external_user_id: {external_user_id}")
-                    else:
-                        current_app.logger.debug(f"Invite service - UserMediaAccess already exists for user {new_user.id} on server {server.name}")
-                        
-                except Exception as e:
-                    current_app.logger.error(f"Error creating UserMediaAccess for server {server.name}: {e}")
-        else:
-            current_app.logger.error(f"Failed to get new_user.id after flush for invite {invite.id}")
+        current_app.logger.info(f"=== COMMITTING SESSION - 1 UserAppAccess and {len(created_user_media_accesses)} UserMediaAccess records ===")
+        
+        # Log all created user media access records
+        for user_media_access, server in created_user_media_accesses:
+            current_app.logger.info(f"UserMediaAccess - ID: {user_media_access.id}, external_username: {user_media_access.external_username}, server: {server.name}")
+        
+        # Set usage log user ID
+        usage_log.user_app_access_id = new_user.id
         usage_log.accepted_invite = True
         db.session.add(usage_log)
         db.session.add(invite)
 
+        current_app.logger.info(f"=== COMMITTING TRANSACTION ===")
+        current_app.logger.info(f"About to commit: 1 UserAppAccess, {len(created_user_media_accesses)} UserMediaAccess records, usage log, invite update")
+        
         db.session.commit()
+        current_app.logger.info("✅ All changes committed to database")
+        
+        # Get whitelist info from UserMediaAccess for logging
+        first_media_access = created_user_media_accesses[0][0] if created_user_media_accesses else None
+        purge_whitelisted = first_media_access.is_purge_whitelisted if first_media_access else False
+        bot_whitelisted = first_media_access.is_discord_bot_whitelisted if first_media_access else False
 
         log_event(EventType.INVITE_USER_ACCEPTED_AND_SHARED, 
-                  f"User '{plex_username}' accepted invite '{invite.id}'. Purge WL: {new_user.is_purge_whitelisted}, Bot WL: {new_user.is_discord_bot_whitelisted}. Access expires: {user_access_expires_at.strftime('%Y-%m-%d') if user_access_expires_at else 'Permanent'}.", 
+                  f"User '{plex_username}' accepted invite '{invite.id}'. Purge WL: {purge_whitelisted}, Bot WL: {bot_whitelisted}. Access expires: {user_access_expires_at.strftime('%Y-%m-%d') if user_access_expires_at else 'Permanent'}.", 
                   user_id=new_user.id, invite_id=invite.id)
         
         return True, new_user 
