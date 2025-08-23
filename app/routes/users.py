@@ -2015,7 +2015,7 @@ def get_quick_edit_form(user_id):
     
     # We pass the _settings_tab partial, which contains the form we need.
     return render_template(
-        'users/partials/settings_tab.html',
+        'user/partials/settings_tab.html',
         form=form,
         user=user,
         user_server_names=user_server_names

@@ -108,15 +108,25 @@ def monitor_media_sessions_task():
                     # Jellyfin session - look up by username
                     jellyfin_username = session.get('UserName')
                     if jellyfin_username:
-                        # Find UserMediaAccess for Jellyfin username
-                        user_media_access = UserMediaAccess.query.filter_by(external_username=jellyfin_username).first()
-                        if user_media_access:
-                            # Check if it's linked to a UserAppAccess account
-                            mum_user = user_media_access.user_app_access
-                            if not mum_user:
-                                current_app.logger.info(f"Found standalone UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}). Processing as standalone user.")
+                        # Find UserMediaAccess for Jellyfin username on the correct server
+                        jellyfin_server = MediaServer.query.filter_by(service_type=ServiceType.JELLYFIN).first()
+                        if jellyfin_server:
+                            user_media_access = UserMediaAccess.query.filter_by(
+                                server_id=jellyfin_server.id,
+                                external_username=jellyfin_username
+                            ).first()
+                            if user_media_access:
+                                # Check if it's linked to a UserAppAccess account
+                                mum_user = user_media_access.user_app_access
+                                if not mum_user:
+                                    current_app.logger.info(f"Found standalone UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}). Processing as standalone user.")
+                                else:
+                                    current_app.logger.info(f"Found linked UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}) linked to UserAppAccess (ID: {mum_user.id}). Processing as linked user.")
+                            else:
+                                current_app.logger.warning(f"No UserMediaAccess found for Jellyfin username '{jellyfin_username}' on server '{jellyfin_server.name}'. Skipping session.")
+                                continue
                         else:
-                            current_app.logger.warning(f"No UserMediaAccess found for Jellyfin username '{jellyfin_username}'. Skipping session.")
+                            current_app.logger.warning(f"No Jellyfin server configured. Skipping session {session_key}.")
                             continue
                     else:
                         current_app.logger.warning(f"Jellyfin session {session_key} is missing UserName. Skipping.")
@@ -244,7 +254,7 @@ def monitor_media_sessions_task():
                     
                     new_history_record = MediaStreamHistory(
                         user_app_access_id=mum_user.id if mum_user else None,
-                        user_media_access_id=user_media_access.id if not mum_user else None,
+                        user_media_access_id=user_media_access.id,  # Always set this to identify which service account was used
                         server_id=current_server.id,
                         session_key=str(session_key),
                         rating_key=rating_key,

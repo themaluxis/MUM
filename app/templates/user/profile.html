@@ -1,4 +1,4 @@
-<!-- File: app/templates/users/profile.html -->
+<!-- File: app/templates/user/profile.html -->
 {% extends "base.html" %}
 
 {% block title %}{{ super() }} - {{ title }}{% endblock %}
@@ -265,4 +265,14 @@
         </div>
     </div>
 </div>
+
+<!-- Reset Password Modal -->
+<dialog id="user_reset_password_modal" class="modal">
+    <div class="modal-box max-w-md">
+        <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick="document.getElementById('user_reset_password_modal').close()">✕</button></form>
+        <div id="user_reset_password_modal_content">
+            <!-- Modal content will be loaded here -->
+        </div>
+    </div>
+</dialog>
 {% endblock %}

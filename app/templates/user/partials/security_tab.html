@@ -26,6 +26,7 @@
                         </span>
                     </div>
                 </div>
+                {% if user.password_hash and user.used_invite_id %}
                 <div class="bg-base-200 rounded-lg p-4">
                     <div class="flex items-center justify-between">
                         <div>
@@ -34,7 +35,10 @@
                         </div>
                         <button 
                             class="btn btn-outline btn-warning btn-sm"
-                            onclick="resetAppUserPassword('{{ user.username }}')"
+                            hx-get="{{ url_for('user.reset_app_user_password', username=user.username) }}"
+                            hx-target="#user_reset_password_modal_content"
+                            hx-swap="innerHTML"
+                            onclick="document.getElementById('user_reset_password_modal').showModal()"
                             title="Reset user password"
                         >
                             <i class="fa-solid fa-key mr-1"></i>
@@ -42,6 +46,24 @@
                         </button>
                     </div>
                 </div>
+                {% else %}
+                <div class="bg-base-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h5 class="font-medium text-sm">Reset Password</h5>
+                            <p class="text-xs text-gray-600">Password reset is only available for local accounts created through invites</p>
+                        </div>
+                        <button 
+                            class="btn btn-outline btn-disabled btn-sm"
+                            disabled
+                            title="Password reset not available for this account type"
+                        >
+                            <i class="fa-solid fa-key mr-1"></i>
+                            Not Available
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

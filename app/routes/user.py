@@ -294,7 +294,7 @@ def view_service_account(server_nickname, server_username):
                     if access.server.name not in user_server_names_for_modal[user.id]:
                         user_server_names_for_modal[user.id].append(access.server.name)
                 
-                modal_html = render_template('users/partials/settings_tab.html', form=form_after_save, user=user, user_server_names=user_server_names_for_modal)
+                modal_html = render_template('user/partials/settings_tab.html', form=form_after_save, user=user, user_server_names=user_server_names_for_modal)
 
                 # 2. Render the updated user card for the OOB swap
                 # We need the same context that the main user list uses for a card
@@ -393,7 +393,7 @@ def view_service_account(server_nickname, server_username):
 
     if request.method == 'POST' and form.errors:
         if request.headers.get('HX-Request'):
-            return render_template('users/partials/settings_tab.html', form=form, user=user), 422
+            return render_template('user/partials/settings_tab.html', form=form, user=user), 422
 
     if request.method == 'GET':
         # Get current library IDs from UserMediaAccess records (same as quick edit form)
@@ -531,21 +531,20 @@ def view_service_account(server_nickname, server_username):
             current_app.logger.info(f"DEBUG HISTORY: _is_service_user value: {getattr(user, '_is_service_user', 'N/A')}")
             
             if hasattr(user, '_is_service_user') and user._is_service_user:
-                # This is a service user - check if they have a linked local account
-                if access.user_app_access_id:
-                    # Linked service user - their history is stored with user_app_access_id
-                    current_app.logger.info(f"DEBUG HISTORY: Linked service user - querying MediaStreamHistory with user_app_access_id={access.user_app_access_id}")
-                    stream_history_pagination = MediaStreamHistory.query.filter_by(user_app_access_id=access.user_app_access_id)\
-                        .order_by(MediaStreamHistory.started_at.desc())\
-                        .paginate(page=page, per_page=15, error_out=False)
-                    current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for linked service user")
-                else:
-                    # Standalone service user - query by user_media_access_id
-                    current_app.logger.info(f"DEBUG HISTORY: Standalone service user - querying MediaStreamHistory with user_media_access_id={user.id}")
-                    stream_history_pagination = MediaStreamHistory.query.filter_by(user_media_access_id=user.id)\
-                        .order_by(MediaStreamHistory.started_at.desc())\
-                        .paginate(page=page, per_page=15, error_out=False)
-                    current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for standalone service user")
+                # This is a service user - we need to filter by user_media_access_id to get only this service's history
+                # For linked service accounts, history is stored with both user_app_access_id AND user_media_access_id
+                current_app.logger.info(f"DEBUG HISTORY: Service user - querying MediaStreamHistory with user_media_access_id={user.id}")
+                current_app.logger.info(f"DEBUG HISTORY: Access record details - server: {access.server.name}, service_type: {access.server.service_type.value}, external_username: {access.external_username}")
+                stream_history_pagination = MediaStreamHistory.query.filter_by(user_media_access_id=user.id)\
+                    .order_by(MediaStreamHistory.started_at.desc())\
+                    .paginate(page=page, per_page=15, error_out=False)
+                current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for service user")
+                
+                # Additional debugging - show sample records
+                if stream_history_pagination.items:
+                    current_app.logger.info(f"DEBUG HISTORY: Sample records:")
+                    for i, record in enumerate(stream_history_pagination.items[:3]):
+                        current_app.logger.info(f"DEBUG HISTORY: Record {i+1}: {record.media_title} at {record.started_at} (user_media_access_id: {record.user_media_access_id}, user_app_access_id: {record.user_app_access_id})")
             else:
                 # This is a regular UserAppAccess - query by user_app_access_id
                 current_app.logger.info(f"DEBUG HISTORY: Regular UserAppAccess - querying MediaStreamHistory with user_app_access_id={user.id}")
@@ -568,6 +567,18 @@ def view_service_account(server_nickname, server_username):
                 current_app.logger.info(f"DEBUG HISTORY: Specific records for user_media_access_id {user.id}: {len(specific_records)}")
                 for record in specific_records:
                     current_app.logger.info(f"DEBUG HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
+                
+                # Check if this user is linked to a local account and if so, what other user_media_access_ids exist for that local account
+                if access.user_app_access_id:
+                    current_app.logger.info(f"DEBUG HISTORY: This service account is linked to local user_app_access_id: {access.user_app_access_id}")
+                    # Find all UserMediaAccess records for this local user
+                    all_user_accesses = UserMediaAccess.query.filter_by(user_app_access_id=access.user_app_access_id).all()
+                    current_app.logger.info(f"DEBUG HISTORY: All UserMediaAccess records for local user:")
+                    for ua in all_user_accesses:
+                        current_app.logger.info(f"DEBUG HISTORY: - UserMediaAccess ID {ua.id}: {ua.server.name} ({ua.server.service_type.value}) - {ua.external_username}")
+                        # Check how many history records exist for each
+                        count = MediaStreamHistory.query.filter_by(user_media_access_id=ua.id).count()
+                        current_app.logger.info(f"DEBUG HISTORY:   -> Has {count} streaming history records")
             else:
                 specific_records = MediaStreamHistory.query.filter_by(user_app_access_id=user.id).all()
                 current_app.logger.info(f"DEBUG HISTORY: Specific records for user_app_access_id {user.id}: {len(specific_records)}")
@@ -974,7 +985,7 @@ def view_app_user(username):
     )
 
 
-@bp.route('/<username>/reset_password', methods=['GET', 'POST'])
+@bp.route('/app_user/<username>/reset_password', methods=['GET', 'POST'])
 @login_required
 @permission_required('edit_user')
 def reset_app_user_password(username):
@@ -1008,10 +1019,10 @@ def reset_app_user_password(username):
             return response
         else:
             # Re-render form with validation errors for HTMX
-            return render_template('users/partials/reset_password_modal.html', form=form, user=user_app_access), 422
+            return render_template('user/partials/modals/reset_password_modal.html', form=form, user=user_app_access), 422
     
     # For GET request, just render the form
-    return render_template('users/partials/reset_password_modal.html', form=form, user=user_app_access)
+    return render_template('user/partials/modals/reset_password_modal.html', form=form, user=user_app_access)
 
 @bp.route('/account', methods=['GET', 'POST'])
 @login_required

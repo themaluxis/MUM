@@ -1,4 +1,4 @@
-<!-- File: app/templates/users/_history_tab_content.html -->
+<!-- File: app/templates/user/_history_tab_content.html -->
 {% set user_services = user_service_types.get(user.id, []) if user_service_types else [] %}
 {% set service_values = [] %}
 {% for st in user_services %}
@@ -59,10 +59,17 @@
                         </td>
                         <td>
                             {% if entry.rating_key %}
-                                <img src="{{ url_for('api.plex_image_proxy', path=('/library/metadata/' + entry.rating_key + '/thumb')) }}" 
-                                     class="w-12 h-18 rounded object-cover" 
-                                     alt="Media poster"
-                                     onerror="this.src='{{ url_for('static', filename='default_media_thumb.png') }}'">
+                                {% if entry.server and entry.server.service_type.value == 'jellyfin' %}
+                                    <img src="{{ url_for('api.jellyfin_image_proxy', item_id=entry.rating_key, image_type='Primary') }}" 
+                                         class="w-12 h-18 rounded object-cover" 
+                                         alt="Media poster"
+                                         onerror="this.src='{{ url_for('static', filename='default_media_thumb.png') }}'">
+                                {% else %}
+                                    <img src="{{ url_for('api.plex_image_proxy', path=('/library/metadata/' + entry.rating_key + '/thumb')) }}" 
+                                         class="w-12 h-18 rounded object-cover" 
+                                         alt="Media poster"
+                                         onerror="this.src='{{ url_for('static', filename='default_media_thumb.png') }}'">
+                                {% endif %}
                             {% else %}
                                 <div class="w-12 h-18 rounded bg-base-300 flex items-center justify-center">
                                     <i class="fa-solid fa-play text-base-content/40"></i>

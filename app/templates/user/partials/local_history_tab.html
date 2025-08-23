@@ -110,10 +110,17 @@
                             <td>
                                 <div class="flex items-center gap-3">
                                     {% if entry.rating_key %}
-                                        <img src="{{ url_for('api.plex_image_proxy', path=('/library/metadata/' + entry.rating_key + '/thumb')) }}" 
-                                             class="w-12 h-18 rounded object-cover" 
-                                             alt="Media thumbnail"
-                                             onerror="this.src='{{ url_for('static', filename='default_media_thumb.png') }}'">
+                                        {% if entry.service_type == 'jellyfin' %}
+                                            <img src="{{ url_for('api.jellyfin_image_proxy', item_id=entry.rating_key, image_type='Primary') }}" 
+                                                 class="w-12 h-18 rounded object-cover" 
+                                                 alt="Media thumbnail"
+                                                 onerror="this.src='{{ url_for('static', filename='default_media_thumb.png') }}'">
+                                        {% else %}
+                                            <img src="{{ url_for('api.plex_image_proxy', path=('/library/metadata/' + entry.rating_key + '/thumb')) }}" 
+                                                 class="w-12 h-18 rounded object-cover" 
+                                                 alt="Media thumbnail"
+                                                 onerror="this.src='{{ url_for('static', filename='default_media_thumb.png') }}'">
+                                        {% endif %}
                                     {% else %}
                                         <div class="w-12 h-18 rounded bg-base-300 flex items-center justify-center">
                                             <i class="fa-solid fa-play text-base-content/40"></i>
