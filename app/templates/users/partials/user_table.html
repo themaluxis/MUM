@@ -94,7 +94,7 @@
             {% endif %}
             <tr id="user-row-{{ user.id }}" class="hover:bg-base-300 user-row user-row-clickable cursor-pointer" data-user-id="{{ user.id }}" data-service-color="{{ service_color }}" data-service-class="{{ service_bg_class }}">
                 <td class="text-center">
-                    <input type="checkbox" class="checkbox checkbox-xs sm:checkbox-sm user-select-checkbox" data-user-id="{{ user.id }}" style="--input-color: {{ service_color }}; --chkfg: white;">
+                    <input type="checkbox" class="checkbox checkbox-xs sm:checkbox-sm user-select-checkbox" data-user-id="{{ user._prefixed_id if user._prefixed_id is defined else user.id }}" style="--input-color: {{ service_color }}; --chkfg: white;">
                 </td>
                 <td data-col="user">
                     <div class="flex items-center space-x-3">

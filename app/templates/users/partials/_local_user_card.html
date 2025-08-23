@@ -2,7 +2,7 @@
 {# Template for local user accounts matching service user card layout #}
 <div id="local-user-card-{{ user.id }}" class="card bg-gradient-to-br from-base-200 to-primary/10 shadow-lg hover:shadow-xl transition-all duration-200 ease-in-out relative group user-card-clickable local-user-card" data-local-user-id="{{ user.id }}" data-service-color="var(--color-primary)" data-service-class="primary">
     <!-- User Selection Checkbox -->
-    <input type="checkbox" id="local-user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-local-user-id="{{ user.id }}" title="Select local user" style="--input-color: var(--color-primary); --chkfg: white;">
+    <input type="checkbox" id="local-user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-local-user-id="{{ user._prefixed_id if user._prefixed_id is defined else user.id }}" title="Select local user" style="--input-color: var(--color-primary); --chkfg: white;">
     
     <div class="card-body p-4">
         <div class="flex flex-row items-center mb-3">
@@ -16,28 +16,46 @@
             </div>
             
             <!-- User Info -->
-            <div class="flex flex-col">
+            <div>
                 <div class="flex items-center gap-2 mb-1">
                     <h2 class="card-title text-lg truncate" title="{{ user.username }}">
                         {{ user.username }}
                     </h2>
                 </div>
                 
-                {% if user.email %}
-                <p class="text-sm text-base-content/70 truncate mb-1" title="{{ user.email }}">{{ user.email }}</p>
-                {% endif %}
-                
                 <!-- Local User Badge -->
-                <div class="flex items-center gap-1 mb-2">
-                    <span class="inline-flex items-center rounded-md px-2 py-1 bg-primary/10 text-primary ring-primary/20 hover:bg-primary/20 text-xs font-medium ring-1 ring-inset gap-1 mt-1">
-                        <i class="fa-solid fa-user w-3 h-3"></i>
-                        Local Account
-                    </span>
-                </div>
-                
-                <!-- Linked Service Accounts -->
-                {% if user.media_accesses %}
-                <div class="flex flex-wrap gap-1 mt-1">
+                <span class="inline-flex items-center rounded-md px-2 py-1 bg-primary/10 text-primary ring-primary/20 hover:bg-primary/20 text-xs font-medium ring-1 ring-inset gap-1 mt-1">
+                    <i class="fa-solid fa-user w-3 h-3"></i>
+                    Local Account
+                </span>
+            </div>
+        </div>
+        
+        <div class="text-xs space-y-1 mb-3">
+            {# For UserAppAccess, show the primary email #}
+            <p class="text-xs text-base-content/70 truncate" title="{{ user.email or 'No E-mail address' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.email or 'No E-mail address' }}</p>
+            <div class="tooltip tooltip-top" data-tip="The date {{ user.get_display_name() }} was added to MUM">
+                <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}</p>
+            </div>
+            <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
+            {% if user.access_expires_at %}
+                <p class="text-warning">
+                    <i class="fa-solid fa-hourglass-end fa-fw mr-1"></i> 
+                    Access Expires: {{ user.access_expires_at | format_datetime_user }} 
+                    <span class="text-base-content">{{ user.access_expires_at | format_datetime_user }}</span>
+                </p>
+            {% endif %}
+        </div>
+
+        <div class="user-notes-container" style="display: none;">
+            <p class="text-xs font-semibold mb-1">Notes:</p>
+            <p class="text-xs text-base-content/70 mb-3">{{ user.notes or 'No notes for this user.' }}</p>
+        </div>
+
+        <div class="mb-3">
+            <p class="text-xs font-semibold mb-2">Service Accounts (<span class="font-normal">{{ user.media_accesses|length }}</span>):</p>
+            {% if user.media_accesses %}
+                <div class="flex flex-wrap gap-1">
                     {% for media_access in user.media_accesses %}
                         {% set service_type = media_access.get_service_type() %}
                         {% if service_type == 'plex' %}
@@ -115,31 +133,18 @@
                         {% endif %}
                     {% endfor %}
                 </div>
-                {% endif %}
-            </div>
+            {% else %}
+                <span class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1">
+                    <i class="fa-solid fa-unlink w-2.5 h-2.5"></i>
+                    No linked service accounts
+                </span>
+            {% endif %}
         </div>
 
-        <!-- User Stats Section (matching service cards but local-specific) -->
-        <div class="grid grid-cols-2 gap-3 text-xs mb-3">
-            <div class="bg-base-300/30 rounded-lg p-2 text-center">
-                <div class="font-semibold text-base-content">{{ user.media_accesses|length }}</div>
-                <div class="text-base-content/60">Linked Services</div>
-            </div>
-            <div class="bg-base-300/30 rounded-lg p-2 text-center">
-                <div class="font-semibold text-base-content">{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'Unknown' }}</div>
-                <div class="text-base-content/60">Created</div>
-            </div>
+        <div class="flex flex-wrap gap-1 mb-3">
+            {% if user.is_purge_whitelisted %}<div class="badge badge-accent badge-sm" title="This user is immune to inactivity purges."><i class="fa-solid fa-shield-halved"></i>Purge Whitelisted</div>{% endif %}
         </div>
 
-        <!-- Notes Section (if exists) -->
-        {% if user.notes %}
-        <div class="user-notes-container bg-base-300/20 rounded-lg p-3 mb-3">
-            <div class="flex items-start gap-2">
-                <i class="fa-solid fa-sticky-note text-warning text-sm mt-0.5 flex-shrink-0"></i>
-                <div class="text-xs text-base-content/80 leading-relaxed">{{ user.notes }}</div>
-            </div>
-        </div>
-        {% endif %}
 
         <!-- Action Footer -->
         <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">

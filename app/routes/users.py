@@ -917,18 +917,93 @@ def delete_user(user_id):
             response.headers['HX-Trigger'] = json.dumps(toast)
             return response
 
+# Mock user class for mass edit libraries template
+class MassEditMockUser:
+    def __init__(self, access, server):
+        self.access = access
+        self.server = server
+    
+    def get_display_name(self):
+        return f"{self.access.external_username} ({self.server.name})"
+
 @bp.route('/mass_edit_libraries_form')
 @login_required
 def mass_edit_libraries_form():
     current_app.logger.info("=== USERS PAGE: mass_edit_libraries_form() called - USING DATABASE DATA ===")
     user_ids_str = request.args.get('user_ids', '')
+    current_app.logger.info(f"DEBUG: Raw user_ids_str received: '{user_ids_str}'")
     if not user_ids_str:
         return '<div class="alert alert-error">No users selected.</div>'
     
-    user_ids = [int(uid) for uid in user_ids_str.split(',') if uid.isdigit()]
+    # Parse user IDs - handle both prefixed and plain numeric IDs
+    service_user_ids = []
+    current_app.logger.info(f"DEBUG: Processing user IDs: {user_ids_str.split(',')}")
+    
+    for uid_str in user_ids_str.split(','):
+        uid_str = uid_str.strip()
+        current_app.logger.info(f"DEBUG: Processing individual ID: '{uid_str}'")
+        if not uid_str:
+            continue
+        
+        # Try to parse as prefixed ID first
+        try:
+            user_type, actual_id = parse_user_id(uid_str)
+            current_app.logger.info(f"DEBUG: Parsed prefixed ID - type: {user_type}, id: {actual_id}")
+            # Mass edit libraries only applies to service users (UserMediaAccess)
+            if user_type == "user_media_access":
+                service_user_ids.append(actual_id)
+                current_app.logger.info(f"DEBUG: Added service user ID {actual_id} from prefixed ID {uid_str}")
+            else:
+                current_app.logger.warning(f"Mass edit libraries attempted on local user {uid_str} - not supported")
+        except ValueError as e:
+            current_app.logger.info(f"DEBUG: Failed to parse as prefixed ID: {e}")
+            # If parsing fails, treat as plain numeric ID and assume it's a UserMediaAccess ID
+            # This handles the case where frontend passes plain IDs like "1" instead of "user_media_access_1"
+            try:
+                actual_id = int(uid_str)
+                current_app.logger.info(f"DEBUG: Treating as plain numeric ID: {actual_id}")
+                
+                # Check both UserMediaAccess and UserAppAccess to see which one exists
+                from app.models_media_services import UserMediaAccess
+                uma_record = UserMediaAccess.query.get(actual_id)
+                uaa_record = UserAppAccess.query.get(actual_id)
+                
+                current_app.logger.info(f"DEBUG: UserMediaAccess record with ID {actual_id}: {'EXISTS' if uma_record else 'NOT FOUND'}")
+                current_app.logger.info(f"DEBUG: UserAppAccess record with ID {actual_id}: {'EXISTS' if uaa_record else 'NOT FOUND'}")
+                
+                if uma_record and uaa_record:
+                    current_app.logger.error(f"DEBUG: ID COLLISION! Both UserMediaAccess and UserAppAccess have ID {actual_id}")
+                    current_app.logger.error(f"DEBUG: UserMediaAccess: {uma_record.external_username} on {uma_record.server.name}")
+                    current_app.logger.error(f"DEBUG: UserAppAccess: {uaa_record.username}")
+                    current_app.logger.error(f"DEBUG: This is why we need prefixed IDs!")
+                
+                if uma_record:
+                    service_user_ids.append(actual_id)
+                    current_app.logger.info(f"DEBUG: Added service user ID {actual_id} from plain ID {uid_str}")
+                else:
+                    current_app.logger.warning(f"Plain ID {uid_str} does not correspond to a valid UserMediaAccess record")
+            except (ValueError, TypeError) as e:
+                current_app.logger.error(f"Invalid user ID format in mass edit libraries: {uid_str} - {e}")
+    
+    if not service_user_ids:
+        return '<div class="alert alert-warning">Mass edit libraries is only available for service users. No valid service users were selected.</div>'
     
     from app.models_media_services import UserMediaAccess, MediaServer
-    access_records = db.session.query(UserMediaAccess, UserAppAccess, MediaServer).join(UserAppAccess, UserMediaAccess.user_app_access_id == UserAppAccess.id).join(MediaServer, UserMediaAccess.server_id == MediaServer.id).filter(UserMediaAccess.user_app_access_id.in_(user_ids)).all()
+    current_app.logger.info(f"DEBUG: Querying for service_user_ids: {service_user_ids}")
+    access_records = db.session.query(UserMediaAccess, UserAppAccess, MediaServer).join(UserAppAccess, UserMediaAccess.user_app_access_id == UserAppAccess.id, isouter=True).join(MediaServer, UserMediaAccess.server_id == MediaServer.id).filter(UserMediaAccess.id.in_(service_user_ids)).all()
+    current_app.logger.info(f"DEBUG: Found {len(access_records)} access records")
+    
+    # Debug each access record
+    for i, (access, user, server) in enumerate(access_records):
+        current_app.logger.info(f"DEBUG: Record {i}: access={access.id if access else None}, user={user.id if user else None}, server={server.id if server else None}")
+        if access:
+            current_app.logger.info(f"DEBUG: Record {i} access details: external_username={access.external_username}, server_id={access.server_id}")
+        if server:
+            current_app.logger.info(f"DEBUG: Record {i} server details: name={server.name}, service_type={server.service_type}")
+        if user:
+            current_app.logger.info(f"DEBUG: Record {i} user details: username={user.username}")
+        else:
+            current_app.logger.info(f"DEBUG: Record {i} user is None (standalone service user)")
 
     services_data = {}
     for access, user, server in access_records:
@@ -963,7 +1038,41 @@ def mass_edit_libraries_form():
         current_ids = services_data[service_type_key]['servers'][server.id]['current_library_ids']
         current_ids.intersection_update(access.allowed_library_ids or [])
 
-    return render_template('users/partials/_mass_edit_libraries.html', services_data=services_data)
+    # Build user objects list for the template
+    users_list = []
+    current_app.logger.info(f"DEBUG: Building users list from {len(access_records)} access records")
+    for access, user, server in access_records:
+        # Safety check - ensure access and server are not None
+        if access is None:
+            current_app.logger.error("DEBUG: access is None, skipping")
+            continue
+        if server is None:
+            current_app.logger.error("DEBUG: server is None, skipping")
+            continue
+            
+        # Just use the display name string directly
+        display_name = f"{access.external_username} ({server.name})"
+        
+        current_app.logger.info(f"DEBUG: Adding user: {display_name}")
+        current_app.logger.info(f"DEBUG: User string type: {type(display_name)}")
+        
+        users_list.append(display_name)
+    
+    current_app.logger.info(f"DEBUG: Final users_list length: {len(users_list)}")
+    current_app.logger.info(f"DEBUG: First user type: {type(users_list[0]) if users_list else 'No users'}")
+    
+    # Create a data structure that matches what the template expects
+    user_data = {
+        'users': users_list
+    }
+    
+    current_app.logger.info(f"DEBUG: user_data object: {user_data}")
+    current_app.logger.info(f"DEBUG: user_data['users'] length: {len(user_data['users'])}")
+    current_app.logger.info(f"DEBUG: Calling render_template with services_data and user_data")
+    
+    return render_template('users/partials/_mass_edit_libraries.html', 
+                           services_data=services_data, 
+                           user_data=user_data)
 
 @bp.route('/mass_edit', methods=['POST'])
 @login_required

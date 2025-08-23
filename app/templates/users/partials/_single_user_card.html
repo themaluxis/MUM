@@ -44,7 +44,7 @@
 {% endif %}
 <div id="user-card-{{ user.id }}" class="card {{ card_bg_class }} shadow-lg hover:shadow-xl transition-all duration-200 ease-in-out relative group user-card-clickable user-card" data-user-id-for-card="{{ user.id }}" data-service-color="{{ service_color }}" data-service-class="{{ service_color_class }}">
     <!-- User Selection Checkbox -->
-    <input type="checkbox" id="user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-user-id="{{ user.id }}" title="Select user" style="--input-color: {{ service_color }}; --chkfg: white;">
+    <input type="checkbox" id="user-checkbox-{{ user.id }}" class="checkbox absolute top-2 right-2 z-10 user-select-checkbox opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-user-id="{{ user._prefixed_id if user._prefixed_id is defined else user.id }}" title="Select user" style="--input-color: {{ service_color }}; --chkfg: white;">
     
     <div class="card-body p-4">
         <div class="flex flex-row items-center mb-3">
