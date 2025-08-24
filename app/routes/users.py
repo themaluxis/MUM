@@ -1862,7 +1862,7 @@ def get_user_debug_info(user_uuid):
         
         # Create a mock user object for the template
         class MockUser:
-            def __init__(self, access):
+            def __init__(self, access, user_id):
                 self.id = user_id  # Keep the prefixed ID for display
                 self.username = access.external_username or 'Unknown'
                 self.email = access.external_email
@@ -1883,11 +1883,11 @@ def get_user_debug_info(user_uuid):
                 """Return avatar URL for MockUser - service users typically don't have avatars"""
                 return default_url
         
-        user = MockUser(access)
+        user = MockUser(access, user_uuid)
     
     try:
         # Enhanced debugging for raw service data
-        current_app.logger.info(f"=== DEBUG INFO REQUEST FOR USER {user_id} ===")
+        current_app.logger.info(f"=== DEBUG INFO REQUEST FOR USER {user_uuid} ===")
         current_app.logger.info(f"Username: {user.get_display_name()}")
         
         # Check for service-specific data in UserMediaAccess records
@@ -1925,7 +1925,7 @@ def get_user_debug_info(user_uuid):
         return render_template('users/partials/user_debug_info_modal.html', user=user)
         
     except Exception as e:
-        current_app.logger.error(f"Error getting debug info for user {user_id}: {e}", exc_info=True)
+        current_app.logger.error(f"Error getting debug info for user {user_uuid}: {e}", exc_info=True)
         return f"<p class='text-error'>Error fetching user data: {str(e)}</p>"
 
 @bp.route('/quick_edit_form/<uuid:user_uuid>')
