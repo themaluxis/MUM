@@ -98,41 +98,23 @@ def configure(plugin_id):
             'error': None,
             'actual_server_name': None
         }
+        # Use database data instead of making API calls on page load
         try:
-            service = MediaServiceFactory.create_service_from_db(server)
-            if service:
-                # Get actual server name from the API
-                try:
-                    if hasattr(service, '_make_request'):
-                        if server.service_type.value.lower() == 'jellyfin':
-                            info = service._make_request('System/Info')
-                            server_details['actual_server_name'] = info.get('ServerName', server.service_type.value.title())
-                        elif server.service_type.value.lower() == 'plex':
-                            server_instance = service._get_server_instance()
-                            if server_instance:
-                                server_details['actual_server_name'] = getattr(server_instance, 'friendlyName', server.service_type.value.title())
-                        else:
-                            server_details['actual_server_name'] = server.service_type.value.title()
-                    else:
-                        server_details['actual_server_name'] = server.service_type.value.title()
-                except Exception as e:
-                    current_app.logger.debug(f"Could not get actual server name for {server.server_nickname}: {e}")
-                    server_details['actual_server_name'] = server.service_type.value.title()
-                
-                # Get libraries
-                try:
-                    libs = service.get_libraries()
-                    server_details['libraries'] = [lib.get('name', 'Unknown Library') for lib in libs] if libs else []
-                except Exception as e:
-                    current_app.logger.error(f"Error getting libraries for server {server.server_nickname}: {e}")
-                    server_details['error'] = "Could not fetch libraries."
-            else:
-                server_details['error'] = "Could not create media service."
-                server_details['actual_server_name'] = server.service_type.value.title()
+            # Get libraries from database instead of API
+            from app.models_media_services import MediaLibrary
+            db_libraries = MediaLibrary.query.filter_by(server_id=server.id).all()
+            server_details['libraries'] = [lib.name for lib in db_libraries]
+            
+            # Use server nickname as display name (can be updated via sync)
+            server_details['actual_server_name'] = server.server_nickname
+            
+            # No error since we're using database data
+            server_details['error'] = None
+            
         except Exception as e:
-            current_app.logger.error(f"Error creating service for server {server.server_nickname}: {e}\n{traceback.format_exc()}")
-            server_details['error'] = "Failed to connect to server."
-            server_details['actual_server_name'] = server.service_type.value.title()
+            current_app.logger.error(f"Error getting server details from database for {server.server_nickname}: {e}")
+            server_details['error'] = "Could not fetch server details from database."
+            server_details['actual_server_name'] = server.server_nickname
             
         servers_with_details.append(server_details)
 

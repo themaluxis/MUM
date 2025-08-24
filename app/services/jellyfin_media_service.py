@@ -110,7 +110,7 @@ class JellyfinMediaService(BaseMediaService):
             
             for folder in virtual_folders:
                 libraries.append({
-                    'id': folder.get('ItemId', folder.get('Name', '')),
+                    'external_id': folder.get('ItemId', folder.get('Name', '')),
                     'name': folder.get('Name', 'Unknown Library'),
                     'type': folder.get('CollectionType', 'mixed'),
                     'locations': folder.get('Locations', [])
