@@ -350,7 +350,6 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                             current_app.logger.warning(f"Error parsing prefixed library ID {lib_id}: {e}")
                     else:
                         # Raw library ID - check if it belongs to this server
-                        # Get libraries from this server to validate
                         try:
                             from app.models_media_services import MediaLibrary
                             db_library = MediaLibrary.query.filter_by(
@@ -364,10 +363,8 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                             else:
                                 current_app.logger.debug(f"Skipped raw library {lib_id} - not found in server {server.server_nickname}")
                         except Exception as e:
-                            current_app.logger.warning(f"Error validating library {lib_id} for server {server.server_nickname}: {e}")
-                            # Fallback: add it anyway for legacy compatibility
-                            server_library_ids.append(lib_id)
-                            current_app.logger.info(f"Added raw library {lib_id} for server {server.server_nickname} (fallback)")
+                            current_app.logger.error(f"Database error validating library {lib_id} for server {server.server_nickname}: {e}")
+                            # No fallback - if database validation fails, skip the library
             
             current_app.logger.info(f"Final library IDs for {server.server_nickname}: {server_library_ids}")
             
