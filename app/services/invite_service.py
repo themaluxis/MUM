@@ -132,13 +132,6 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
     # User is new to MUM. Grant access to all servers associated with the invite.
     servers_to_grant_access = invite.servers if invite.servers else []
     
-    # Fallback to legacy single server if no servers in many-to-many relationship
-    if not servers_to_grant_access and invite.server_id:
-        media_service_manager = MediaServiceManager()
-        legacy_server = media_service_manager.get_server_by_id(invite.server_id)
-        if legacy_server:
-            servers_to_grant_access = [legacy_server]
-    
     if not servers_to_grant_access:
         log_event(EventType.ERROR_GENERAL, f"No servers found for invite {invite.id} when trying to grant access to {plex_username}", invite_id=invite.id)
         return False, "No servers are configured for this invite. Please contact admin."

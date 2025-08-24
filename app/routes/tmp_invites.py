@@ -1175,6 +1175,7 @@ def get_edit_invite_form(invite_id):
         form=form,
         invite=invite,
         grouped_servers=grouped_servers,
+        invite_server=invite_server,
         servers_with_libraries=servers_with_libraries,
         global_require_guild=global_require_guild
     )
