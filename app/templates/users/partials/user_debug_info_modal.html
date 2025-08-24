@@ -8,10 +8,9 @@
         </div>
         <div class="flex-1">
             <h4 class="font-medium text-base-content mb-1">User Information</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            <div class="flex flex-col gap-2 text-sm">
                 <div><span class="text-base-content/60">Username:</span> <span class="font-mono">{{ user.get_display_name() }}</span></div>
-                <div><span class="text-base-content/60">User UUID:</span> <span class="font-mono">{{ user.uuid }}</span></div>
-                <div><span class="text-base-content/60">Internal ID:</span> <span class="font-mono">{{ user.id }}</span></div>
+                <div><span class="text-base-content/60">User UUID:</span> <span class="font-mono">{{ user.id }}</span></div>
                 {% if user._is_standalone and user._access_record.external_user_id %}
                     {% if user._access_record.server.service_type.value == 'plex' %}
                         <div><span class="text-base-content/60">Plex UUID:</span> <span class="font-mono">{{ user._access_record.external_user_id }}</span></div>
