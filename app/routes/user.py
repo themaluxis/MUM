@@ -669,11 +669,16 @@ def delete_stream_history(username=None, server_nickname=None, server_username=N
         
         # Perform the bulk delete based on user type
         if user_type == "user_app_access":
-            # For linked users, delete by user_app_access_id
-            num_deleted = db.session.query(MediaStreamHistory).filter(
-                MediaStreamHistory.user_app_access_id == actual_id,
-                MediaStreamHistory.id.in_(ids_as_int)
-            ).delete(synchronize_session=False)
+            # For linked users, delete by user_app_access_uuid
+            # Need to get the UUID from the ID
+            user_app_access = UserAppAccess.query.get(actual_id)
+            if user_app_access:
+                num_deleted = db.session.query(MediaStreamHistory).filter(
+                    MediaStreamHistory.user_app_access_uuid == user_app_access.uuid,
+                    MediaStreamHistory.id.in_(ids_as_int)
+                ).delete(synchronize_session=False)
+            else:
+                num_deleted = 0
         else:  # user_media_access
             # For standalone service users, delete by user_media_access_uuid
             num_deleted = db.session.query(MediaStreamHistory).filter(
@@ -914,7 +919,7 @@ def view_app_user(username):
         
         # Get streaming history for this local user
         history_query = MediaStreamHistory.query.filter(
-            MediaStreamHistory.user_app_access_id == user_app_access.id,
+            MediaStreamHistory.user_app_access_uuid == user_app_access.uuid,
             MediaStreamHistory.started_at >= start_date,
             MediaStreamHistory.started_at <= end_date
         )

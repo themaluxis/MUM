@@ -341,7 +341,45 @@ def get_active_streams_count():
 @bp.route('/servers/<int:server_id>/libraries', methods=['GET'])
 @login_required
 def get_server_libraries(server_id):
-    """Get libraries for a specific server"""
+    """Get libraries for a specific server from database (fast)"""
+    server = MediaServiceManager.get_server_by_id(server_id)
+    if not server:
+        return jsonify({'error': 'Server not found'}), 404
+    
+    try:
+        from app.models_media_services import MediaLibrary
+        
+        # Load libraries from database (much faster than API calls)
+        db_libraries = MediaLibrary.query.filter_by(server_id=server_id).all()
+        
+        libraries = []
+        for lib in db_libraries:
+            libraries.append({
+                'id': lib.external_id,
+                'external_id': lib.external_id,
+                'name': lib.name,
+                'type': lib.library_type or 'unknown',
+                'item_count': lib.item_count or 0
+            })
+        
+        current_app.logger.info(f"Loaded {len(libraries)} libraries from database for server {server.server_nickname}")
+        
+        return jsonify({
+            'success': True, 
+            'libraries': libraries,
+            'service_type': server.service_type.name.upper(),
+            'server_name': server.server_nickname,
+            'source': 'database'
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error getting libraries from database for server {server_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@bp.route('/servers/<int:server_id>/libraries/refresh', methods=['POST'])
+@login_required
+@csrf.exempt
+def refresh_server_libraries(server_id):
+    """Refresh libraries for a specific server from live API"""
     server = MediaServiceManager.get_server_by_id(server_id)
     if not server:
         return jsonify({'error': 'Server not found'}), 404
@@ -351,15 +389,25 @@ def get_server_libraries(server_id):
         return jsonify({'error': 'Service not available'}), 503
     
     try:
+        # Get fresh libraries from live API
         libraries = service.get_libraries()
+        
+        # Ensure each library has both 'id' and 'external_id' for compatibility
+        for lib in libraries:
+            if 'external_id' in lib and 'id' not in lib:
+                lib['id'] = lib['external_id']
+        
+        current_app.logger.info(f"Refreshed {len(libraries)} libraries from live API for server {server.server_nickname}")
+        
         return jsonify({
             'success': True, 
             'libraries': libraries,
             'service_type': server.service_type.name.upper(),
-            'server_name': server.server_nickname
+            'server_name': server.server_nickname,
+            'source': 'live_api'
         })
     except Exception as e:
-        current_app.logger.error(f"Error getting libraries for server {server_id}: {e}")
+        current_app.logger.error(f"Error refreshing libraries from API for server {server_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @bp.route('/servers/test', methods=['POST'])

@@ -78,7 +78,10 @@
                                                 <span class="label-text">Libraries on {{ server.server_nickname }}</span>
                                                 <span class="label-text-alt">
                                                     <button type="button" class="btn btn-xs btn-ghost select-all-libs-{{ server.id }}">All</button> |
-                                                    <button type="button" class="btn btn-xs btn-ghost deselect-all-libs-{{ server.id }}">None</button>
+                                                    <button type="button" class="btn btn-xs btn-ghost deselect-all-libs-{{ server.id }}">None</button> |
+                                                    <button type="button" class="btn btn-xs btn-ghost refresh-libs-{{ server.id }}" title="Refresh libraries from server">
+                                                        <i class="fa-solid fa-refresh"></i>
+                                                    </button>
                                                 </span>
                                             </label>
                                             <div class="max-h-40 overflow-y-auto p-2 border border-base-300 rounded-md bg-base-100/30 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
@@ -328,6 +331,102 @@
     const libCheckboxes = form.querySelectorAll('.library-checkbox');
     if(selectAllBtn) selectAllBtn.addEventListener('click', (e) => { e.preventDefault(); libCheckboxes.forEach(cb => cb.checked = true); });
     if(deselectAllBtn) deselectAllBtn.addEventListener('click', (e) => { e.preventDefault(); libCheckboxes.forEach(cb => cb.checked = false); });
+
+    // Per-server library selection and refresh logic
+    {% for server_id, server_data in servers_with_libraries.items() %}
+    (function() {
+        const serverId = {{ server_id }};
+        const selectAllBtn = form.querySelector('.select-all-libs-{{ server_id }}');
+        const deselectAllBtn = form.querySelector('.deselect-all-libs-{{ server_id }}');
+        const refreshBtn = form.querySelector('.refresh-libs-{{ server_id }}');
+        const serverLibCheckboxes = form.querySelectorAll('input[name="libraries"][value*="[{{ server_data.server.service_type.name.upper() }}]-{{ server_data.server.server_nickname }}-"]');
+        
+        if(selectAllBtn) {
+            selectAllBtn.addEventListener('click', (e) => { 
+                e.preventDefault(); 
+                serverLibCheckboxes.forEach(cb => cb.checked = true); 
+            });
+        }
+        if(deselectAllBtn) {
+            deselectAllBtn.addEventListener('click', (e) => { 
+                e.preventDefault(); 
+                serverLibCheckboxes.forEach(cb => cb.checked = false); 
+            });
+        }
+        if(refreshBtn) {
+            refreshBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                refreshServerLibraries(serverId, '{{ server_data.server.server_nickname }}', '{{ server_data.server.service_type.name.upper() }}');
+            });
+        }
+    })();
+    {% endfor %}
+
+    function refreshServerLibraries(serverId, serverName, serviceType) {
+        const refreshBtn = form.querySelector('.refresh-libs-' + serverId);
+        const originalContent = refreshBtn.innerHTML;
+        
+        // Show loading state
+        refreshBtn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
+        refreshBtn.disabled = true;
+        
+        fetch(`/api/servers/${serverId}/libraries/refresh`, { method: 'POST' })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.libraries) {
+                    // Remove old checkboxes for this server
+                    const oldCheckboxes = form.querySelectorAll(`input[name="libraries"][value*="[${serviceType}]-${serverName}-"]`);
+                    oldCheckboxes.forEach(cb => cb.closest('label').remove());
+                    
+                    // Find the container for this server's libraries
+                    const serverContainer = refreshBtn.closest('.form-control').querySelector('.max-h-40.overflow-y-auto');
+                    
+                    // Add new checkboxes
+                    data.libraries.forEach(lib => {
+                        let libraryValue;
+                        if (serviceType === 'KAVITA') {
+                            // Kavita needs prefixed format to avoid ID conflicts
+                            libraryValue = `[${serviceType}]-${serverName}-${lib.external_id || lib.id}`;
+                        } else {
+                            // Keep prefixed format for edit form consistency
+                            libraryValue = `[${serviceType}]-${serverName}-${lib.external_id || lib.id}`;
+                        }
+                        
+                        const label = document.createElement('label');
+                        label.className = 'label cursor-pointer justify-start py-1';
+                        label.innerHTML = `
+                            <input type="checkbox" name="libraries" value="${libraryValue}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" checked>
+                            <span class="label-text" title="${lib.name}">${lib.name.length > 30 ? lib.name.substring(0, 30) + '...' : lib.name}</span>
+                        `;
+                        serverContainer.appendChild(label);
+                    });
+                    
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'text-xs text-success text-center py-1';
+                    successMsg.textContent = '✓ Refreshed from server';
+                    serverContainer.appendChild(successMsg);
+                    setTimeout(() => successMsg.remove(), 3000);
+                } else {
+                    const errorMsg = data && data.error ? data.error : 'Unknown error occurred';
+                    alert(`Error refreshing libraries: ${errorMsg}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing libraries:', error);
+                alert(`Failed to refresh libraries: ${error.message}`);
+            })
+            .finally(() => {
+                // Restore button state
+                refreshBtn.innerHTML = originalContent;
+                refreshBtn.disabled = false;
+            });
+    }
 
 })();
 </script>

@@ -103,7 +103,10 @@
                                                 <span class="label-text">{{ form.libraries.label.text }}</span>
                                                 <span class="label-text-alt">
                                                     <button type="button" class="btn btn-xs btn-ghost select-all-libs">All</button> |
-                                                    <button type="button" class="btn btn-xs btn-ghost deselect-all-libs">None</button>
+                                                    <button type="button" class="btn btn-xs btn-ghost deselect-all-libs">None</button> |
+                                                    <button type="button" class="btn btn-xs btn-ghost refresh-libs" title="Refresh libraries from server">
+                                                        <i class="fa-solid fa-refresh"></i>
+                                                    </button>
                                                 </span>
                                             </label>
                                             <div class="max-h-40 overflow-y-auto p-2 border border-base-300 rounded-md bg-base-100/30 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
@@ -398,6 +401,7 @@
             const checkmarkIcon = card.querySelector('.checkmark-icon');
             const selectAllBtn = card.querySelector('.select-all-libs');
             const deselectAllBtn = card.querySelector('.deselect-all-libs');
+            const refreshBtn = card.querySelector('.refresh-libs');
             const libCheckboxes = card.querySelectorAll('.library-checkbox');
 
             card.addEventListener('click', (e) => {
@@ -454,15 +458,20 @@
         });
 
         // Function to load libraries for a specific server
-        function loadLibrariesForServer(serverId, serverCard) {
+        function loadLibrariesForServer(serverId, serverCard, forceRefresh = false) {
             // Find the libraries grid container in the server card
             const librariesContainer = serverCard.querySelector('.max-h-40.overflow-y-auto');
             if (!librariesContainer) return;
             
             // Show loading state
-            librariesContainer.innerHTML = '<div class="text-center py-4"><span class="loading loading-spinner loading-sm"></span> Loading libraries...</div>';
+            const loadingText = forceRefresh ? 'Refreshing from server...' : 'Loading libraries...';
+            librariesContainer.innerHTML = `<div class="text-center py-4"><span class="loading loading-spinner loading-sm"></span> ${loadingText}</div>`;
             
-            fetch(`/api/servers/${serverId}/libraries`)
+            // Use refresh endpoint if forceRefresh is true, otherwise use fast database endpoint
+            const endpoint = forceRefresh ? `/api/servers/${serverId}/libraries/refresh` : `/api/servers/${serverId}/libraries`;
+            const method = forceRefresh ? 'POST' : 'GET';
+            
+            fetch(endpoint, { method })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -474,15 +483,23 @@
                         // Build library checkboxes HTML
                         let librariesHtml = '';
                         data.libraries.forEach(lib => {
-                            // Generate unique library ID format: [SERVICE_TYPE]-{ServerName}-{LibraryID}
-                            // Use server info from API response
+                            // Only use prefixed format for Kavita (which doesn't have UUIDs)
+                            // For other services, use raw external_id to avoid unnecessary backend processing
                             const serviceType = data.service_type || 'UNKNOWN';
                             const serverName = data.server_name || 'Unknown Server';
-                            const uniqueLibId = `[${serviceType}]-${serverName}-${lib.id}`;
+                            
+                            let libraryValue;
+                            if (serviceType.toUpperCase() === 'KAVITA') {
+                                // Kavita needs prefixed format to avoid ID conflicts (uses integer IDs)
+                                libraryValue = `[${serviceType}]-${serverName}-${lib.external_id || lib.id}`;
+                            } else {
+                                // UUID-based services can use raw external_id directly
+                                libraryValue = lib.external_id || lib.id;
+                            }
                             
                             librariesHtml += `
                                 <label class="label cursor-pointer justify-start py-1">
-                                    <input type="checkbox" name="libraries" value="${uniqueLibId}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" checked>
+                                    <input type="checkbox" name="libraries" value="${libraryValue}" class="checkbox checkbox-primary checkbox-sm mr-2 library-checkbox" checked>
                                     <span class="label-text" title="${lib.name}">${lib.name.length > 30 ? lib.name.substring(0, 30) + '...' : lib.name}</span>
                                 </label>
                             `;
@@ -491,9 +508,10 @@
                         if (librariesHtml) {
                             librariesContainer.innerHTML = librariesHtml;
                             
-                            // Re-attach select all/none functionality for this server card
+                            // Re-attach select all/none/refresh functionality for this server card
                             const selectAllBtn = serverCard.querySelector('.select-all-libs');
                             const deselectAllBtn = serverCard.querySelector('.deselect-all-libs');
+                            const refreshBtn = serverCard.querySelector('.refresh-libs');
                             const libCheckboxes = librariesContainer.querySelectorAll('.library-checkbox');
                             
                             if(selectAllBtn) {
@@ -506,8 +524,25 @@
                                 const newDeselectAllBtn = serverCard.querySelector('.deselect-all-libs');
                                 newDeselectAllBtn.addEventListener('click', () => libCheckboxes.forEach(cb => cb.checked = false));
                             }
+                            if(refreshBtn) {
+                                refreshBtn.replaceWith(refreshBtn.cloneNode(true)); // Remove old listeners
+                                const newRefreshBtn = serverCard.querySelector('.refresh-libs');
+                                newRefreshBtn.addEventListener('click', () => {
+                                    loadLibrariesForServer(serverId, serverCard, true); // Force refresh from live API
+                                });
+                            }
                         } else {
                             librariesContainer.innerHTML = '<div class="text-center py-4 text-base-content/60">No libraries found</div>';
+                        }
+                        
+                        // Show source indicator
+                        if (forceRefresh && data.source === 'live_api') {
+                            // Briefly show success message for refresh
+                            const sourceIndicator = document.createElement('div');
+                            sourceIndicator.className = 'text-xs text-success text-center py-1';
+                            sourceIndicator.textContent = '✓ Refreshed from server';
+                            librariesContainer.appendChild(sourceIndicator);
+                            setTimeout(() => sourceIndicator.remove(), 3000);
                         }
                     } else {
                         const errorMsg = data && data.error ? data.error : 'Unknown error occurred';

@@ -325,6 +325,52 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
         for server in servers_to_grant_access:
             current_app.logger.info(f"--- Processing server: {server.server_nickname} (Type: {server.service_type.name}) ---")
             
+            # Extract library IDs for this specific server from the invite's grant_library_ids
+            server_library_ids = []
+            if invite.grant_library_ids:
+                current_app.logger.debug(f"Invite service - Processing grant_library_ids for {server.server_nickname}: {invite.grant_library_ids}")
+                for lib_id in invite.grant_library_ids:
+                    # Check if this is a prefixed format library ID
+                    if isinstance(lib_id, str) and lib_id.startswith('[') and ']-' in lib_id:
+                        # Format: [SERVICE_TYPE]-ServerName-LibraryID
+                        try:
+                            service_part, remainder = lib_id.split(']-', 1)
+                            service_type = service_part[1:]  # Remove the opening [
+                            server_name, library_id = remainder.split('-', 1)
+                            
+                            # Check if this library belongs to the current server
+                            if server_name == server.server_nickname:
+                                # For Kavita, keep the prefixed format; for others, use raw UUID
+                                if service_type == 'KAVITA':
+                                    server_library_ids.append(lib_id)  # Keep prefixed for Kavita
+                                else:
+                                    server_library_ids.append(library_id)  # Use raw UUID for others
+                                current_app.logger.info(f"Added library {lib_id} -> {server_library_ids[-1]} for server {server.server_nickname}")
+                        except Exception as e:
+                            current_app.logger.warning(f"Error parsing prefixed library ID {lib_id}: {e}")
+                    else:
+                        # Raw library ID - check if it belongs to this server
+                        # Get libraries from this server to validate
+                        try:
+                            from app.models_media_services import MediaLibrary
+                            db_library = MediaLibrary.query.filter_by(
+                                server_id=server.id,
+                                external_id=lib_id
+                            ).first()
+                            
+                            if db_library:
+                                server_library_ids.append(lib_id)
+                                current_app.logger.info(f"Added validated raw library {lib_id} for server {server.server_nickname}")
+                            else:
+                                current_app.logger.debug(f"Skipped raw library {lib_id} - not found in server {server.server_nickname}")
+                        except Exception as e:
+                            current_app.logger.warning(f"Error validating library {lib_id} for server {server.server_nickname}: {e}")
+                            # Fallback: add it anyway for legacy compatibility
+                            server_library_ids.append(lib_id)
+                            current_app.logger.info(f"Added raw library {lib_id} for server {server.server_nickname} (fallback)")
+            
+            current_app.logger.info(f"Final library IDs for {server.server_nickname}: {server_library_ids}")
+            
             # Determine service-specific username and email
             if server.service_type.name.upper() == 'PLEX':
                 # For Plex, use the authenticated Plex user info
@@ -347,7 +393,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                 external_user_id=str(plex_user_uuid) if server.service_type.name.upper() == 'PLEX' else getattr(server, '_temp_external_user_id', None),
                 external_username=service_username,
                 external_email=service_email,
-                allowed_library_ids=invite.grant_library_ids or [],
+                allowed_library_ids=server_library_ids,  # Use server-specific library IDs
                 allow_downloads=bool(invite.allow_downloads),
                 used_invite_id=invite.id,
                 service_join_date=datetime.now(timezone.utc),

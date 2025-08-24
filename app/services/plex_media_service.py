@@ -159,11 +159,11 @@ class PlexMediaService(BaseMediaService):
             for raw_lib_data in raw_libraries:
                 try:
                     libraries.append({
-                        'id': str(raw_lib_data.get('key', 'unknown')),
+                        'id': str(raw_lib_data.get('uuid', 'unknown')),
                         'name': raw_lib_data.get('title', 'Unknown Library'),
                         'type': raw_lib_data.get('type', 'unknown'),
                         'item_count': raw_lib_data.get('totalSize', 0),
-                        'external_id': str(raw_lib_data.get('key', 'unknown')),
+                        'external_id': str(raw_lib_data.get('uuid', 'unknown')),
                         'raw_data': raw_lib_data  # Store the complete raw data for backward compatibility
                     })
                     
@@ -171,11 +171,11 @@ class PlexMediaService(BaseMediaService):
                     self.log_error(f"Error processing library {raw_lib_data.get('title', 'Unknown')}: {lib_error}")
                     # Add basic library info even if processing fails
                     libraries.append({
-                        'id': str(raw_lib_data.get('key', 'unknown')),
+                        'id': str(raw_lib_data.get('uuid', 'unknown')),
                         'name': raw_lib_data.get('title', 'Unknown Library'),
                         'type': raw_lib_data.get('type', 'unknown'),
                         'item_count': raw_lib_data.get('totalSize', 0),
-                        'external_id': str(raw_lib_data.get('key', 'unknown')),
+                        'external_id': str(raw_lib_data.get('uuid', 'unknown')),
                         'raw_data': {'error': f'Could not process library: {str(lib_error)}'}
                     })
                     
@@ -304,10 +304,11 @@ class PlexMediaService(BaseMediaService):
         
         all_my_server_library_ids_as_strings = []
         try:
-            all_my_server_library_ids_as_strings = [str(lib_section.key) for lib_section in plex_server.library.sections()]
-            self.log_info(f"get_users(): All available library IDs on this server: {all_my_server_library_ids_as_strings}")
+            # Use UUIDs instead of keys for library IDs
+            all_my_server_library_ids_as_strings = [str(lib_section.uuid) for lib_section in plex_server.library.sections() if hasattr(lib_section, 'uuid') and lib_section.uuid]
+            self.log_info(f"get_users(): All available library UUIDs on this server: {all_my_server_library_ids_as_strings}")
         except Exception as e_all_libs:
-            self.log_error(f"get_users(): Could not fetch all library IDs from server: {e_all_libs}.")
+            self.log_error(f"get_users(): Could not fetch all library UUIDs from server: {e_all_libs}.")
 
         detailed_shares_by_userid = {} 
         try:
@@ -338,9 +339,21 @@ class PlexMediaService(BaseMediaService):
                     
                     shared_section_keys_for_user = []
                     if not all_libs: 
+                        # Create a mapping from keys to UUIDs for conversion
+                        key_to_uuid_map = {}
+                        try:
+                            for lib_section in plex_server.library.sections():
+                                if hasattr(lib_section, 'key') and hasattr(lib_section, 'uuid') and lib_section.uuid:
+                                    key_to_uuid_map[str(lib_section.key)] = str(lib_section.uuid)
+                        except Exception as e:
+                            self.log_warning(f"Error building key-to-UUID mapping: {e}")
+                        
                         for section_elem in shared_server_elem.findall('Section'):
                             if section_elem.get('shared') == "1" and section_elem.get('key'):
-                                shared_section_keys_for_user.append(str(section_elem.get('key')))
+                                section_key = str(section_elem.get('key'))
+                                # Convert key to UUID if available, otherwise use key as fallback
+                                section_uuid = key_to_uuid_map.get(section_key, section_key)
+                                shared_section_keys_for_user.append(section_uuid)
                     
                     detailed_shares_by_userid[user_id_int_key] = {
                         'allLibraries': all_libs,
@@ -536,7 +549,16 @@ class PlexMediaService(BaseMediaService):
             
             if library_ids is not None:
                 if library_ids:
-                    all_libs = {str(lib.key): lib for lib in server.library.sections()}
+                    # Create mapping from both UUIDs and keys to library objects for compatibility
+                    all_libs = {}
+                    for lib in server.library.sections():
+                        # Map by UUID (primary)
+                        if hasattr(lib, 'uuid') and lib.uuid:
+                            all_libs[str(lib.uuid)] = lib
+                        # Also map by key for backward compatibility
+                        if hasattr(lib, 'key'):
+                            all_libs[str(lib.key)] = lib
+                    
                     sections = [all_libs[str(lib_id)] for lib_id in library_ids if str(lib_id) in all_libs]
                     update_kwargs['sections'] = sections
                 else:

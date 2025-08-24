@@ -123,8 +123,14 @@ class JellyfinMediaService(BaseMediaService):
             
             # Process the raw data for internal use
             for folder in virtual_folders:
+                # Use Name as external_id for Jellyfin virtual folders since ItemId may not exist
+                external_id = folder.get('ItemId') or folder.get('Name', '')
+                if not external_id:
+                    # Skip libraries without a valid identifier
+                    continue
+                    
                 libraries.append({
-                    'external_id': folder.get('ItemId', folder.get('Name', '')),
+                    'external_id': external_id,
                     'name': folder.get('Name', 'Unknown Library'),
                     'type': folder.get('CollectionType', 'mixed'),
                     'locations': folder.get('Locations', [])

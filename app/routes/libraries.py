@@ -307,8 +307,12 @@ def get_library_raw_data(server_id, library_id):
                 # Check different possible ID fields from the raw API based on service type
                 lib_id = None
                 if server.service_type.value.lower() == 'plex':
-                    # Plex uses 'key' field
-                    lib_id = lib.get('key')
+                    # Plex uses UUID exclusively
+                    lib_uuid = lib.get('uuid')
+                    if str(lib_uuid) == str(library_id):
+                        target_library = lib
+                        break
+                    continue
                 elif server.service_type.value.lower() in ['jellyfin', 'emby']:
                     # Jellyfin/Emby use 'ItemId'
                     lib_id = lib.get('ItemId')

@@ -214,13 +214,13 @@ def list_users():
                     from app.models_media_services import MediaStreamHistory
                     
                     if access.user_app_access_id:
-                        # This is a linked service account, get streaming history from UserAppAccess
+                        # This is a linked service account, get streaming history from UserAppAccess UUID
                         last_stream = MediaStreamHistory.query.filter_by(
-                            user_app_access_id=access.user_app_access_id
+                            user_app_access_uuid=access.user_app_access.uuid if access.user_app_access else None
                         ).order_by(MediaStreamHistory.started_at.desc()).first()
                         self.last_streamed_at = last_stream.started_at if last_stream else None
                     else:
-                        # This is a standalone service account, get streaming history from UserMediaAccess
+                        # This is a standalone service account, get streaming history from UserMediaAccess UUID
                         last_stream = MediaStreamHistory.query.filter_by(
                             user_media_access_uuid=access.uuid
                         ).order_by(MediaStreamHistory.started_at.desc()).first()
@@ -542,22 +542,28 @@ def list_users():
     
     if local_user_ids_on_page:
         # Get the most recent stream for each local user from MediaStreamHistory table
-        from sqlalchemy import desc
-        last_streams = db.session.query(MediaStreamHistory).filter(
-            MediaStreamHistory.user_app_access_id.in_(local_user_ids_on_page)
-        ).order_by(MediaStreamHistory.user_app_access_id, desc(MediaStreamHistory.started_at)).all()
+        # Need to get UUIDs for the local users first
+        local_user_uuids = []
+        for user in users_on_page:
+            if hasattr(user, '_user_type') and user._user_type == 'local':
+                local_user_uuids.append(user.uuid)
         
-        # Group by user_app_access_id and take the first (most recent) for each user
-        # Map back to prefixed IDs for template usage
-        seen_users = set()
-        for stream in last_streams:
-            if stream.user_app_access_id not in seen_users:
-                # Find the user by database ID to get their UUID
-                user_for_stream = next((u for u in users_on_page if hasattr(u, '_user_type') and u._user_type == 'local' and u.id == stream.user_app_access_id), None)
-                if user_for_stream:
-                    user_last_played[user_for_stream.uuid] = {
-                    'media_title': stream.media_title,
-                    'media_type': stream.media_type,
+        if local_user_uuids:
+            from sqlalchemy import desc
+            last_streams = db.session.query(MediaStreamHistory).filter(
+                MediaStreamHistory.user_app_access_uuid.in_(local_user_uuids)
+            ).order_by(MediaStreamHistory.user_app_access_uuid, desc(MediaStreamHistory.started_at)).all()
+            
+            # Group by user_app_access_uuid and take the first (most recent) for each user
+            seen_users = set()
+            for stream in last_streams:
+                if stream.user_app_access_uuid not in seen_users:
+                    # Find the user by UUID
+                    user_for_stream = next((u for u in users_on_page if hasattr(u, '_user_type') and u._user_type == 'local' and u.uuid == stream.user_app_access_uuid), None)
+                    if user_for_stream:
+                        user_last_played[user_for_stream.uuid] = {
+                        'media_title': stream.media_title,
+                        'media_type': stream.media_type,
                     'grandparent_title': stream.grandparent_title,
                     'parent_title': stream.parent_title,
                     'started_at': stream.started_at,
@@ -569,7 +575,7 @@ def list_users():
                     # When sorting by last_streamed, users_on_page contains all users, not just paginated ones
                     user_for_stream.last_streamed_at = stream.started_at
                 
-                seen_users.add(stream.user_app_access_id)
+                seen_users.add(stream.user_app_access_uuid)
 
     # Handle last_streamed sorting after streaming data is populated
     if 'last_streamed' in sort_by_param:
