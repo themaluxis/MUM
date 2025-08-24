@@ -38,12 +38,20 @@
         </div>
     </div>
 
-    <div class="overflow-x-auto">
-        <table class="table table-sm w-full">
+    <!-- History Table -->
+    <div class="bg-base-100 rounded-xl border border-base-300/60 overflow-hidden">
+        <!-- Table Header -->
+        <div class="bg-base-200/50 px-6 py-4 border-b border-base-300/60">
+            <h3 class="font-semibold text-base-content">Recent Activity</h3>
+        </div>
+
+        <!-- Table Content -->
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
             <thead>
-                <tr>
+                <tr class="bg-base-200/30">
                     <th class="w-10 text-center">
-                        <input type="checkbox" id="history-select-all" class="checkbox checkbox-sm" title="Select All">
+                        <input type="checkbox" id="history-select-all" class="checkbox checkbox-primary checkbox-sm" title="Select All">
                     </th>
                     {% if is_kavita_user %}
                         <th data-col="media_title">Book / Chapter</th>
@@ -69,9 +77,9 @@
             </thead>
             <tbody>
                 {% for entry in history_logs.items %}
-                    <tr class="hover">
+                    <tr class="hover:bg-base-200/50">
                         <td class="text-center">
-                            <input type="checkbox" name="history_ids[]" value="{{ entry.id }}" class="checkbox checkbox-sm history-checkbox">
+                            <input type="checkbox" name="history_ids[]" value="{{ entry.id }}" class="checkbox checkbox-primary checkbox-sm history-checkbox">
                         </td>
                         <td data-col="poster">
                             {% if entry.rating_key %}
@@ -102,7 +110,7 @@
                             <div class="font-medium">{{ entry.player or 'Unknown Player' }}</div>
                             <div class="text-xs opacity-70">{{ entry.product or entry.platform or 'Unknown Platform' }}</div>
                         </td>
-                        <td class="hidden sm:table-cell" data-col="ip_address">
+                        <td data-col="ip_address">
                             {% if entry.ip_address %}
                                 <span class="font-mono text-xs">{{ entry.ip_address }}</span>
                                 <span class="badge badge-ghost badge-xs ml-1">{{ 'LAN' if entry.is_lan else 'WAN' }}</span>
@@ -200,7 +208,9 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
+</div>
 </form>
 
 <!-- Pagination remains the same -->
