@@ -143,7 +143,7 @@ def create_invite():
                 libraries = service.get_libraries()
                 available_libraries = {lib['id']: lib['name'] for lib in libraries}
             except Exception as e:
-                current_app.logger.error(f"Failed to fetch libraries from server {first_server.name}: {e}")
+                current_app.logger.error(f"Failed to fetch libraries from server {first_server.server_nickname}: {e}")
                 available_libraries = {}
     
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
@@ -168,7 +168,7 @@ def create_invite():
                 unique_choices = []
                 service_type = first_server.service_type.name.upper()
                 for lib_id, lib_name in available_libraries.items():
-                    unique_lib_id = f"[{service_type}]-{first_server.name}-{lib_id}"
+                    unique_lib_id = f"[{service_type}]-{first_server.server_nickname}-{lib_id}"
                     unique_choices.append((unique_lib_id, lib_name))
                 form.libraries.choices = unique_choices
         else:
@@ -189,7 +189,7 @@ def create_invite():
                             'libraries': server_lib_dict
                         }
                     except Exception as e:
-                        current_app.logger.error(f"Failed to fetch libraries from server {server.name}: {e}")
+                        current_app.logger.error(f"Failed to fetch libraries from server {server.server_nickname}: {e}")
             
             # Second pass: detect conflicts and build choices
             for server_id, server_data in servers_libraries.items():
@@ -207,13 +207,13 @@ def create_invite():
                     if conflicts_with_other_servers:
                         # Use more unique prefixed ID format: [ServiceType]-{ServerName}-{LibID}
                         service_type = server.service_type.name.upper()
-                        unique_lib_id = f"[{service_type}]-{server.name}-{lib_id}"
-                        all_valid_choices.append((unique_lib_id, f"[{server.name}] {lib_name}"))
+                        unique_lib_id = f"[{service_type}]-{server.server_nickname}-{lib_id}"
+                        all_valid_choices.append((unique_lib_id, f"[{server.server_nickname}] {lib_name}"))
                     else:
                         # Still use unique format for consistency in multi-server invites
                         service_type = server.service_type.name.upper()
-                        unique_lib_id = f"[{service_type}]-{server.name}-{lib_id}"
-                        all_valid_choices.append((unique_lib_id, f"[{server.name}] {lib_name}"))
+                        unique_lib_id = f"[{service_type}]-{server.server_nickname}-{lib_id}"
+                        all_valid_choices.append((unique_lib_id, f"[{server.server_nickname}] {lib_name}"))
             
             # Update form choices for multi-server
             form.libraries.choices = all_valid_choices
@@ -481,7 +481,7 @@ def process_invite_form(invite_path_or_token):
         from app.models_media_services import MediaServer
         server = MediaServer.query.get(invite.server_id)
         if server:
-            server_name = server.name
+            server_name = server.server_nickname
     # --- END NEW ---
 
     # Get all servers for template logic
@@ -501,7 +501,7 @@ def process_invite_form(invite_path_or_token):
                         'libraries': {lib['id']: lib['name'] for lib in libraries}
                     }
             except Exception as e:
-                current_app.logger.error(f"Failed to fetch libraries for server {server.name}: {e}")
+                current_app.logger.error(f"Failed to fetch libraries for server {server.server_nickname}: {e}")
                 servers_with_libraries[server.id] = {'server': server, 'libraries': {}}
     
     # Check if user accounts are enabled
@@ -728,7 +728,7 @@ def process_invite_form(invite_path_or_token):
     if has_plex_servers:
         # Get the first Plex server name for the step title
         plex_server = next((server for server in invite.servers if server.service_type.name.upper() == 'PLEX'), None)
-        plex_server_name = plex_server.name if plex_server else 'Plex'
+        plex_server_name = plex_server.server_nickname if plex_server else 'Plex'
         
         invite_steps.append({
             'id': 'plex',
@@ -745,12 +745,12 @@ def process_invite_form(invite_path_or_token):
             server_completed = session.get(f'invite_{invite.id}_server_{server.id}_completed', False)
             invite_steps.append({
                 'id': step_id,
-                'name': f'{server.name} Access',
+                'name': f'{server.server_nickname} Access',
                 'icon': 'fa-solid fa-server',
                 'required': True,
                 'completed': server_completed,
                 'server_id': server.id,
-                'server_name': server.name,
+                'server_name': server.server_nickname,
                 'server_type': server.service_type.name.upper()
             })
             
@@ -1059,10 +1059,10 @@ def invite_success():
     
     for server_name in server_list:
         # Find the server in the database
-        server = next((s for s in all_servers if s.name == server_name), None)
+        server = next((s for s in all_servers if s.server_nickname == server_name), None)
         if server:
             configured_servers.append({
-                'name': server.name,
+                'name': server.server_nickname,
                 'type': server.service_type.name.upper(),
                 'url': get_server_url(server)
             })

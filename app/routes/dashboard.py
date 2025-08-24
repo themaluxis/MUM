@@ -45,19 +45,38 @@ def index():
     active_streams_count = 0
     # NOTE: Active streams will be loaded via HTMX after page load to avoid blocking
 
-    # Server Status Card Logic - Load basic info only, status will be fetched asynchronously
-    current_app.logger.debug("Dashboard: Getting server list (DB only, no API calls)")
+    # Server Status Card Logic - Check for cached status first
+    current_app.logger.debug("Dashboard: Getting server list and checking for cached status")
     all_servers = MediaServiceManager.get_all_servers(active_only=True)
     server_count = len(all_servers)
     current_app.logger.debug(f"Dashboard: Found {server_count} servers in database")
     
-    # Just pass basic server info for initial load, actual status will be loaded via HTMX
-    server_status_data = {
-        'loading': True,
-        'server_count': server_count,
-        'servers': [{'id': server.id, 'name': server.name, 'service_type': server.service_type.value} for server in all_servers]
-    }
-    current_app.logger.debug("Dashboard: Server status data prepared (loading state)")
+    # Check if any servers have never been checked (last_status is None)
+    unchecked_servers = [server for server in all_servers if server.last_status is None]
+    
+    if unchecked_servers:
+        current_app.logger.info(f"Dashboard: Found {len(unchecked_servers)} servers that have never been checked - performing automatic first check")
+        # Perform automatic first check for all servers
+        from app.routes.api import get_fresh_server_status
+        server_status_data = get_fresh_server_status()
+        current_app.logger.debug("Dashboard: Automatic first server check completed")
+    else:
+        # Check for stored server status in database
+        from app.routes.api import get_stored_server_status
+        stored_status = get_stored_server_status()
+        
+        if stored_status:
+            current_app.logger.debug("Dashboard: Using stored server status from database")
+            server_status_data = stored_status
+        else:
+            current_app.logger.debug("Dashboard: No stored status, showing initial state")
+            # Just pass basic server info for initial load, actual status will be loaded via HTMX
+            server_status_data = {
+                'loading': True,
+                'server_count': server_count,
+                'servers': [{'id': server.id, 'name': server.server_nickname, 'service_type': server.service_type.value} for server in all_servers]
+            }
+    current_app.logger.debug("Dashboard: Server status data prepared")
 
     current_app.logger.debug("Dashboard: Fetching recent activities")
     recent_activities = HistoryLog.query.order_by(HistoryLog.timestamp.desc()).limit(10).all()

@@ -44,7 +44,7 @@
                     <ul>
                         <li><a href="{{ url_for('plugin_management.index') }}">Plugins</a></li>
                         <li><a href="{{ url_for('plugin_management.configure', plugin_id=server.service_type.value) }}">{{ server.service_type.value.title() }}</a></li>
-                        <li>Edit {{ server.name }}</li>
+                        <li>Edit {{ server.server_nickname }}</li>
                     </ul>
                 </div>
             </div>

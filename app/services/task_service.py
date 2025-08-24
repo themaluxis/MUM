@@ -30,7 +30,7 @@ def monitor_media_sessions_task():
         current_app.logger.info(f"DEBUG: Found {len(all_servers)} active media servers in database")
         
         for server in all_servers:
-            current_app.logger.info(f"DEBUG: Server - Name: {server.name}, Type: {server.service_type.value}, Active: {server.is_active}")
+            current_app.logger.info(f"DEBUG: Server - Name: {server.server_nickname}, Type: {server.service_type.value}, Active: {server.is_active}")
         
         if not all_servers:
             current_app.logger.warning("No active media servers configured in the database. Skipping task.")
@@ -123,7 +123,7 @@ def monitor_media_sessions_task():
                                 else:
                                     current_app.logger.info(f"Found linked UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}) linked to UserAppAccess (ID: {mum_user.id}). Processing as linked user.")
                             else:
-                                current_app.logger.warning(f"No UserMediaAccess found for Jellyfin username '{jellyfin_username}' on server '{jellyfin_server.name}'. Skipping session.")
+                                current_app.logger.warning(f"No UserMediaAccess found for Jellyfin username '{jellyfin_username}' on server '{jellyfin_server.server_nickname}'. Skipping session.")
                                 continue
                         else:
                             current_app.logger.warning(f"No Jellyfin server configured. Skipping session {session_key}.")
@@ -248,7 +248,7 @@ def monitor_media_sessions_task():
                         user_display_name = user_media_access.get_display_name()
                         user_id = user_media_access.id
                     
-                    current_app.logger.info(f"DEBUG: Server: {current_server.name} (ID: {current_server.id})")
+                    current_app.logger.info(f"DEBUG: Server: {current_server.server_nickname} (ID: {current_server.id})")
                     current_app.logger.info(f"DEBUG: Media: {media_title} ({media_type})")
                     current_app.logger.info(f"DEBUG: Platform: {platform}, Player: {player_title}")
                     

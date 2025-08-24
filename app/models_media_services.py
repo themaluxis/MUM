@@ -44,7 +44,8 @@ class MediaServer(db.Model):
     __tablename__ = 'media_servers'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)  # User-friendly name - must be unique
+    server_nickname = db.Column(db.String(100), nullable=False, unique=True)  # User-defined nickname - must be unique
+    server_name = db.Column(db.String(255), nullable=True)  # Actual server name from the service
     service_type = db.Column(db.Enum(ServiceType), nullable=False)
     url = db.Column(db.String(512), nullable=False)
     api_key = db.Column(db.String(512), nullable=True)  # For services that use API keys
@@ -59,12 +60,18 @@ class MediaServer(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_sync_at = db.Column(db.DateTime, nullable=True)
     
+    # Server status tracking
+    last_status_check = db.Column(db.DateTime, nullable=True)
+    last_status = db.Column(db.Boolean, nullable=True)  # True=online, False=offline, None=never checked
+    last_status_error = db.Column(db.Text, nullable=True)  # Error message if offline
+    last_version = db.Column(db.String(100), nullable=True)  # Server version from last successful check
+    
     # Relationships
     libraries = db.relationship('MediaLibrary', back_populates='server', cascade="all, delete-orphan")
     user_accesses = db.relationship('UserMediaAccess', back_populates='server', cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f'<MediaServer {self.name} ({self.service_type.value})>'
+        return f'<MediaServer {self.server_nickname} ({self.service_type.value})>'
     
     def update_plugin_servers_count(self):
         """Update the servers_count for the associated plugin"""
@@ -134,7 +141,7 @@ class MediaLibrary(db.Model):
     __table_args__ = (db.UniqueConstraint('server_id', 'external_id', name='_server_library_uc'),)
     
     def __repr__(self):
-        return f'<MediaLibrary {self.name} on {self.server.name}>'
+        return f'<MediaLibrary {self.name} on {self.server.server_nickname}>'
 
 class UserMediaAccess(db.Model):
     """Represents a user's access to a specific media server"""
@@ -205,7 +212,7 @@ class UserMediaAccess(db.Model):
     
     def __repr__(self):
         username = self.external_username or self.user_app_access.username if self.user_app_access else 'Unknown'
-        server_name = self.server.name if self.server else 'Unknown Server'
+        server_name = self.server.server_nickname if self.server else 'Unknown Server'
         return f'<UserMediaAccess {username} on {server_name}>'
     
     def get_display_name(self):
@@ -310,7 +317,7 @@ class MediaStreamHistory(db.Model):
     
     def __repr__(self):
         username = self.user_app_access.get_display_name() if self.user_app_access else 'Unknown User'
-        server_name = self.server.name if self.server else 'Unknown Server'
+        server_name = self.server.server_nickname if self.server else 'Unknown Server'
         return f'<MediaStreamHistory {self.id} by {username} on {server_name}>'
     
     def get_user_display_name(self):
@@ -324,7 +331,7 @@ class MediaStreamHistory(db.Model):
     
     def get_server_name(self):
         """Get the name of the server where this was streamed"""
-        return self.server.name if self.server else 'Unknown Server'
+        return self.server.server_nickname if self.server else 'Unknown Server'
     
     def get_service_type(self):
         """Get the service type where this was streamed"""

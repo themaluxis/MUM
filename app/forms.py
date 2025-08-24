@@ -78,7 +78,7 @@ class MediaServerForm(FlaskForm):
     def validate_name(self, field):
         from app.models_media_services import MediaServer
         # Check if name is unique (excluding current server if editing)
-        query = MediaServer.query.filter_by(name=field.data)
+        query = MediaServer.query.filter_by(server_nickname=field.data)
         if self.server_id:
             query = query.filter(MediaServer.id != self.server_id)
         

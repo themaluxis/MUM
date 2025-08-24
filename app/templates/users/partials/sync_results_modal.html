@@ -32,15 +32,15 @@
                 <div>
                     <h4 class="font-medium text-base-content mb-1">Synchronization Summary</h4>
                     <p class="text-sm text-base-content/70 leading-relaxed">
-                        {% if sync_result.added == 0 and sync_result.updated == 0 and sync_result.removed == 0 and sync_result.errors == 0 %}
+                        {% if sync_result['added'] == 0 and sync_result['updated'] == 0 and sync_result['removed'] == 0 and sync_result['errors'] == 0 %}
                             All media servers are synchronized and up to date. No user changes were required.
                         {% else %}
                             Media server synchronization completed with 
-                            {% if sync_result.added > 0 %}<span class="text-success font-medium">{{ sync_result.added }} users added</span>{% endif %}{% if sync_result.added > 0 and (sync_result.updated > 0 or sync_result.removed > 0) %}, {% endif %}
-                            {% if sync_result.updated > 0 %}<span class="text-warning font-medium">{{ sync_result.updated }} users updated</span>{% endif %}{% if sync_result.updated > 0 and sync_result.removed > 0 %}, and {% endif %}
-                            {% if sync_result.removed > 0 %}<span class="text-error font-medium">{{ sync_result.removed }} users removed</span>{%endif%}. 
-                            {% if sync_result.errors > 0 %}
-                                <span class="text-error font-medium">{{ sync_result.errors }} errors occurred</span> during the process.
+                            {% if sync_result['added'] > 0 %}<span class="text-success font-medium">{{ sync_result['added'] }} users added</span>{% endif %}{% if sync_result['added'] > 0 and (sync_result['updated'] > 0 or sync_result['removed'] > 0) %}, {% endif %}
+                            {% if sync_result['updated'] > 0 %}<span class="text-warning font-medium">{{ sync_result['updated'] }} users updated</span>{% endif %}{% if sync_result['updated'] > 0 and sync_result['removed'] > 0 %}, and {% endif %}
+                            {% if sync_result['removed'] > 0 %}<span class="text-error font-medium">{{ sync_result['removed'] }} users removed</span>{%endif%}. 
+                            {% if sync_result['errors'] > 0 %}
+                                <span class="text-error font-medium">{{ sync_result['errors'] }} errors occurred</span> during the process.
                             {% endif %}
                         {% endif %}
                     </p>
@@ -49,7 +49,7 @@
         </div>
 
         <!-- Error Messages -->
-        {% if sync_result.errors > 0 %}
+        {% if sync_result['errors'] > 0 %}
         <div class="bg-error/10 border border-error/20 rounded-lg p-4 mb-6">
             <div class="flex items-start gap-3">
                 <div class="w-6 h-6 rounded-full bg-error/20 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -58,7 +58,7 @@
                 <div>
                     <h4 class="font-medium text-error mb-2">Synchronization Errors</h4>
                     <ul class="text-sm text-base-content/80 space-y-1">
-                        {% for error in sync_result.error_messages %}
+                        {% for error in sync_result['error_messages'] %}
                             <li class="flex items-start gap-2">
                                 <i class="fa-solid fa-circle text-error text-[6px] mt-1.5"></i>
                                 {{ error }}
@@ -71,7 +71,7 @@
         {% endif %}
 
         <!-- Sync Results Sections -->
-        {% if sync_result.added > 0 or sync_result.updated > 0 or sync_result.removed > 0 %}
+        {% if sync_result['added'] > 0 or sync_result['updated'] > 0 or sync_result['removed'] > 0 %}
             <div class="space-y-4">
                 <!-- Added Users Section -->
                 {% set section_type = 'added' %}

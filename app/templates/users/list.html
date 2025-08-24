@@ -113,7 +113,7 @@
                             </label>
                             <select name="server_id" class="select select-bordered">
                                 {% for server in server_dropdown_options %}
-                                <option value="{{ server.id }}" {% if request.args.get('server_id', 'all') == server.id %}selected{% endif %}>{{ server.name }}</option>
+                                <option value="{{ server.id }}" {% if request.args.get('server_id', 'all') == server.id %}selected{% endif %}>{{ server.server_nickname }}</option>
                                 {% endfor %}
                             </select>
                         </div>

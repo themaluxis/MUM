@@ -45,7 +45,7 @@ def index():
                 'type': library.library_type,
                 'item_count': library.item_count,
                 'last_scanned': library.last_scanned,
-                'server_name': server.name,
+                'server_name': server.server_nickname,
                 'service_type': server.service_type.value,
                 'server_id': server.id,
                 'external_id': library.external_id
@@ -64,7 +64,7 @@ def index():
                 'service_display_name': service_type.title()
             }
         
-        libraries_by_service[service_type]['servers'][server.name] = {
+        libraries_by_service[service_type]['servers'][server.server_nickname] = {
             'libraries': server_data['libraries'],
             'server_id': server.id,
             'online': server_data['has_data'],
@@ -132,12 +132,12 @@ def sync_libraries():
         
         for server in all_servers:
             try:
-                current_app.logger.info(f"Syncing libraries for {server.name} ({server.service_type.value})")
+                current_app.logger.info(f"Syncing libraries for {server.server_nickname} ({server.service_type.value})")
                 service = MediaServiceFactory.create_service_from_db(server)
                 
                 if not service:
                     sync_result['errors'] += 1
-                    sync_result['error_messages'].append(f"Could not create service for {server.name}")
+                    sync_result['error_messages'].append(f"Could not create service for {server.server_nickname}")
                     continue
                 
                 # Get libraries from API
@@ -204,9 +204,9 @@ def sync_libraries():
                 sync_result['servers_synced'] += 1
                 
             except Exception as e:
-                current_app.logger.error(f"Error syncing libraries for {server.name}: {e}")
+                current_app.logger.error(f"Error syncing libraries for {server.server_nickname}: {e}")
                 sync_result['errors'] += 1
-                sync_result['error_messages'].append(f"Error syncing {server.name}: {str(e)}")
+                sync_result['error_messages'].append(f"Error syncing {server.server_nickname}: {str(e)}")
         
         # Remove libraries that no longer exist on servers
         for server_id, current_lib_ids in current_library_ids_by_server.items():

@@ -51,10 +51,7 @@
             </div>
         </a>
         <div class="card bg-base-200 shadow-xl">
-            <div class="card-body justify-between" id="server_status_card_content"
-                 hx-get="{{ url_for('api.get_dashboard_server_status') }}"
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
+            <div class="card-body justify-between" id="server_status_card_content">
                 {% include 'dashboard/partials/multi_service_status.html' with context %}
             </div>
         </div>

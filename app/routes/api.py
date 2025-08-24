@@ -6,12 +6,90 @@ from app.models import EventType, Invite, Setting
 from app.utils.helpers import log_event, permission_required
 from app.utils.timeout_helper import get_api_timeout
 from app.extensions import csrf, db
-from app.models_media_services import ServiceType
+from app.models_media_services import ServiceType, MediaServer
 from app.services.media_service_factory import MediaServiceFactory
 from app.services.media_service_manager import MediaServiceManager
 import time
+from datetime import datetime, timedelta
 
 bp = Blueprint('api', __name__)
+
+def get_stored_server_status():
+    """Get server status from database (last known status)"""
+    all_servers = MediaServiceManager.get_all_servers(active_only=True)
+    server_count = len(all_servers)
+    current_app.logger.debug(f"API: Found {server_count} servers to get stored status")
+    
+    if server_count == 0:
+        return None
+    elif server_count == 1:
+        server = all_servers[0]
+        return {
+            'server_id': server.id,
+            'name': f"{server.service_type.value.title()} Server Status",
+            'service_type': server.service_type.value,
+            'friendly_name': server.server_nickname,
+            'actual_server_name': server.server_name,
+            'online': server.last_status,
+            'last_check_time': server.last_status_check,
+            'error_message': server.last_status_error,
+            'version': server.last_version,
+            'url': server.url
+        }
+    else:
+        # Multiple servers
+        online_count = 0
+        offline_count = 0
+        all_server_statuses = []
+        servers_by_service = {}
+        
+        for server in all_servers:
+            status = {
+                'server_id': server.id,
+                'name': server.server_nickname,
+                'service_type': server.service_type.value,
+                'online': server.last_status,
+                'last_check_time': server.last_status_check,
+                'error_message': server.last_status_error,
+                'version': server.last_version,
+                'url': server.url,
+                'actual_server_name': server.server_name
+            }
+            
+            if server.last_status is True:
+                online_count += 1
+            elif server.last_status is False:
+                offline_count += 1
+            # None status (never checked) doesn't count as online or offline
+            
+            all_server_statuses.append(status)
+            
+            # Group by service type for modal
+            service_type = server.service_type.value
+            if service_type not in servers_by_service:
+                servers_by_service[service_type] = {
+                    'service_name': service_type.title(),
+                    'servers': [],
+                    'online_count': 0,
+                    'offline_count': 0,
+                    'total_count': 0
+                }
+            
+            servers_by_service[service_type]['servers'].append(status)
+            servers_by_service[service_type]['total_count'] += 1
+            
+            if server.last_status is True:
+                servers_by_service[service_type]['online_count'] += 1
+            elif server.last_status is False:
+                servers_by_service[service_type]['offline_count'] += 1
+        
+        return {
+            'multi_server': True,
+            'online_count': online_count,
+            'offline_count': offline_count,
+            'all_statuses': all_server_statuses,
+            'servers_by_service': servers_by_service
+        }
 
 def get_fresh_server_status():
     """Fetch fresh server status data from all servers - NO CACHING"""
@@ -23,19 +101,33 @@ def get_fresh_server_status():
 
     if server_count == 1:
         server = all_servers[0]
-        current_app.logger.warning(f"API: Making API call to single server '{server.name}' ({server.service_type.value})")
+        current_app.logger.warning(f"API: Making API call to single server '{server.server_nickname}' ({server.service_type.value})")
         service = MediaServiceFactory.create_service_from_db(server)
         if service:
             server_status_data = service.get_server_info()
             # The service returns 'name' field with the server's actual friendly name (e.g., "Plex+")
             # Save this as 'friendly_name' for the template
-            actual_server_name = server_status_data.get('name', server.name)
+            actual_server_name = server_status_data.get('name', server.server_nickname)
+            # Update server status in database
+            server.last_status_check = datetime.utcnow()
+            server.last_status = server_status_data.get('online')
+            server.last_status_error = server_status_data.get('error_message') if not server_status_data.get('online') else None
+            server.last_version = server_status_data.get('version') if server_status_data.get('online') else server.last_version
+            server.server_name = actual_server_name if server_status_data.get('online') else server.server_name
+            db.session.add(server)
+            
+            try:
+                db.session.commit()
+                current_app.logger.debug("API: Single server status update committed to database")
+            except Exception as e:
+                current_app.logger.error(f"API: Error committing single server status update: {e}")
+                db.session.rollback()
+            
             server_status_data['server_id'] = server.id
             server_status_data['name'] = f"{server.service_type.value.title()} Server Status"
             server_status_data['service_type'] = server.service_type.value
             server_status_data['friendly_name'] = actual_server_name
-            # Don't show last check time since it's always current
-            server_status_data['last_check_time'] = None
+            server_status_data['last_check_time'] = server.last_status_check
             current_app.logger.debug(f"API: Single server status: {server_status_data.get('online', 'unknown')}")
     elif server_count > 1:
         online_count = 0
@@ -45,18 +137,28 @@ def get_fresh_server_status():
         
         current_app.logger.warning(f"API: Making API calls to {len(all_servers)} servers for status check")
         for server in all_servers:
-            current_app.logger.warning(f"API: Making API call to server '{server.name}' ({server.service_type.value}) at {server.url}")
+            current_app.logger.warning(f"API: Making API call to server '{server.server_nickname}' ({server.service_type.value}) at {server.url}")
             service = MediaServiceFactory.create_service_from_db(server)
             if service:
                 status = service.get_server_info()
-                current_app.logger.debug(f"API: Server '{server.name}' status: {status.get('online', 'unknown')}")
+                current_app.logger.info(f"API: Server '{server.server_nickname}' status: {status.get('online', 'unknown')} - Error: {status.get('error_message', 'None')}")
+                current_app.logger.debug(f"API: Server '{server.server_nickname}' status: {status.get('online', 'unknown')}")
+                
                 # Extract the actual server name BEFORE overriding the 'name' field
-                actual_server_name = status.get('name', server.name)
+                actual_server_name = status.get('name', server.server_nickname)
+                
+                # Update server status in database
+                server.last_status_check = datetime.utcnow()
+                server.last_status = status.get('online')
+                server.last_status_error = status.get('error_message') if not status.get('online') else None
+                server.last_version = status.get('version') if status.get('online') else server.last_version
+                server.server_name = actual_server_name if status.get('online') else server.server_name
+                db.session.add(server)
                 
                 status['server_id'] = server.id
-                status['custom_name'] = server.name  # Custom nickname from app
+                status['custom_name'] = server.server_nickname  # Custom nickname from app
                 status['actual_server_name'] = actual_server_name  # Actual server name from service
-                status['name'] = server.name  # Override with custom name for backward compatibility
+                status['name'] = server.server_nickname  # Override with custom name for backward compatibility
                 status['service_type'] = server.service_type.value
                 all_server_statuses.append(status)
                 
@@ -81,6 +183,14 @@ def get_fresh_server_status():
                     offline_count += 1
                     servers_by_service[service_type]['offline_count'] += 1
                     
+        # Commit all status updates to database
+        try:
+            db.session.commit()
+            current_app.logger.debug("API: Server status updates committed to database")
+        except Exception as e:
+            current_app.logger.error(f"API: Error committing server status updates: {e}")
+            db.session.rollback()
+        
         server_status_data = {
             'multi_server': True,
             'online_count': online_count,
@@ -157,7 +267,7 @@ def check_server_status(server_id):
     # Render the partial template with the fresh status data.
     # We need to format this as a single server status for the multi_service_status template
     # Use the same logic as get_fresh_server_status for consistency
-    actual_server_name = server_status_for_htmx.get('name', server.name)
+    actual_server_name = server_status_for_htmx.get('name', server.server_nickname)
     server_status_data = {
         'server_id': server.id,
         'service_type': server.service_type.value,
@@ -178,8 +288,9 @@ def get_dashboard_server_status():
     current_app.logger.info("=== API ENDPOINT: /dashboard/server-status called ===")
     current_app.logger.debug("Api.py - get_dashboard_server_status(): Loading real-time server status for dashboard")
     
-    # Get fresh server status data (no caching)
+    # Get fresh server status data and save to database
     server_status_data = get_fresh_server_status()
+    current_app.logger.info(f"DASHBOARD CARD: Online={server_status_data.get('online_count', 'N/A')}, Offline={server_status_data.get('offline_count', 'N/A')}")
     current_app.logger.debug(f"Api.py - get_dashboard_server_status(): Fresh server status: {server_status_data}")
 
     return render_template('dashboard/partials/multi_service_status.html', server_status=server_status_data)
@@ -187,13 +298,14 @@ def get_dashboard_server_status():
 @bp.route('/dashboard/all-servers-modal', methods=['GET'])
 @login_required
 def get_all_servers_modal():
-    """Get all servers status for modal - uses real-time data"""
+    """Get all servers status for modal - uses cached data if available"""
     current_app.logger.info("=== API ENDPOINT: /dashboard/all-servers-modal called ===")
-    current_app.logger.debug("Api.py - get_all_servers_modal(): Loading real-time server status for modal")
+    current_app.logger.debug("Api.py - get_all_servers_modal(): Loading server status for modal")
     
-    # Get fresh server status data (no caching)
-    server_status_data = get_fresh_server_status()
-    current_app.logger.debug(f"Api.py - get_all_servers_modal(): Fresh server status for modal: {server_status_data}")
+    # Use stored database status (same as dashboard card)
+    server_status_data = get_stored_server_status()
+    current_app.logger.info(f"MODAL: Online={server_status_data.get('online_count', 'N/A')}, Offline={server_status_data.get('offline_count', 'N/A')}")
+    current_app.logger.debug(f"Api.py - get_all_servers_modal(): Server status for modal: {server_status_data}")
 
     return render_template('components/modals/all_servers_status_modal_content.html', server_status=server_status_data)
 
@@ -244,7 +356,7 @@ def get_server_libraries(server_id):
             'success': True, 
             'libraries': libraries,
             'service_type': server.service_type.name.upper(),
-            'server_name': server.name
+            'server_name': server.server_nickname
         })
     except Exception as e:
         current_app.logger.error(f"Error getting libraries for server {server_id}: {e}")
@@ -378,7 +490,7 @@ def jellyfin_image_proxy():
             return "No Jellyfin servers available", 404
 
         jellyfin_server = jellyfin_servers[0]  # Use first available server
-        current_app.logger.info(f"API jellyfin_image_proxy: Using Jellyfin server: {jellyfin_server.name} at {jellyfin_server.url}")
+        current_app.logger.info(f"API jellyfin_image_proxy: Using Jellyfin server: {jellyfin_server.server_nickname} at {jellyfin_server.url}")
         
         jellyfin_service = MediaServiceFactory.create_service_from_db(jellyfin_server)
         
@@ -435,7 +547,7 @@ def jellyfin_user_avatar_proxy():
             abort(404)
 
         jellyfin_server = jellyfin_servers[0]  # Use first available server
-        current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Using Jellyfin server: {jellyfin_server.name}")
+        current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Using Jellyfin server: {jellyfin_server.server_nickname}")
         
         # First, get user data to check if PrimaryImageTag exists
         headers = {
@@ -515,7 +627,7 @@ def terminate_session():
         # Find the specific server by name if provided, otherwise use the first one
         target_server = None
         if server_name:
-            target_server = next((s for s in servers if s.name == server_name), None)
+            target_server = next((s for s in servers if s.server_nickname == server_name), None)
         if not target_server:
             target_server = servers[0]  # Use first available server
         
@@ -523,12 +635,12 @@ def terminate_session():
         if not service:
             return jsonify(success=False, error=f"{service_type} service not available."), 500
 
-        current_app.logger.info(f"Terminating {service_type} session {session_key} on server {target_server.name}")
+        current_app.logger.info(f"Terminating {service_type} session {session_key} on server {target_server.server_nickname}")
         success = service.terminate_session(session_key, message)
         
         if success:
             log_event(EventType.SETTING_CHANGE, 
-                     f"Terminated {service_type} session {session_key} on {target_server.name}",
+                     f"Terminated {service_type} session {session_key} on {target_server.server_nickname}",
                      admin_id=current_user.id if hasattr(current_user, 'id') else None)
             return jsonify(success=True, message=f"Termination command sent for {service_type} session {session_key}.")
         else:

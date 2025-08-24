@@ -83,7 +83,7 @@
                 {% if access.user_raw_data %}
                 <div class="border border-base-300 rounded-lg">
                     <div class="bg-base-200/50 px-3 py-2 border-b border-base-300">
-                        <span class="font-medium text-sm">{{ access.server.name }} ({{ access.server.service_type.value|title }})</span>
+                        <span class="font-medium text-sm">{{ access.server.server_nickname }} ({{ access.server.service_type.value|title }})</span>
                     </div>
                     <div class="p-3">
                         <div class="mockup-code bg-base-300/50 border border-base-300" id="userRawDataContent-{{ user.uuid }}-{{ access.server.id }}">

@@ -88,7 +88,7 @@
                         <i class="fa-solid fa-server text-primary text-lg"></i>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-base-content">{{ server.name }}</h3>
+                        <h3 class="font-semibold text-base-content">{{ server.server_nickname }}</h3>
                         <span class="text-xs text-base-content/60">{{ details.actual_server_name or server.service_type.value.title() }}</span>
                     </div>
                 </div>
@@ -192,7 +192,7 @@
                     </a>
                     
                     <!-- Delete Button -->
-                    <button onclick="deleteServer({{ server.id }}, '{{ server.name }}')" 
+                    <button onclick="deleteServer({{ server.id }}, '{{ server.server_nickname }}')" 
                             class="btn btn-ghost btn-xs text-error hover:bg-error/10" title="Delete Server">
                         <i class="fa-solid fa-trash"></i>
                     </button>
@@ -220,7 +220,7 @@
                             </button>
                         </li>
                         <li>
-                            <button onclick="showRawServerInfo({{ server.id }}, '{{ server.name }}')" class="text-base-content/60 gap-2">
+                            <button onclick="showRawServerInfo({{ server.id }}, '{{ server.server_nickname }}')" class="text-base-content/60 gap-2">
                                 <i class="fa-solid fa-code"></i>Raw Server Info
                             </button>
                         </li>

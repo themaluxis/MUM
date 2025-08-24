@@ -2,20 +2,28 @@
 {# Expects 'server_status' (dict) in context #}
 
 {% if server_status and server_status.loading %}
-    {# Loading state - show spinner while fetching status #}
+    {# Initial state - show server count without status check #}
     <div class="flex flex-row gap-3 items-center">
         <div class="self-start p-3 rounded-md bg-base-300 text-base-content/60">
-            <span class="loading loading-spinner loading-lg"></span>
+            <i class="fa-solid fa-server fa-2x"></i>
         </div>
         <div class="flex flex-col">
             <h2 class="card-title text-base-content/70 text-sm font-normal mb-px">Media Server Status</h2>
-            <p class="text-sm text-base-content/70">Loading server status...</p>
+            <p class="text-sm text-base-content/70">Click "Check Status" to view server status</p>
             {% if server_status.server_count > 0 %}
                 <p class="text-xs text-base-content/60">{{ server_status.server_count }} server{{ 's' if server_status.server_count != 1 else '' }} configured</p>
             {% endif %}
         </div>
     </div>
     <div class="card-actions justify-end mt-4">
+        <button class="btn btn-xs btn-outline btn-primary"
+                hx-get="{{ url_for('api.get_dashboard_server_status') }}"
+                hx-target="#server_status_card_content"
+                hx-swap="innerHTML"
+                hx-indicator="#server_status_loader">
+            <span id="server_status_loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
+            <i class="fa-solid fa-sync mr-1 htmx-indicator-hide"></i> Check Status
+        </button>
         <a href="{{ url_for('plugin_management.index') }}" class="btn btn-xs btn-outline btn-ghost">
             <i class="fa-solid fa-sliders mr-1"></i> Configure
         </a>
@@ -48,9 +56,23 @@
                 <strong class="text-error">Offline: {{ server_status.offline_count }}</strong>
                 {% endif %}
             </div>
+            {% if server_status.all_statuses and server_status.all_statuses|length > 0 %}
+                {% set latest_check = server_status.all_statuses|selectattr('last_check_time')|map(attribute='last_check_time')|max %}
+                {% if latest_check %}
+                    <p class="text-xs text-base-content/60">Last checked: {{ latest_check | time_ago }}</p>
+                {% endif %}
+            {% endif %}
         </div>
     </div>
     <div class="card-actions justify-end mt-4">
+        <button class="btn btn-xs btn-outline btn-primary"
+                hx-get="{{ url_for('api.get_dashboard_server_status') }}"
+                hx-target="#server_status_card_content"
+                hx-swap="innerHTML"
+                hx-indicator="#server_status_refresh_loader">
+            <span id="server_status_refresh_loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
+            <i class="fa-solid fa-sync mr-1 htmx-indicator-hide"></i> Refresh
+        </button>
         <button class="btn btn-xs btn-outline btn-ghost" onclick="openAllServersModal()">
             <i class="fa-solid fa-eye mr-1"></i> View All
         </button>
@@ -65,11 +87,16 @@
             {% if server_status.online %}
                 <p class="text-sm"><strong class="text-success">Online</strong> - {{ server_status.friendly_name | default('Unknown Server') }}</p>
                 <p class="text-xs text-base-content/70">Version: {{ server_status.version | default('N/A') }}</p>
-            {% else %}
+            {% elif server_status.online == false %}
                 <p class="text-sm"><strong class="text-error">Offline</strong></p>
                 <p class="text-xs text-base-content/70" title="{{ server_status.error_message | default('Could not connect.') }}">
                     {{ server_status.error_message | default('Could not connect to server.') | truncate(100, True) }}
                 </p>
+            {% else %}
+                <p class="text-sm text-base-content/70">Status unknown - click "Check Status"</p>
+            {% endif %}
+            {% if server_status.last_check_time %}
+                <p class="text-xs text-base-content/60">Last checked: {{ server_status.last_check_time | time_ago }}</p>
             {% endif %}
         </div>
     </div>

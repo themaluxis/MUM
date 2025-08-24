@@ -25,7 +25,7 @@
             <div class="card bg-base-200">
                 <div class="card-body p-4">
                     <div class="flex items-start justify-between">
-                        <h3 class="font-semibold text-lg">{{ server.name }}</h3>
+                        <h3 class="font-semibold text-lg">{{ server.server_nickname }}</h3>
                         <div class="badge badge-{{ 'success' if server.is_active else 'error' }} badge-sm">
                             {{ 'Active' if server.is_active else 'Inactive' }}
                         </div>
@@ -33,7 +33,7 @@
                     <p class="text-sm text-gray-500 truncate">{{ server.url }}</p>
                     <div class="card-actions justify-end mt-2">
                         <a href="{{ url_for('media_servers.setup_edit_server', plugin_id=plugin.plugin_id, server_id=server.id) }}" class="btn btn-ghost btn-xs">Edit</a>
-                        <button onclick="deleteServer({{ server.id }}, '{{ server.name }}')" class="btn btn-ghost btn-xs text-red-500">Delete</button>
+                        <button onclick="deleteServer({{ server.id }}, '{{ server.server_nickname }}')" class="btn btn-ghost btn-xs text-red-500">Delete</button>
                     </div>
                 </div>
             </div>

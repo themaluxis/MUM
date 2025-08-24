@@ -160,7 +160,7 @@ def edit_server(server_id):
     if form.validate_on_submit():
         try:
             # Update server
-            server.name = form.name.data
+            server.server_nickname = form.name.data
             server.url = form.url.data.rstrip('/')
             server.api_key = form.api_key.data
             server.username = form.username.data
@@ -172,7 +172,7 @@ def edit_server(server_id):
             
             log_event(
                 EventType.SETTING_CHANGE,
-                f"Updated media server: {server.name}",
+                f"Updated media server: {server.server_nickname}",
                 admin_id=current_user.id
             )
             
@@ -211,7 +211,7 @@ def setup_edit_server(plugin_id, server_id):
         if form.validate_on_submit():
             current_app.logger.debug("Form validation successful.")
             try:
-                server.name = form.name.data
+                server.server_nickname = form.name.data
                 server.url = form.url.data.rstrip('/')
                 server.api_key = form.api_key.data
                 server.username = form.username.data
@@ -243,7 +243,7 @@ def delete_server(server_id):
         return redirect(url_for('plugin_management.index'))
     
     try:
-        server_name = server.name
+        server_name = server.server_nickname
         service_type = server.service_type
         db.session.delete(server)
         db.session.commit()
@@ -316,13 +316,13 @@ def enable_server(server_id):
         server.is_active = True
         db.session.commit()
         
-        flash(f'Server "{server.name}" enabled successfully!', 'success')
-        log_event(EventType.SETTING_CHANGE, f"Server '{server.name}' enabled", admin_id=current_user.id)
+        flash(f'Server "{server.server_nickname}" enabled successfully!', 'success')
+        log_event(EventType.SETTING_CHANGE, f"Server '{server.server_nickname}' enabled", admin_id=current_user.id)
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error enabling server {server_id}: {e}")
-        flash(f'Failed to enable server "{server.name}": {str(e)}', 'danger')
+        flash(f'Failed to enable server "{server.server_nickname}": {str(e)}', 'danger')
     
     # Redirect back to plugin configuration page
     return redirect(url_for('plugin_management.configure', plugin_id=server.service_type.value))
@@ -339,13 +339,13 @@ def disable_server(server_id):
         server.is_active = False
         db.session.commit()
         
-        flash(f'Server "{server.name}" disabled successfully!', 'success')
-        log_event(EventType.SETTING_CHANGE, f"Server '{server.name}' disabled", admin_id=current_user.id)
+        flash(f'Server "{server.server_nickname}" disabled successfully!', 'success')
+        log_event(EventType.SETTING_CHANGE, f"Server '{server.server_nickname}' disabled", admin_id=current_user.id)
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error disabling server {server_id}: {e}")
-        flash(f'Failed to disable server "{server.name}": {str(e)}', 'danger')
+        flash(f'Failed to disable server "{server.server_nickname}": {str(e)}', 'danger')
     
     # Redirect back to plugin configuration page
     return redirect(url_for('plugin_management.configure', plugin_id=server.service_type.value))

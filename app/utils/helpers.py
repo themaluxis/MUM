@@ -449,7 +449,7 @@ def get_primary_server_for_user(service_account):
         return None
     
     server = user_access.server
-    server_name = server.name
+    server_name = server.server_nickname
     
     # Extract the appropriate username for this server
     username = extract_username_for_server(service_account, server)
@@ -538,8 +538,8 @@ def get_user_servers_and_types(user):
     service_types = []
     
     for access in user_access_records:
-        if access.server and access.server.name not in server_names:
-            server_names.append(access.server.name)
+        if access.server and access.server.server_nickname not in server_names:
+            server_names.append(access.server.server_nickname)
         if access.server and access.server.service_type not in service_types:
             service_types.append(access.server.service_type)
     
@@ -581,7 +581,7 @@ def validate_username_for_routing(username, user_type='app'):
     if user_type == 'app':
         # Check if username conflicts with existing server nicknames
         from app.models_media_services import MediaServer
-        server_conflict = MediaServer.query.filter_by(name=username).first()
+        server_conflict = MediaServer.query.filter_by(server_nickname=username).first()
         if server_conflict:
             result['conflicts'].append(f"Username '{username}' conflicts with existing server nickname")
             result['valid'] = False
@@ -651,7 +651,7 @@ def resolve_user_route_conflict(path_segment):
     app_user = UserAppAccess.query.filter_by(username=decoded_segment).first()
     
     # Check for server
-    server = MediaServer.query.filter_by(name=decoded_segment).first()
+    server = MediaServer.query.filter_by(server_nickname=decoded_segment).first()
     
     if app_user and server:
         result['type'] = 'ambiguous'

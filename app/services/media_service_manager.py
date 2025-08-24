@@ -60,9 +60,9 @@ class MediaServiceManager:
             return {'success': False, 'message': 'Service type not supported'}
         
         try:
-            current_app.logger.info(f"Starting library sync for server {server_id} ({server.name})")
+            current_app.logger.info(f"Starting library sync for server {server_id} ({server.server_nickname})")
             libraries_data = service.get_libraries()
-            current_app.logger.info(f"Retrieved {len(libraries_data)} libraries from {server.name}")
+            current_app.logger.info(f"Retrieved {len(libraries_data)} libraries from {server.server_nickname}")
             
             # Update database
             existing_libs = {lib.external_id: lib for lib in server.libraries}
@@ -109,7 +109,7 @@ class MediaServiceManager:
             
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f"Error syncing libraries for server {server_id} ({server.name}): {e}", exc_info=True)
+            current_app.logger.error(f"Error syncing libraries for server {server_id} ({server.server_nickname}): {e}", exc_info=True)
             return {'success': False, 'message': f'Sync failed: {str(e)}'}
     
     @staticmethod
@@ -129,18 +129,18 @@ class MediaServiceManager:
             if not connection_test[0]:  # test_connection returns (success, message)
                 return {
                     'success': False, 
-                    'message': f'Server {server.name} is offline or unreachable: {connection_test[1]}'
+                    'message': f'Server {server.server_nickname} is offline or unreachable: {connection_test[1]}'
                 }
             
             users_data = service.get_users()
             
             # If we get an empty list, double-check if this is expected or an error
             if not users_data:
-                current_app.logger.warning(f"No users returned from {server.name}. This could indicate the server is offline or has no users.")
+                current_app.logger.warning(f"No users returned from {server.server_nickname}. This could indicate the server is offline or has no users.")
                 # For safety, don't process removals if we get no users - this could indicate server issues
                 return {
                     'success': False,
-                    'message': f'No users returned from {server.name}. Server may be offline or experiencing issues.'
+                    'message': f'No users returned from {server.server_nickname}. Server may be offline or experiencing issues.'
                 }
             
             added_count = 0
@@ -307,7 +307,7 @@ class MediaServiceManager:
                     if str(access.external_user_id) not in external_user_ids_from_service:
                         user_to_check = access.user_app_access
                         display_name = user_to_check.get_display_name() if user_to_check else access.external_username or 'Unknown'
-                        current_app.logger.info(f"Removing user access: {display_name} from server {server.name}")
+                        current_app.logger.info(f"Removing user access: {display_name} from server {server.server_nickname}")
                         
                         # Track removal details before deleting
                         removed_details.append({
@@ -334,7 +334,7 @@ class MediaServiceManager:
                         else:
                             current_app.logger.info(f"Standalone server user {display_name} removed (no linked MUM account)")
             else:
-                current_app.logger.warning(f"Skipping user removal processing for {server.name} - no valid user data received")
+                current_app.logger.warning(f"Skipping user removal processing for {server.server_nickname} - no valid user data received")
 
             db.session.commit()
             
@@ -450,27 +450,27 @@ class MediaServiceManager:
         current_app.logger.debug(f"MediaServiceManager: Found {len(servers)} servers to check for active sessions")
         
         for server in servers:
-            current_app.logger.warning(f"MediaServiceManager: Making API call to server '{server.name}' ({server.service_type.value}) at {server.url}")
+            current_app.logger.warning(f"MediaServiceManager: Making API call to server '{server.server_nickname}' ({server.service_type.value}) at {server.url}")
             service = MediaServiceFactory.create_service_from_db(server)
             if service:
                 try:
-                    current_app.logger.debug(f"MediaServiceManager: Calling get_active_sessions() for {server.name}")
+                    current_app.logger.debug(f"MediaServiceManager: Calling get_active_sessions() for {server.server_nickname}")
                     sessions = service.get_active_sessions()
-                    current_app.logger.debug(f"MediaServiceManager: Got {len(sessions)} sessions from {server.name}")
+                    current_app.logger.debug(f"MediaServiceManager: Got {len(sessions)} sessions from {server.server_nickname}")
                     for session in sessions:
                         if isinstance(session, dict):
-                            session['server_name'] = server.name
+                            session['server_name'] = server.server_nickname
                             session['server_id'] = server.id
                             session['service_type'] = server.service_type.value
                         else:
-                            setattr(session, 'server_name', server.name)
+                            setattr(session, 'server_name', server.server_nickname)
                             setattr(session, 'server_id', server.id)
                             setattr(session, 'service_type', server.service_type.value)
                     all_sessions.extend(sessions)
                 except Exception as e:
-                    current_app.logger.error(f"MediaServiceManager: Error getting sessions from {server.name}: {e}")
+                    current_app.logger.error(f"MediaServiceManager: Error getting sessions from {server.server_nickname}: {e}")
             else:
-                current_app.logger.warning(f"MediaServiceManager: Could not create service for {server.name}")
+                current_app.logger.warning(f"MediaServiceManager: Could not create service for {server.server_nickname}")
         
         current_app.logger.warning(f"MediaServiceManager: Total sessions found across all servers: {len(all_sessions)}")
         return all_sessions
@@ -489,7 +489,7 @@ class MediaServiceManager:
         try:
             return service.terminate_session(session_id, reason)
         except Exception as e:
-            current_app.logger.error(f"Error terminating session on {server.name}: {e}")
+            current_app.logger.error(f"Error terminating session on {server.server_nickname}: {e}")
             return False
     
     @staticmethod
@@ -511,7 +511,7 @@ class MediaServiceManager:
             return existing
         
         server = MediaServer(
-            name="Plex Media Server",
+            server_nickname="Plex Media Server",
             service_type=ServiceType.PLEX,
             url=plex_url,
             api_key=plex_token,

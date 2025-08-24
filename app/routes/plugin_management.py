@@ -115,7 +115,7 @@ def configure(plugin_id):
                     else:
                         server_details['actual_server_name'] = server.service_type.value.title()
                 except Exception as e:
-                    current_app.logger.debug(f"Could not get actual server name for {server.name}: {e}")
+                    current_app.logger.debug(f"Could not get actual server name for {server.server_nickname}: {e}")
                     server_details['actual_server_name'] = server.service_type.value.title()
                 
                 # Get libraries
@@ -123,13 +123,13 @@ def configure(plugin_id):
                     libs = service.get_libraries()
                     server_details['libraries'] = [lib.get('name', 'Unknown Library') for lib in libs] if libs else []
                 except Exception as e:
-                    current_app.logger.error(f"Error getting libraries for server {server.name}: {e}")
+                    current_app.logger.error(f"Error getting libraries for server {server.server_nickname}: {e}")
                     server_details['error'] = "Could not fetch libraries."
             else:
                 server_details['error'] = "Could not create media service."
                 server_details['actual_server_name'] = server.service_type.value.title()
         except Exception as e:
-            current_app.logger.error(f"Error creating service for server {server.name}: {e}\n{traceback.format_exc()}")
+            current_app.logger.error(f"Error creating service for server {server.server_nickname}: {e}\n{traceback.format_exc()}")
             server_details['error'] = "Failed to connect to server."
             server_details['actual_server_name'] = server.service_type.value.title()
             
@@ -169,7 +169,7 @@ def edit_server(plugin_id, server_id):
     if form.validate_on_submit():
         try:
             # Update server
-            server.name = form.name.data
+            server.server_nickname = form.name.data
             server.url = form.url.data.rstrip('/')
             server.api_key = form.api_key.data
             server.username = form.username.data
@@ -181,12 +181,12 @@ def edit_server(plugin_id, server_id):
             
             log_event(
                 EventType.SETTING_CHANGE,
-                f"Updated media server: {server.name}",
+                f"Updated media server: {server.server_nickname}",
                 admin_id=current_user.id
             )
             
             response = make_response(redirect(url_for('plugin_management.configure', plugin_id=plugin_id)))
-            response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": f'Media server "{server.name}" updated successfully!', "category": "success"}})
+            response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": f'Media server "{server.server_nickname}" updated successfully!', "category": "success"}})
             return response
             
         except Exception as e:
@@ -197,7 +197,7 @@ def edit_server(plugin_id, server_id):
     # If we get here, there was an error
     response = make_response(render_template(
         'settings/index.html',
-        title=f"Edit {server.name}",
+        title=f"Edit {server.server_nickname}",
         plugin=plugin,
         server=server,
         form=form,
@@ -232,7 +232,7 @@ def add_server(plugin_id):
         try:
             # Create new server
             new_server = MediaServer(
-                name=form.name.data,
+                server_nickname=form.name.data,
                 url=form.url.data.rstrip('/'),
                 api_key=form.api_key.data,
                 username=form.username.data,
@@ -254,12 +254,12 @@ def add_server(plugin_id):
             
             log_event(
                 EventType.SETTING_CHANGE,
-                f"Added new media server: {new_server.name}",
+                f"Added new media server: {new_server.server_nickname}",
                 admin_id=current_user.id
             )
             
             response = make_response(redirect(url_for('plugin_management.configure', plugin_id=plugin_id)))
-            response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": f'Media server "{new_server.name}" added successfully!', "category": "success"}})
+            response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": f'Media server "{new_server.server_nickname}" added successfully!', "category": "success"}})
             return response
             
         except Exception as e:
@@ -304,14 +304,14 @@ def disable_server(plugin_id, server_id):
         server.is_active = False
         db.session.commit()
         
-        toast_message = f'Server "{server.name}" disabled successfully!'
+        toast_message = f'Server "{server.server_nickname}" disabled successfully!'
         toast_category = 'success'
-        log_event(EventType.SETTING_CHANGE, f"Server '{server.name}' disabled", admin_id=current_user.id)
+        log_event(EventType.SETTING_CHANGE, f"Server '{server.server_nickname}' disabled", admin_id=current_user.id)
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error disabling server {server_id}: {e}")
-        toast_message = f'Failed to disable server "{server.name}": {str(e)}'
+        toast_message = f'Failed to disable server "{server.server_nickname}": {str(e)}'
         toast_category = 'error'
     
     response = make_response(redirect(url_for('plugin_management.configure', plugin_id=plugin_id)))
@@ -574,13 +574,13 @@ def enable_server(plugin_id, server_id):
         server.is_active = True
         db.session.commit()
         
-        flash(f'Server "{server.name}" enabled successfully!', 'success')
-        log_event(EventType.SETTING_CHANGE, f"Server '{server.name}' enabled", admin_id=current_user.id)
+        flash(f'Server "{server.server_nickname}" enabled successfully!', 'success')
+        log_event(EventType.SETTING_CHANGE, f"Server '{server.server_nickname}' enabled", admin_id=current_user.id)
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error enabling server {server_id}: {e}")
-        flash(f'Failed to enable server "{server.name}": {str(e)}', 'danger')
+        flash(f'Failed to enable server "{server.server_nickname}": {str(e)}', 'danger')
     
     return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
 
@@ -604,7 +604,7 @@ def delete_server(plugin_id, server_id):
         return redirect(url_for('plugin_management.index'))
     
     server = MediaServer.query.filter_by(id=server_id, service_type=service_type_enum).first_or_404()
-    server_name = server.name  # Store name before deletion
+    server_name = server.server_nickname  # Store name before deletion
     
     try:
         db.session.delete(server)

@@ -279,7 +279,7 @@
                 {# All users are now UserAppAccess, so use consistent profile link #}
                 {% if user._user_type == 'service' %}
                     {# Service user - route to /user/{server_nickname}/{username} #}
-                    <a href="{{ url_for('user.view_service_account', server_nickname=user._access_record.server.name, server_username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                    <a href="{{ url_for('user.view_service_account', server_nickname=user._access_record.server.server_nickname, server_username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
                 {% else %}
                     {# Local user - route to /user/{username} #}
                     <a href="{{ url_for('user.view_app_user', username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">

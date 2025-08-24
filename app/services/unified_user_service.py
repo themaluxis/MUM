@@ -31,7 +31,7 @@ class UnifiedUserService:
 
         for server in servers:
             try:
-                current_app.logger.info(f"Syncing users from server: {server.name} ({server.service_type.value})")
+                current_app.logger.info(f"Syncing users from server: {server.server_nickname} ({server.service_type.value})")
                 result = MediaServiceManager.sync_server_users(server.id)
                 if result['success']:
                     total_added += result.get('added', 0)
@@ -46,7 +46,7 @@ class UnifiedUserService:
                     
                     # Track successful server sync
                     successful_servers.append({
-                        'name': server.name,
+                        'name': server.server_nickname,
                         'service_type': server.service_type.value.capitalize(),
                         'added': result.get('added', 0),
                         'updated': result.get('updated', 0),
@@ -55,7 +55,7 @@ class UnifiedUserService:
                         'updated_details': result.get('updated_details', []),
                         'removed_details': result.get('removed_details', [])
                     })
-                    current_app.logger.info(f"Successfully synced {server.name}: +{result.get('added', 0)} users, ~{result.get('updated', 0)} updated, -{result.get('removed', 0)} removed")
+                    current_app.logger.info(f"Successfully synced {server.server_nickname}: +{result.get('added', 0)} users, ~{result.get('updated', 0)} updated, -{result.get('removed', 0)} removed")
                 else:
                     total_errors += 1
                     # Use service type name instead of server name to avoid redundancy
@@ -65,15 +65,15 @@ class UnifiedUserService:
                     
                     # Track failed server sync
                     failed_servers.append({
-                        'name': server.name,
+                        'name': server.server_nickname,
                         'service_type': service_name,
                         'error': result['message']
                     })
-                    current_app.logger.warning(f"Failed to sync users from {server.name}: {result['message']}")
+                    current_app.logger.warning(f"Failed to sync users from {server.server_nickname}: {result['message']}")
                     
                     # If server is offline, this is expected and shouldn't be treated as a critical error
                     if 'offline' in result['message'].lower() or 'unreachable' in result['message'].lower():
-                        current_app.logger.info(f"Server {server.name} appears to be offline - this is normal and users will be preserved")
+                        current_app.logger.info(f"Server {server.server_nickname} appears to be offline - this is normal and users will be preserved")
             except Exception as e:
                 total_errors += 1
                 # Use service type name instead of server name to avoid redundancy
@@ -83,11 +83,11 @@ class UnifiedUserService:
                 
                 # Track failed server sync
                 failed_servers.append({
-                    'name': server.name,
+                    'name': server.server_nickname,
                     'service_type': service_name,
                     'error': str(e)
                 })
-                current_app.logger.error(f"Error syncing users from {server.name}: {e}", exc_info=True)
+                current_app.logger.error(f"Error syncing users from {server.server_nickname}: {e}", exc_info=True)
 
         # Group linked accounts for better display
         grouped_results = UnifiedUserService._group_linked_accounts(
@@ -147,7 +147,7 @@ class UnifiedUserService:
                     if not local_user:
                         # Get the server to help with the search
                         from app.models_media_services import MediaServer
-                        server = MediaServer.query.filter_by(name=server_name).first()
+                        server = MediaServer.query.filter_by(server_nickname=server_name).first()
                         if server:
                             # Look for UserMediaAccess records on this server with this external_username
                             user_access = UserMediaAccess.query.filter_by(
@@ -234,7 +234,7 @@ class UnifiedUserService:
             
             access_info.append({
                 'server_id': server.id,
-                'server_name': server.name,
+                'server_name': server.server_nickname,
                 'service_type': server.service_type.value,
                 'external_user_id': access.external_user_id,
                 'external_username': access.external_username,
@@ -301,11 +301,11 @@ class UnifiedUserService:
                 )
                 
                 if not service_success:
-                    current_app.logger.warning(f"Service update failed for user {user_id} on {server.name}")
+                    current_app.logger.warning(f"Service update failed for user {user_id} on {server.server_nickname}")
                     # Don't return False here - local update might still be valuable
                 
             except Exception as e:
-                current_app.logger.error(f"Error updating user access on {server.name}: {e}")
+                current_app.logger.error(f"Error updating user access on {server.server_nickname}: {e}")
                 # Continue with local update even if service update fails
         
         if changes_made:
@@ -313,7 +313,7 @@ class UnifiedUserService:
                 db.session.commit()
                 log_event(
                     EventType.MUM_USER_LIBRARIES_EDITED,
-                    f"Updated access for '{user.get_display_name()}' on {server.name}",
+                    f"Updated access for '{user.get_display_name()}' on {server.server_nickname}",
                     user_id=user_id,
                     admin_id=admin_id
                 )
@@ -349,7 +349,7 @@ class UnifiedUserService:
             try:
                 service.delete_user(access.external_user_id)
             except Exception as e:
-                current_app.logger.error(f"Error removing user from {server.name}: {e}")
+                current_app.logger.error(f"Error removing user from {server.server_nickname}: {e}")
                 # Continue with local removal even if service removal fails
         
         # Remove from local database
@@ -359,7 +359,7 @@ class UnifiedUserService:
             
             log_event(
                 EventType.PLEX_USER_REMOVED,
-                f"Removed '{user.get_display_name()}' from {server.name}",
+                f"Removed '{user.get_display_name()}' from {server.server_nickname}",
                 user_id=user_id,
                 admin_id=admin_id
             )
@@ -384,7 +384,7 @@ class UnifiedUserService:
             try:
                 UnifiedUserService.remove_user_from_server(user_id, access.server_id, admin_id)
             except Exception as e:
-                current_app.logger.error(f"Error removing user from {access.server.name}: {e}")
+                current_app.logger.error(f"Error removing user from {access.server.server_nickname}: {e}")
         
         # Delete user from MUM database
         try:

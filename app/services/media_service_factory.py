@@ -52,7 +52,7 @@ class MediaServiceFactory:
         """Create a media service instance from a database MediaServer object"""
         server_config = {
             'id': media_server.id,
-            'name': media_server.name,
+            'name': media_server.server_nickname,
             'service_type': media_server.service_type,
             'url': media_server.url,
             'api_key': media_server.api_key,

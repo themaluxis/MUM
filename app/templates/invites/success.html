@@ -44,7 +44,7 @@
                                             {% endif %}
                                         </div>
                                         <div class="flex-1 min-w-0">
-                                            <div class="font-medium text-base-content">{{ server.name }}</div>
+                                            <div class="font-medium text-base-content">{{ server.server_nickname }}</div>
                                             <div class="text-sm text-base-content/60">{{ server.type }} Media Server</div>
                                         </div>
                                         <a href="{{ server.url }}" target="_blank" 
@@ -73,13 +73,13 @@
                                         <span>Open Plex</span>
                                     {% elif server.type == 'JELLYFIN' %}
                                         <i class="fa-solid fa-film text-[#00a4dc] mr-2"></i>
-                                        <span>Open {{ server.name }}</span>
+                                        <span>Open {{ server.server_nickname }}</span>
                                     {% elif server.type == 'EMBY' %}
                                         <i class="fa-solid fa-video text-[#52b54b] mr-2"></i>
-                                        <span>Open {{ server.name }}</span>
+                                        <span>Open {{ server.server_nickname }}</span>
                                     {% else %}
                                         <i class="fa-solid fa-server mr-2"></i>
-                                        <span>Open {{ server.name }}</span>
+                                        <span>Open {{ server.server_nickname }}</span>
                                     {% endif %}
                                     <i class="fa-solid fa-arrow-up-right-from-square ml-auto text-xs"></i>
                                 </a>

@@ -239,7 +239,7 @@
                 {% elif active_tab == 'history' %}
                     {% if is_service_user and server %}
                         <div id="user-history-container" 
-                             hx-get="{{ url_for('user.view_service_account', server_nickname=server.name, server_username=user.username, tab='history') }}"
+                             hx-get="{{ url_for('user.view_service_account', server_nickname=server.server_nickname, server_username=user.username, tab='history') }}"
                              hx-trigger="load"
                              hx-indicator="#loading-spinner">
                             <div class="flex justify-center items-center py-8">

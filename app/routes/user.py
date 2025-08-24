@@ -89,7 +89,7 @@ def view_service_account(server_nickname, server_username):
         current_app.logger.warning(f"Potential conflict: server nickname '{server_nickname}' matches app user username")
     
     # Find the server by nickname (name)
-    server = MediaServer.query.filter_by(name=server_nickname).first_or_404()
+    server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
     
     # Find the service account by server and username
     # Look for UserMediaAccess record directly (handles both standalone and linked users)
@@ -147,7 +147,7 @@ def view_service_account(server_nickname, server_username):
     for access in user_access_records:
         try:
             service = MediaServiceFactory.create_service_from_db(access.server)
-            current_app.logger.info(f"DEBUG KAVITA FORM: Processing server {access.server.name} (type: {access.server.service_type.value})")
+            current_app.logger.info(f"DEBUG KAVITA FORM: Processing server {access.server.server_nickname} (type: {access.server.service_type.value})")
             current_app.logger.info(f"DEBUG KAVITA FORM: User access record allowed_library_ids: {access.allowed_library_ids}")
             
             if service:
@@ -167,7 +167,7 @@ def view_service_account(server_nickname, server_username):
                             available_libraries[str(lib_id)] = lib_name
                             current_app.logger.info(f"DEBUG KAVITA FORM: Added non-Kavita library: {lib_id} -> {lib_name}")
         except Exception as e:
-            current_app.logger.error(f"Error getting libraries from {access.server.name}: {e}")
+            current_app.logger.error(f"Error getting libraries from {access.server.server_nickname}: {e}")
     
     current_app.logger.info(f"DEBUG KAVITA FORM: Final available_libraries: {available_libraries}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
@@ -250,7 +250,7 @@ def view_service_account(server_nickname, server_username):
                                 if user_identifier:
                                     service.update_user_access(user_identifier, new_libs_for_this_server)
                     except Exception as e:
-                        current_app.logger.error(f"Error updating library access for server {access.server.name}: {e}")
+                        current_app.logger.error(f"Error updating library access for server {access.server.server_nickname}: {e}")
                 
                 log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' library access updated", user_id=user.id, admin_id=current_user.id)
             
@@ -292,8 +292,8 @@ def view_service_account(server_nickname, server_username):
                 user_server_names_for_modal = {}
                 user_server_names_for_modal[user.uuid] = []
                 for access in user_access_records:
-                    if access.server.name not in user_server_names_for_modal[user.uuid]:
-                        user_server_names_for_modal[user.uuid].append(access.server.name)
+                    if access.server.server_nickname not in user_server_names_for_modal[user.uuid]:
+                        user_server_names_for_modal[user.uuid].append(access.server.server_nickname)
                 
                 modal_html = render_template('user/partials/settings_tab.html', form=form_after_save, user=user, user_server_names=user_server_names_for_modal)
 
@@ -317,8 +317,8 @@ def view_service_account(server_nickname, server_username):
                     if access.server.service_type not in user_service_types[user.uuid]:
                         user_service_types[user.uuid].append(access.server.service_type)
                     # Track server names
-                    if access.server.name not in user_server_names[user.uuid]:
-                        user_server_names[user.uuid].append(access.server.name)
+                    if access.server.server_nickname not in user_server_names[user.uuid]:
+                        user_server_names[user.uuid].append(access.server.server_nickname)
                 
                 # Handle special case for Jellyfin users with '*' (all libraries access)
                 if all_library_ids == ['*']:
@@ -486,13 +486,13 @@ def view_service_account(server_nickname, server_username):
         kavita_user_id = None
         
         current_app.logger.info(f"DEBUG KAVITA HISTORY: Checking user {user.id} for Kavita access")
-        current_app.logger.info(f"DEBUG KAVITA HISTORY: User access records: {[(access.server.name, access.server.service_type.value, access.external_user_id) for access in user_access_records]}")
+        current_app.logger.info(f"DEBUG KAVITA HISTORY: User access records: {[(access.server.server_nickname, access.server.service_type.value, access.external_user_id) for access in user_access_records]}")
         
         for access in user_access_records:
             if access.server.service_type.value == 'kavita':
                 is_kavita_user = True
                 kavita_user_id = access.external_user_id
-                current_app.logger.info(f"DEBUG KAVITA HISTORY: Found Kavita user! Server: {access.server.name}, External User ID: {kavita_user_id}")
+                current_app.logger.info(f"DEBUG KAVITA HISTORY: Found Kavita user! Server: {access.server.server_nickname}, External User ID: {kavita_user_id}")
                 break
         
         current_app.logger.info(f"DEBUG KAVITA HISTORY: Is Kavita user: {is_kavita_user}, User ID: {kavita_user_id}")
@@ -528,7 +528,7 @@ def view_service_account(server_nickname, server_username):
                 # This is a service user - we need to filter by user_media_access_id to get only this service's history
                 # For linked service accounts, history is stored with both user_app_access_id AND user_media_access_id
                 current_app.logger.info(f"DEBUG HISTORY: Service user - querying MediaStreamHistory with user_media_access_id={user.id}")
-                current_app.logger.info(f"DEBUG HISTORY: Access record details - server: {access.server.name}, service_type: {access.server.service_type.value}, external_username: {access.external_username}")
+                current_app.logger.info(f"DEBUG HISTORY: Access record details - server: {access.server.server_nickname}, service_type: {access.server.service_type.value}, external_username: {access.external_username}")
                 stream_history_pagination = MediaStreamHistory.query.filter_by(user_media_access_id=user.id)\
                     .order_by(MediaStreamHistory.started_at.desc())\
                     .paginate(page=page, per_page=15, error_out=False)
@@ -569,7 +569,7 @@ def view_service_account(server_nickname, server_username):
                     all_user_accesses = UserMediaAccess.query.filter_by(user_app_access_id=access.user_app_access_id).all()
                     current_app.logger.info(f"DEBUG HISTORY: All UserMediaAccess records for local user:")
                     for ua in all_user_accesses:
-                        current_app.logger.info(f"DEBUG HISTORY: - UserMediaAccess ID {ua.id}: {ua.server.name} ({ua.server.service_type.value}) - {ua.external_username}")
+                        current_app.logger.info(f"DEBUG HISTORY: - UserMediaAccess ID {ua.id}: {ua.server.server_nickname} ({ua.server.service_type.value}) - {ua.external_username}")
                         # Check how many history records exist for each
                         count = MediaStreamHistory.query.filter_by(user_media_access_id=ua.id).count()
                         current_app.logger.info(f"DEBUG HISTORY:   -> Has {count} streaming history records")
@@ -589,8 +589,8 @@ def view_service_account(server_nickname, server_username):
     for access_record in user_access_records:
         if access_record.server.service_type not in user_service_types[user.uuid]:
             user_service_types[user.uuid].append(access_record.server.service_type)
-        if access_record.server.name not in user_server_names[user.uuid]:
-            user_server_names[user.uuid].append(access_record.server.name)
+        if access_record.server.server_nickname not in user_server_names[user.uuid]:
+            user_server_names[user.uuid].append(access_record.server.server_nickname)
 
     if request.headers.get('HX-Request') and tab == 'history':
         # UUID is already available on user objects for the delete function
@@ -640,7 +640,7 @@ def delete_stream_history(username=None, server_nickname=None, server_username=N
     elif server_nickname and server_username:
         # Service user route
         from app.models_media_services import MediaServer
-        server = MediaServer.query.filter_by(name=urllib.parse.unquote(server_nickname)).first()
+        server = MediaServer.query.filter_by(server_nickname=urllib.parse.unquote(server_nickname)).first()
         if not server:
             current_app.logger.error(f"Server not found: {server_nickname}")
             return make_response("<!-- error -->", 400)
@@ -726,7 +726,7 @@ def reset_password(username=None, server_nickname=None, server_username=None):
     elif server_nickname and server_username:
         # Service user route - get the associated UserAppAccess if it exists
         from app.models_media_services import MediaServer
-        server = MediaServer.query.filter_by(name=urllib.parse.unquote(server_nickname)).first_or_404()
+        server = MediaServer.query.filter_by(server_nickname=urllib.parse.unquote(server_nickname)).first_or_404()
         
         media_access = UserMediaAccess.query.filter_by(
             server_id=server.id,
@@ -835,7 +835,7 @@ def view_app_user(username):
     
     # Check for potential conflicts with server nicknames
     from app.models_media_services import MediaServer
-    server_conflict = MediaServer.query.filter_by(name=username).first()
+    server_conflict = MediaServer.query.filter_by(server_nickname=username).first()
     if server_conflict:
         current_app.logger.warning(f"Potential conflict: app username '{username}' matches server nickname")
     
@@ -859,8 +859,8 @@ def view_app_user(username):
             if access.server:
                 if access.server.service_type not in service_types:
                     service_types.append(access.server.service_type)
-                if access.server.name not in server_names:
-                    server_names.append(access.server.name)
+                if access.server.server_nickname not in server_names:
+                    server_names.append(access.server.server_nickname)
         
         user_service_types[user_app_access.id] = service_types
         user_server_names[user_app_access.id] = server_names
@@ -946,7 +946,7 @@ def view_app_user(username):
                 if service_access:
                     entry.service_account = service_access
                     entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
-                    entry.server_name = service_access.server.name if service_access.server else 'Unknown Server'
+                    entry.server_name = service_access.server.server_nickname if service_access.server else 'Unknown Server'
                     entry.service_username = service_access.external_username or 'Unknown'
                     current_app.logger.info(f"DEBUG LOCAL HISTORY: Found service account - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
                 else:
@@ -965,7 +965,7 @@ def view_app_user(username):
                 if service_access:
                     entry.service_account = service_access
                     entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
-                    entry.server_name = service_access.server.name if service_access.server else 'Unknown Server'
+                    entry.server_name = service_access.server.server_nickname if service_access.server else 'Unknown Server'
                     entry.service_username = service_access.external_username or 'Unknown'
                     current_app.logger.info(f"DEBUG LOCAL HISTORY: Found service account by server_id - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
                 else:

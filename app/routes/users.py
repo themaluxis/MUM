@@ -136,7 +136,7 @@ def list_users():
             linked_count = len(app_user.media_accesses)
             current_app.logger.info(f"  App user: {app_user.username} (ID: {app_user.id}) - {linked_count} media accesses")
             for media_access in app_user.media_accesses:
-                current_app.logger.info(f"    Media access: {media_access.external_username} (ID: {media_access.id}, Server: {media_access.server.name if media_access.server else 'Unknown'})")
+                current_app.logger.info(f"    Media access: {media_access.external_username} (ID: {media_access.id}, Server: {media_access.server.server_nickname if media_access.server else 'Unknown'})")
     
     if user_type_filter in ['all', 'service']:
         # Query service users - these are standalone UserMediaAccess records without linked UserAppAccess
@@ -190,7 +190,7 @@ def list_users():
         current_app.logger.info(f"DEBUG: Found {len(all_access_records)} total access records (standalone + linked)")
         
         for access in all_access_records:
-            current_app.logger.info(f"DEBUG: Creating mock user for access ID {access.id}, username: {access.external_username}, server: {access.server.name}")
+            current_app.logger.info(f"DEBUG: Creating mock user for access ID {access.id}, username: {access.external_username}, server: {access.server.server_nickname}")
             # Create a mock user object with the necessary attributes for display
             class MockUser:
                 def __init__(self, access):
@@ -240,7 +240,7 @@ def list_users():
         
         current_app.logger.info(f"Found {len(service_users)} standalone service users")
         for service_user in service_users:
-            current_app.logger.info(f"  Standalone service user: {service_user.username} (Access ID: {service_user._access_record.id}, Server: {service_user._access_record.server.name})")
+            current_app.logger.info(f"  Standalone service user: {service_user.username} (Access ID: {service_user._access_record.id}, Server: {service_user._access_record.server.server_nickname})")
             
             # Add service type information for standalone users so they get proper colors
             if not hasattr(service_user, '_user_type'):
@@ -293,7 +293,7 @@ def list_users():
     allgas_users = [user for user in all_users if user.username == 'AllGas']
     current_app.logger.info(f"DEBUG: Found {len(allgas_users)} AllGas users in total list")
     for user in allgas_users:
-        server_name = getattr(user._access_record, 'server', {}).name if hasattr(user, '_access_record') else 'N/A'
+        server_name = getattr(user._access_record, 'server', {}).server_nickname if hasattr(user, '_access_record') else 'N/A'
         current_app.logger.info(f"DEBUG: AllGas user - UUID: {getattr(user, 'uuid', user.id)}, type: {getattr(user, '_user_type', 'unknown')}, server: {server_name}")
     
     allgas_on_page = [user for user in users_on_page if user.username == 'AllGas']
@@ -418,23 +418,23 @@ def list_users():
         
         # Process the access records for this user
         for access in access_records:
-            current_app.logger.info(f"DEBUG: User {user.username} access to server {access.server.name} (ID: {access.server_id}) with libraries: {access.allowed_library_ids}")
+            current_app.logger.info(f"DEBUG: User {user.username} access to server {access.server.server_nickname} (ID: {access.server_id}) with libraries: {access.allowed_library_ids}")
             
             # Special handling for AllGas users to debug library issues
             if user.username == 'AllGas':
-                current_app.logger.info(f"DEBUG: AllGas library processing - Server: {access.server.name}, Raw libraries: {access.allowed_library_ids}")
+                current_app.logger.info(f"DEBUG: AllGas library processing - Server: {access.server.server_nickname}, Raw libraries: {access.allowed_library_ids}")
                 # Check if libraries need filtering for this specific server
                 if access.allowed_library_ids:
                     server_specific_libs = []
                     for lib_id in access.allowed_library_ids:
-                        if isinstance(lib_id, str) and lib_id.startswith(f'[{access.server.service_type.value.upper()}]-{access.server.name}-'):
+                        if isinstance(lib_id, str) and lib_id.startswith(f'[{access.server.service_type.value.upper()}]-{access.server.server_nickname}-'):
                             # Extract the actual library ID from the prefixed format
                             actual_lib_id = lib_id.split('-', 2)[-1]
                             server_specific_libs.append(actual_lib_id)
                         elif not isinstance(lib_id, str) or not lib_id.startswith('['):
                             # This is already a clean library ID
                             server_specific_libs.append(lib_id)
-                    current_app.logger.info(f"DEBUG: AllGas filtered libraries for {access.server.name}: {server_specific_libs}")
+                    current_app.logger.info(f"DEBUG: AllGas filtered libraries for {access.server.server_nickname}: {server_specific_libs}")
                     user_library_access_by_server[user_id][access.server_id] = server_specific_libs
                 else:
                     user_library_access_by_server[user_id][access.server_id] = access.allowed_library_ids
@@ -444,8 +444,8 @@ def list_users():
             if access.server.service_type not in user_service_types[user_id]:
                 user_service_types[user_id].append(access.server.service_type)
             # Track which server names this user has access to
-            if access.server.name not in user_server_names[user_id]:
-                user_server_names[user_id].append(access.server.name)
+            if access.server.server_nickname not in user_server_names[user_id]:
+                user_server_names[user_id].append(access.server.server_nickname)
 
     media_service_manager = MediaServiceManager()
     
@@ -520,7 +520,7 @@ def list_users():
     for server in all_servers:
         server_dropdown_options.append({
             "id": server.id,
-            "name": f"{server.name} ({server.service_type.value.capitalize()})"
+            "name": f"{server.server_nickname} ({server.service_type.value.capitalize()})"
         })
     
     # Add user type filter options
@@ -891,7 +891,7 @@ class MassEditMockUser:
         self.server = server
     
     def get_display_name(self):
-        return f"{self.access.external_username} ({self.server.name})"
+        return f"{self.access.external_username} ({self.server.server_nickname})"
 
 @bp.route('/mass_edit_libraries_form')
 @login_required
@@ -943,7 +943,7 @@ def mass_edit_libraries_form():
         if access:
             current_app.logger.info(f"DEBUG: Record {i} access details: external_username={access.external_username}, server_id={access.server_id}")
         if server:
-            current_app.logger.info(f"DEBUG: Record {i} server details: name={server.name}, service_type={server.service_type}")
+            current_app.logger.info(f"DEBUG: Record {i} server details: name={server.server_nickname}, service_type={server.service_type}")
         if user:
             current_app.logger.info(f"DEBUG: Record {i} user details: username={user.username}")
         else:
@@ -971,7 +971,7 @@ def mass_edit_libraries_form():
                 })
             
             services_data[service_type_key]['servers'][server.id] = {
-                'server_name': server.name,
+                'server_name': server.server_nickname,
                 'users': [],
                 'libraries': libraries,
                 'current_library_ids': set(access.allowed_library_ids or [])
@@ -995,7 +995,7 @@ def mass_edit_libraries_form():
             continue
             
         # Just use the display name string directly
-        display_name = f"{access.external_username} ({server.name})"
+        display_name = f"{access.external_username} ({server.server_nickname})"
         
         current_app.logger.info(f"DEBUG: Adding user: {display_name}")
         current_app.logger.info(f"DEBUG: User string type: {type(display_name)}")
@@ -1055,7 +1055,7 @@ def mass_edit_users():
                     # Use just the library name since server name is now shown in a separate badge
                     available_libraries[str(lib_id)] = lib_name
         except Exception as e:
-            current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
+            current_app.logger.error(f"Error getting libraries from {server.server_nickname}: {e}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
 
     # Manual validation for user_ids, then form validation for the rest
@@ -1299,7 +1299,7 @@ def mass_edit_users():
                 if lib_id:
                     libraries_by_server[server.id][str(lib_id)] = lib_name
         except Exception as e:
-            current_app.logger.error(f"Error getting libraries from {server.name}: {e}")
+            current_app.logger.error(f"Error getting libraries from {server.server_nickname}: {e}")
 
     # Create a mapping of user_id to User object for easy lookup
     users_by_id = {user.id: user for user in users_pagination.items}
@@ -1370,8 +1370,8 @@ def mass_edit_users():
         if access.server.service_type not in user_service_types[access.user_app_access_id]:
             user_service_types[access.user_app_access_id].append(access.server.service_type)
         
-        if access.server.name not in user_server_names[access.user_app_access_id]:
-            user_server_names[access.user_app_access_id].append(access.server.name)
+        if access.server.server_nickname not in user_server_names[access.user_app_access_id]:
+            user_server_names[access.user_app_access_id].append(access.server.server_nickname)
 
     # Get server dropdown options for template
     media_service_manager = MediaServiceManager()
@@ -1380,7 +1380,7 @@ def mass_edit_users():
     for server in all_servers:
         server_dropdown_options.append({
             "id": server.id,
-            "name": f"{server.name} ({server.service_type.value.capitalize()})"
+            "name": f"{server.server_nickname} ({server.service_type.value.capitalize()})"
         })
 
     response_html = render_template('users/partials/user_list_content.html',
@@ -1538,7 +1538,7 @@ def get_linked_accounts(local_user_id):
         join_date_str = join_date.strftime('%b %Y') if join_date else 'Unknown'
         
         # Server info is already available from access.server
-        server_name = access.server.name if access.server else 'Unknown Server'
+        server_name = access.server.server_nickname if access.server else 'Unknown Server'
         
         linked_accounts_html += f"""
         <div class="group relative bg-base-100 rounded-xl border border-base-300/60 hover:border-base-300 transition-all duration-200 hover:shadow-lg hover:shadow-base-300/20">
@@ -1764,7 +1764,7 @@ def delete_app_user(username):
         for access in linked_accounts:
             try:
                 access_name = access.external_username or 'Unknown'
-                current_app.logger.debug(f"Deleting linked media access: {access_name} on {access.server.name}")
+                current_app.logger.debug(f"Deleting linked media access: {access_name} on {access.server.server_nickname}")
                 # Delete the UserMediaAccess record - this will handle server deletion if needed
                 db.session.delete(access)
             except Exception as e:
@@ -1888,7 +1888,7 @@ def get_user_debug_info(user_uuid):
         for access in user_accesses:
             if access.service_settings:
                 has_service_data = True
-                current_app.logger.info(f"Service data found for {access.server.service_type.value} server: {access.server.name}")
+                current_app.logger.info(f"Service data found for {access.server.service_type.value} server: {access.server.server_nickname}")
                 current_app.logger.info(f"Service settings type: {type(access.service_settings)}")
                 current_app.logger.info(f"Service settings preview: {str(access.service_settings)[:100]}...")
         
@@ -1904,7 +1904,7 @@ def get_user_debug_info(user_uuid):
             user_access = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
         current_app.logger.info(f"User has access to {len(user_access)} servers:")
         for access in user_access:
-            current_app.logger.info(f"  - Server: {access.server.name} (Type: {access.server.service_type.value})")
+            current_app.logger.info(f"  - Server: {access.server.server_nickname} (Type: {access.server.service_type.value})")
         
         # Render the template with the user data
         return render_template('users/partials/user_debug_info_modal.html', user=user)
@@ -1978,7 +1978,7 @@ def get_quick_edit_form(user_uuid):
             # Get libraries from database instead of making API calls
             from app.models_media_services import MediaLibrary
             db_libraries = MediaLibrary.query.filter_by(server_id=access.server.id).all()
-            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Processing server {access.server.name} (type: {access.server.service_type.value})")
+            current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Processing server {access.server.server_nickname} (type: {access.server.service_type.value})")
             current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: User access record allowed_library_ids: {access.allowed_library_ids}")
             current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Server libraries from DB: {[{lib.external_id: lib.name} for lib in db_libraries]}")
             
@@ -1998,7 +1998,7 @@ def get_quick_edit_form(user_uuid):
             # Collect current library IDs from this server
             current_library_ids.extend(access.allowed_library_ids or [])
         except Exception as e:
-            current_app.logger.error(f"Error getting libraries from {access.server.name}: {e}")
+            current_app.logger.error(f"Error getting libraries from {access.server.server_nickname}: {e}")
     
     current_app.logger.info(f"DEBUG KAVITA QUICK EDIT: Final available_libraries: {available_libraries}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
@@ -2071,8 +2071,8 @@ def get_quick_edit_form(user_uuid):
     user_server_names = {}
     user_server_names[actual_id] = []
     for access in user_access_records:
-        if access.server.name not in user_server_names[actual_id]:
-            user_server_names[actual_id].append(access.server.name)
+        if access.server.server_nickname not in user_server_names[actual_id]:
+            user_server_names[actual_id].append(access.server.server_nickname)
     
     # We pass the _settings_tab partial, which contains the form we need.
     return render_template(
