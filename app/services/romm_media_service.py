@@ -1,204 +1,380 @@
-# File: app/services/romm_media_service.py
-from typing import List, Dict, Any, Optional, Tuple
+"""
+RomM Media Service Implementation
+Provides integration with RomM (Rom Manager) servers for retro gaming content management.
+"""
+
 import requests
+import json
+from typing import List, Dict, Any, Optional, Tuple
+from flask import current_app
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
-from app.utils.timeout_helper import get_api_timeout
+from app.services.media_service_manager import register_media_client
 
-class RomMMediaService(BaseMediaService):
-    """RomM implementation of BaseMediaService"""
+
+@register_media_client("romm")
+class RommMediaService(BaseMediaService):
+    """RomM media service implementation"""
     
     @property
     def service_type(self) -> ServiceType:
         return ServiceType.ROMM
     
-    def _get_headers(self):
-        """Get headers for RomM API requests"""
-        if self.username and self.password:
-            # RomM might use session-based auth, but we'll try basic auth first
-            import base64
-            credentials = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
-            return {
-                'Authorization': f'Basic {credentials}',
-                'Content-Type': 'application/json'
-            }
-        elif self.api_key:
-            return {
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': 'application/json'
-            }
-        else:
-            return {'Content-Type': 'application/json'}
-    
-    def _make_request(self, endpoint: str, method: str = 'GET', data: Dict = None):
-        """Make API request to RomM server"""
-        url = f"{self.url.rstrip('/')}/api/{endpoint.lstrip('/')}"
-        headers = self._get_headers()
+    def __init__(self, server_config: Dict[str, Any]):
+        super().__init__(server_config)
+        self.session = requests.Session()
+        self.session.timeout = 30
+        self._token = None
         
+    def _authenticate(self) -> bool:
+        """Authenticate with RomM server and get access token"""
         try:
-            timeout = get_api_timeout()
-            if method == 'GET':
-                response = requests.get(url, headers=headers, timeout=timeout)
-            elif method == 'POST':
-                response = requests.post(url, headers=headers, json=data, timeout=timeout)
-            elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, timeout=timeout)
-            elif method == 'PUT':
-                response = requests.put(url, headers=headers, json=data, timeout=timeout)
-            else:
-                raise ValueError(f"Unsupported method: {method}")
+            if not self.username or not self.password:
+                self.log_error("Username and password are required for RomM authentication")
+                return False
+                
+            auth_url = f"{self.url.rstrip('/')}/api/token"
             
+            response = self.session.post(
+                auth_url,
+                data={
+                    "username": self.username,
+                    "password": self.password
+                },
+                timeout=10
+            )
             response.raise_for_status()
-            return response.json() if response.content else {}
+            
+            auth_data = response.json()
+            self._token = auth_data.get('access_token')
+            
+            if self._token:
+                self.session.headers.update({
+                    'Authorization': f'Bearer {self._token}'
+                })
+                self.log_info("Successfully authenticated with RomM server")
+                return True
+            else:
+                self.log_error("No access token received from RomM server")
+                return False
+                
         except requests.exceptions.RequestException as e:
-            self.log_error(f"API request failed: {e}")
-            raise
+            self.log_error(f"Authentication failed: {e}")
+            return False
+        except Exception as e:
+            self.log_error(f"Unexpected error during authentication: {e}")
+            return False
     
     def test_connection(self) -> Tuple[bool, str]:
         """Test connection to RomM server"""
         try:
-            # Try to get platforms (which should be available)
-            platforms = self._make_request('platforms')
-            return True, f"Connected to RomM successfully"
+            # First authenticate
+            if not self._authenticate():
+                return False, "Authentication failed. Check username and password."
+            
+            # Test authenticated request
+            response = self.session.get(f"{self.url.rstrip('/')}/api/users/me")
+            response.raise_for_status()
+            
+            user_info = response.json()
+            username = user_info.get('username', self.username)
+            
+            return True, f"Successfully connected to RomM server as user '{username}'"
+            
+        except requests.exceptions.ConnectTimeout:
+            return False, "Connection to RomM timed out. Check if the server is running and accessible."
+        except requests.exceptions.ConnectionError:
+            return False, "Could not connect to RomM. Check the URL and network connectivity."
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 401:
+                return False, "Authentication failed. Check username and password."
+            elif e.response.status_code == 403:
+                return False, "Access denied. User may not have sufficient permissions."
+            else:
+                return False, f"RomM returned an error: {e.response.status_code} - {e.response.reason}"
+        except requests.exceptions.Timeout:
+            return False, "Request to RomM timed out. The server may be slow to respond."
         except Exception as e:
-            return False, f"Connection failed: {str(e)}"
+            return False, f"Unexpected error connecting to RomM: {str(e)}"
     
     def get_libraries(self) -> List[Dict[str, Any]]:
-        """Get all RomM platforms (equivalent to libraries)"""
+        """Get all platforms (libraries) from RomM"""
         try:
-            platforms = self._make_request('platforms')
-            result = []
+            if not self._authenticate():
+                self.log_error("Failed to authenticate for library retrieval")
+                return []
+            
+            response = self.session.get(f"{self.url.rstrip('/')}/api/platforms")
+            response.raise_for_status()
+            
+            platforms = response.json()
+            libraries = []
             
             for platform in platforms:
-                result.append({
+                libraries.append({
                     'id': str(platform.get('id', '')),
-                    'name': platform.get('name', 'Unknown'),
-                    'type': 'game',  # RomM is for games
-                    'item_count': platform.get('rom_count', 0),
-                    'external_id': str(platform.get('id', ''))
+                    'name': platform.get('name', 'Unknown Platform'),
+                    'slug': platform.get('slug', ''),
+                    'rom_count': platform.get('rom_count', 0)
                 })
             
-            return result
+            self.log_info(f"Retrieved {len(libraries)} platforms from RomM")
+            return libraries
+            
         except Exception as e:
-            self.log_error(f"Error fetching platforms: {e}")
+            self.log_error(f"Error retrieving platforms: {e}")
             return []
     
     def get_users(self) -> List[Dict[str, Any]]:
-        """Get all RomM users"""
+        """Get all users from RomM"""
         try:
-            users = self._make_request('users')
-            result = []
+            if not self._authenticate():
+                self.log_error("Failed to authenticate for user retrieval")
+                return []
             
-            for user in users:
-                user_id = user.get('id')
-                if not user_id:
-                    continue
-                
-                # RomM might not have granular library access control
-                # We'll assume all users have access to all platforms for now
-                result.append({
-                    'id': str(user_id),
-                    'uuid': str(user_id),
-                    'username': user.get('username', 'Unknown'),
-                    'email': user.get('email'),
-                    'thumb': None,  # RomM doesn't provide avatars
-                    'is_home_user': False,
-                    'library_ids': [],  # Will be populated if RomM supports this
-                    'is_admin': user.get('role') == 'admin'
+            response = self.session.get(f"{self.url.rstrip('/')}/api/users")
+            response.raise_for_status()
+            
+            users_data = response.json()
+            users = []
+            
+            for user in users_data:
+                users.append({
+                    'id': str(user.get('id', '')),
+                    'username': user.get('username', ''),
+                    'email': user.get('email', ''),
+                    'enabled': user.get('enabled', True),
+                    'role': user.get('role', 'viewer'),
+                    'created_at': user.get('created_at', ''),
+                    'last_active_at': user.get('last_active_at', '')
                 })
             
-            return result
+            self.log_info(f"Retrieved {len(users)} users from RomM")
+            return users
+            
         except Exception as e:
-            self.log_error(f"Error fetching users: {e}")
+            self.log_error(f"Error retrieving users: {e}")
             return []
     
     def create_user(self, username: str, email: str, password: str = None, **kwargs) -> Dict[str, Any]:
-        """Create new RomM user"""
+        """Create a new user in RomM"""
         try:
+            if not self._authenticate():
+                self.log_error("Failed to authenticate for user creation")
+                return {}
+            
             user_data = {
                 'username': username,
-                'email': email or '',
-                'password': password or 'changeme123',
-                'role': 'viewer'  # Default role
+                'password': password or 'defaultpassword123',  # RomM requires a password
+                'role': kwargs.get('role', 'viewer'),
+                'enabled': kwargs.get('enabled', True)
             }
             
-            result = self._make_request('users', method='POST', data=user_data)
+            if email:
+                user_data['email'] = email
+            
+            response = self.session.post(
+                f"{self.url.rstrip('/')}/api/users",
+                json=user_data
+            )
+            response.raise_for_status()
+            
+            created_user = response.json()
+            self.log_info(f"Created user '{username}' in RomM")
             
             return {
-                'success': True,
-                'user_id': str(result.get('id')),
-                'username': username,
-                'email': email
+                'id': str(created_user.get('id', '')),
+                'username': created_user.get('username', ''),
+                'email': created_user.get('email', ''),
+                'role': created_user.get('role', ''),
+                'enabled': created_user.get('enabled', True)
             }
+            
         except Exception as e:
-            self.log_error(f"Error creating user: {e}")
-            raise
+            self.log_error(f"Error creating user '{username}': {e}")
+            return {}
     
     def update_user_access(self, user_id: str, library_ids: List[str] = None, **kwargs) -> bool:
-        """Update RomM user's access - RomM might not support granular library access"""
+        """Update user's platform access in RomM"""
         try:
-            # RomM might not have granular library access control
-            # This would depend on the specific RomM API implementation
-            self.log_info(f"Library access update requested for user {user_id}, but RomM might not support granular access control")
-            return True
+            if not self._authenticate():
+                self.log_error("Failed to authenticate for user access update")
+                return False
+            
+            # RomM doesn't have granular library access control like other services
+            # Users typically have access to all platforms based on their role
+            # This method could be used to update user role or other permissions
+            
+            user_data = {}
+            if 'role' in kwargs:
+                user_data['role'] = kwargs['role']
+            if 'enabled' in kwargs:
+                user_data['enabled'] = kwargs['enabled']
+            
+            if user_data:
+                response = self.session.patch(
+                    f"{self.url.rstrip('/')}/api/users/{user_id}",
+                    json=user_data
+                )
+                response.raise_for_status()
+                
+                self.log_info(f"Updated user {user_id} access in RomM")
+                return True
+            
+            return True  # No changes needed
+            
         except Exception as e:
-            self.log_error(f"Error updating user access: {e}")
+            self.log_error(f"Error updating user access for {user_id}: {e}")
             return False
     
     def delete_user(self, user_id: str) -> bool:
-        """Delete RomM user"""
+        """Delete/remove user from RomM"""
         try:
-            self._make_request(f'users/{user_id}', method='DELETE')
+            if not self._authenticate():
+                self.log_error("Failed to authenticate for user deletion")
+                return False
+            
+            response = self.session.delete(f"{self.url.rstrip('/')}/api/users/{user_id}")
+            response.raise_for_status()
+            
+            self.log_info(f"Deleted user {user_id} from RomM")
             return True
+            
         except Exception as e:
-            self.log_error(f"Error deleting user: {e}")
+            self.log_error(f"Error deleting user {user_id}: {e}")
             return False
     
     def get_active_sessions(self) -> List[Dict[str, Any]]:
-        """Get active RomM sessions - RomM doesn't have real-time sessions"""
-        # RomM doesn't have active session tracking like media servers
-        # Games are typically downloaded and played locally
-        return []
+        """Get currently active gaming sessions from RomM"""
+        try:
+            if not self._authenticate():
+                self.log_error("Failed to authenticate for session retrieval")
+                return []
+            
+            # RomM doesn't have traditional "streaming sessions" like media servers
+            # But we can get recent activity or currently playing games
+            response = self.session.get(f"{self.url.rstrip('/')}/api/stats/recent-activity")
+            response.raise_for_status()
+            
+            activity_data = response.json()
+            sessions = []
+            
+            # Convert recent activity to session-like format
+            for activity in activity_data.get('recent_plays', []):
+                sessions.append({
+                    'session_id': f"romm_{activity.get('id', '')}",
+                    'user_id': str(activity.get('user_id', '')),
+                    'username': activity.get('username', 'Unknown'),
+                    'game_title': activity.get('rom_name', 'Unknown Game'),
+                    'platform': activity.get('platform_name', 'Unknown Platform'),
+                    'started_at': activity.get('played_at', ''),
+                    'state': 'playing' if activity.get('is_active', False) else 'recent'
+                })
+            
+            return sessions
+            
+        except Exception as e:
+            self.log_error(f"Error retrieving active sessions: {e}")
+            return []
     
     def terminate_session(self, session_id: str, reason: str = None) -> bool:
-        """Terminate session - Not applicable for RomM"""
-        return False
+        """Terminate an active gaming session"""
+        try:
+            # RomM doesn't support terminating sessions remotely
+            # This is a limitation of the platform
+            self.log_warning(f"Session termination not supported by RomM for session {session_id}")
+            return False
+            
+        except Exception as e:
+            self.log_error(f"Error terminating session {session_id}: {e}")
+            return False
+    
+    def get_formatted_sessions(self) -> List[Dict[str, Any]]:
+        """Get active sessions formatted for display"""
+        sessions = self.get_active_sessions()
+        formatted_sessions = []
+        
+        for session in sessions:
+            formatted_sessions.append({
+                'session_id': session.get('session_id', ''),
+                'user_name': session.get('username', 'Unknown'),
+                'user_id': session.get('user_id', ''),
+                'media_title': session.get('game_title', 'Unknown Game'),
+                'media_type': 'game',
+                'platform': session.get('platform', 'Unknown Platform'),
+                'state': session.get('state', 'unknown'),
+                'started_at': session.get('started_at', ''),
+                'server_name': self.name,
+                'server_id': self.server_id,
+                'service_type': 'romm',
+                'can_terminate': False,  # RomM doesn't support session termination
+                'progress_percent': 0,  # Not applicable for games
+                'bandwidth': 0,  # Not applicable for games
+                'location': 'Unknown'
+            })
+        
+        return formatted_sessions
     
     def get_server_info(self) -> Dict[str, Any]:
         """Get RomM server information"""
         try:
-            # Try to get some basic info
-            self._make_request('platforms')
+            if not self._authenticate():
+                return {
+                    'name': self.name,
+                    'url': self.url,
+                    'service_type': 'romm',
+                    'online': False,
+                    'version': 'Unknown'
+                }
+            
+            response = self.session.get(f"{self.url.rstrip('/')}/api/heartbeat")
+            response.raise_for_status()
+            
+            heartbeat_data = response.json()
+            
             return {
                 'name': self.name,
                 'url': self.url,
-                'service_type': self.service_type.value,
+                'service_type': 'romm',
                 'online': True,
-                'version': 'Unknown'
+                'version': heartbeat_data.get('version', 'Unknown'),
+                'platforms_count': heartbeat_data.get('platforms_count', 0),
+                'roms_count': heartbeat_data.get('roms_count', 0),
+                'users_count': heartbeat_data.get('users_count', 0)
             }
-        except:
+            
+        except Exception as e:
+            self.log_error(f"Error getting server info: {e}")
             return {
                 'name': self.name,
                 'url': self.url,
-                'service_type': self.service_type.value,
+                'service_type': 'romm',
                 'online': False,
                 'version': 'Unknown'
             }
-
-    def get_formatted_sessions(self) -> List[Dict[str, Any]]:
-        """Get active RomM sessions formatted for display"""
-        # RomM doesn't have real-time sessions like media servers
-        return []
-
-    def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
-        """Get GeoIP information for a given IP address."""
-        if not ip_address or ip_address in ['127.0.0.1', 'localhost']:
-            return {"status": "local", "message": "This is a local address."}
+    
+    def supports_feature(self, feature: str) -> bool:
+        """Check if RomM supports a specific feature"""
+        romm_features = [
+            'user_management',
+            'library_access',
+            'downloads',  # ROMs can be downloaded
+            'active_sessions'  # Can view recent activity
+        ]
         
-        try:
-            response = requests.get(f"http://ip-api.com/json/{ip_address}")
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            self.log_error(f"Failed to get GeoIP info for {ip_address}: {e}")
-            return {"status": "error", "message": str(e)}
+        # Features RomM doesn't support
+        unsupported_features = [
+            'transcoding',  # Not applicable for ROMs
+            'sharing',  # No sharing mechanism
+            'session_termination'  # Can't terminate remote sessions
+        ]
+        
+        if feature in unsupported_features:
+            return False
+        
+        return feature in romm_features
+    
+    def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
+        """Get GeoIP information for a given IP address"""
+        # Use the base class implementation
+        return super().get_geoip_info(ip_address)

@@ -101,23 +101,50 @@ class JellyfinMediaService(BaseMediaService):
         try:
             client = self._get_client()
             
-            # Use the official client's HTTP session for consistency
+            # Check for different possible session structures in Jellyfin client
+            session = None
+            auth_token = None
+            
+            # Debug: Log the client structure to understand what's available
+            self.log_info(f"Jellyfin client type: {type(client)}")
+            self.log_info(f"Jellyfin client attributes: {[attr for attr in dir(client) if not attr.startswith('_')]}")
+            if hasattr(client, 'http'):
+                self.log_info(f"Client.http type: {type(client.http)}")
+                self.log_info(f"Client.http attributes: {[attr for attr in dir(client.http) if not attr.startswith('_')]}")
+            
+            # Try to find the HTTP session in various possible locations
             if hasattr(client, 'http') and hasattr(client.http, 'session') and client.http.session is not None:
-                self.log_info("Using official client's HTTP session")
+                self.log_info("Using official client's HTTP session (client.http.session)")
                 session = client.http.session
-                # Ensure the session has the authentication token
-                auth_token = None
+            elif hasattr(client, '_http') and hasattr(client._http, 'session') and client._http.session is not None:
+                self.log_info("Using official client's HTTP session (client._http.session)")
+                session = client._http.session
+            elif hasattr(client, 'session') and client.session is not None:
+                self.log_info("Using official client's HTTP session (client.session)")
+                session = client.session
+            elif hasattr(client, 'http') and client.http is not None and hasattr(client.http, 'get'):
+                self.log_info("Found client.http object with request methods - checking if it's usable as session")
+                # Check if this HTTP object can be used like a requests session
+                if hasattr(client.http, 'headers') and hasattr(client.http, 'get'):
+                    self.log_info("Using official client's HTTP object as session")
+                    session = client.http
+                else:
+                    self.log_info("Client.http object doesn't have session-like interface, skipping")
+            
+            if session is not None:
+                # Get authentication token
                 if hasattr(client.config, 'data') and client.config.data.get('auth.token'):
                     auth_token = client.config.data.get('auth.token')
                 elif self.api_key and self.api_key.strip() != '':
                     auth_token = self.api_key
                 
-                if auth_token and 'X-Emby-Token' not in session.headers:
+                # Add authentication header if needed
+                if auth_token and hasattr(session, 'headers') and 'X-Emby-Token' not in session.headers:
                     session.headers['X-Emby-Token'] = auth_token
                     self.log_info("Added authentication token to official client session")
             else:
-                # Fallback to requests if client structure is different or session is None
-                self.log_info("Falling back to requests session with manual headers (client session is None or unavailable)")
+                # Fallback to requests if no suitable session found
+                self.log_info("No suitable session found in official client, falling back to manual requests session")
                 session = requests.Session()
                 
                 # Determine authentication token
@@ -137,12 +164,20 @@ class JellyfinMediaService(BaseMediaService):
             self.log_info(f"Full request URL: {url}")
             
             # Log headers (but mask the API key for security)
-            headers_to_log = dict(session.headers)
-            if 'X-Emby-Token' in headers_to_log:
-                headers_to_log['X-Emby-Token'] = f"{self.api_key[:8]}..." if len(self.api_key) > 8 else "***"
-            self.log_info(f"Request headers: {headers_to_log}")
+            if hasattr(session, 'headers') and session.headers:
+                headers_to_log = dict(session.headers)
+                if 'X-Emby-Token' in headers_to_log:
+                    headers_to_log['X-Emby-Token'] = f"{self.api_key[:8]}..." if len(self.api_key) > 8 else "***"
+                self.log_info(f"Request headers: {headers_to_log}")
+            else:
+                self.log_info("Session has no headers attribute or headers are empty")
             
             timeout = get_api_timeout()
+            
+            # Check if session has the required methods
+            if not hasattr(session, method.lower()):
+                raise AttributeError(f"Session object does not have {method.lower()} method")
+            
             if method == 'GET':
                 response = session.get(url, timeout=timeout)
             elif method == 'POST':

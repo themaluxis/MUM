@@ -40,9 +40,9 @@ class MediaServerForm(FlaskForm):
     name = StringField('Server Name', validators=[DataRequired(), Length(min=1, max=100)])
     service_type = SelectField('Service Type', validators=[DataRequired()])
     url = StringField('Server URL', validators=[DataRequired(), URL(message="Invalid URL format. Include http(s)://")])
-    api_key = StringField('API Key/Token', validators=[Optional()], description="Required for most services. For Jellyfin/Emby, you can use either API key OR username/password.")
-    username = StringField('Username', validators=[Optional()], description="Optional - can be used instead of API key for Jellyfin/Emby, or required for some services like ROMM")
-    password = PasswordField('Password', validators=[Optional()], description="Optional - can be used instead of API key for Jellyfin/Emby, or required for some services like ROMM")
+    api_key = StringField('API Key/Token', validators=[Optional()], description="Required for Plex, Emby, Jellyfin, Kavita, AudioBookshelf, and Komga.")
+    username = StringField('Username', validators=[Optional()], description="Required for services like RomM and Komga that use username/password authentication")
+    password = PasswordField('Password', validators=[Optional()], description="Required for services like RomM and Komga that use username/password authentication")
     is_active = BooleanField('Active', default=True)
     submit = SubmitField('Save Server')
     
@@ -86,9 +86,8 @@ class MediaServerForm(FlaskForm):
             raise ValidationError('A server with this name already exists.')
     
     def validate_api_key(self, field):
-        # For certain service types, API key is required
-        # Note: Jellyfin and Emby can work with username/password OR API key, so we make API key optional
-        if self.service_type.data in ['kavita', 'audiobookshelf', 'komga']:
+        # For token-based services, API key is required
+        if self.service_type.data in ['plex', 'emby', 'jellyfin', 'kavita', 'audiobookshelf', 'komga']:
             if not field.data or field.data.strip() == '':
                 service_name = self.service_type.data.title() if self.service_type.data else 'This service'
                 raise ValidationError(f'{service_name} requires an API key/token for authentication.')

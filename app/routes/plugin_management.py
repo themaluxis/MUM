@@ -8,6 +8,7 @@ from app.models import Setting, EventType
 from app.forms import PluginSettingsForm
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
+from app.utils.connection_tester import test_server_connection
 from app.services.plugin_manager import plugin_manager
 import traceback
 import json
@@ -165,6 +166,11 @@ def edit_server(plugin_id, server_id):
     
     form = MediaServerForm(server_id=server.id, obj=server)
     form.service_type.data = server.service_type.value
+    
+    # Remove username/password fields for services that only use API tokens
+    if plugin_id in ['plex', 'emby', 'jellyfin', 'kavita']:
+        delattr(form, 'username')
+        delattr(form, 'password')
     
     if form.validate_on_submit():
         try:
@@ -325,7 +331,6 @@ def disable_server(plugin_id, server_id):
 def test_connection(plugin_id):
     """Test connection for a new server configuration"""
     try:
-        from app.services.media_service_factory import MediaServiceFactory
         from flask import jsonify
         
         # Get data from JSON request
@@ -333,61 +338,48 @@ def test_connection(plugin_id):
         if not data:
             return jsonify({'success': False, 'message': 'No data provided'})
             
-        name = data.get('name', '').strip()
         url = data.get('url', '').strip()
         api_key = data.get('api_key', '').strip()
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
         
-        # Validate required fields based on service type
+        # Validate required fields
         if not url:
             return jsonify({'success': False, 'message': 'URL is required'})
         
-        # Services that use credentials instead of API keys
-        credential_services = ['romm']
+        # Prepare credentials based on service type
+        credentials = {}
         
-        # Services that can use either API key OR username/password
-        flexible_auth_services = ['jellyfin', 'emby']
-        
-        # Services that require API key
-        api_key_required_services = ['kavita', 'audiobookshelf', 'komga']
-        
-        if plugin_id in credential_services:
+        if plugin_id in ['jellyfin', 'emby', 'plex', 'audiobookshelf', 'kavita']:
+            # Token-based authentication only
+            if not api_key:
+                return jsonify({'success': False, 'message': f'API token is required for {plugin_id.title()}'})
+            credentials['token'] = api_key
+                
+        elif plugin_id in ['komga', 'romm']:
+            # Username/password authentication
             if not username or not password:
-                return jsonify({'success': False, 'message': 'URL, username, and password are required'})
-        elif plugin_id in api_key_required_services:
-            if not api_key:
-                return jsonify({'success': False, 'message': 'URL and API key are required'})
-        elif plugin_id in flexible_auth_services:
-            # For Jellyfin/Emby, either API key OR username+password is acceptable
-            if not api_key and not (username and password):
-                return jsonify({'success': False, 'message': 'Either API key OR username and password are required'})
+                return jsonify({'success': False, 'message': f'Username and password are required for {plugin_id.title()}'})
+            credentials['username'] = username
+            credentials['password'] = password
+        
         else:
-            # Default behavior for other services
-            if not api_key:
-                return jsonify({'success': False, 'message': 'URL and API key are required'})
+            return jsonify({'success': False, 'message': f'Unsupported service type: {plugin_id}'})
         
-        # Create temporary server config for testing
-        server_config = {
-            'name': name or 'Test Server',
-            'service_type': plugin_id,
-            'url': url,
-            'api_key': api_key,
-            'username': username if username else None,
-            'password': password if password else None,
-            'config': {}
-        }
+        # Test the connection using our new utility
+        success, message = test_server_connection(plugin_id, url, **credentials)
         
-        # Create service instance and test connection
-        service = MediaServiceFactory.create_service(server_config)
-        if not service:
-            return jsonify({'success': False, 'message': f'Failed to create service for {plugin_id}'})
+        # Log the test attempt
+        log_event(
+            EventType.SETTING_CHANGE,
+            f"Connection test for {plugin_id.title()} server: {'Success' if success else 'Failed'} - {message}",
+            admin_id=current_user.id
+        )
         
-        success, message = service.test_connection()
         return jsonify({'success': success, 'message': message})
         
     except Exception as e:
-        current_app.logger.error(f"Error testing plugin connection: {e}")
+        current_app.logger.error(f"Error testing plugin connection: {e}", exc_info=True)
         return jsonify({'success': False, 'message': f'Connection test failed: {str(e)}'})
 
 @bp.route('/<plugin_id>/<int:server_id>/test', methods=['POST'])
@@ -397,7 +389,6 @@ def test_connection(plugin_id):
 def test_existing_server_connection(plugin_id, server_id):
     """Test connection for an existing server"""
     try:
-        from app.services.media_service_factory import MediaServiceFactory
         from app.models_media_services import MediaServer, ServiceType
         from flask import jsonify
         
@@ -412,16 +403,39 @@ def test_existing_server_connection(plugin_id, server_id):
         if not server:
             return jsonify({'success': False, 'message': 'Server not found'})
         
-        # Create service instance and test connection
-        service = MediaServiceFactory.create_service_from_db(server)
-        if not service:
-            return jsonify({'success': False, 'message': f'Failed to create service for {plugin_id}'})
+        # Prepare credentials based on service type
+        credentials = {}
         
-        success, message = service.test_connection()
+        if plugin_id in ['jellyfin', 'emby', 'plex', 'audiobookshelf', 'kavita']:
+            # Token-based authentication
+            if not server.api_key:
+                return jsonify({'success': False, 'message': f'API token not configured for this {plugin_id.title()} server'})
+            credentials['token'] = server.api_key
+                
+        elif plugin_id in ['komga', 'romm']:
+            # Username/password authentication
+            if not server.username or not server.password:
+                return jsonify({'success': False, 'message': f'Username and password not configured for this {plugin_id.title()} server'})
+            credentials['username'] = server.username
+            credentials['password'] = server.password
+        
+        else:
+            return jsonify({'success': False, 'message': f'Unsupported service type: {plugin_id}'})
+        
+        # Test the connection using our new utility
+        success, message = test_server_connection(plugin_id, server.url, **credentials)
+        
+        # Log the test attempt
+        log_event(
+            EventType.SETTING_CHANGE,
+            f"Connection test for existing {plugin_id.title()} server '{server.server_nickname}': {'Success' if success else 'Failed'} - {message}",
+            admin_id=current_user.id
+        )
+        
         return jsonify({'success': success, 'message': message})
         
     except Exception as e:
-        current_app.logger.error(f"Error testing existing server connection: {e}")
+        current_app.logger.error(f"Error testing existing server connection: {e}", exc_info=True)
         return jsonify({'success': False, 'message': f'Connection test failed: {str(e)}'})
 
 @bp.route('/<plugin_id>/<int:server_id>/raw-info', methods=['GET'])
@@ -619,3 +633,4 @@ def delete_server(plugin_id, server_id):
         flash(f'Failed to delete server "{server_name}": {str(e)}', 'danger')
     
     return redirect(url_for('plugin_management.configure', plugin_id=plugin_id))
+
