@@ -297,16 +297,43 @@ def get_library_raw_data(server_id, library_id):
         if not service:
             return {'error': 'Could not create service instance'}, 500
         
-        # Get all libraries and find the specific one
-        libraries = service.get_libraries()
-        
-        # Find the library with matching external_id
-        target_library = None
-        for lib in libraries:
-            lib_external_id = lib.get('external_id') or lib.get('id')
-            if str(lib_external_id) == str(library_id):
-                target_library = lib
-                break
+        # Get raw libraries data (unmodified API response)
+        if hasattr(service, 'get_libraries_raw'):
+            # Use raw data method if available (shows true API response)
+            libraries = service.get_libraries_raw()
+            # For raw data, we need to match against the actual API field names
+            target_library = None
+            for lib in libraries:
+                # Check different possible ID fields from the raw API based on service type
+                lib_id = None
+                if server.service_type.value.lower() == 'plex':
+                    # Plex uses 'key' field
+                    lib_id = lib.get('key')
+                elif server.service_type.value.lower() in ['jellyfin', 'emby']:
+                    # Jellyfin/Emby use 'ItemId'
+                    lib_id = lib.get('ItemId')
+                elif server.service_type.value.lower() in ['kavita', 'komga', 'romm']:
+                    # These services use 'id'
+                    lib_id = lib.get('id')
+                elif server.service_type.value.lower() == 'audiobookshelf':
+                    # AudioBookshelf uses 'id'
+                    lib_id = lib.get('id')
+                else:
+                    # Fallback - try common field names
+                    lib_id = lib.get('ItemId') or lib.get('id') or lib.get('key') or lib.get('external_id')
+                
+                if str(lib_id) == str(library_id):
+                    target_library = lib
+                    break
+        else:
+            # Fallback to processed data for services that don't have raw method
+            libraries = service.get_libraries()
+            target_library = None
+            for lib in libraries:
+                lib_external_id = lib.get('external_id') or lib.get('id')
+                if str(lib_external_id) == str(library_id):
+                    target_library = lib
+                    break
         
         if not target_library:
             return {'error': f'Library with ID {library_id} not found on server'}, 404

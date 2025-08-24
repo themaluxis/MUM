@@ -216,12 +216,25 @@ class KavitaMediaService(BaseMediaService):
         except Exception as e:
             return False, f"Connection failed: {str(e)}"
     
-    def get_libraries(self) -> List[Dict[str, Any]]:
-        """Get all Kavita libraries"""
+    def get_libraries_raw(self) -> List[Dict[str, Any]]:
+        """Get raw, unmodified library data from Kavita API"""
         try:
+            # Return the raw API response without any modifications
             libraries = self._make_request('Library/libraries')
+            self.log_info(f"Retrieved {len(libraries)} raw libraries from Kavita")
+            return libraries
+        except Exception as e:
+            self.log_error(f"Error fetching raw libraries: {e}")
+            return []
+    
+    def get_libraries(self) -> List[Dict[str, Any]]:
+        """Get all Kavita libraries (processed for internal use)"""
+        try:
+            # Get raw data first
+            libraries = self.get_libraries_raw()
             result = []
             
+            # Process the raw data for internal use
             for lib in libraries:
                 # Handle library type - it might be an integer or string
                 lib_type = lib.get('type', 'book')
@@ -241,6 +254,7 @@ class KavitaMediaService(BaseMediaService):
                     'raw_data': lib  # Store raw data for debugging
                 })
             
+            self.log_info(f"Processed {len(result)} libraries from Kavita")
             return result
         except Exception as e:
             self.log_error(f"Error fetching libraries: {e}")

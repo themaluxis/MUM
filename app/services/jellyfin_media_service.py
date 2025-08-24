@@ -92,11 +92,11 @@ class JellyfinMediaService(BaseMediaService):
         except Exception as e:
             return False, f"Unexpected error connecting to Jellyfin: {str(e)}"
     
-    def get_libraries(self) -> List[Dict[str, Any]]:
-        """Get all libraries from Jellyfin"""
+    def get_libraries_raw(self) -> List[Dict[str, Any]]:
+        """Get raw, unmodified library data from Jellyfin API"""
         try:
             if not self._authenticated and not self._authenticate():
-                self.log_error("Failed to authenticate for library retrieval")
+                self.log_error("Failed to authenticate for raw library retrieval")
                 return []
             
             response = self.session.get(
@@ -105,9 +105,23 @@ class JellyfinMediaService(BaseMediaService):
             )
             response.raise_for_status()
             
+            # Return the raw API response without any modifications
             virtual_folders = response.json()
+            self.log_info(f"Retrieved {len(virtual_folders)} raw libraries from Jellyfin")
+            return virtual_folders
+            
+        except Exception as e:
+            self.log_error(f"Error retrieving raw libraries: {e}")
+            return []
+    
+    def get_libraries(self) -> List[Dict[str, Any]]:
+        """Get all libraries from Jellyfin (processed for internal use)"""
+        try:
+            # Get raw data first
+            virtual_folders = self.get_libraries_raw()
             libraries = []
             
+            # Process the raw data for internal use
             for folder in virtual_folders:
                 libraries.append({
                     'external_id': folder.get('ItemId', folder.get('Name', '')),
@@ -116,7 +130,7 @@ class JellyfinMediaService(BaseMediaService):
                     'locations': folder.get('Locations', [])
                 })
             
-            self.log_info(f"Retrieved {len(libraries)} libraries from Jellyfin")
+            self.log_info(f"Processed {len(libraries)} libraries from Jellyfin")
             return libraries
             
         except Exception as e:

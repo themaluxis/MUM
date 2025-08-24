@@ -95,28 +95,43 @@ class RommMediaService(BaseMediaService):
         except Exception as e:
             return False, f"Unexpected error connecting to RomM: {str(e)}"
     
-    def get_libraries(self) -> List[Dict[str, Any]]:
-        """Get all platforms (libraries) from RomM"""
+    def get_libraries_raw(self) -> List[Dict[str, Any]]:
+        """Get raw, unmodified platform data from RomM API"""
         try:
             if not self._authenticate():
-                self.log_error("Failed to authenticate for library retrieval")
+                self.log_error("Failed to authenticate for raw library retrieval")
                 return []
             
             response = self.session.get(f"{self.url.rstrip('/')}/api/platforms")
             response.raise_for_status()
             
+            # Return the raw API response without any modifications
             platforms = response.json()
+            self.log_info(f"Retrieved {len(platforms)} raw platforms from RomM")
+            return platforms
+            
+        except Exception as e:
+            self.log_error(f"Error retrieving raw platforms: {e}")
+            return []
+    
+    def get_libraries(self) -> List[Dict[str, Any]]:
+        """Get all platforms (libraries) from RomM (processed for internal use)"""
+        try:
+            # Get raw data first
+            platforms = self.get_libraries_raw()
             libraries = []
             
+            # Process the raw data for internal use
             for platform in platforms:
                 libraries.append({
                     'id': str(platform.get('id', '')),
                     'name': platform.get('name', 'Unknown Platform'),
                     'slug': platform.get('slug', ''),
-                    'rom_count': platform.get('rom_count', 0)
+                    'rom_count': platform.get('rom_count', 0),
+                    'external_id': str(platform.get('id', ''))  # Add external_id for compatibility
                 })
             
-            self.log_info(f"Retrieved {len(libraries)} platforms from RomM")
+            self.log_info(f"Processed {len(libraries)} platforms from RomM")
             return libraries
             
         except Exception as e:

@@ -52,13 +52,26 @@ class AudiobookShelfMediaService(BaseMediaService):
         except Exception as e:
             return False, f"Connection failed: {str(e)}"
     
-    def get_libraries(self) -> List[Dict[str, Any]]:
-        """Get all AudiobookShelf libraries"""
+    def get_libraries_raw(self) -> List[Dict[str, Any]]:
+        """Get raw, unmodified library data from AudiobookShelf API"""
         try:
+            # Return the raw API response without any modifications
             libraries = self._make_request('libraries')
+            self.log_info(f"Retrieved raw libraries from AudiobookShelf")
+            return libraries
+        except Exception as e:
+            self.log_error(f"Error fetching raw libraries: {e}")
+            return []
+    
+    def get_libraries(self) -> List[Dict[str, Any]]:
+        """Get all AudiobookShelf libraries (processed for internal use)"""
+        try:
+            # Get raw data first
+            libraries_response = self.get_libraries_raw()
             result = []
             
-            for lib in libraries.get('libraries', []):
+            # Process the raw data for internal use
+            for lib in libraries_response.get('libraries', []):
                 result.append({
                     'id': lib.get('id', ''),
                     'name': lib.get('name', 'Unknown'),
@@ -67,6 +80,7 @@ class AudiobookShelfMediaService(BaseMediaService):
                     'external_id': lib.get('id', '')
                 })
             
+            self.log_info(f"Processed {len(result)} libraries from AudiobookShelf")
             return result
         except Exception as e:
             self.log_error(f"Error fetching libraries: {e}")

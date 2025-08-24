@@ -51,12 +51,25 @@ class EmbyMediaService(BaseMediaService):
         except Exception as e:
             return False, f"Connection failed: {str(e)}"
     
-    def get_libraries(self) -> List[Dict[str, Any]]:
-        """Get all Emby libraries"""
+    def get_libraries_raw(self) -> List[Dict[str, Any]]:
+        """Get raw, unmodified library data from Emby API"""
         try:
+            # Return the raw API response without any modifications
             libraries = self._make_request('Library/VirtualFolders')
+            self.log_info(f"Retrieved {len(libraries)} raw libraries from Emby")
+            return libraries
+        except Exception as e:
+            self.log_error(f"Error fetching raw libraries: {e}")
+            return []
+    
+    def get_libraries(self) -> List[Dict[str, Any]]:
+        """Get all Emby libraries (processed for internal use)"""
+        try:
+            # Get raw data first
+            libraries = self.get_libraries_raw()
             result = []
             
+            # Process the raw data for internal use
             for lib in libraries:
                 result.append({
                     'id': lib.get('ItemId', lib.get('Name', '')),
@@ -66,6 +79,7 @@ class EmbyMediaService(BaseMediaService):
                     'external_id': lib.get('ItemId', lib.get('Name', ''))
                 })
             
+            self.log_info(f"Processed {len(result)} libraries from Emby")
             return result
         except Exception as e:
             self.log_error(f"Error fetching libraries: {e}")

@@ -63,13 +63,26 @@ class KomgaMediaService(BaseMediaService):
         except Exception as e:
             return False, f"Connection failed: {str(e)}"
     
-    def get_libraries(self) -> List[Dict[str, Any]]:
-        """Get all Komga libraries"""
+    def get_libraries_raw(self) -> List[Dict[str, Any]]:
+        """Get raw, unmodified library data from Komga API"""
         try:
+            # Return the raw API response without any modifications
             libraries = self._make_request('libraries')
+            self.log_info(f"Retrieved raw libraries from Komga")
+            return libraries
+        except Exception as e:
+            self.log_error(f"Error fetching raw libraries: {e}")
+            return []
+    
+    def get_libraries(self) -> List[Dict[str, Any]]:
+        """Get all Komga libraries (processed for internal use)"""
+        try:
+            # Get raw data first
+            libraries_response = self.get_libraries_raw()
             result = []
             
-            for lib in libraries.get('content', []):
+            # Process the raw data for internal use
+            for lib in libraries_response.get('content', []):
                 result.append({
                     'id': lib.get('id', ''),
                     'name': lib.get('name', 'Unknown'),
@@ -78,6 +91,7 @@ class KomgaMediaService(BaseMediaService):
                     'external_id': lib.get('id', '')
                 })
             
+            self.log_info(f"Processed {len(result)} libraries from Komga")
             return result
         except Exception as e:
             self.log_error(f"Error fetching libraries: {e}")

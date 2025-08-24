@@ -68,8 +68,124 @@ class PlexMediaService(BaseMediaService):
                 return False, f"Connection failed: {str(e)}"
         return False, "Could not establish connection"
     
+    def get_libraries_raw(self) -> List[Dict[str, Any]]:
+        """Get raw, unmodified library data from Plex API"""
+        server = self._get_server_instance()
+        if not server:
+            return []
+        
+        raw_libraries = []
+        try:
+            for lib in server.library.sections():
+                try:
+                    # Store raw library data - with safe attribute access
+                    raw_lib_data = {
+                        'key': getattr(lib, 'key', None),
+                        'title': getattr(lib, 'title', None),
+                        'type': getattr(lib, 'type', None),
+                        'totalSize': getattr(lib, 'totalSize', None),
+                        'uuid': getattr(lib, 'uuid', None),
+                        'agent': getattr(lib, 'agent', None),
+                        'scanner': getattr(lib, 'scanner', None),
+                        'language': getattr(lib, 'language', None),
+                        'refreshing': getattr(lib, 'refreshing', None),
+                        'updatedAt': str(getattr(lib, 'updatedAt', None)) if getattr(lib, 'updatedAt', None) else None,
+                        'createdAt': str(getattr(lib, 'createdAt', None)) if getattr(lib, 'createdAt', None) else None,
+                        'scannedAt': str(getattr(lib, 'scannedAt', None)) if getattr(lib, 'scannedAt', None) else None,
+                        'thumb': getattr(lib, 'thumb', None),
+                        'art': getattr(lib, 'art', None),
+                        'composite': getattr(lib, 'composite', None),
+                        'filters': getattr(lib, 'filters', None),
+                        'sorts': getattr(lib, 'sorts', None),
+                        'fields': getattr(lib, 'fields', None)
+                    }
+                    
+                    # Safely get locations
+                    try:
+                        locations = getattr(lib, 'locations', [])
+                        raw_lib_data['locations'] = [getattr(loc, 'path', str(loc)) for loc in locations] if locations else []
+                    except Exception as loc_error:
+                        self.log_warning(f"Error getting locations for library {lib.title}: {loc_error}")
+                        raw_lib_data['locations'] = []
+                    
+                    # Safely get all attributes for complete raw data
+                    try:
+                        safe_attrs = {}
+                        for attr in dir(lib):
+                            if not attr.startswith('_'):
+                                try:
+                                    value = getattr(lib, attr, None)
+                                    if not callable(value):
+                                        # Convert datetime objects to strings for JSON serialization
+                                        if hasattr(value, 'strftime'):
+                                            value = str(value)
+                                        safe_attrs[attr] = value
+                                except Exception:
+                                    safe_attrs[attr] = f"<Error accessing {attr}>"
+                        raw_lib_data['all_attributes'] = safe_attrs
+                    except Exception as attr_error:
+                        self.log_warning(f"Error getting attributes for library {lib.title}: {attr_error}")
+                        raw_lib_data['all_attributes'] = {}
+                    
+                    raw_libraries.append(raw_lib_data)
+                    
+                except Exception as lib_error:
+                    self.log_error(f"Error processing raw library {getattr(lib, 'title', 'Unknown')}: {lib_error}")
+                    # Add basic library info even if detailed raw_data fails
+                    raw_libraries.append({
+                        'key': getattr(lib, 'key', 'unknown'),
+                        'title': getattr(lib, 'title', 'Unknown Library'),
+                        'type': getattr(lib, 'type', 'unknown'),
+                        'totalSize': getattr(lib, 'totalSize', 0),
+                        'error': f'Could not fetch complete raw data: {str(lib_error)}'
+                    })
+                    
+        except Exception as e:
+            self.log_error(f"Error fetching raw libraries: {e}")
+        
+        return raw_libraries
+    
     def get_libraries(self) -> List[Dict[str, Any]]:
-        """Get all Plex libraries"""
+        """Get all Plex libraries (processed for internal use)"""
+        server = self._get_server_instance()
+        if not server:
+            return []
+        
+        libraries = []
+        try:
+            # Get raw data first
+            raw_libraries = self.get_libraries_raw()
+            
+            for raw_lib_data in raw_libraries:
+                try:
+                    libraries.append({
+                        'id': str(raw_lib_data.get('key', 'unknown')),
+                        'name': raw_lib_data.get('title', 'Unknown Library'),
+                        'type': raw_lib_data.get('type', 'unknown'),
+                        'item_count': raw_lib_data.get('totalSize', 0),
+                        'external_id': str(raw_lib_data.get('key', 'unknown')),
+                        'raw_data': raw_lib_data  # Store the complete raw data for backward compatibility
+                    })
+                    
+                except Exception as lib_error:
+                    self.log_error(f"Error processing library {raw_lib_data.get('title', 'Unknown')}: {lib_error}")
+                    # Add basic library info even if processing fails
+                    libraries.append({
+                        'id': str(raw_lib_data.get('key', 'unknown')),
+                        'name': raw_lib_data.get('title', 'Unknown Library'),
+                        'type': raw_lib_data.get('type', 'unknown'),
+                        'item_count': raw_lib_data.get('totalSize', 0),
+                        'external_id': str(raw_lib_data.get('key', 'unknown')),
+                        'raw_data': {'error': f'Could not process library: {str(lib_error)}'}
+                    })
+                    
+        except Exception as e:
+            self.log_error(f"Error fetching libraries: {e}")
+        
+        return libraries
+    
+    def _legacy_get_libraries_with_raw_data(self) -> List[Dict[str, Any]]:
+        """Legacy method - kept for reference but not used"""
         server = self._get_server_instance()
         if not server:
             return []

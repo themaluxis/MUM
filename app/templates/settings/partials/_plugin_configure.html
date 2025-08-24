@@ -89,7 +89,7 @@
                     </div>
                     <div>
                         <h3 class="font-semibold text-base-content">{{ server.server_nickname }}</h3>
-                        <span class="text-xs text-base-content/60">{{ details.actual_server_name or server.service_type.value.title() }}</span>
+                        <span class="text-xs text-base-content/60">{{ server.server_name or server.service_type.value.title() }}</span>
                     </div>
                 </div>
                 {% if server.is_active %}
