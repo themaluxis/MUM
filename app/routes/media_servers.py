@@ -57,7 +57,7 @@ def add_server_setup(plugin_id):
                 return render_template('setup/add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
 
             # Save to database
-            server = MediaServer(name=form.name.data, service_type=ServiceType(form.service_type.data), url=form.url.data.rstrip('/'), api_key=form.api_key.data, username=form.username.data, password=form.password.data, is_active=form.is_active.data)
+            server = MediaServer(server_nickname=form.name.data, service_type=ServiceType(form.service_type.data), url=form.url.data.rstrip('/'), api_key=form.api_key.data, username=form.username.data, password=form.password.data, is_active=form.is_active.data)
             db.session.add(server)
             db.session.commit()
             
@@ -114,7 +114,7 @@ def add_server():
                 return render_template('media_servers/add.html', form=form)
 
             # Save to database
-            server = MediaServer(name=form.name.data, service_type=ServiceType(form.service_type.data), url=form.url.data.rstrip('/'), api_key=form.api_key.data, username=form.username.data, password=form.password.data, is_active=form.is_active.data)
+            server = MediaServer(server_nickname=form.name.data, service_type=ServiceType(form.service_type.data), url=form.url.data.rstrip('/'), api_key=form.api_key.data, username=form.username.data, password=form.password.data, is_active=form.is_active.data)
             db.session.add(server)
             db.session.commit()
             

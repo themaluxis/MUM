@@ -27,7 +27,7 @@ def check_if_user_is_admin(user):
     
     for plex_server in plex_servers:
         access = UserMediaAccess.query.filter_by(
-            user_app_access_id=user.id,
+            user_app_access_uuid=user.uuid,
             server_id=plex_server.id
         ).first()
         
@@ -468,8 +468,8 @@ def view_service_account(server_nickname, server_username):
     
     # Additional debugging - check what's actually in the database for this user
     from app.models_media_services import MediaStreamHistory
-    db_records = MediaStreamHistory.query.filter_by(user_media_access_id=user.id).count()
-    current_app.logger.info(f"DEBUG STATS: Direct DB check - MediaStreamHistory records for user_media_access_id={user.id}: {db_records}")
+    db_records = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).count()
+    current_app.logger.info(f"DEBUG STATS: Direct DB check - MediaStreamHistory records for user_media_access_uuid={user.uuid}: {db_records}")
     
     # Check if user_service is looking in the right place
     current_app.logger.info(f"DEBUG STATS: Checking user_service logic for user UUID: {user.uuid}")
@@ -525,11 +525,11 @@ def view_service_account(server_nickname, server_username):
             current_app.logger.info(f"DEBUG HISTORY: _is_service_user value: {getattr(user, '_is_service_user', 'N/A')}")
             
             if hasattr(user, '_is_service_user') and user._is_service_user:
-                # This is a service user - we need to filter by user_media_access_id to get only this service's history
-                # For linked service accounts, history is stored with both user_app_access_id AND user_media_access_id
-                current_app.logger.info(f"DEBUG HISTORY: Service user - querying MediaStreamHistory with user_media_access_id={user.id}")
+                # This is a service user - we need to filter by user_media_access_uuid to get only this service's history
+                # For linked service accounts, history is stored with both user_app_access_uuid AND user_media_access_uuid
+                current_app.logger.info(f"DEBUG HISTORY: Service user - querying MediaStreamHistory with user_media_access_uuid={user.uuid}")
                 current_app.logger.info(f"DEBUG HISTORY: Access record details - server: {access.server.server_nickname}, service_type: {access.server.service_type.value}, external_username: {access.external_username}")
-                stream_history_pagination = MediaStreamHistory.query.filter_by(user_media_access_id=user.id)\
+                stream_history_pagination = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid)\
                     .order_by(MediaStreamHistory.started_at.desc())\
                     .paginate(page=page, per_page=15, error_out=False)
                 current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for service user")
@@ -538,31 +538,31 @@ def view_service_account(server_nickname, server_username):
                 if stream_history_pagination.items:
                     current_app.logger.info(f"DEBUG HISTORY: Sample records:")
                     for i, record in enumerate(stream_history_pagination.items[:3]):
-                        current_app.logger.info(f"DEBUG HISTORY: Record {i+1}: {record.media_title} at {record.started_at} (user_media_access_id: {record.user_media_access_id}, user_app_access_id: {record.user_app_access_id})")
+                        current_app.logger.info(f"DEBUG HISTORY: Record {i+1}: {record.media_title} at {record.started_at} (user_media_access_uuid: {record.user_media_access_uuid}, user_app_access_uuid: {record.user_app_access_uuid})")
             else:
                 # This is a regular UserAppAccess - query by user_app_access_id
-                current_app.logger.info(f"DEBUG HISTORY: Regular UserAppAccess - querying MediaStreamHistory with user_app_access_id={user.id}")
-                stream_history_pagination = MediaStreamHistory.query.filter_by(user_app_access_id=user.id)\
+                current_app.logger.info(f"DEBUG HISTORY: Regular UserAppAccess - querying MediaStreamHistory with user_app_access_uuid={user.uuid}")
+                stream_history_pagination = MediaStreamHistory.query.filter_by(user_app_access_uuid=user.uuid)\
                     .order_by(MediaStreamHistory.started_at.desc())\
                     .paginate(page=page, per_page=15, error_out=False)
                 current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for regular user")
             
             # Additional debugging - check what's actually in the database
             total_records = MediaStreamHistory.query.count()
-            records_with_user_media_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_media_access_id.isnot(None)).count()
-            records_with_user_app_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_app_access_id.isnot(None)).count()
+            records_with_user_media_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_media_access_uuid.isnot(None)).count()
+            records_with_user_app_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_app_access_uuid.isnot(None)).count()
             current_app.logger.info(f"DEBUG HISTORY: Total MediaStreamHistory records: {total_records}")
-            current_app.logger.info(f"DEBUG HISTORY: Records with user_media_access_id: {records_with_user_media_access}")
-            current_app.logger.info(f"DEBUG HISTORY: Records with user_app_access_id: {records_with_user_app_access}")
+            current_app.logger.info(f"DEBUG HISTORY: Records with user_media_access_uuid: {records_with_user_media_access}")
+            current_app.logger.info(f"DEBUG HISTORY: Records with user_app_access_uuid: {records_with_user_app_access}")
             
             # Check specifically for this user's records
             if hasattr(user, '_is_service_user') and user._is_service_user:
-                specific_records = MediaStreamHistory.query.filter_by(user_media_access_id=user.id).all()
-                current_app.logger.info(f"DEBUG HISTORY: Specific records for user_media_access_id {user.id}: {len(specific_records)}")
+                specific_records = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).all()
+                current_app.logger.info(f"DEBUG HISTORY: Specific records for user_media_access_uuid {user.uuid}: {len(specific_records)}")
                 for record in specific_records:
                     current_app.logger.info(f"DEBUG HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
                 
-                # Check if this user is linked to a local account and if so, what other user_media_access_ids exist for that local account
+                # Check if this user is linked to a local account and if so, what other user_media_access_uuids exist for that local account
                 if access.user_app_access_id:
                     current_app.logger.info(f"DEBUG HISTORY: This service account is linked to local user_app_access_id: {access.user_app_access_id}")
                     # Find all UserMediaAccess records for this local user
@@ -571,11 +571,11 @@ def view_service_account(server_nickname, server_username):
                     for ua in all_user_accesses:
                         current_app.logger.info(f"DEBUG HISTORY: - UserMediaAccess ID {ua.id}: {ua.server.server_nickname} ({ua.server.service_type.value}) - {ua.external_username}")
                         # Check how many history records exist for each
-                        count = MediaStreamHistory.query.filter_by(user_media_access_id=ua.id).count()
+                        count = MediaStreamHistory.query.filter_by(user_media_access_uuid=ua.uuid).count()
                         current_app.logger.info(f"DEBUG HISTORY:   -> Has {count} streaming history records")
             else:
-                specific_records = MediaStreamHistory.query.filter_by(user_app_access_id=user.id).all()
-                current_app.logger.info(f"DEBUG HISTORY: Specific records for user_app_access_id {user.id}: {len(specific_records)}")
+                specific_records = MediaStreamHistory.query.filter_by(user_app_access_uuid=user.uuid).all()
+                current_app.logger.info(f"DEBUG HISTORY: Specific records for user_app_access_uuid {user.uuid}: {len(specific_records)}")
                 for record in specific_records:
                     current_app.logger.info(f"DEBUG HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
             
@@ -675,9 +675,9 @@ def delete_stream_history(username=None, server_nickname=None, server_username=N
                 MediaStreamHistory.id.in_(ids_as_int)
             ).delete(synchronize_session=False)
         else:  # user_media_access
-            # For standalone service users, delete by user_media_access_id
+            # For standalone service users, delete by user_media_access_uuid
             num_deleted = db.session.query(MediaStreamHistory).filter(
-                MediaStreamHistory.user_media_access_id == actual_id,
+                MediaStreamHistory.user_media_access_uuid == access.uuid,
                 MediaStreamHistory.id.in_(ids_as_int)
             ).delete(synchronize_session=False)
         
@@ -924,7 +924,7 @@ def view_app_user(username):
             # Join with UserMediaAccess and MediaServer to filter by service type
             history_query = history_query.join(
                 UserMediaAccess, 
-                MediaStreamHistory.user_media_access_id == UserMediaAccess.id
+                MediaStreamHistory.user_media_access_uuid == UserMediaAccess.uuid
             ).join(
                 UserMediaAccess.server
             ).filter(
@@ -938,11 +938,11 @@ def view_app_user(username):
         
         # Enhance history entries with service account info
         for entry in streaming_history:
-            current_app.logger.info(f"DEBUG LOCAL HISTORY: Processing entry - user_media_access_id: {entry.user_media_access_id}, server_id: {getattr(entry, 'server_id', 'N/A')}")
+            current_app.logger.info(f"DEBUG LOCAL HISTORY: Processing entry - user_media_access_uuid: {entry.user_media_access_uuid}, server_id: {getattr(entry, 'server_id', 'N/A')}")
             
-            if entry.user_media_access_id:
+            if entry.user_media_access_uuid:
                 # Get the service account that was used for this stream
-                service_access = UserMediaAccess.query.get(entry.user_media_access_id)
+                service_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
                 if service_access:
                     entry.service_account = service_access
                     entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
@@ -950,14 +950,14 @@ def view_app_user(username):
                     entry.service_username = service_access.external_username or 'Unknown'
                     current_app.logger.info(f"DEBUG LOCAL HISTORY: Found service account - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
                 else:
-                    current_app.logger.warning(f"DEBUG LOCAL HISTORY: No service account found for user_media_access_id: {entry.user_media_access_id}")
+                    current_app.logger.warning(f"DEBUG LOCAL HISTORY: No service account found for user_media_access_uuid: {entry.user_media_access_uuid}")
                     entry.service_account = None
                     entry.service_type = 'unknown'
                     entry.server_name = 'Unknown Server'
                     entry.service_username = 'Unknown'
             elif hasattr(entry, 'server_id') and entry.server_id:
                 # Try to find service account by server_id for this local user
-                current_app.logger.info(f"DEBUG LOCAL HISTORY: No user_media_access_id, trying server_id: {entry.server_id}")
+                current_app.logger.info(f"DEBUG LOCAL HISTORY: No user_media_access_uuid, trying server_id: {entry.server_id}")
                 service_access = UserMediaAccess.query.filter_by(
                     user_app_access_id=user_app_access.id,
                     server_id=entry.server_id
@@ -975,7 +975,7 @@ def view_app_user(username):
                     entry.server_name = 'Unknown Server'
                     entry.service_username = 'Unknown'
             else:
-                current_app.logger.warning(f"DEBUG LOCAL HISTORY: No user_media_access_id or server_id available")
+                current_app.logger.warning(f"DEBUG LOCAL HISTORY: No user_media_access_uuid or server_id available")
                 entry.service_account = None
                 entry.service_type = 'unknown'
                 entry.server_name = 'Unknown Server'

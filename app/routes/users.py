@@ -222,7 +222,7 @@ def list_users():
                     else:
                         # This is a standalone service account, get streaming history from UserMediaAccess
                         last_stream = MediaStreamHistory.query.filter_by(
-                            user_media_access_id=access.id
+                            user_media_access_uuid=access.uuid
                         ).order_by(MediaStreamHistory.started_at.desc()).first()
                         self.last_streamed_at = last_stream.started_at if last_stream else None
                 

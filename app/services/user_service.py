@@ -913,7 +913,7 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
         
         # UserAppAccess doesn't have last_streamed_at - need to check MediaStreamHistory
         from app.models_media_services import MediaStreamHistory
-        last_stream = MediaStreamHistory.query.filter_by(user_app_access_id=user.id).order_by(MediaStreamHistory.started_at.desc()).first()
+        last_stream = MediaStreamHistory.query.filter_by(user_app_access_uuid=user.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
         last_streamed_at = last_stream.started_at if last_stream else None
         
         if last_streamed_at is None:
@@ -950,11 +950,11 @@ def get_user_stream_stats(user_id):
     
     # Build query filter based on user type
     if user_type == "user_app_access":
-        filter_condition = MediaStreamHistory.user_app_access_id == user_obj.id
-        current_app.logger.info(f"DEBUG STATS SERVICE: UUID lookup successful for {user_id} -> user_app_access_id: {user_obj.id}")
+        filter_condition = MediaStreamHistory.user_app_access_uuid == user_obj.uuid
+        current_app.logger.info(f"DEBUG STATS SERVICE: UUID lookup successful for {user_id} -> user_app_access_uuid: {user_obj.uuid}")
     elif user_type == "user_media_access":
-        filter_condition = MediaStreamHistory.user_media_access_id == user_obj.id
-        current_app.logger.info(f"DEBUG STATS SERVICE: UUID lookup successful for {user_id} -> user_media_access_id: {user_obj.id}")
+        filter_condition = MediaStreamHistory.user_media_access_uuid == user_obj.uuid
+        current_app.logger.info(f"DEBUG STATS SERVICE: UUID lookup successful for {user_id} -> user_media_access_uuid: {user_obj.uuid}")
     else:
         current_app.logger.error(f"Invalid user type {user_type} for user ID: {user_id}")
         return {'global': {}, 'players': []}
@@ -1004,15 +1004,39 @@ def get_bulk_user_stream_stats(user_ids: list[int]) -> dict:
     if not user_ids:
         return {}
 
+    # Convert user IDs to UUIDs for the query
+    from app.utils.helpers import get_user_by_uuid
+    user_uuids = []
+    for user_id in user_ids:
+        try:
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                user_uuids.append(user_obj.uuid)
+        except Exception:
+            continue
+    
+    if not user_uuids:
+        return {}
+    
     results = db.session.query(
-        MediaStreamHistory.user_app_access_id,
+        MediaStreamHistory.user_app_access_uuid,
         func.count(MediaStreamHistory.id).label('total_plays'),
         func.sum(MediaStreamHistory.duration_seconds).label('total_duration')
-    ).filter(MediaStreamHistory.user_app_access_id.in_(user_ids)).group_by(MediaStreamHistory.user_app_access_id).all()
+    ).filter(MediaStreamHistory.user_app_access_uuid.in_(user_uuids)).group_by(MediaStreamHistory.user_app_access_uuid).all()
 
+    # Create a mapping from UUID back to original user ID
+    uuid_to_user_id = {}
+    for user_id in user_ids:
+        try:
+            user_obj, user_type = get_user_by_uuid(str(user_id))
+            if user_obj and user_type == "user_app_access":
+                uuid_to_user_id[user_obj.uuid] = user_id
+        except Exception:
+            continue
+    
     return {
-        user_id: {'play_count': plays, 'total_duration': duration or 0}
-        for user_id, plays, duration in results
+        uuid_to_user_id.get(user_uuid, user_uuid): {'play_count': plays, 'total_duration': duration or 0}
+        for user_uuid, plays, duration in results
     }
 
 def get_bulk_last_known_ips(user_uuids: list) -> dict:

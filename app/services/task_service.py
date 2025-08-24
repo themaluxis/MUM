@@ -253,8 +253,8 @@ def monitor_media_sessions_task():
                     current_app.logger.info(f"DEBUG: Platform: {platform}, Player: {player_title}")
                     
                     new_history_record = MediaStreamHistory(
-                        user_app_access_id=mum_user.id if mum_user else None,
-                        user_media_access_id=user_media_access.id,  # Always set this to identify which service account was used
+                        user_app_access_uuid=mum_user.uuid if mum_user else None,
+                        user_media_access_uuid=user_media_access.uuid,  # Always set this to identify which service account was used
                         server_id=current_server.id,
                         session_key=str(session_key),
                         rating_key=rating_key,

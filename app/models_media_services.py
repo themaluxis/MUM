@@ -276,9 +276,9 @@ class MediaStreamHistory(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     
-    # Relationships - Support both UserAppAccess (linked) and UserMediaAccess (standalone)
-    user_app_access_id = db.Column(db.Integer, db.ForeignKey('user_app_access.id'), nullable=True, index=True)
-    user_media_access_id = db.Column(db.Integer, db.ForeignKey('user_media_access.id'), nullable=True, index=True)
+    # Relationships - Support both UserAppAccess (linked) and UserMediaAccess (standalone) using UUIDs
+    user_app_access_uuid = db.Column(db.String(36), db.ForeignKey('user_app_access.uuid'), nullable=True, index=True)
+    user_media_access_uuid = db.Column(db.String(36), db.ForeignKey('user_media_access.uuid'), nullable=True, index=True)
     server_id = db.Column(db.Integer, db.ForeignKey('media_servers.id'), nullable=False, index=True)
     
     # Session Details
@@ -310,9 +310,9 @@ class MediaStreamHistory(db.Model):
     # Service-specific data stored as JSON
     service_data = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)
     
-    # Relationships - Updated to support both UserAppAccess and UserMediaAccess
-    user_app_access = db.relationship('UserAppAccess', backref=db.backref('media_stream_history', lazy='dynamic', cascade="all, delete-orphan"))
-    user_media_access = db.relationship('UserMediaAccess', backref=db.backref('media_stream_history', lazy='dynamic', cascade="all, delete-orphan"))
+    # Relationships - Updated to support both UserAppAccess and UserMediaAccess using UUIDs
+    user_app_access = db.relationship('UserAppAccess', foreign_keys=[user_app_access_uuid], backref=db.backref('media_stream_history', lazy='dynamic', cascade="all, delete-orphan"))
+    user_media_access = db.relationship('UserMediaAccess', foreign_keys=[user_media_access_uuid], backref=db.backref('media_stream_history', lazy='dynamic', cascade="all, delete-orphan"))
     server = db.relationship('MediaServer', backref=db.backref('stream_history', lazy='dynamic'))
     
     def __repr__(self):
