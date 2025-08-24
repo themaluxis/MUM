@@ -289,12 +289,12 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
         current_app.logger.info(f"App user: {app_user.username if app_user else 'None'} (ID: {app_user.id if app_user else 'None'})")
         current_app.logger.info(f"Plex user: {plex_username} (UUID: {plex_user_uuid})")
         
-        # Use existing app_user or create new UserAppAccess
+        # Use existing app_user or create new UserAppAccess if needed
         if app_user:
             user_app_access = app_user
             current_app.logger.info(f"Using existing UserAppAccess: {user_app_access.username} (ID: {user_app_access.id})")
         else:
-            # Create new UserAppAccess record
+            # Create new UserAppAccess record (for invites without user accounts enabled)
             base_username = plex_username or f"user_{int(datetime.now().timestamp())}"
             base_email = plex_email or f"{base_username}@example.com"
             
@@ -303,7 +303,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                 email=base_email,
                 used_invite_id=invite.id,
                 access_expires_at=user_access_expires_at,
-                notes=f"Created via invite {invite.id}"
+                notes=f"Created via invite {invite.id} (service-only)"
             )
             
             # Add Discord info to UserAppAccess if provided (global Discord linking)

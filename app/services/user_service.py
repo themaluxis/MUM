@@ -613,19 +613,24 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
             current_app.logger.error(f"Mass Delete Error: Invalid user UUID {user_id}: {e}")
             error_count += 1
     
+    current_app.logger.info(f"Mass Delete: Processing {len(local_user_ids)} local users and {len(standalone_user_ids)} standalone users")
+    
     # Delete UserAppAccess users (local users)
     if local_user_ids:
         users_to_delete = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
         
         for user in users_to_delete:
             username_for_log = user.get_display_name()
+            user_deleted_successfully = False
+            
             try:
                 # Get all UserMediaAccess records for this user to delete from all services
                 user_accesses = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
                 
+                # Try to delete from external services first, but don't fail if they're unavailable
                 for access in user_accesses:
                     server = access.server
-                    if access.external_user_id:
+                    if access.external_user_id and server:
                         try:
                             # Create service instance and delete user from the actual server
                             service = MediaServiceFactory.create_service_from_db(server)
@@ -640,17 +645,28 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
                 
                 # Delete the UserAppAccess from MUM (this will cascade to UserMediaAccess records)
                 db.session.delete(user)
+                user_deleted_successfully = True
                 processed_count += 1
                 usernames_for_log_detail.append(username_for_log)
-                current_app.logger.info(f"Deleted UserAppAccess {username_for_log} from MUM")
+                current_app.logger.info(f"Marked UserAppAccess {username_for_log} for deletion from MUM")
                 
             except Exception as e:
                 current_app.logger.error(f"Mass Delete Error: UserAppAccess {username_for_log} (ID: {user.id}): {e}")
                 error_count += 1
+                # If there was an error, try to rollback any partial changes for this user
+                if not user_deleted_successfully:
+                    try:
+                        db.session.rollback()
+                        db.session.begin()  # Start a new transaction
+                    except Exception as rollback_error:
+                        current_app.logger.error(f"Error during rollback for user {username_for_log}: {rollback_error}")
     
     # Delete standalone UserMediaAccess users (service users)
     if standalone_user_ids:
         for standalone_user_id in standalone_user_ids:
+            access_deleted_successfully = False
+            username_for_log = 'Unknown'
+            
             try:
                 # Get the UserMediaAccess record directly using the actual ID
                 access = UserMediaAccess.query.filter(
@@ -662,7 +678,7 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
                     username_for_log = access.external_username or 'Unknown'
                     server = access.server
                     
-                    # Delete from the actual server
+                    # Try to delete from the actual server first
                     if access.external_user_id and server:
                         try:
                             service = MediaServiceFactory.create_service_from_db(server)
@@ -677,9 +693,10 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
                     
                     # Delete the standalone UserMediaAccess record
                     db.session.delete(access)
+                    access_deleted_successfully = True
                     processed_count += 1
                     usernames_for_log_detail.append(username_for_log)
-                    current_app.logger.info(f"Deleted standalone UserMediaAccess {username_for_log} from MUM")
+                    current_app.logger.info(f"Marked standalone UserMediaAccess {username_for_log} for deletion from MUM")
                 else:
                     current_app.logger.warning(f"Standalone user with ID {standalone_user_id} not found")
                     error_count += 1
@@ -687,19 +704,34 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
             except Exception as e:
                 current_app.logger.error(f"Mass Delete Error: Standalone user (ID: {standalone_user_id}): {e}")
                 error_count += 1
+                # If there was an error, try to rollback any partial changes for this user
+                if not access_deleted_successfully:
+                    try:
+                        db.session.rollback()
+                        db.session.begin()  # Start a new transaction
+                    except Exception as rollback_error:
+                        current_app.logger.error(f"Error during rollback for standalone user {username_for_log}: {rollback_error}")
     
-    if processed_count > 0 : # Only commit if there were successful MUM deletions
+    # Commit all deletions at once
+    if processed_count > 0:
         try:
+            current_app.logger.info(f"Mass Delete: Committing deletion of {processed_count} users to database...")
             db.session.commit()
-            if processed_count > 0: # Log only if actual MUM deletions were committed
-                log_event(EventType.MUM_USER_DELETED_FROM_MUM, f"Mass delete: {processed_count} users removed from MUM and media servers.", admin_id=admin_id, details={'deleted_count': processed_count, 'errors': error_count, 'attempted_ids_count': len(user_ids), 'deleted_usernames_sample': usernames_for_log_detail[:10]})
+            current_app.logger.info(f"Mass Delete: Successfully committed {processed_count} user deletions")
+            log_event(EventType.MUM_USER_DELETED_FROM_MUM, f"Mass delete: {processed_count} users removed from MUM and media servers.", admin_id=admin_id, details={'deleted_count': processed_count, 'errors': error_count, 'attempted_ids_count': len(user_ids), 'deleted_usernames_sample': usernames_for_log_detail[:10]})
         except Exception as e_commit:
-            db.session.rollback(); current_app.logger.error(f"Mass Delete: DB commit error: {e_commit}");
-            error_count = len(users_to_delete)
+            db.session.rollback()
+            current_app.logger.error(f"Mass Delete: DB commit error: {e_commit}")
+            # All deletions failed due to commit error
+            error_count += processed_count
             processed_count = 0
             log_event(EventType.ERROR_GENERAL, f"Mass delete DB commit failed: {e_commit}", admin_id=admin_id, details={'attempted_count': len(user_ids)})
-    elif error_count > 0: # No successes, only errors, still log the attempt
-         log_event(EventType.ERROR_GENERAL, f"Mass delete attempt failed for all {error_count} users selected.", admin_id=admin_id, details={'attempted_count': len(user_ids), 'errors': error_count})
+    elif error_count > 0:
+        # No successes, only errors, still log the attempt
+        current_app.logger.warning(f"Mass Delete: No users were successfully processed. {error_count} errors occurred.")
+        log_event(EventType.ERROR_GENERAL, f"Mass delete attempt failed for all {error_count} users selected.", admin_id=admin_id, details={'attempted_count': len(user_ids), 'errors': error_count})
+    else:
+        current_app.logger.warning("Mass Delete: No users were provided for deletion.")
 
 
     return processed_count, error_count

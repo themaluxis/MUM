@@ -1076,16 +1076,31 @@ def mass_edit_users():
                 continue
             try:
                 user_obj, user_type = get_user_by_uuid(uid_str)
-                # For mass edit operations, we only support service users (not local users)
-                if user_obj and user_type == "user_media_access":
-                    user_ids.append(uid_str)  # Use UUID for mass operations
+                if user_obj:
+                    # For delete operations, support both local and service users
+                    # For other mass edit operations, we only support service users (not local users)
+                    if user_type == "user_media_access":
+                        user_ids.append(uid_str)  # Use UUID for mass operations
+                    elif user_type == "user_app_access":
+                        # Check if this is a delete operation - if so, allow local users too
+                        action = form.action.data if form.action.data else request.form.get('action', '')
+                        if action == 'delete_users':
+                            user_ids.append(uid_str)  # Allow local users for delete operations
+                        else:
+                            current_app.logger.warning(f"Mass edit attempted on local user {uid_str} - only service users supported for {action}")
+                    else:
+                        current_app.logger.warning(f"Unknown user type {user_type} for user {uid_str}")
                 else:
-                    current_app.logger.warning(f"Mass edit attempted on local user {uid_str} - only service users supported")
+                    current_app.logger.warning(f"User not found for UUID {uid_str}")
             except Exception as e:
                 current_app.logger.error(f"Invalid user UUID in mass edit: {uid_str} - {e}")
         
         if not user_ids:
-            toast_message = "No valid service users selected for mass edit operation."
+            action = form.action.data if form.action.data else request.form.get('action', '')
+            if action == 'delete_users':
+                toast_message = "No valid users selected for mass delete operation."
+            else:
+                toast_message = "No valid service users selected for mass edit operation."
             toast_category = "error"
         else:
             action = form.action.data

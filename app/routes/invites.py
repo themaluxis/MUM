@@ -511,36 +511,25 @@ def process_invite_form(invite_path_or_token):
     if request.method == 'POST':
         auth_method = request.form.get('auth_method'); action_taken = request.form.get('action')
         
-        # Handle user account creation if enabled
+        # Handle user account creation if enabled (MODIFIED: Store form data in session instead of creating account)
         if action_taken == 'create_user_account' and allow_user_accounts:
             from app.forms import UserAccountCreationForm
-            from app.models import UserAppAccess
             
             account_form = UserAccountCreationForm()
             if account_form.validate_on_submit():
-                try:
-                    # Create new local user account
-                    new_user_app_access = UserAppAccess(
-                        username=account_form.username.data,
-                        email=account_form.email.data,
-                        created_at=utcnow(),
-                        used_invite_id=invite.id
-                    )
-                    new_user_app_access.set_password(account_form.password.data)
-                    db.session.add(new_user_app_access)
-                    db.session.commit()
+                # Store account creation data in session for later use
+                session[f'invite_{invite.id}_user_account_data'] = {
+                    'username': account_form.username.data,
+                    'email': account_form.email.data,
+                    'password': account_form.password.data
+                }
+                
+                # Mark account step as completed (but not actually created yet)
+                session[f'invite_{invite.id}_user_account_created'] = True
+                
+                flash("Account information saved! Please continue with the authentication steps.", "success")
+                current_app.logger.info(f"User account data stored in session for invite {invite.id}, username: {account_form.username.data}")
                     
-                    # Mark account as created in session
-                    session[f'invite_{invite.id}_user_account_created'] = True
-                    session[f'invite_{invite.id}_app_user_id'] = new_user_app_access.id
-                    
-                    flash("Account created successfully! Please continue with the authentication steps.", "success")
-                    log_event(EventType.MUM_USER_ADDED_FROM_PLEX, f"Local user account '{account_form.username.data}' created via invite {invite.id}", invite_id=invite.id)
-                    
-                except Exception as e:
-                    db.session.rollback()
-                    current_app.logger.error(f"Error creating local user account for invite {invite.id}: {e}")
-                    flash("Error creating account. Please try again.", "error")
             else:
                 # Form validation failed, show errors
                 for field, errors in account_form.errors.items():
@@ -636,23 +625,44 @@ def process_invite_form(invite_path_or_token):
                 flash("No server specified for setup.", "error")
 
         elif action_taken == 'accept_invite':
-            # This is now the "All Servers Configured" step - create all service accounts and link them
+            # This is now the "All Servers Configured" step - create local account and all service accounts together
             if not already_authenticated_plex_user_info and has_plex_servers: 
                 flash("Please sign in with Plex first to accept the invite.", "warning")
             elif effective_require_sso and not already_authenticated_discord_user_info: 
                 flash("Discord account linking is required for this invite. Please link your Discord account.", "warning")
+            elif allow_user_accounts and not session.get(f'invite_{invite.id}_user_account_data'):
+                flash("Please complete the account setup step first.", "warning")
             else:
-                # Check if local user account was created during this invite flow
-                existing_app_user_id = session.get(f'invite_{invite.id}_app_user_id')
-                current_app.logger.debug(f"Invite acceptance - Looking for session key: invite_{invite.id}_app_user_id")
-                current_app.logger.debug(f"Invite acceptance - Found existing_app_user_id: {existing_app_user_id}")
-                current_app.logger.debug(f"Invite acceptance - Session keys: {list(session.keys())}")
-                
-                # Now create all service accounts and link them to the app user
+                # Create local user account from stored session data if needed
                 from app.models import UserAppAccess
                 user_app_access = None
-                if existing_app_user_id:
-                    user_app_access = UserAppAccess.query.get(existing_app_user_id)
+                
+                # Check if we have stored user account data to create
+                user_account_data = session.get(f'invite_{invite.id}_user_account_data')
+                if user_account_data and allow_user_accounts:
+                    try:
+                        # Create the local user account now
+                        user_app_access = UserAppAccess(
+                            username=user_account_data['username'],
+                            email=user_account_data['email'],
+                            created_at=utcnow(),
+                            used_invite_id=invite.id
+                        )
+                        user_app_access.set_password(user_account_data['password'])
+                        db.session.add(user_app_access)
+                        db.session.flush()  # Get the ID without committing yet
+                        
+                        current_app.logger.info(f"Created local user account '{user_account_data['username']}' for invite {invite.id}")
+                        log_event(EventType.MUM_USER_ADDED_FROM_PLEX, f"Local user account '{user_account_data['username']}' created via invite {invite.id}", invite_id=invite.id)
+                        
+                    except Exception as e:
+                        db.session.rollback()
+                        current_app.logger.error(f"Error creating local user account for invite {invite.id}: {e}")
+                        flash("Error creating your account. Please try again.", "error")
+                        return redirect(url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token))
+                
+                current_app.logger.debug(f"Invite acceptance - User app access: {user_app_access.username if user_app_access else 'None'}")
+                current_app.logger.debug(f"Invite acceptance - Session keys: {list(session.keys())}")
                 
                 success, result_object_or_message = invite_service.accept_invite_and_grant_access(
                     invite=invite, 
@@ -671,6 +681,7 @@ def process_invite_form(invite_path_or_token):
                     session.pop(f'invite_{invite.id}_discord_user', None)
                     session.pop(f'invite_{invite.id}_app_user_id', None)
                     session.pop(f'invite_{invite.id}_user_account_created', None)
+                    session.pop(f'invite_{invite.id}_user_account_data', None)  # Clear stored account data
                     
                     # Clear server completion flags
                     for server in invite.servers:
@@ -702,7 +713,7 @@ def process_invite_form(invite_path_or_token):
     if allow_user_accounts:
         invite_steps.append({
             'id': 'user_account',
-            'name': 'Create Account',
+            'name': 'Account Details',
             'icon': 'fa-solid fa-user-plus',
             'required': True,
             'completed': user_account_created
