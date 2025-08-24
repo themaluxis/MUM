@@ -179,7 +179,7 @@ def sync_libraries():
                             sync_result['libraries_updated'] += 1
                             sync_result['updated_libraries'].append({
                                 'name': existing_library.name,
-                                'server_name': server.name,
+                                'server_name': server.server_nickname,
                                 'changes': changes
                             })
                     else:
@@ -196,7 +196,7 @@ def sync_libraries():
                         sync_result['libraries_added'] += 1
                         sync_result['added_libraries'].append({
                             'name': lib_data.get('name', 'Unknown'),
-                            'server_name': server.name,
+                            'server_name': server.server_nickname,
                             'type': lib_data.get('type'),
                             'item_count': lib_data.get('item_count')
                         })
@@ -219,7 +219,7 @@ def sync_libraries():
                 current_app.logger.info(f"Removing library {removed_lib.name} (no longer exists on server)")
                 sync_result['removed_libraries'].append({
                     'name': removed_lib.name,
-                    'server_name': removed_lib.server.name
+                    'server_name': removed_lib.server.server_nickname
                 })
                 db.session.delete(removed_lib)
                 sync_result['libraries_removed'] += 1
@@ -315,7 +315,7 @@ def get_library_raw_data(server_id, library_id):
             'success': True,
             'library_data': target_library,
             'server_info': {
-                'name': server.name,
+                'name': server.server_nickname,
                 'service_type': server.service_type.value,
                 'url': server.url
             }

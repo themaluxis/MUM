@@ -223,7 +223,7 @@ class MediaServiceManager:
                     display_name = user.get_display_name() if user else user_data.get('username', 'Unknown')
                     added_details.append({
                         'username': display_name,
-                        'server_name': server.name,
+                        'server_name': server.server_nickname,
                         'service_type': server.service_type.value.capitalize(),
                         'linked_to_mum_account': user is not None
                     })
@@ -293,7 +293,7 @@ class MediaServiceManager:
                         updated_details.append({
                             'username': display_name, 
                             'changes': changes,
-                            'server_name': server.name,
+                            'server_name': server.server_nickname,
                             'service_type': server.service_type.value.capitalize(),
                             'linked_to_mum_account': user is not None
                         })
@@ -312,7 +312,7 @@ class MediaServiceManager:
                         # Track removal details before deleting
                         removed_details.append({
                             'username': display_name,
-                            'server_name': server.name,
+                            'server_name': server.server_nickname,
                             'service_type': server.service_type.value.capitalize(),
                             'linked_to_mum_account': user_to_check is not None
                         })

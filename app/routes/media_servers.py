@@ -73,8 +73,8 @@ def add_server_setup(plugin_id):
             except Exception as e:
                 current_app.logger.error(f"Error auto-enabling plugin '{plugin_id}' during setup: {e}")
             
-            log_event(EventType.SETTING_CHANGE, f"Added new media server: {server.name}", admin_id=current_user.id)
-            flash(f'Media server "{server.name}" added successfully!', 'success')
+            log_event(EventType.SETTING_CHANGE, f"Added new media server: {server.server_nickname}", admin_id=current_user.id)
+            flash(f'Media server "{server.server_nickname}" added successfully!', 'success')
             
             MediaServiceManager.sync_server_libraries(server.id)
             
@@ -129,8 +129,8 @@ def add_server():
             except Exception as e:
                 current_app.logger.error(f"Error auto-enabling plugin '{server.service_type.value}': {e}")
             
-            log_event(EventType.SETTING_CHANGE, f"Added new media server: {server.name}", admin_id=current_user.id)
-            flash(f'Media server "{server.name}" added successfully!', 'success')
+            log_event(EventType.SETTING_CHANGE, f"Added new media server: {server.server_nickname}", admin_id=current_user.id)
+            flash(f'Media server "{server.server_nickname}" added successfully!', 'success')
             
             MediaServiceManager.sync_server_libraries(server.id)
             
@@ -176,7 +176,7 @@ def edit_server(server_id):
                 admin_id=current_user.id
             )
             
-            flash(f'Media server "{server.name}" updated successfully!', 'success')
+            flash(f'Media server "{server.server_nickname}" updated successfully!', 'success')
             # Redirect to the appropriate plugin settings page based on service type
             if server.service_type.value == 'plex':
                 return redirect(url_for('plugin_management.configure', plugin_id='plex'))
@@ -219,7 +219,7 @@ def setup_edit_server(plugin_id, server_id):
                     server.password = form.password.data
                 server.is_active = form.is_active.data
                 db.session.commit()
-                flash(f'Media server "{server.name}" updated successfully!', 'success')
+                flash(f'Media server "{server.server_nickname}" updated successfully!', 'success')
                 current_app.logger.debug("Server updated and committed. Redirecting.")
                 return redirect(url_for('media_servers.setup_list_servers', plugin_id=plugin_id))
             except Exception as e:

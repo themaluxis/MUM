@@ -79,7 +79,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
     """
     current_app.logger.info(f"=== ACCEPT INVITE AND GRANT ACCESS STARTED ===")
     current_app.logger.info(f"Invite ID: {invite.id}, Plex user: {plex_username}, App user: {app_user.username if app_user else 'None'}")
-    current_app.logger.info(f"Invite servers: {[s.name for s in invite.servers]}")
+    current_app.logger.info(f"Invite servers: {[s.server_nickname for s in invite.servers]}")
     current_app.logger.info(f"Invite grant_library_ids: {invite.grant_library_ids}")
     if not invite.is_usable:
         log_event(EventType.INVITE_VIEWED, f"Attempt to use unusable invite '{invite.custom_path or invite.token}' (ID: {invite.id}).", invite_id=invite.id, details={'reason': 'not usable'})
@@ -142,11 +142,11 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
     
     for server in servers_to_grant_access:
         try:
-            current_app.logger.debug(f"Invite service - Processing server: {server.name}, service_type: {server.service_type}, id: {server.id}")
+            current_app.logger.debug(f"Invite service - Processing server: {server.server_nickname}, service_type: {server.service_type}, id: {server.id}")
             service = MediaServiceFactory.create_service_from_db(server)
             if not service:
-                current_app.logger.error(f"Invite service - Failed to create service for server {server.name} with service_type: {server.service_type}")
-                failed_servers.append(f"{server.name} (service creation failed)")
+                current_app.logger.error(f"Invite service - Failed to create service for server {server.server_nickname} with service_type: {server.service_type}")
+                failed_servers.append(f"{server.server_nickname} (service creation failed)")
                 continue
                 
             # For now, we'll use the invite_user_to_plex_server method for all services
@@ -176,17 +176,17 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                                     raw_lib_id = server_lib_parts[1]
                                     
                                     # Check if this library belongs to the current server
-                                    if server_name_from_lib == server.name:
+                                    if server_name_from_lib == server.server_nickname:
                                         server_library_ids.append(raw_lib_id)
-                                        current_app.logger.debug(f"Invite service - Added library {raw_lib_id} for server {server.name}")
+                                        current_app.logger.debug(f"Invite service - Added library {raw_lib_id} for server {server.server_nickname}")
                         except Exception as e:
                             current_app.logger.error(f"Invite service - Error parsing library ID {lib_id}: {e}")
                     else:
                         # For legacy single-server invites or raw library IDs, include all
                         server_library_ids.append(lib_id)
-                        current_app.logger.debug(f"Invite service - Added raw library {lib_id} for server {server.name}")
+                        current_app.logger.debug(f"Invite service - Added raw library {lib_id} for server {server.server_nickname}")
             
-            current_app.logger.debug(f"Invite service - Final library IDs for server {server.name}: {server_library_ids}")
+            current_app.logger.debug(f"Invite service - Final library IDs for server {server.server_nickname}: {server_library_ids}")
 
             # Handle different service types appropriately
             if server.service_type.name.upper() == 'PLEX':
@@ -202,7 +202,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                     current_app.logger.debug(f"Invite service - Successfully called update_user_access for Plex")
                 else:
                     current_app.logger.error(f"Invite service - Plex service missing update_user_access method")
-                    failed_servers.append(f"{server.name} (missing update_user_access method)")
+                    failed_servers.append(f"{server.server_nickname} (missing update_user_access method)")
                     continue
             else:
                 # For other services (Jellyfin, Emby, etc.), create a new user
@@ -252,20 +252,20 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
                     if external_user_id:
                         if not hasattr(server, '_temp_external_user_id'):
                             server._temp_external_user_id = external_user_id
-                        current_app.logger.debug(f"Invite service - Stored external_user_id {external_user_id} for server {server.name}")
+                        current_app.logger.debug(f"Invite service - Stored external_user_id {external_user_id} for server {server.server_nickname}")
                     else:
                         current_app.logger.warning(f"Invite service - No user_id returned from create_user for {server.service_type.name}")
                 else:
                     current_app.logger.error(f"Invite service - Service {service} has no create_user method")
-                    failed_servers.append(f"{server.name} (missing create_user method)")
+                    failed_servers.append(f"{server.server_nickname} (missing create_user method)")
                     continue
                 
-            successful_servers.append(server.name)
-            log_event(EventType.PLEX_USER_ADDED, f"User '{plex_username}' granted access to {server.name}. Downloads: {'enabled' if invite.allow_downloads else 'disabled'}.", invite_id=invite.id, details={'plex_user': plex_username, 'server': server.name, 'allow_downloads': invite.allow_downloads})
+            successful_servers.append(server.server_nickname)
+            log_event(EventType.PLEX_USER_ADDED, f"User '{plex_username}' granted access to {server.server_nickname}. Downloads: {'enabled' if invite.allow_downloads else 'disabled'}.", invite_id=invite.id, details={'plex_user': plex_username, 'server': server.server_nickname, 'allow_downloads': invite.allow_downloads})
             
         except Exception as e:
-            failed_servers.append(f"{server.name} ({str(e)})")
-            log_event(EventType.ERROR_PLEX_API, f"Failed to grant access to {server.name} for {plex_username} via invite {invite.id}: {e}", invite_id=invite.id)
+            failed_servers.append(f"{server.server_nickname} ({str(e)})")
+            log_event(EventType.ERROR_PLEX_API, f"Failed to grant access to {server.server_nickname} for {plex_username} via invite {invite.id}: {e}", invite_id=invite.id)
     
     # Check if any servers were successful
     if not successful_servers:
@@ -323,13 +323,13 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
         
         # Create UserMediaAccess records for each server
         for server in servers_to_grant_access:
-            current_app.logger.info(f"--- Processing server: {server.name} (Type: {server.service_type.name}) ---")
+            current_app.logger.info(f"--- Processing server: {server.server_nickname} (Type: {server.service_type.name}) ---")
             
             # Determine service-specific username and email
             if server.service_type.name.upper() == 'PLEX':
                 # For Plex, use the authenticated Plex user info
                 if not plex_username:
-                    current_app.logger.warning(f"No Plex username provided for Plex server {server.name}")
+                    current_app.logger.warning(f"No Plex username provided for Plex server {server.server_nickname}")
                     continue
                 service_username = plex_username
                 service_email = plex_email
@@ -363,7 +363,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
             # Add UserMediaAccess to session
             db.session.add(user_media_access)
             created_user_media_accesses.append((user_media_access, server))
-            current_app.logger.info(f"✅ Created UserMediaAccess for {service_username} (UserAppAccess ID: {user_app_access.id}) on server {server.name}")
+            current_app.logger.info(f"✅ Created UserMediaAccess for {service_username} (UserAppAccess ID: {user_app_access.id}) on server {server.server_nickname}")
             current_app.logger.debug(f"UserMediaAccess details - ID: {user_media_access.id}, username: {user_media_access.external_username}, email: {user_media_access.external_email}")
         
         # Use the UserAppAccess as the primary user reference
@@ -381,7 +381,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
         
         # Log all created user media access records
         for user_media_access, server in created_user_media_accesses:
-            current_app.logger.info(f"UserMediaAccess - ID: {user_media_access.id}, external_username: {user_media_access.external_username}, server: {server.name}")
+            current_app.logger.info(f"UserMediaAccess - ID: {user_media_access.id}, external_username: {user_media_access.external_username}, server: {server.server_nickname}")
         
         # Set usage log user ID
         usage_log.user_app_access_id = new_user.id

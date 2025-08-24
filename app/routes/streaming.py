@@ -77,7 +77,7 @@ def sessions_partial():
                     formatted_sessions = service.get_formatted_sessions()
                     active_sessions_data.extend(formatted_sessions)
                 except Exception as e:
-                    current_app.logger.error(f"Error getting formatted sessions from {server.name}: {e}")
+                    current_app.logger.error(f"Error getting formatted sessions from {server.server_nickname}: {e}")
 
         # Calculate summary statistics from formatted sessions
         summary_stats["total_streams"] = len(active_sessions_data)

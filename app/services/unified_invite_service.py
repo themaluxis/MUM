@@ -164,11 +164,11 @@ class UnifiedInviteService:
                         access.is_active = True
                         access.updated_at = datetime.utcnow()
                     
-                    successful_servers.append(server.name)
+                    successful_servers.append(server.server_nickname)
                     
                 except Exception as e:
-                    current_app.logger.error(f"Error granting access to {server.name}: {e}")
-                    failed_servers.append(f"{server.name}: {str(e)}")
+                    current_app.logger.error(f"Error granting access to {server.server_nickname}: {e}")
+                    failed_servers.append(f"{server.server_nickname}: {str(e)}")
             
             # Update invite usage
             invite.current_uses += 1

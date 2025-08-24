@@ -506,7 +506,7 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
 
         service = MediaServiceFactory.create_service_from_db(server)
         if not service:
-            current_app.logger.error(f"Mass Update: Could not create service for server {server.name}. Skipping.")
+            current_app.logger.error(f"Mass Update: Could not create service for server {server.server_nickname}. Skipping.")
             error_count += len(user_ids)
             continue
 
@@ -528,14 +528,14 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
                     if service_user_id:
                         service.update_user_access(service_user_id, new_library_ids)
                     else:
-                        current_app.logger.warning(f"Cannot update user access - no external_user_id found for {user.get_display_name()} on {server.name}")
+                        current_app.logger.warning(f"Cannot update user access - no external_user_id found for {user.get_display_name()} on {server.server_nickname}")
                 
                 # Update the UserMediaAccess record
                 access.allowed_library_ids = new_library_ids
                 user.updated_at = datetime.utcnow()
                 processed_count += 1
             except Exception as e:
-                current_app.logger.error(f"Mass Update Error for user {user.get_display_name()} on server {server.name}: {e}")
+                current_app.logger.error(f"Mass Update Error for user {user.get_display_name()} on server {server.server_nickname}: {e}")
                 error_count += 1
 
     if processed_count > 0 or error_count > 0:
@@ -631,11 +631,11 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
                             service = MediaServiceFactory.create_service_from_db(server)
                             if service and hasattr(service, 'delete_user'):
                                 service.delete_user(access.external_user_id)
-                                current_app.logger.info(f"Deleted user {username_for_log} from {server.service_type.value} server {server.name}")
+                                current_app.logger.info(f"Deleted user {username_for_log} from {server.service_type.value} server {server.server_nickname}")
                             else:
-                                current_app.logger.warning(f"Cannot delete user from {server.service_type.value} server {server.name} - service not available or doesn't support deletion")
+                                current_app.logger.warning(f"Cannot delete user from {server.service_type.value} server {server.server_nickname} - service not available or doesn't support deletion")
                         except Exception as e:
-                            current_app.logger.error(f"Failed to delete user {username_for_log} from {server.service_type.value} server {server.name}: {e}")
+                            current_app.logger.error(f"Failed to delete user {username_for_log} from {server.service_type.value} server {server.server_nickname}: {e}")
                             # Continue with deletion from MUM even if server deletion fails
                 
                 # Delete the UserAppAccess from MUM (this will cascade to UserMediaAccess records)
@@ -668,11 +668,11 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
                             service = MediaServiceFactory.create_service_from_db(server)
                             if service and hasattr(service, 'delete_user'):
                                 service.delete_user(access.external_user_id)
-                                current_app.logger.info(f"Deleted standalone user {username_for_log} from {server.service_type.value} server {server.name}")
+                                current_app.logger.info(f"Deleted standalone user {username_for_log} from {server.service_type.value} server {server.server_nickname}")
                             else:
-                                current_app.logger.warning(f"Cannot delete user from {server.service_type.value} server {server.name} - service not available or doesn't support deletion")
+                                current_app.logger.warning(f"Cannot delete user from {server.service_type.value} server {server.server_nickname} - service not available or doesn't support deletion")
                         except Exception as e:
-                            current_app.logger.error(f"Failed to delete standalone user {username_for_log} from {server.service_type.value} server {server.name}: {e}")
+                            current_app.logger.error(f"Failed to delete standalone user {username_for_log} from {server.service_type.value} server {server.server_nickname}: {e}")
                             # Continue with deletion from MUM even if server deletion fails
                     
                     # Delete the standalone UserMediaAccess record
