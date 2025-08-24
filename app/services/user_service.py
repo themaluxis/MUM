@@ -550,52 +550,44 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
     return processed_count, error_count
 
 
-def mass_update_bot_whitelist(user_ids: list, should_whitelist: bool, admin_id: int = None):
-    # Convert UUIDs to actual user IDs for local users only
-    local_user_ids = []
+def mass_update_bot_whitelist(user_uuids: list, should_whitelist: bool, admin_id: int = None):
+    """Mass update bot whitelist for service users (UserMediaAccess)"""
     from app.utils.helpers import get_user_by_uuid
-    
-    for user_id in user_ids:
-        try:
-            user_obj, user_type = get_user_by_uuid(str(user_id))
-            if user_obj and user_type == "user_app_access":
-                local_user_ids.append(user_obj.id)
-        except Exception:
-            continue  # Skip invalid UUIDs
-    
-    users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
     updated_count = 0
-    for user in users_to_update:
-        if user.is_discord_bot_whitelisted != should_whitelist:
-            user.is_discord_bot_whitelisted = should_whitelist
-            user.updated_at = datetime.utcnow()
-            updated_count +=1
-    if updated_count > 0: db.session.commit()
-    log_event(EventType.SETTING_CHANGE, f"Mass updated Discord Bot Whitelist for {updated_count} users to {should_whitelist}.", admin_id=admin_id, details={"count": updated_count, "whitelisted": should_whitelist})
+    
+    for uuid_str in user_uuids:
+        try:
+            user_obj, user_type = get_user_by_uuid(uuid_str)
+            if user_obj and user_type == "user_media_access":
+                if user_obj.is_bot_whitelisted != should_whitelist:
+                    user_obj.is_bot_whitelisted = should_whitelist
+                    updated_count += 1
+        except Exception as e:
+            current_app.logger.error(f"Error updating bot whitelist for service user {uuid_str}: {e}")
+    
+    if updated_count > 0: 
+        db.session.commit()
+    log_event(EventType.SETTING_CHANGE, f"Mass updated Discord Bot Whitelist for {updated_count} service users to {should_whitelist}.", admin_id=admin_id, details={"count": updated_count, "whitelisted": should_whitelist})
     return updated_count
 
-def mass_update_purge_whitelist(user_ids: list, should_whitelist: bool, admin_id: int = None):
-    # Convert UUIDs to actual user IDs for local users only
-    local_user_ids = []
+def mass_update_purge_whitelist(user_uuids: list, should_whitelist: bool, admin_id: int = None):
+    """Mass update purge whitelist for service users (UserMediaAccess)"""
     from app.utils.helpers import get_user_by_uuid
-    
-    for user_id in user_ids:
-        try:
-            user_obj, user_type = get_user_by_uuid(str(user_id))
-            if user_obj and user_type == "user_app_access":
-                local_user_ids.append(user_obj.id)
-        except Exception:
-            continue  # Skip invalid UUIDs
-    
-    users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
     updated_count = 0
-    for user in users_to_update:
-        if user.is_purge_whitelisted != should_whitelist:
-            user.is_purge_whitelisted = should_whitelist
-            user.updated_at = datetime.utcnow()
-            updated_count +=1
-    if updated_count > 0: db.session.commit()
-    log_event(EventType.SETTING_CHANGE, f"Mass updated Purge Whitelist for {updated_count} users to {should_whitelist}.", admin_id=admin_id, details={"count": updated_count, "whitelisted": should_whitelist})
+    
+    for uuid_str in user_uuids:
+        try:
+            user_obj, user_type = get_user_by_uuid(uuid_str)
+            if user_obj and user_type == "user_media_access":
+                if user_obj.is_purge_whitelisted != should_whitelist:
+                    user_obj.is_purge_whitelisted = should_whitelist
+                    updated_count += 1
+        except Exception as e:
+            current_app.logger.error(f"Error updating purge whitelist for service user {uuid_str}: {e}")
+    
+    if updated_count > 0: 
+        db.session.commit()
+    log_event(EventType.SETTING_CHANGE, f"Mass updated Purge Whitelist for {updated_count} service users to {should_whitelist}.", admin_id=admin_id, details={"count": updated_count, "whitelisted": should_whitelist})
     return updated_count
 
 def mass_delete_users(user_ids: list, admin_id: int = None):
@@ -1039,138 +1031,76 @@ def get_bulk_last_known_ips(user_uuids: list) -> dict:
     
     return uuid_to_ip
 
-def mass_extend_access(user_ids: list, days_to_extend: int, admin_id: int = None):
-    """Extend access expiration for multiple users by a specified number of days"""
+def mass_extend_access(user_uuids: list, days_to_extend: int, admin_id: int = None):
+    """Mass extend access for service users (UserMediaAccess)"""
+    from app.utils.helpers import get_user_by_uuid
     from datetime import datetime, timedelta
     processed_count = 0
     error_count = 0
     
-    # Convert UUIDs to actual user IDs for local users only
-    local_user_ids = []
-    from app.utils.helpers import get_user_by_uuid
-    
-    for user_id in user_ids:
+    for uuid_str in user_uuids:
         try:
-            user_obj, user_type = get_user_by_uuid(str(user_id))
-            if user_obj and user_type == "user_app_access":
-                local_user_ids.append(user_obj.id)
-        except Exception:
-            error_count += 1
-            continue
-    
-    users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
-    
-    for user in users_to_update:
-        try:
-            # If user has no expiration, set it to today + extension days
-            if user.access_expires_at is None:
-                user.access_expires_at = datetime.now() + timedelta(days=days_to_extend)
+            user_obj, user_type = get_user_by_uuid(uuid_str)
+            if user_obj and user_type == "user_media_access":
+                if user_obj.access_expires_at:
+                    user_obj.access_expires_at += timedelta(days=days_to_extend)
+                else:
+                    user_obj.access_expires_at = datetime.utcnow() + timedelta(days=days_to_extend)
+                processed_count += 1
             else:
-                # If user already has expiration, extend it by the specified days
-                user.access_expires_at = user.access_expires_at + timedelta(days=days_to_extend)
-            
-            processed_count += 1
+                error_count += 1
         except Exception as e:
-            current_app.logger.error(f"Error extending access for user {user.get_display_name()}: {e}")
             error_count += 1
+            current_app.logger.error(f"Error extending access for service user {uuid_str}: {e}")
     
-    if processed_count > 0:
-        try:
-            db.session.commit()
-            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Mass extend access: {processed_count} users extended by {days_to_extend} days.", admin_id=admin_id)
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f"Error committing mass extend access: {e}")
-            error_count = len(users_to_update)
-            processed_count = 0
-    
+    if processed_count > 0: 
+        db.session.commit()
+    log_event(EventType.SETTING_CHANGE, f"Mass extended access for {processed_count} service users by {days_to_extend} days.", admin_id=admin_id, details={"count": processed_count, "days": days_to_extend})
     return processed_count, error_count
 
-def mass_set_expiration(user_ids: list, expiration_date, admin_id: int = None):
-    """Set expiration date for multiple users"""
-    from datetime import datetime, time
+def mass_set_expiration(user_uuids: list, new_expiration_date, admin_id: int = None):
+    """Mass set expiration date for service users (UserMediaAccess)"""
+    from app.utils.helpers import get_user_by_uuid
     processed_count = 0
     error_count = 0
     
-    # Convert UUIDs to actual user IDs for local users only
-    local_user_ids = []
-    from app.utils.helpers import get_user_by_uuid
-    
-    for user_id in user_ids:
+    for uuid_str in user_uuids:
         try:
-            user_obj, user_type = get_user_by_uuid(str(user_id))
-            if user_obj and user_type == "user_app_access":
-                local_user_ids.append(user_obj.id)
-        except Exception:
-            error_count += 1
-            continue
-    
-    users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
-    
-    # Convert date to datetime at end of day
-    if hasattr(expiration_date, 'date'):
-        # If it's already a datetime, extract the date
-        expiration_datetime = datetime.combine(expiration_date.date(), time(23, 59, 59))
-    else:
-        # If it's a date object
-        expiration_datetime = datetime.combine(expiration_date, time(23, 59, 59))
-    
-    for user in users_to_update:
-        try:
-            user.access_expires_at = expiration_datetime
-            processed_count += 1
+            user_obj, user_type = get_user_by_uuid(uuid_str)
+            if user_obj and user_type == "user_media_access":
+                user_obj.access_expires_at = new_expiration_date
+                processed_count += 1
+            else:
+                error_count += 1
         except Exception as e:
-            current_app.logger.error(f"Error setting expiration for user {user.get_display_name()}: {e}")
             error_count += 1
+            current_app.logger.error(f"Error setting expiration for service user {uuid_str}: {e}")
     
-    if processed_count > 0:
-        try:
-            db.session.commit()
-            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Mass set expiration: {processed_count} users set to expire on {expiration_date}.", admin_id=admin_id)
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f"Error committing mass set expiration: {e}")
-            error_count = len(users_to_update)
-            processed_count = 0
-    
+    if processed_count > 0: 
+        db.session.commit()
+    log_event(EventType.SETTING_CHANGE, f"Mass set expiration for {processed_count} service users to {new_expiration_date}.", admin_id=admin_id, details={"count": processed_count, "expiration_date": str(new_expiration_date)})
     return processed_count, error_count
 
-def mass_clear_expiration(user_ids: list, admin_id: int = None):
-    """Clear expiration date for multiple users (set to never expire)"""
+def mass_clear_expiration(user_uuids: list, admin_id: int = None):
+    """Mass clear expiration date for service users (UserMediaAccess)"""
+    from app.utils.helpers import get_user_by_uuid
     processed_count = 0
     error_count = 0
     
-    # Convert UUIDs to actual user IDs for local users only
-    local_user_ids = []
-    from app.utils.helpers import get_user_by_uuid
-    
-    for user_id in user_ids:
+    for uuid_str in user_uuids:
         try:
-            user_obj, user_type = get_user_by_uuid(str(user_id))
-            if user_obj and user_type == "user_app_access":
-                local_user_ids.append(user_obj.id)
-        except Exception:
-            error_count += 1
-            continue
-    
-    users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
-    
-    for user in users_to_update:
-        try:
-            user.access_expires_at = None
-            processed_count += 1
+            user_obj, user_type = get_user_by_uuid(uuid_str)
+            if user_obj and user_type == "user_media_access":
+                user_obj.access_expires_at = None
+                processed_count += 1
+            else:
+                error_count += 1
         except Exception as e:
-            current_app.logger.error(f"Error clearing expiration for user {user.get_display_name()}: {e}")
             error_count += 1
+            current_app.logger.error(f"Error clearing expiration for service user {uuid_str}: {e}")
     
-    if processed_count > 0:
-        try:
-            db.session.commit()
-            log_event(EventType.MUM_USER_LIBRARIES_EDITED, f"Mass clear expiration: {processed_count} users set to never expire.", admin_id=admin_id)
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f"Error committing mass clear expiration: {e}")
-            error_count = len(users_to_update)
-            processed_count = 0
-    
+    if processed_count > 0: 
+        db.session.commit()
+    log_event(EventType.SETTING_CHANGE, f"Mass cleared expiration for {processed_count} service users.", admin_id=admin_id, details={"count": processed_count})
     return processed_count, error_count
+    

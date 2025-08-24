@@ -1076,80 +1076,81 @@ def mass_edit_users():
                 continue
             try:
                 user_obj, user_type = get_user_by_uuid(uid_str)
-                # For mass edit operations, we only support local users (UserAppAccess)
-                if user_obj and user_type == "user_app_access":
-                    user_ids.append(user_obj.id)
+                # For mass edit operations, we only support service users (not local users)
+                if user_obj and user_type == "user_media_access":
+                    user_ids.append(uid_str)  # Use UUID for mass operations
                 else:
-                    current_app.logger.warning(f"Mass edit attempted on non-local user {uid_str} - not supported")
+                    current_app.logger.warning(f"Mass edit attempted on local user {uid_str} - only service users supported")
             except Exception as e:
                 current_app.logger.error(f"Invalid user UUID in mass edit: {uid_str} - {e}")
         
         if not user_ids:
-            toast_message = "No valid local users selected for mass edit operation."
+            toast_message = "No valid service users selected for mass edit operation."
             toast_category = "error"
         else:
             action = form.action.data
-        try:
-            if action == 'update_libraries':
-                # The new logic will parse libraries per server
-                updates_by_server = {}
-                for key, value in request.form.items():
-                    if key.startswith('libraries_server_'):
-                        server_id = int(key.split('_')[-1])
-                        if server_id not in updates_by_server:
-                            updates_by_server[server_id] = []
-                        updates_by_server[server_id] = request.form.getlist(key)
+            try:
+                if action == 'update_libraries':
+                    # Parse libraries per server for service users
+                    updates_by_server = {}
+                    for key, value in request.form.items():
+                        if key.startswith('libraries_server_'):
+                            server_id = int(key.split('_')[-1])
+                            if server_id not in updates_by_server:
+                                updates_by_server[server_id] = []
+                            updates_by_server[server_id] = request.form.getlist(key)
 
-                processed_count, error_count = user_service.mass_update_user_libraries_by_server(user_ids, updates_by_server, admin_id=current_user.id)
-                toast_message = f"Mass library update: {processed_count} users updated, {error_count} errors."
-                toast_category = "success" if error_count == 0 else "warning"
-            elif action == 'extend_access':
-                days_to_extend = form.days_to_extend.data
-                if not days_to_extend or days_to_extend < 1:
-                    toast_message = "Invalid number of days to extend."
-                    toast_category = "error"
-                else:
-                    processed_count, error_count = user_service.mass_extend_access(user_ids, days_to_extend, admin_id=current_user.id)
-                    toast_message = f"Extended access for {processed_count} users by {days_to_extend} days, {error_count} errors."
+                    processed_count, error_count = user_service.mass_update_user_libraries_by_server(user_ids, updates_by_server, admin_id=current_user.id)
+                    toast_message = f"Mass library update: {processed_count} service users updated, {error_count} errors."
                     toast_category = "success" if error_count == 0 else "warning"
-            elif action == 'set_expiration':
-                new_expiration_date = form.new_expiration_date.data
-                if not new_expiration_date:
-                    toast_message = "Expiration date is required."
-                    toast_category = "error"
-                else:
-                    processed_count, error_count = user_service.mass_set_expiration(user_ids, new_expiration_date, admin_id=current_user.id)
-                    toast_message = f"Set expiration date for {processed_count} users, {error_count} errors."
+                elif action == 'extend_access':
+                    days_to_extend = form.days_to_extend.data
+                    if not days_to_extend or days_to_extend < 1:
+                        toast_message = "Invalid number of days to extend."
+                        toast_category = "error"
+                    else:
+                        processed_count, error_count = user_service.mass_extend_access(user_ids, days_to_extend, admin_id=current_user.id)
+                        toast_message = f"Extended access for {processed_count} service users by {days_to_extend} days, {error_count} errors."
+                        toast_category = "success" if error_count == 0 else "warning"
+                elif action == 'set_expiration':
+                    new_expiration_date = form.new_expiration_date.data
+                    if not new_expiration_date:
+                        toast_message = "Expiration date is required."
+                        toast_category = "error"
+                    else:
+                        processed_count, error_count = user_service.mass_set_expiration(user_ids, new_expiration_date, admin_id=current_user.id)
+                        toast_message = f"Set expiration date for {processed_count} service users, {error_count} errors."
+                        toast_category = "success" if error_count == 0 else "warning"
+                elif action == 'clear_expiration':
+                    processed_count, error_count = user_service.mass_clear_expiration(user_ids, admin_id=current_user.id)
+                    toast_message = f"Cleared expiration for {processed_count} service users, {error_count} errors."
                     toast_category = "success" if error_count == 0 else "warning"
-            elif action == 'clear_expiration':
-                processed_count, error_count = user_service.mass_clear_expiration(user_ids, admin_id=current_user.id)
-                toast_message = f"Cleared expiration for {processed_count} users, {error_count} errors."
-                toast_category = "success" if error_count == 0 else "warning"
-            elif action == 'delete_users':
-                if not form.confirm_delete.data:
-                    toast_message = "Deletion was not confirmed. No action taken."
-                    toast_category = "warning"
+                elif action == 'delete_users':
+                    if not form.confirm_delete.data:
+                        toast_message = "Deletion was not confirmed. No action taken."
+                        toast_category = "warning"
+                    else:
+                        # mass_delete_users already supports UUIDs, so pass them directly
+                        processed_count, error_count = user_service.mass_delete_users(user_ids, admin_id=current_user.id)
+                        toast_message = f"Mass delete: {processed_count} removed, {error_count} errors."
+                        toast_category = "success" if error_count == 0 else "warning"
+                elif action.endswith('_whitelist'):
+                    should_add = action.startswith('add_to')
+                    whitelist_type = "Bot" if "bot" in action else "Purge"
+                    if whitelist_type == "Bot":
+                        count = user_service.mass_update_bot_whitelist(user_ids, should_add, current_user.id)
+                    else: # Purge
+                        count = user_service.mass_update_purge_whitelist(user_ids, should_add, current_user.id)
+                    action_text = "added to" if should_add else "removed from"
+                    toast_message = f"{count} service user(s) {action_text} the {whitelist_type} Whitelist."
+                    toast_category = "success"
                 else:
-                    processed_count, error_count = user_service.mass_delete_users(user_ids, admin_id=current_user.id)
-                    toast_message = f"Mass delete: {processed_count} removed, {error_count} errors."
-                    toast_category = "success" if error_count == 0 else "warning"
-            elif action.endswith('_whitelist'):
-                should_add = action.startswith('add_to')
-                whitelist_type = "Bot" if "bot" in action else "Purge"
-                if whitelist_type == "Bot":
-                    count = user_service.mass_update_bot_whitelist(user_ids, should_add, current_user.id)
-                else: # Purge
-                    count = user_service.mass_update_purge_whitelist(user_ids, should_add, current_user.id)
-                action_text = "added to" if should_add else "removed from"
-                toast_message = f"{count} user(s) {action_text} the {whitelist_type} Whitelist."
-                toast_category = "success"
-            else:
-                toast_message = "Invalid action."
-        except Exception as e:
-            toast_message = f"Server Error: {str(e)[:100]}"
-            print(f"[SERVER DEBUG 5] Exception during action '{action}': {e}")
-            import traceback
-            traceback.print_exc()
+                    toast_message = "Invalid action."
+            except Exception as e:
+                toast_message = f"Server Error: {str(e)[:100]}"
+                print(f"[SERVER DEBUG 5] Exception during action '{action}': {e}")
+                import traceback
+                traceback.print_exc()
     else:
         # Form validation failed for other fields (e.g., action)
         error_list = []
