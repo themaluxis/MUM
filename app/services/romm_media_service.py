@@ -9,10 +9,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from flask import current_app
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
-from app.services.media_service_manager import register_media_client
 
 
-@register_media_client("romm")
 class RommMediaService(BaseMediaService):
     """RomM media service implementation"""
     

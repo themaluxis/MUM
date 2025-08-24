@@ -3,7 +3,6 @@ import os
 import sys
 import json
 import importlib
-import importlib.util
 from typing import Dict, List, Optional, Type, Any
 from flask import current_app
 from app.models_plugins import Plugin, PluginStatus, PluginType
