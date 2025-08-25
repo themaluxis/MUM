@@ -287,11 +287,39 @@ document.addEventListener('DOMContentLoaded', function() {
                         font: {
                             size: 11
                         },
+                        maxTicksLimit: 6,  // Limit the number of ticks
+                        stepSize: 1,       // Force 1-minute steps for small values
                         callback: function(value) {
                             // Format Y-axis labels as time (e.g., "2h", "30m")
                             if (value === 0) return '0m';
+                            if (value % 1 !== 0) return ''; // Hide non-integer values
                             return formatMinutes(value);
                         }
+                    },
+                    afterBuildTicks: function(axis) {
+                        // Custom logic to create cleaner tick intervals
+                        const max = Math.max(...axis.chart.data.datasets.flatMap(d => d.data));
+                        
+                        if (max <= 5) {
+                            // For small values (0-5 minutes), show every minute
+                            axis.ticks = [];
+                            for (let i = 0; i <= Math.ceil(max); i++) {
+                                axis.ticks.push({ value: i });
+                            }
+                        } else if (max <= 30) {
+                            // For medium values (5-30 minutes), show every 5 minutes
+                            axis.ticks = [];
+                            for (let i = 0; i <= Math.ceil(max/5)*5; i += 5) {
+                                axis.ticks.push({ value: i });
+                            }
+                        } else if (max <= 120) {
+                            // For larger values (30-120 minutes), show every 15 minutes
+                            axis.ticks = [];
+                            for (let i = 0; i <= Math.ceil(max/15)*15; i += 15) {
+                                axis.ticks.push({ value: i });
+                            }
+                        }
+                        // For very large values, let Chart.js handle it automatically
                     }
                 }
             },
