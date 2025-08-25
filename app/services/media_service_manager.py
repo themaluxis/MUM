@@ -176,6 +176,52 @@ class MediaServiceManager:
                         ).first()
                 
                 if not access:
+                    # Check if there's already a UserMediaAccess for this linked user on this server
+                    # This can happen when a user was created via invite but then we sync again
+                    if user:
+                        existing_linked_access = UserMediaAccess.query.filter_by(
+                            user_app_access_id=user.id,
+                            server_id=server_id
+                        ).first()
+                        
+                        if existing_linked_access:
+                            current_app.logger.info(f"Found existing UserMediaAccess for linked user {user.get_display_name()} on server {server.server_nickname}")
+                            access = existing_linked_access
+                            # Update the existing record with fresh data
+                            access.external_user_id = user_data.get('id')
+                            access.external_username = user_data.get('username')
+                            access.external_email = user_data.get('email')
+                            access.allowed_library_ids = user_data.get('library_ids', [])
+                            access.user_raw_data = user_data.get('raw_data') or {}
+                            access.is_active = True
+                            access.updated_at = datetime.utcnow()
+                            
+                            # Set service-specific fields
+                            if server.service_type == ServiceType.PLEX:
+                                access.external_user_alt_id = user_data.get('uuid')
+                                # Parse and set service_join_date from acceptedAt timestamp
+                                accepted_at_str = user_data.get('accepted_at')
+                                if accepted_at_str and str(accepted_at_str).isdigit():
+                                    try:
+                                        from datetime import timezone
+                                        join_date_dt = datetime.fromtimestamp(int(accepted_at_str), tz=timezone.utc)
+                                        access.service_join_date = join_date_dt.replace(tzinfo=None)
+                                    except (ValueError, TypeError) as e:
+                                        current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {user_data.get('username')}: {e}")
+                            
+                            elif server.service_type == ServiceType.KAVITA:
+                                # Parse and set service_join_date from join_date field
+                                if user_data.get('join_date'):
+                                    try:
+                                        access.service_join_date = user_data.get('join_date')
+                                    except Exception as e:
+                                        current_app.logger.warning(f"Failed to set join date for Kavita user {user_data.get('username')}: {e}")
+                            
+                            updated_count += 1
+                            current_app.logger.info(f"Updated existing linked UserMediaAccess for {user.get_display_name()}")
+                            continue  # Skip the creation logic below
+                    
+                    # Create new UserMediaAccess record
                     # Prepare fields based on server type
                     external_user_alt_id = None
                     if server.service_type == ServiceType.PLEX:

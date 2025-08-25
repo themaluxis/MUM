@@ -54,6 +54,11 @@ class BaseMediaService(ABC):
         pass
     
     @abstractmethod
+    def check_username_exists(self, username: str) -> bool:
+        """Check if a username already exists in the service"""
+        pass
+    
+    @abstractmethod
     def get_active_sessions(self) -> List[Dict[str, Any]]:
         """Get currently active streaming sessions"""
         pass

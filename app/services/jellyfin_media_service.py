@@ -286,6 +286,18 @@ class JellyfinMediaService(BaseMediaService):
             self.log_error(f"Error deleting user {user_id}: {e}")
             return False
     
+    def check_username_exists(self, username: str) -> bool:
+        """Check if a username already exists in Jellyfin"""
+        try:
+            users = self.get_users()
+            for user in users:
+                if user.get('Name', '').lower() == username.lower():
+                    return True
+            return False
+        except Exception as e:
+            self.log_error(f"Error checking username '{username}': {e}")
+            return False  # Assume username doesn't exist if we can't check
+    
     def get_active_sessions(self) -> List[Dict[str, Any]]:
         """Get currently active sessions from Jellyfin"""
         try:

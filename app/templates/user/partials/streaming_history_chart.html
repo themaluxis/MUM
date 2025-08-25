@@ -1,0 +1,307 @@
+<!-- File: app/templates/user/partials/streaming_history_chart.html -->
+<!-- Streaming History Bar Chart for User Dashboard -->
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="card-title text-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Watch Time Activity
+            </h2>
+            
+            <!-- Date Range Selector -->
+            <div class="dropdown dropdown-end">
+                <div tabindex="0" role="button" class="btn btn-sm btn-outline">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {% if selected_days == 7 %}Last 7 Days
+                    {% elif selected_days == 30 %}Last 30 Days  
+                    {% elif selected_days == 90 %}Last 90 Days
+                    {% elif selected_days == 365 %}Last Year
+                    {% elif selected_days == -1 %}All Time
+                    {% else %}Last 30 Days{% endif %}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+                <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
+                    <li><a href="{{ url_for('user.index', days=7) }}" class="{% if selected_days == 7 %}active{% endif %}">Last 7 Days</a></li>
+                    <li><a href="{{ url_for('user.index', days=30) }}" class="{% if selected_days == 30 %}active{% endif %}">Last 30 Days</a></li>
+                    <li><a href="{{ url_for('user.index', days=90) }}" class="{% if selected_days == 90 %}active{% endif %}">Last 90 Days</a></li>
+                    <li><a href="{{ url_for('user.index', days=365) }}" class="{% if selected_days == 365 %}active{% endif %}">Last Year</a></li>
+                    <li><a href="{{ url_for('user.index', days='all') }}" class="{% if selected_days == -1 %}active{% endif %}">All Time</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        {% if chart_data %}
+            <!-- Chart Container -->
+            <div class="relative">
+                <canvas id="streamingHistoryChart" width="400" height="200"></canvas>
+            </div>
+            
+            <!-- Legend -->
+            <div class="flex flex-wrap gap-2 mt-4 justify-center">
+                {% for service in chart_data.services %}
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded" style="background-color: {{ service.color }};"></div>
+                    <span class="text-sm">{{ service.name }} ({{ service.watch_time }})</span>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Summary Stats -->
+            <div class="stats stats-horizontal shadow mt-4 w-full">
+                <div class="stat">
+                    <div class="stat-title">Total Streams</div>
+                    <div class="stat-value text-primary">{{ chart_data.total_streams }}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">Total Watch Time</div>
+                    <div class="stat-value text-secondary">{{ chart_data.total_duration }}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">Most Active Service</div>
+                    <div class="stat-value text-accent text-sm">{{ chart_data.most_active_service }}</div>
+                </div>
+            </div>
+        {% else %}
+            <!-- No Data State -->
+            <div class="text-center py-8">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-base-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-10 0a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2M9 12l2 2 4-4" />
+                </svg>
+                <p class="text-base-content/60">No streaming activity in the last 30 days</p>
+                <p class="text-sm text-base-content/40 mt-2">Start watching content on your connected services to see your activity here</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if chart_data %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('streamingHistoryChart').getContext('2d');
+    
+    console.log('Chart data:', {{ chart_data | tojson | safe }});
+    
+    // Service color mapping (similar to Plex's style)
+    const serviceColors = {
+        'plex': '#e5a00d',
+        'jellyfin': '#00a4dc', 
+        'emby': '#52b54b',
+        'kavita': '#f39c12',
+        'audiobookshelf': '#8b5cf6',
+        'komga': '#ef4444',
+        'romm': '#10b981'
+    };
+    
+    // Chart data from backend
+    const chartData = {{ chart_data.chart_data | tojson | safe }};
+    const services = {{ chart_data.services | tojson | safe }};
+    
+    console.log('Chart data array:', chartData);
+    console.log('Services array:', services);
+    
+    // Create gradient backgrounds for bars
+    const gradients = {};
+    Object.keys(serviceColors).forEach(service => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+        gradient.addColorStop(0, serviceColors[service] + 'CC'); // 80% opacity
+        gradient.addColorStop(1, serviceColors[service] + '66'); // 40% opacity
+        gradients[service] = gradient;
+    });
+    
+    // Prepare datasets for Chart.js
+    const datasets = [];
+    
+    // Handle empty data case
+    if (!chartData || chartData.length === 0) {
+        console.log('No chart data available, creating empty chart');
+        // Create empty chart with at least 7 days of data
+        const today = new Date();
+        const emptyChartData = [];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            emptyChartData.push({
+                date: date.toISOString().split('T')[0]
+            });
+        }
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: emptyChartData.map(day => {
+                    const date = new Date(day.date);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }),
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#9ca3af', font: { size: 11 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(156, 163, 175, 0.1)' },
+                        title: {
+                            display: true,
+                            text: 'Watch Time',
+                            color: '#9ca3af',
+                            font: { size: 12, weight: 'bold' }
+                        },
+                        ticks: {
+                            color: '#9ca3af',
+                            font: { size: 11 },
+                            callback: function(value) {
+                                return value === 0 ? '0m' : value + 'm';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        return;
+    }
+    
+    services.forEach(service => {
+        datasets.push({
+            label: service.name,
+            data: chartData.map(day => day[service.type] || 0),
+            backgroundColor: gradients[service.type] || serviceColors[service.type] || '#64748b',
+            borderColor: serviceColors[service.type] || '#64748b',
+            borderWidth: 1,
+            borderRadius: 4,
+            borderSkipped: false,
+        });
+    });
+    
+    // Helper function to format minutes to readable time
+    function formatMinutes(minutes) {
+        if (minutes < 60) {
+            return Math.round(minutes) + 'm';
+        } else {
+            const hours = Math.floor(minutes / 60);
+            const remainingMinutes = Math.round(minutes % 60);
+            if (remainingMinutes === 0) {
+                return hours + 'h';
+            } else {
+                return hours + 'h ' + remainingMinutes + 'm';
+            }
+        }
+    }
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: chartData.map(day => {
+                const date = new Date(day.date);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    display: false // We use custom legend below
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    displayColors: true,
+                    callbacks: {
+                        title: function(context) {
+                            const date = new Date(chartData[context[0].dataIndex].date);
+                            return date.toLocaleDateString('en-US', { 
+                                weekday: 'long', 
+                                month: 'long', 
+                                day: 'numeric' 
+                            });
+                        },
+                        label: function(context) {
+                            const minutes = context.parsed.y;
+                            const service = context.dataset.label;
+                            return `${service}: ${formatMinutes(minutes)}`;
+                        },
+                        footer: function(context) {
+                            const dayData = chartData[context[0].dataIndex];
+                            const totalMinutes = Object.keys(dayData)
+                                .filter(key => key !== 'date')
+                                .reduce((sum, key) => sum + (dayData[key] || 0), 0);
+                            return totalMinutes > 0 ? `Total: ${formatMinutes(totalMinutes)}` : '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#9ca3af',
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(156, 163, 175, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Watch Time',
+                        color: '#9ca3af',
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        }
+                    },
+                    ticks: {
+                        color: '#9ca3af',
+                        font: {
+                            size: 11
+                        },
+                        callback: function(value) {
+                            // Format Y-axis labels as time (e.g., "2h", "30m")
+                            if (value === 0) return '0m';
+                            return formatMinutes(value);
+                        }
+                    }
+                }
+            },
+            elements: {
+                bar: {
+                    borderRadius: 2
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}

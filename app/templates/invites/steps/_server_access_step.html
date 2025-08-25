@@ -70,37 +70,101 @@
         
         {% if current_step.server_type != 'PLEX' %}
             <div class="space-y-4 mb-6">
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text font-medium text-sm">Choose a username for {{ current_step.server_name }}</span>
-                    </label>
-                    <input type="text" name="jellyfin_username" placeholder="Username" 
-                           class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" 
-                           value="{{ already_authenticated_plex_user.username }}" required>
-                    <label class="label">
-                        <span class="label-text-alt text-xs text-base-content/60">Default: Your Plex username</span>
-                    </label>
-                </div>
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text font-medium text-sm">Set a password for {{ current_step.server_name }}</span>
-                    </label>
-                    <input type="password" name="jellyfin_password" placeholder="Enter password" 
-                           class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" required>
-                    <label class="label">
-                        <span class="label-text-alt text-xs text-base-content/60">Choose a secure password for your account</span>
-                    </label>
-                </div>
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text font-medium text-sm">Confirm password</span>
-                    </label>
-                    <input type="password" name="jellyfin_password_confirm" placeholder="Confirm password" 
-                           class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" required>
-                    <label class="label">
-                        <span class="label-text-alt text-xs text-base-content/60">Re-enter your password to confirm</span>
-                    </label>
-                </div>
+                <!-- Username field (only show if not using same username or if username was taken) -->
+                {% if not use_same_username or server_username_taken %}
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-medium text-sm">
+                                {% if server_username_taken %}
+                                    Username for {{ current_step.server_name }} (original was taken)
+                                {% else %}
+                                    Choose a username for {{ current_step.server_name }}
+                                {% endif %}
+                            </span>
+                        </label>
+                        
+                        {% if server_username_taken %}
+                            <!-- Show warning that username was taken -->
+                            <div class="bg-warning/10 border border-warning/20 rounded-lg p-3 mb-3">
+                                <div class="flex items-start gap-2">
+                                    <i class="fa-solid fa-exclamation-triangle text-warning text-sm mt-0.5"></i>
+                                    <div class="text-sm">
+                                        <p class="font-medium text-warning mb-1">Username Not Available</p>
+                                        <p class="text-base-content/80">
+                                            The username "{{ preferred_username }}" is already taken on {{ current_step.server_name }}. 
+                                            Please choose a different username.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        <input type="text" name="jellyfin_username" placeholder="Username" 
+                               class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" 
+                               value="{% if server_username_taken %}{% else %}{{ default_username }}{% endif %}" required>
+                        <label class="label">
+                            <span class="label-text-alt text-xs text-base-content/60">
+                                {% if already_authenticated_plex_user %}
+                                    Default: Your Plex username
+                                {% else %}
+                                    Choose a unique username for this server
+                                {% endif %}
+                            </span>
+                        </label>
+                    </div>
+                {% else %}
+                    <!-- Show info that same username will be used -->
+                    <div class="bg-success/10 border border-success/20 rounded-lg p-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-check-circle text-success text-sm mt-0.5"></i>
+                            <div class="text-sm">
+                                <p class="font-medium text-success mb-1">Using Local Account Username</p>
+                                <p class="text-base-content/80">
+                                    Your local account username "{{ default_username }}" will be used for {{ current_step.server_name }}.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Hidden field to pass the username -->
+                    <input type="hidden" name="jellyfin_username" value="{{ default_username }}">
+                {% endif %}
+                
+                <!-- Password fields (only show if not using same password or if username was taken) -->
+                {% if not use_same_password or server_username_taken %}
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-medium text-sm">Set a password for {{ current_step.server_name }}</span>
+                        </label>
+                        <input type="password" name="jellyfin_password" placeholder="Enter password" 
+                               class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" required>
+                        <label class="label">
+                            <span class="label-text-alt text-xs text-base-content/60">Choose a secure password for your account</span>
+                        </label>
+                    </div>
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-medium text-sm">Confirm password</span>
+                        </label>
+                        <input type="password" name="jellyfin_password_confirm" placeholder="Confirm password" 
+                               class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100" required>
+                        <label class="label">
+                            <span class="label-text-alt text-xs text-base-content/60">Re-enter your password to confirm</span>
+                        </label>
+                    </div>
+                {% else %}
+                    <!-- Show info that same password will be used -->
+                    <div class="bg-success/10 border border-success/20 rounded-lg p-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-check-circle text-success text-sm mt-0.5"></i>
+                            <div class="text-sm">
+                                <p class="font-medium text-success mb-1">Using Local Account Password</p>
+                                <p class="text-base-content/80">
+                                    Your local account password will be used for {{ current_step.server_name }}.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         {% endif %}
 

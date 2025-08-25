@@ -257,6 +257,18 @@ class RommMediaService(BaseMediaService):
             self.log_error(f"Error deleting user {user_id}: {e}")
             return False
     
+    def check_username_exists(self, username: str) -> bool:
+        """Check if a username already exists in Romm"""
+        try:
+            users = self.get_users()
+            for user in users:
+                if user.get('username', '').lower() == username.lower():
+                    return True
+            return False
+        except Exception as e:
+            self.log_error(f"Error checking username '{username}': {e}")
+            return False
+    
     def get_active_sessions(self) -> List[Dict[str, Any]]:
         """Get currently active gaming sessions from RomM"""
         try:

@@ -237,7 +237,7 @@ def permission_required(permission_name):
             
             # Other user types don't have admin permissions
             flash("You do not have permission to access this page.", "danger")
-            return redirect(url_for('dashboard.index'))
+            return redirect(url_for('user.index'))
         return decorated_function
     return decorator
 

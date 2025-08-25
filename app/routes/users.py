@@ -841,8 +841,7 @@ def delete_user(user_uuid):
         # This is a standalone service user, get the UserMediaAccess record
         from app.models_media_services import UserMediaAccess
         access = UserMediaAccess.query.filter(
-            UserMediaAccess.id == actual_id,
-            UserMediaAccess.user_app_access_id.is_(None)
+            UserMediaAccess.id == actual_id
         ).first()
         
         if not access:
@@ -1859,8 +1858,7 @@ def get_user_debug_info(user_uuid):
         # This is a standalone service user, get the UserMediaAccess record
         from app.models_media_services import UserMediaAccess
         access = UserMediaAccess.query.filter(
-            UserMediaAccess.id == actual_id,
-            UserMediaAccess.user_app_access_id.is_(None)
+            UserMediaAccess.id == actual_id
         ).first()
         
         if not access:

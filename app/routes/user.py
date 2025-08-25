@@ -16,6 +16,162 @@ import urllib.parse
 # Note the new blueprint name and singular URL prefix
 bp = Blueprint('user', __name__, url_prefix='/user')
 
+def _generate_streaming_chart_data(user, days=30):
+    """Generate streaming history chart data for the specified number of days"""
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    from app.utils.helpers import format_duration
+    
+    # Calculate date range based on days parameter
+    end_date = datetime.now(timezone.utc)
+    if days == -1:  # All time
+        # Get the earliest stream date for this user
+        earliest_stream = MediaStreamHistory.query.filter(
+            MediaStreamHistory.user_app_access_uuid == user.uuid
+        ).order_by(MediaStreamHistory.started_at.asc()).first()
+        
+        if earliest_stream:
+            start_date = earliest_stream.started_at
+        else:
+            start_date = end_date - timedelta(days=30)  # Fallback to 30 days
+    else:
+        start_date = end_date - timedelta(days=days)
+    
+    current_app.logger.info(f"DEBUG CHART DATA: Date range calculation - start: {start_date}, end: {end_date}")
+    current_app.logger.info(f"DEBUG CHART DATA: Start date: {start_date.date()}, End date: {end_date.date()}")
+    
+    # Get streaming history for this user
+    history_query = MediaStreamHistory.query.filter(
+        MediaStreamHistory.user_app_access_uuid == user.uuid,
+        MediaStreamHistory.started_at >= start_date,
+        MediaStreamHistory.started_at <= end_date
+    )
+    
+    streaming_history = history_query.all()
+    
+    current_app.logger.info(f"DEBUG CHART DATA: Found {len(streaming_history)} streaming history records")
+    current_app.logger.info(f"DEBUG CHART DATA: Date range: {start_date} to {end_date}")
+    
+    if not streaming_history:
+        current_app.logger.info("DEBUG CHART DATA: No streaming history found, returning empty chart data")
+        # Return empty chart data structure instead of None
+        return {
+            'chart_data': [],
+            'services': [],
+            'total_streams': 0,
+            'total_duration': '0m',
+            'most_active_service': 'None',
+            'date_range_days': days
+        }
+    
+    # Service color mapping
+    service_colors = {
+        'plex': '#e5a00d',
+        'jellyfin': '#00a4dc', 
+        'emby': '#52b54b',
+        'kavita': '#f39c12',
+        'audiobookshelf': '#8b5cf6',
+        'komga': '#ef4444',
+        'romm': '#10b981'
+    }
+    
+    # Group data by date and service (using watch time in minutes)
+    daily_data = defaultdict(lambda: defaultdict(int))
+    service_totals = defaultdict(int)  # Total watch time per service
+    service_counts = defaultdict(int)  # Stream counts per service
+    total_duration_seconds = 0
+    
+    for entry in streaming_history:
+        # Debug logging for each entry
+        current_app.logger.info(f"DEBUG CHART DATA: Processing entry ID {entry.id}")
+        current_app.logger.info(f"DEBUG CHART DATA: - started_at: {entry.started_at}")
+        current_app.logger.info(f"DEBUG CHART DATA: - duration_seconds: {entry.duration_seconds}")
+        current_app.logger.info(f"DEBUG CHART DATA: - user_media_access_uuid: {entry.user_media_access_uuid}")
+        current_app.logger.info(f"DEBUG CHART DATA: - media_title: {entry.media_title}")
+        
+        # Get the date (without time)
+        entry_date = entry.started_at.date()
+        
+        # Get service type from the server
+        service_type = 'unknown'
+        if entry.user_media_access_uuid:
+            service_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
+            if service_access and service_access.server:
+                service_type = service_access.server.service_type.value
+                current_app.logger.info(f"DEBUG CHART DATA: - service_type: {service_type}")
+            else:
+                current_app.logger.warning(f"DEBUG CHART DATA: - No service access found for UUID {entry.user_media_access_uuid}")
+        else:
+            current_app.logger.warning(f"DEBUG CHART DATA: - No user_media_access_uuid")
+        
+        # Get duration in minutes for the chart
+        duration_minutes = 0
+        if entry.duration_seconds and entry.duration_seconds > 0:
+            duration_minutes = entry.duration_seconds / 60  # Convert to minutes
+            total_duration_seconds += entry.duration_seconds
+        else:
+            # If no duration, estimate based on media type or use a default
+            # For now, use a small default value so streams show up on the chart
+            duration_minutes = 1  # 1 minute minimum to show activity
+            current_app.logger.warning(f"DEBUG CHART DATA: Stream entry {entry.id} has no duration_seconds, using 1 minute default")
+        
+        # Add watch time per day per service (in minutes)
+        daily_data[entry_date][service_type] += duration_minutes
+        service_totals[service_type] += duration_minutes
+        service_counts[service_type] += 1
+        
+        current_app.logger.info(f"DEBUG CHART DATA: - Added {duration_minutes} minutes to {service_type} on {entry_date}")
+        current_app.logger.info(f"DEBUG CHART DATA: - Running totals: {dict(service_totals)}")
+    
+    # Generate chart data for the date range (including days with no activity)
+    chart_data_list = []
+    current_date = start_date.date()
+    
+    while current_date <= end_date.date():
+        day_data = {'date': current_date.isoformat()}
+        
+        # Add service watch times for this day (in minutes)
+        for service_type in service_totals.keys():
+            day_data[service_type] = round(daily_data[current_date].get(service_type, 0), 1)
+        
+        current_app.logger.info(f"DEBUG CHART DATA: Day {current_date}: {day_data}")
+        chart_data_list.append(day_data)
+        current_date += timedelta(days=1)
+    
+    current_app.logger.info(f"DEBUG CHART DATA: Final chart_data_list length: {len(chart_data_list)}")
+    current_app.logger.info(f"DEBUG CHART DATA: Sample chart data entries: {chart_data_list[:3] if chart_data_list else 'None'}")
+    current_app.logger.info(f"DEBUG CHART DATA: Last few chart data entries: {chart_data_list[-3:] if chart_data_list else 'None'}")
+    current_app.logger.info(f"DEBUG CHART DATA: Final service_totals: {dict(service_totals)}")
+    current_app.logger.info(f"DEBUG CHART DATA: Daily data keys (dates with activity): {list(daily_data.keys())}")
+    
+    # Prepare service information for legend
+    services = []
+    for service_type, total_minutes in service_totals.items():
+        services.append({
+            'type': service_type,
+            'name': service_type.title(),
+            'watch_time': format_duration(total_minutes * 60),  # Convert back to seconds for formatting
+            'count': service_counts[service_type],
+            'color': service_colors.get(service_type, '#64748b')
+        })
+    
+    # Sort services by watch time (descending)
+    services.sort(key=lambda x: service_totals[x['type']], reverse=True)
+    
+    # Calculate summary stats
+    total_streams = sum(service_counts.values())
+    most_active_service = services[0]['name'] if services else 'None'
+    total_duration_formatted = format_duration(total_duration_seconds)
+    
+    return {
+        'chart_data': chart_data_list,
+        'services': services,
+        'total_streams': total_streams,
+        'total_duration': total_duration_formatted,
+        'most_active_service': most_active_service,
+        'date_range_days': days
+    }
+
 def check_if_user_is_admin(user):
     """Check if a UserAppAccess user is an admin by looking up their access in UserMediaAccess"""
     if not isinstance(user, UserAppAccess):
@@ -58,10 +214,34 @@ def index():
     from app.models import Setting
     app_name = Setting.get('APP_NAME', 'MUM')
     
+    # Get date range from query parameter
+    days_param = request.args.get('days', '30')
+    try:
+        if days_param == 'all':
+            days = -1
+        else:
+            days = int(days_param)
+            # Validate days parameter
+            if days not in [7, 30, 90, 365]:
+                days = 30
+    except (ValueError, TypeError):
+        days = 30
+    
+    # Generate streaming history chart data
+    chart_data = _generate_streaming_chart_data(current_user, days)
+    
+    # Debug logging (simplified)
+    if chart_data and chart_data.get('services'):
+        current_app.logger.info(f"Chart generated: {len(chart_data['services'])} services, {chart_data['total_streams']} streams")
+    else:
+        current_app.logger.info("Chart generated: No data available")
+    
     return render_template('user/index.html', 
-                         title="Welcome", 
+                         title="Dashboard", 
                          app_name=app_name,
-                         user=current_user)
+                         user=current_user,
+                         chart_data=chart_data,
+                         selected_days=days)
 
 @bp.route('/<server_nickname>/<server_username>', methods=['GET', 'POST'])
 @login_required

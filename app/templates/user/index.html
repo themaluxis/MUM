@@ -1,33 +1,105 @@
 {% extends "base.html" %}
 
-{% block title %}{{ super() }} - Welcome{% endblock %}
+{% block title %}{{ super() }} - Dashboard{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <div class="hero min-h-[60vh] bg-base-200 rounded-lg">
-        <div class="hero-content text-center">
-            <div class="max-w-md">
-                <h1 class="text-5xl font-bold mb-6">Welcome to {{ app_name }}</h1>
-                <p class="text-lg mb-8">Hello, {{ user.get_display_name() }}!</p>
-                <p class="text-base-content/70">
-                    You have successfully logged into your user account. 
-                    Your media access and settings are managed through your connected services.
-                </p>
-                
-                <div class="mt-8">
-                    <div class="stats shadow">
-                        <div class="stat">
-                            <div class="stat-title">Account Created</div>
-                            <div class="stat-value text-sm">{{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'Unknown' }}</div>
+    <!-- Welcome Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold mb-2">Welcome back, {{ user.get_display_name() }}!</h1>
+        <p class="text-base-content/70">Here's your streaming activity overview</p>
+    </div>
+    
+    <!-- Dashboard Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Streaming History Chart - Takes up 2 columns on large screens -->
+        <div class="lg:col-span-2">
+            {% include 'user/partials/streaming_history_chart.html' %}
+        </div>
+        
+        <!-- Quick Stats Sidebar -->
+        <div class="space-y-6">
+            <!-- Account Info Card -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title text-lg mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Account Info
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <div class="text-sm text-base-content/60">Username</div>
+                            <div class="font-medium">{{ user.username }}</div>
+                        </div>
+                        
+                        {% if user.email %}
+                        <div>
+                            <div class="text-sm text-base-content/60">Email</div>
+                            <div class="font-medium">{{ user.email }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        <div>
+                            <div class="text-sm text-base-content/60">Member Since</div>
+                            <div class="font-medium">{{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'Unknown' }}</div>
                         </div>
                     </div>
+                    
+                    <div class="card-actions justify-end mt-4">
+                        <a href="{{ url_for('user.account') }}" class="btn btn-sm btn-outline">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Account Settings
+                        </a>
+                    </div>
                 </div>
-                
-                <div class="mt-6">
-                    <a href="{{ url_for('auth.logout') }}" class="btn btn-outline">Logout</a>
+            </div>
+            
+            <!-- Quick Actions Card -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title text-lg mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Quick Actions
+                    </h2>
+                    
+                    <div class="space-y-2">
+                        <a href="{{ url_for('user.profile') }}?tab=history" class="btn btn-sm btn-ghost w-full justify-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            View Full History
+                        </a>
+                        
+                        <a href="{{ url_for('user.profile') }}?tab=linked-accounts" class="btn btn-sm btn-ghost w-full justify-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            Linked Accounts
+                        </a>
+                        
+                        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-ghost w-full justify-start text-error">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                            Logout
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js for the streaming history chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}

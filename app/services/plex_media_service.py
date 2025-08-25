@@ -1013,3 +1013,9 @@ class PlexMediaService(BaseMediaService):
         except Exception as e:
             current_app.logger.error(f"An unexpected error occurred during GeoIP lookup: {e}", exc_info=True)
             return {"error": "An unexpected error occurred"}
+    
+    def check_username_exists(self, username: str) -> bool:
+        """Check if a username already exists in Plex (not applicable for Plex OAuth)"""
+        # Plex uses OAuth authentication, so username conflicts don't apply
+        # Always return False since Plex handles user authentication externally
+        return False

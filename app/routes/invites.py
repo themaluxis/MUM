@@ -530,6 +530,7 @@ def process_invite_form(invite_path_or_token):
     form_instance = FlaskForm()
     already_authenticated_plex_user_info = session.get(f'invite_{invite.id}_plex_user')
     already_authenticated_discord_user_info = session.get(f'invite_{invite.id}_discord_user')
+    plex_conflict_info = session.get(f'invite_{invite.id}_plex_conflict')
     
     # --- MODIFIED: Determine effective Discord settings using invite fields ---
     oauth_is_generally_enabled = Setting.get_bool('DISCORD_OAUTH_ENABLED', False)
@@ -578,8 +579,29 @@ def process_invite_form(invite_path_or_token):
     if request.method == 'POST':
         auth_method = request.form.get('auth_method'); action_taken = request.form.get('action')
         
+        # Handle Plex conflict resolution
+        if action_taken == 'link_plex_account' and plex_conflict_info and plex_conflict_info.get('type') == 'can_link':
+            # User chose to link existing Plex account to local account
+            # Clear the conflict and set the Plex user info to proceed
+            plex_user_data = {
+                'username': plex_conflict_info['plex_username'],
+                'email': plex_conflict_info['plex_email'],
+                # We'll need to get the full Plex account info again
+            }
+            session[f'invite_{invite.id}_plex_user'] = plex_user_data
+            session.pop(f'invite_{invite.id}_plex_conflict', None)
+            flash(f"Plex account '{plex_conflict_info['plex_username']}' will be linked to your local account.", "success")
+            current_app.logger.info(f"User chose to link existing Plex account {plex_conflict_info['plex_username']}")
+            
+        elif action_taken == 'use_different_plex' and plex_conflict_info:
+            # User chose to use a different Plex account
+            session.pop(f'invite_{invite.id}_plex_conflict', None)
+            session.pop(f'invite_{invite.id}_plex_user', None)
+            flash("Please authenticate with a different Plex account.", "info")
+            current_app.logger.info(f"User chose to use different Plex account instead of {plex_conflict_info['plex_username']}")
+            
         # Handle user account creation if enabled (MODIFIED: Store form data in session instead of creating account)
-        if action_taken == 'create_user_account' and allow_user_accounts:
+        elif action_taken == 'create_user_account' and allow_user_accounts:
             from app.forms import UserAccountCreationForm
             
             account_form = UserAccountCreationForm()
@@ -591,11 +613,21 @@ def process_invite_form(invite_path_or_token):
                     'password': account_form.password.data
                 }
                 
+                # Store cross-server credential preferences
+                use_same_username = request.form.get('use_same_username') == 'true'
+                use_same_password = request.form.get('use_same_password') == 'true'
+                
+                session[f'invite_{invite.id}_cross_server_prefs'] = {
+                    'use_same_username': use_same_username,
+                    'use_same_password': use_same_password
+                }
+                
                 # Mark account step as completed (but not actually created yet)
                 session[f'invite_{invite.id}_user_account_created'] = True
                 
                 flash("Account information saved! Please continue with the authentication steps.", "success")
                 current_app.logger.info(f"User account data stored in session for invite {invite.id}, username: {account_form.username.data}")
+                current_app.logger.info(f"Cross-server preferences: same_username={use_same_username}, same_password={use_same_password}")
                     
             else:
                 # Form validation failed, show errors
@@ -772,6 +804,15 @@ def process_invite_form(invite_path_or_token):
     # Check if there are Plex servers in the invite
     has_plex_servers = any(server.service_type.name.upper() == 'PLEX' for server in invite.servers)
     
+    # Get cross-server preferences from session
+    cross_server_prefs = session.get(f'invite_{invite.id}_cross_server_prefs', {})
+    use_same_username = cross_server_prefs.get('use_same_username', False)
+    use_same_password = cross_server_prefs.get('use_same_password', False)
+    
+    # Get user account data for default username
+    user_account_data = session.get(f'invite_{invite.id}_user_account_data', {})
+    local_username = user_account_data.get('username', '')
+    
     # Generate invite steps for progress indicator
     invite_steps = []
     current_step = None
@@ -811,33 +852,72 @@ def process_invite_form(invite_path_or_token):
         })
     
     # Step 4+: Server Access Steps (for non-Plex servers)
-    for server in invite.servers:
-        if server.service_type.name.upper() != 'PLEX':
-            step_id = f'server_access_{server.id}'
-            server_completed = session.get(f'invite_{invite.id}_server_{server.id}_completed', False)
-            invite_steps.append({
-                'id': step_id,
-                'name': f'{server.server_nickname} Access',
-                'icon': 'fa-solid fa-server',
-                'required': True,
-                'completed': server_completed,
-                'server_id': server.id,
-                'server_name': server.server_nickname,
-                'server_type': server.service_type.name.upper()
-            })
+    # Sort servers to prioritize those without username conflicts
+    non_plex_servers = [s for s in invite.servers if s.service_type.name.upper() != 'PLEX']
+    
+    # Check for username conflicts if using same username
+    username_conflicts = {}
+    if use_same_username and local_username:
+        for server in non_plex_servers:
+            try:
+                service = MediaServiceFactory.create_service_from_db(server)
+                if hasattr(service, 'check_username_exists'):
+                    username_exists = service.check_username_exists(local_username)
+                    username_conflicts[server.id] = username_exists
+                    current_app.logger.info(f"Username '{local_username}' exists on {server.server_nickname}: {username_exists}")
+            except Exception as e:
+                current_app.logger.warning(f"Could not check username on {server.server_nickname}: {e}")
+                username_conflicts[server.id] = False
+    
+    # Sort servers: non-conflicting first, then conflicting
+    def server_sort_key(server):
+        has_conflict = username_conflicts.get(server.id, False)
+        return (has_conflict, server.server_nickname)  # False sorts before True
+    
+    sorted_non_plex_servers = sorted(non_plex_servers, key=server_sort_key)
+    
+    for server in sorted_non_plex_servers:
+        step_id = f'server_access_{server.id}'
+        server_completed = session.get(f'invite_{invite.id}_server_{server.id}_completed', False)
+        invite_steps.append({
+            'id': step_id,
+            'name': f'{server.server_nickname} Access',
+            'icon': 'fa-solid fa-server',
+            'required': True,
+            'completed': server_completed,
+            'server_id': server.id,
+            'server_name': server.server_nickname,
+            'server_type': server.service_type.name.upper()
+        })
+        
+        # Set current step if this server setup is not completed
+        if not server_completed and current_step is None:
+            # Check if prerequisites are met
+            discord_ready = not show_discord_button or already_authenticated_discord_user_info
+            plex_ready = not has_plex_servers or already_authenticated_plex_user_info
+            account_ready = not allow_user_accounts or user_account_created
             
-            # Set current step if this server setup is not completed
-            if not server_completed and current_step is None:
-                # Check if prerequisites are met
-                discord_ready = not show_discord_button or already_authenticated_discord_user_info
-                plex_ready = not has_plex_servers or already_authenticated_plex_user_info
-                account_ready = not allow_user_accounts or user_account_created
-                
-                if discord_ready and plex_ready and account_ready:
-                    current_step = invite_steps[-1]  # Set this as current step
+            if discord_ready and plex_ready and account_ready:
+                current_step = invite_steps[-1]  # Set this as current step
     
     use_steps_template = allow_user_accounts or show_discord_button or has_multiple_servers_available
     
+    # Prepare template variables for current step
+    server_username_taken = False
+    preferred_username = ""
+    default_username = ""
+    
+    if current_step and current_step.get('server_id'):
+        server_id = current_step['server_id']
+        server_username_taken = username_conflicts.get(server_id, False)
+        
+        # Determine default username
+        if use_same_username and local_username:
+            preferred_username = local_username
+            default_username = local_username if not server_username_taken else ""
+        elif already_authenticated_plex_user_info:
+            default_username = already_authenticated_plex_user_info.get('username', '')
+        
     template_name = 'invites/public_invite_steps.html' if use_steps_template else 'invites/public_invite.html'
     
     return render_template(template_name, 
@@ -861,7 +941,15 @@ def process_invite_form(invite_path_or_token):
                            # Add missing variables
                            has_plex_servers=has_plex_servers,
                            invite_steps=invite_steps,
-                           current_step=current_step
+                           current_step=current_step,
+                           # Cross-server credential variables
+                           use_same_username=use_same_username,
+                           use_same_password=use_same_password,
+                           server_username_taken=server_username_taken,
+                           preferred_username=preferred_username,
+                           default_username=default_username,
+                           # Plex conflict variables
+                           plex_conflict_info=plex_conflict_info
                            )
 
 @bp.route('/plex_callback') # Path is /invites/plex_callback
@@ -958,18 +1046,103 @@ def plex_oauth_callback():
 
         plex_account = MyPlexAccount(token=plex_auth_token)
         
-        session[f'invite_{invite.id}_plex_user'] = {
-            'id': getattr(plex_account, 'id', None), 
-            'uuid': getattr(plex_account, 'uuid', None), 
-            'username': getattr(plex_account, 'username', None), 
-            'email': getattr(plex_account, 'email', None), 
-            'thumb': getattr(plex_account, 'thumb', None)
-        }
-        log_event(EventType.INVITE_USED_SUCCESS_PLEX, f"Plex auth success for {plex_account.username} on invite {invite.id}.", invite_id=invite.id)
+        # Check if this Plex user is already in any of the invite's Plex servers
+        plex_servers_in_invite = [s for s in invite.servers if s.service_type.name.upper() == 'PLEX']
+        plex_user_already_exists = False
+        existing_server_name = ""
+        existing_local_account = None
         
-        # DO NOT auto-grant Plex access here - wait for "All Servers Configured" step
-        # Just mark Plex authentication as completed
-        current_app.logger.info(f"Plex authentication completed for {plex_account.username} - waiting for final step to grant access")
+        for plex_server in plex_servers_in_invite:
+            try:
+                service = MediaServiceFactory.create_service_from_db(plex_server)
+                users = service.get_users()
+                
+                for user in users:
+                    # Check if this Plex user already exists in the server
+                    if (user.get('uuid') == plex_account.uuid or 
+                        user.get('email', '').lower() == plex_account.email.lower()):
+                        plex_user_already_exists = True
+                        existing_server_name = plex_server.server_nickname
+                        
+                        # Check if this Plex user is already linked to a local account
+                        # Check both external_user_id and external_user_alt_id for Plex users
+                        from app.models_media_services import UserMediaAccess
+                        from sqlalchemy import or_
+                        
+                        existing_access = UserMediaAccess.query.filter(
+                            UserMediaAccess.server_id == plex_server.id,
+                            or_(
+                                UserMediaAccess.external_user_id == str(plex_account.uuid),
+                                UserMediaAccess.external_user_alt_id == str(plex_account.uuid),
+                                UserMediaAccess.external_user_id == str(plex_account.id),
+                                UserMediaAccess.external_user_alt_id == str(plex_account.id)
+                            )
+                        ).first()
+                        
+                        if existing_access:
+                            current_app.logger.info(f"Found existing UserMediaAccess: ID={existing_access.id}, user_app_access_id={existing_access.user_app_access_id}, external_user_id={existing_access.external_user_id}, external_user_alt_id={existing_access.external_user_alt_id}")
+                            
+                            if existing_access.user_app_access_id and existing_access.user_app_access:
+                                existing_local_account = existing_access.user_app_access
+                                current_app.logger.info(f"Plex user is linked to local account: {existing_local_account.username}")
+                            else:
+                                current_app.logger.info(f"Plex user exists but user_app_access_id={existing_access.user_app_access_id}, user_app_access={existing_access.user_app_access}")
+                                existing_local_account = None
+                        else:
+                            current_app.logger.info("No existing UserMediaAccess found for this Plex user")
+                        
+                        current_app.logger.info(f"Plex user {plex_account.username} already exists in {existing_server_name}")
+                        break
+                
+                if plex_user_already_exists:
+                    break
+                    
+            except Exception as e:
+                current_app.logger.warning(f"Could not check existing users in {plex_server.server_nickname}: {e}")
+        
+        # Handle the different scenarios
+        if plex_user_already_exists:
+            allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+            
+            if existing_local_account:
+                # Plex user is already linked to a local account
+                session[f'invite_{invite.id}_plex_conflict'] = {
+                    'type': 'already_linked',
+                    'server_name': existing_server_name,
+                    'linked_username': existing_local_account.username,
+                    'plex_username': plex_account.username,
+                    'plex_email': plex_account.email
+                }
+                current_app.logger.info(f"Plex user {plex_account.username} is already linked to local account {existing_local_account.username}")
+            elif allow_user_accounts:
+                # Plex user exists but not linked - offer to link
+                session[f'invite_{invite.id}_plex_conflict'] = {
+                    'type': 'can_link',
+                    'server_name': existing_server_name,
+                    'plex_username': plex_account.username,
+                    'plex_email': plex_account.email
+                }
+                current_app.logger.info(f"Plex user {plex_account.username} exists but not linked - offering to link")
+            else:
+                # Plex user exists but no local accounts feature
+                session[f'invite_{invite.id}_plex_conflict'] = {
+                    'type': 'already_exists_no_linking',
+                    'server_name': existing_server_name,
+                    'plex_username': plex_account.username,
+                    'plex_email': plex_account.email
+                }
+                current_app.logger.info(f"Plex user {plex_account.username} already exists and no local account linking available")
+        else:
+            # Plex user is new - proceed normally
+            session[f'invite_{invite.id}_plex_user'] = {
+                'id': getattr(plex_account, 'id', None), 
+                'uuid': getattr(plex_account, 'uuid', None), 
+                'username': getattr(plex_account, 'username', None), 
+                'email': getattr(plex_account, 'email', None), 
+                'thumb': getattr(plex_account, 'thumb', None)
+            }
+            log_event(EventType.INVITE_USED_SUCCESS_PLEX, f"Plex auth success for {plex_account.username} on invite {invite.id}.", invite_id=invite.id)
+            current_app.logger.info(f"New Plex user {plex_account.username} - proceeding with invite")
 
     except PlexApiException as e_plex:
         flash(f'Plex API error: {str(e_plex)}', 'danger')

@@ -239,3 +239,15 @@ class KomgaMediaService(BaseMediaService):
         except requests.exceptions.RequestException as e:
             self.log_error(f"Failed to get GeoIP info for {ip_address}: {e}")
             return {"status": "error", "message": str(e)}
+    
+    def check_username_exists(self, username: str) -> bool:
+        """Check if a username already exists in Komga"""
+        try:
+            users = self.get_users()
+            for user in users:
+                if user.get('email', '').lower() == username.lower():
+                    return True
+            return False
+        except Exception as e:
+            self.log_error(f"Error checking username '{username}': {e}")
+            return False
