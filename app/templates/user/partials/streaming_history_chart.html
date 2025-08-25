@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             scales: {
                 x: {
-                    stacked: true,
+                    stacked: false,
                     grid: {
                         display: false
                     },
@@ -289,10 +289,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 },
                 y: {
-                    stacked: true,
+                    stacked: false,
                     beginAtZero: true,
                     grid: {
-                        color: 'rgba(156, 163, 175, 0.1)'
+                        color: 'rgba(156, 163, 175, 0.2)',
+                        lineWidth: 1,
+                        drawBorder: false,
+                        drawOnChartArea: true,
+                        drawTicks: true
                     },
                     title: {
                         display: true,
