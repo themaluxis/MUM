@@ -21,6 +21,7 @@ def _generate_streaming_chart_data(user, days=30):
     from datetime import datetime, timezone, timedelta
     from collections import defaultdict
     from app.utils.helpers import format_duration
+    import calendar
     
     # Calculate date range based on days parameter
     end_date = datetime.now(timezone.utc)
@@ -35,7 +36,9 @@ def _generate_streaming_chart_data(user, days=30):
         else:
             start_date = end_date - timedelta(days=30)  # Fallback to 30 days
     else:
-        start_date = end_date - timedelta(days=days)
+        # For daily periods, we want exactly 'days' number of days including today
+        # So if days=7, we want 7 days total: today + 6 previous days
+        start_date = end_date - timedelta(days=days-1)
     
     # Get streaming history for this user
     history_query = MediaStreamHistory.query.filter(
@@ -68,8 +71,28 @@ def _generate_streaming_chart_data(user, days=30):
         'romm': '#10b981'
     }
     
-    # Group data by date, service, and content type (using watch time in minutes)
-    daily_data = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))  # [date][service][content_type]
+    # Determine grouping strategy based on days parameter
+    if days == 7:
+        # Last 7 days: Show daily
+        grouping_type = 'daily'
+    elif days in [30, 90]:
+        # Last 30/90 days: Group into 7-day periods
+        grouping_type = 'weekly'
+    elif days == 365 or days == -1:
+        # Last year or all time: Group by months
+        grouping_type = 'monthly'
+    else:
+        # Default to daily for any other values
+        grouping_type = 'daily'
+    
+    # Group data by appropriate time period, service, and content type
+    if grouping_type == 'monthly':
+        grouped_data = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))  # [year_month][service][content_type]
+    elif grouping_type == 'weekly':
+        grouped_data = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))  # [week_start_date][service][content_type]
+    else:  # daily
+        grouped_data = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))  # [date][service][content_type]
+    
     service_content_totals = defaultdict(lambda: defaultdict(int))  # [service][content_type]
     service_totals = defaultdict(int)  # Total watch time per service
     service_counts = defaultdict(int)  # Stream counts per service
@@ -78,6 +101,18 @@ def _generate_streaming_chart_data(user, days=30):
     for entry in streaming_history:
         # Get the date (without time)
         entry_date = entry.started_at.date()
+        
+        # Determine the grouping key based on grouping type
+        if grouping_type == 'monthly':
+            # Group by year-month (e.g., "2024-01")
+            group_key = entry_date.strftime('%Y-%m')
+        elif grouping_type == 'weekly':
+            # Group by week start date (Monday of the week)
+            days_since_monday = entry_date.weekday()
+            week_start = entry_date - timedelta(days=days_since_monday)
+            group_key = week_start.isoformat()
+        else:  # daily
+            group_key = entry_date.isoformat()
         
         # Get service type from the server
         service_type = 'unknown'
@@ -124,15 +159,14 @@ def _generate_streaming_chart_data(user, days=30):
             # If no duration, use a small default value so streams show up on the chart
             duration_minutes = 1  # 1 minute minimum to show activity
         
-        # Add watch time per day per service per content type (in minutes)
-        daily_data[entry_date][service_type][content_type] += duration_minutes
+        # Add watch time per group per service per content type (in minutes)
+        grouped_data[group_key][service_type][content_type] += duration_minutes
         service_content_totals[service_type][content_type] += duration_minutes
         service_totals[service_type] += duration_minutes
         service_counts[service_type] += 1
     
-    # Generate chart data for the date range (including days with no activity)
+    # Generate chart data for the date range (including periods with no activity)
     chart_data_list = []
-    current_date = start_date.date()
     
     # Create datasets for each service-content combination
     service_content_combinations = []
@@ -140,17 +174,93 @@ def _generate_streaming_chart_data(user, days=30):
         for content_type in service_content_totals[service_type].keys():
             service_content_combinations.append(f"{service_type}_{content_type}")
     
-    while current_date <= end_date.date():
-        day_data = {'date': current_date.isoformat()}
+    # Generate time periods based on grouping type
+    if grouping_type == 'monthly':
+        # Generate monthly periods
+        # Ensure both dates are timezone-aware and normalized to month boundaries
+        if start_date.tzinfo is None:
+            # If start_date is naive, make it timezone-aware
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        if end_date.tzinfo is None:
+            # If end_date is naive, make it timezone-aware  
+            end_date = end_date.replace(tzinfo=timezone.utc)
+            
+        # Normalize to first day of month with same timezone
+        current_date = start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end_date_month = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
-        # Add service-content watch times for this day (in minutes)
-        for service_type in service_totals.keys():
-            for content_type in service_content_totals[service_type].keys():
-                combination_key = f"{service_type}_{content_type}"
-                day_data[combination_key] = round(daily_data[current_date][service_type].get(content_type, 0), 1)
+        while current_date <= end_date_month:
+            month_key = current_date.strftime('%Y-%m')
+            month_label = current_date.strftime('%b %Y')
+            
+            period_data = {'date': month_key, 'label': month_label}
+            
+            # Add service-content watch times for this month (in minutes)
+            for service_type in service_totals.keys():
+                for content_type in service_content_totals[service_type].keys():
+                    combination_key = f"{service_type}_{content_type}"
+                    period_data[combination_key] = round(grouped_data[month_key][service_type].get(content_type, 0), 1)
+            
+            chart_data_list.append(period_data)
+            
+            # Move to next month
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1)
+                
+    elif grouping_type == 'weekly':
+        # Generate weekly periods
+        # Start from the Monday of the week containing start_date
+        # Ensure we're working with date objects consistently
+        start_date_only = start_date.date() if hasattr(start_date, 'date') else start_date
+        end_date_only = end_date.date() if hasattr(end_date, 'date') else end_date
         
-        chart_data_list.append(day_data)
-        current_date += timedelta(days=1)
+        days_since_monday = start_date_only.weekday()
+        current_week_start = start_date_only - timedelta(days=days_since_monday)
+        
+        while current_week_start <= end_date_only:
+            week_key = current_week_start.isoformat()
+            week_end = current_week_start + timedelta(days=6)
+            
+            # Create label for the week
+            if current_week_start.month == week_end.month:
+                week_label = f"{current_week_start.strftime('%b %d')}-{week_end.day}"
+            else:
+                week_label = f"{current_week_start.strftime('%b %d')}-{week_end.strftime('%b %d')}"
+            
+            period_data = {'date': week_key, 'label': week_label}
+            
+            # Add service-content watch times for this week (in minutes)
+            for service_type in service_totals.keys():
+                for content_type in service_content_totals[service_type].keys():
+                    combination_key = f"{service_type}_{content_type}"
+                    period_data[combination_key] = round(grouped_data[week_key][service_type].get(content_type, 0), 1)
+            
+            chart_data_list.append(period_data)
+            current_week_start += timedelta(days=7)
+            
+    else:  # daily
+        # Generate daily periods (existing logic)
+        # Ensure we're working with date objects consistently
+        start_date_only = start_date.date() if hasattr(start_date, 'date') else start_date
+        end_date_only = end_date.date() if hasattr(end_date, 'date') else end_date
+        
+        current_date = start_date_only
+        while current_date <= end_date_only:
+            day_key = current_date.isoformat()
+            day_label = current_date.strftime('%b %d')
+            
+            period_data = {'date': day_key, 'label': day_label}
+            
+            # Add service-content watch times for this day (in minutes)
+            for service_type in service_totals.keys():
+                for content_type in service_content_totals[service_type].keys():
+                    combination_key = f"{service_type}_{content_type}"
+                    period_data[combination_key] = round(grouped_data[day_key][service_type].get(content_type, 0), 1)
+            
+            chart_data_list.append(period_data)
+            current_date += timedelta(days=1)
     
     # Content type color mapping
     content_colors = {

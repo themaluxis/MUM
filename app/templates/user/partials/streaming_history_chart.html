@@ -165,17 +165,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             emptyChartData.push({
-                date: date.toISOString().split('T')[0]
+                date: date.toISOString().split('T')[0],
+                label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
             });
         }
         
         new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: emptyChartData.map(day => {
-                    const date = new Date(day.date);
-                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                }),
+                labels: emptyChartData.map(day => day.label),
                 datasets: []
             },
             options: {
@@ -283,9 +281,14 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: chartData.map(day => {
-                const date = new Date(day.date);
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            labels: chartData.map(period => {
+                // Use the label if available, otherwise format the date
+                if (period.label) {
+                    return period.label;
+                } else {
+                    const date = new Date(period.date);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }
             }),
             datasets: datasets
         },
@@ -310,12 +313,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     displayColors: true,
                     callbacks: {
                         title: function(context) {
-                            const date = new Date(chartData[context[0].dataIndex].date);
-                            return date.toLocaleDateString('en-US', { 
-                                weekday: 'long', 
-                                month: 'long', 
-                                day: 'numeric' 
-                            });
+                            const periodData = chartData[context[0].dataIndex];
+                            if (periodData.label) {
+                                // For grouped data, show the label
+                                return periodData.label;
+                            } else {
+                                // For daily data, show full date
+                                const date = new Date(periodData.date);
+                                return date.toLocaleDateString('en-US', { 
+                                    weekday: 'long', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                });
+                            }
                         },
                         label: function(context) {
                             const minutes = context.parsed.y;

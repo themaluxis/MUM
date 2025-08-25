@@ -126,6 +126,7 @@ def user_accounts():
 @bp.route('/account', methods=['GET', 'POST'])
 @login_required
 @setup_required
+@permission_required('manage_general_settings')
 def account():
     set_password_form = SetPasswordForm()
     change_password_form = ChangePasswordForm()
