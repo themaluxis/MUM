@@ -46,7 +46,7 @@
             <div class="flex flex-wrap gap-2 mt-4 justify-center">
                 {% for service in chart_data.services %}
                 <div class="flex items-center gap-2">
-                    <div class="w-4 h-4 rounded" style="background-color: {{ service.color }};"></div>
+                    <div class="w-4 h-4 rounded" style="background-color: var(--color-{{ service.type }});"></div>
                     <span class="text-sm">{{ service.name }} ({{ service.watch_time }})</span>
                 </div>
                 {% endfor %}
@@ -85,16 +85,43 @@
 document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('streamingHistoryChart').getContext('2d');
     
-    // Service color mapping (similar to Plex's style)
+    // Get service colors from CSS custom properties
+    const rootStyles = getComputedStyle(document.documentElement);
     const serviceColors = {
-        'plex': '#e5a00d',
-        'jellyfin': '#00a4dc', 
-        'emby': '#52b54b',
-        'kavita': '#f39c12',
-        'audiobookshelf': '#8b5cf6',
-        'komga': '#ef4444',
-        'romm': '#10b981'
+        'plex': rootStyles.getPropertyValue('--color-plex').trim(),
+        'jellyfin': rootStyles.getPropertyValue('--color-jellyfin').trim(),
+        'emby': rootStyles.getPropertyValue('--color-emby').trim(),
+        'kavita': rootStyles.getPropertyValue('--color-kavita').trim(),
+        'audiobookshelf': rootStyles.getPropertyValue('--color-audiobookshelf').trim(),
+        'komga': rootStyles.getPropertyValue('--color-komga').trim(),
+        'romm': rootStyles.getPropertyValue('--color-romm').trim()
     };
+    
+    // Convert OKLCH colors to hex for Chart.js compatibility
+    function oklchToHex(oklchValue) {
+        if (!oklchValue || oklchValue === '') {
+            return '#64748b'; // Fallback gray color
+        }
+        
+        // For now, provide fallback hex colors that match the OKLCH values
+        // This is a simplified approach - ideally you'd use a color conversion library
+        const colorMap = {
+            [rootStyles.getPropertyValue('--color-plex').trim()]: '#e5a00d',
+            [rootStyles.getPropertyValue('--color-jellyfin').trim()]: '#a855f7',
+            [rootStyles.getPropertyValue('--color-emby').trim()]: '#22c55e',
+            [rootStyles.getPropertyValue('--color-kavita').trim()]: '#06b6d4',
+            [rootStyles.getPropertyValue('--color-audiobookshelf').trim()]: '#8b5cf6',
+            [rootStyles.getPropertyValue('--color-komga').trim()]: '#f97316',
+            [rootStyles.getPropertyValue('--color-romm').trim()]: '#8b5cf6'
+        };
+        
+        return colorMap[oklchValue] || '#64748b';
+    }
+    
+    // Convert all service colors to hex
+    Object.keys(serviceColors).forEach(service => {
+        serviceColors[service] = oklchToHex(serviceColors[service]);
+    });
     
     // Chart data from backend
     const chartData = {{ chart_data.chart_data | tojson | safe }};

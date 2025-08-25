@@ -644,7 +644,7 @@ def process_invite_form(invite_path_or_token):
                 
                 # Generate headers like the sample code
                 app_name = Setting.get('APP_NAME', 'MUM')
-                client_id = f"MUM-App-v1-InvitePlexLink-{str(invite.id)[:8]}"
+                client_id = f"MUM-InvitePlexLink-{str(invite.id)[:8]}"
                 
                 # Step 1: Create PIN using direct API call
                 pin_response = requests.post(

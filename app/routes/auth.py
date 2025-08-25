@@ -138,7 +138,7 @@ def plex_sso_login_admin():
         
         # Generate headers like the sample code
         app_name = Setting.get('APP_NAME', 'MUM')
-        client_id = f"MUM-App-v1-AdminLogin"
+        client_id = f"MUM-AdminLogin"
         
         # Step 1: Create PIN using direct API call
         pin_response = requests.post(

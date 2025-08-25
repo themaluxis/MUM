@@ -42,7 +42,7 @@ class Config:
     # and stored in the database.
     # PLEX_CLIENT_ID: For Plex SSO - Plex uses 'Plex Web' as client ID or a custom one if they provide an API for it.
     # For the X-Plex-Client-Identifier, it's usually a unique ID you generate for your app.
-    PLEX_APP_CLIENT_IDENTIFIER = "MUM-App-v1" # Example, generate a UUID for uniqueness in production if needed
+    PLEX_APP_CLIENT_IDENTIFIER = "MUM" # Example, generate a UUID for uniqueness in production if needed
 
     # Flask-Login settings
     LOGIN_DISABLED_FOR_SETUP = False # This might be toggled dynamically
