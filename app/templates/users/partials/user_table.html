@@ -512,47 +512,129 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // This event listener ensures that the script runs only after the initial page load.
-        // For HTMX-loaded content, we need to handle events differently.
-    });
+    // Function to update select all checkbox state (tri-state)
+    function updateSelectAllState() {
+        const selectAllCheckbox = document.getElementById('select_all_users_table');
+        if (!selectAllCheckbox) return;
+        
+        const userCheckboxes = document.querySelectorAll('.user-select-checkbox');
+        const checkedCount = document.querySelectorAll('.user-select-checkbox:checked').length;
+        const totalCount = userCheckboxes.length;
+        
+        if (checkedCount === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+            selectAllCheckbox.parentElement.title = 'Select all visible';
+        } else if (checkedCount === totalCount) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+            selectAllCheckbox.parentElement.title = 'Unselect all';
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+            selectAllCheckbox.parentElement.title = `${checkedCount} of ${totalCount} selected - click to select all`;
+        }
+    }
 
-    // This is a global listener. It's better to attach it once.
-    // It will catch events from content loaded by HTMX.
-    document.body.addEventListener('htmx:afterSwap', function(event) {
-        // Re-initialize "Select All" checkbox logic for the new content
+    // Function to initialize tri-state checkbox functionality
+    function initializeTriStateCheckbox() {
+        // Re-initialize "Select All" checkbox logic
         const selectAllCheckbox = document.getElementById('select_all_users_table');
         if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', function() {
-                const isChecked = this.checked;
+            // Remove existing listeners to prevent duplicates
+            selectAllCheckbox.replaceWith(selectAllCheckbox.cloneNode(true));
+            const newSelectAllCheckbox = document.getElementById('select_all_users_table');
+            
+            // Track the previous state to handle tri-state logic correctly
+            let previousState = { checked: false, indeterminate: false };
+            
+            // Update previous state whenever the checkbox state changes
+            const updatePreviousState = () => {
+                previousState = {
+                    checked: newSelectAllCheckbox.checked,
+                    indeterminate: newSelectAllCheckbox.indeterminate
+                };
+            };
+            
+            // Initialize previous state
+            updatePreviousState();
+            
+            // Listen for state changes to update previous state
+            const observer = new MutationObserver(() => {
+                // Only update if this change wasn't from a user click
+                if (!newSelectAllCheckbox.dataset.userClick) {
+                    updatePreviousState();
+                }
+            });
+            observer.observe(newSelectAllCheckbox, { attributes: true, attributeFilter: ['checked'] });
+            
+            newSelectAllCheckbox.addEventListener('change', function() {
+                // Mark this as a user click
+                this.dataset.userClick = 'true';
+                
+                // Determine what action to take based on previous state
+                let shouldCheck;
+                if (previousState.indeterminate || !previousState.checked) {
+                    // Was indeterminate or unchecked -> select all
+                    shouldCheck = true;
+                } else {
+                    // Was checked -> unselect all
+                    shouldCheck = false;
+                }
+                
                 document.querySelectorAll('.user-select-checkbox').forEach(checkbox => {
-                    checkbox.checked = isChecked;
+                    checkbox.checked = shouldCheck;
                     updateRowSelection(checkbox);
                     // Trigger change event to ensure all handlers are called
-                    checkbox.dispatchEvent(new Event('change'));
+                    // Use bubbles: true to ensure the event delegation in the main file catches it
+                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
                 });
-                updateMassEditFormState(); 
+                
+                // Update the state after the change
+                updateSelectAllState();
+                
+                // Update previous state for next click
+                updatePreviousState();
+                
+                // Remove the user click marker
+                delete this.dataset.userClick;
+                
                 // Also trigger the global mass edit update
-                if (typeof updateMassEditFormState === 'function') {
-                    updateMassEditFormState();
+                if (typeof updateMassEditUI === 'function') {
+                    updateMassEditUI();
                 }
             });
         }
 
         // Re-initialize individual user selection checkboxes
         document.querySelectorAll('.user-select-checkbox').forEach(checkbox => {
+            // Remove existing listeners to prevent duplicates
+            checkbox.replaceWith(checkbox.cloneNode(true));
+        });
+        
+        document.querySelectorAll('.user-select-checkbox').forEach(checkbox => {
             checkbox.addEventListener('change', function() {
-                if (!this.checked) {
-                    if (selectAllCheckbox) selectAllCheckbox.checked = false;
-                }
+                updateSelectAllState();
                 updateRowSelection(this);
-                updateMassEditFormState();
-                // Also trigger the global mass edit update
-                if (typeof updateMassEditFormState === 'function') {
-                    updateMassEditFormState();
-                }
+                // The event will bubble up to the main file's event delegation listener
+                // which will handle updating selectedUserIds and calling updateMassEditUI()
             });
         });
+        
+        // Initialize the select all state
+        updateSelectAllState();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize tri-state functionality on initial page load
+        initializeTriStateCheckbox();
+    });
+
+    // This is a global listener. It's better to attach it once.
+    // It will catch events from content loaded by HTMX.
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        // Re-initialize tri-state functionality after HTMX content swap
+        initializeTriStateCheckbox();
     });
     
     // Add click-to-select functionality for table rows
@@ -572,7 +654,8 @@
             // Toggle the checkbox
             checkbox.checked = !checkbox.checked;
             // Trigger the change event to update everything
-            checkbox.dispatchEvent(new Event('change'));
+            // Use bubbles: true to ensure the event delegation in the main file catches it
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
         }
     });
     
