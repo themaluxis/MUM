@@ -85,8 +85,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('streamingHistoryChart').getContext('2d');
     
-    console.log('Chart data:', {{ chart_data | tojson | safe }});
-    
     // Service color mapping (similar to Plex's style)
     const serviceColors = {
         'plex': '#e5a00d',
@@ -102,9 +100,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const chartData = {{ chart_data.chart_data | tojson | safe }};
     const services = {{ chart_data.services | tojson | safe }};
     
-    console.log('Chart data array:', chartData);
-    console.log('Services array:', services);
-    
     // Create gradient backgrounds for bars
     const gradients = {};
     Object.keys(serviceColors).forEach(service => {
@@ -119,7 +114,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle empty data case
     if (!chartData || chartData.length === 0) {
-        console.log('No chart data available, creating empty chart');
         // Create empty chart with at least 7 days of data
         const today = new Date();
         const emptyChartData = [];
