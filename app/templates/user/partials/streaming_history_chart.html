@@ -103,8 +103,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return '#64748b'; // Fallback gray color
         }
         
-        // For now, provide fallback hex colors that match the OKLCH values
-        // This is a simplified approach - ideally you'd use a color conversion library
         const colorMap = {
             [rootStyles.getPropertyValue('--color-plex').trim()]: '#e5a00d',
             [rootStyles.getPropertyValue('--color-jellyfin').trim()]: '#a855f7',
@@ -123,17 +121,36 @@ document.addEventListener('DOMContentLoaded', function() {
         serviceColors[service] = oklchToHex(serviceColors[service]);
     });
     
+    // Content type color mapping for stacking within service bars
+    const contentColors = {{ chart_data.content_colors | tojson | safe }};
+    
     // Chart data from backend
     const chartData = {{ chart_data.chart_data | tojson | safe }};
     const services = {{ chart_data.services | tojson | safe }};
+    const serviceCombinations = {{ chart_data.service_content_combinations | tojson | safe }};
     
-    // Create gradient backgrounds for bars
+    // Create gradient backgrounds for bars using service colors with content type variations
     const gradients = {};
-    Object.keys(serviceColors).forEach(service => {
+    const contentOpacities = {
+        'movies': 'FF',      // 100% opacity
+        'tv_shows': 'CC',    // 80% opacity  
+        'music': 'AA',       // 67% opacity
+        'books': '88',       // 53% opacity
+        'comics': '66',      // 40% opacity
+        'games': '44',       // 27% opacity
+        'mixed': '33',       // 20% opacity
+        'unknown': '22'      // 13% opacity
+    };
+    
+    serviceCombinations.forEach(combination => {
+        const [serviceType, contentType] = combination.split('_');
+        const baseColor = serviceColors[serviceType] || '#64748b';
+        const opacity = contentOpacities[contentType] || 'FF';
+        
         const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-        gradient.addColorStop(0, serviceColors[service] + 'CC'); // 80% opacity
-        gradient.addColorStop(1, serviceColors[service] + '66'); // 40% opacity
-        gradients[service] = gradient;
+        gradient.addColorStop(0, baseColor + opacity); // Service color with content opacity
+        gradient.addColorStop(1, baseColor + '66'); // Fade to 40% opacity
+        gradients[combination] = gradient;
     });
     
     // Prepare datasets for Chart.js
@@ -196,15 +213,55 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    services.forEach(service => {
+    // Create datasets for each service-content combination (for stacking)
+    // Group combinations by service to determine which are first/last for proper rounding
+    const serviceGroups = {};
+    serviceCombinations.forEach(combination => {
+        const [serviceType, contentType] = combination.split('_');
+        if (!serviceGroups[serviceType]) {
+            serviceGroups[serviceType] = [];
+        }
+        serviceGroups[serviceType].push(combination);
+    });
+    
+    serviceCombinations.forEach((combination, index) => {
+        const [serviceType, contentType] = combination.split('_');
+        const service = services.find(s => s.type === serviceType);
+        const contentDisplayName = contentType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const serviceColor = serviceColors[serviceType] || '#64748b';
+        
+        // Determine if this is the first or last segment in the service stack
+        const serviceCombs = serviceGroups[serviceType];
+        const isFirst = serviceCombs.indexOf(combination) === 0;
+        const isLast = serviceCombs.indexOf(combination) === serviceCombs.length - 1;
+        
+        // Set border radius based on position in stack
+        let borderRadius = 4;
+        if (serviceCombs.length > 1) {
+            if (isFirst && isLast) {
+                // Single segment - round all corners
+                borderRadius = 4;
+            } else if (isFirst) {
+                // Bottom segment - round bottom corners only
+                borderRadius = { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 };
+            } else if (isLast) {
+                // Top segment - round top corners only
+                borderRadius = { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 };
+            } else {
+                // Middle segment - no rounding
+                borderRadius = 0;
+            }
+        }
+        
         datasets.push({
-            label: service.name,
-            data: chartData.map(day => day[service.type] || 0),
-            backgroundColor: gradients[service.type] || serviceColors[service.type] || '#64748b',
-            borderColor: serviceColors[service.type] || '#64748b',
+            label: `${service ? service.name : serviceType} - ${contentDisplayName}`,
+            data: chartData.map(day => day[combination] || 0),
+            backgroundColor: gradients[combination] || serviceColor,
+            borderColor: serviceColor,
             borderWidth: 1,
-            borderRadius: 4,
+            borderRadius: borderRadius,
             borderSkipped: false,
+            stack: serviceType, // Stack by service type
         });
     });
     
@@ -277,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             scales: {
                 x: {
-                    stacked: false,
+                    stacked: true,
                     grid: {
                         display: false
                     },
@@ -289,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 },
                 y: {
-                    stacked: false,
+                    stacked: true,
                     beginAtZero: true,
                     grid: {
                         color: 'rgba(156, 163, 175, 0.2)',

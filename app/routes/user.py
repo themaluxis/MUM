@@ -68,8 +68,9 @@ def _generate_streaming_chart_data(user, days=30):
         'romm': '#10b981'
     }
     
-    # Group data by date and service (using watch time in minutes)
-    daily_data = defaultdict(lambda: defaultdict(int))
+    # Group data by date, service, and content type (using watch time in minutes)
+    daily_data = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))  # [date][service][content_type]
+    service_content_totals = defaultdict(lambda: defaultdict(int))  # [service][content_type]
     service_totals = defaultdict(int)  # Total watch time per service
     service_counts = defaultdict(int)  # Stream counts per service
     total_duration_seconds = 0
@@ -85,6 +86,35 @@ def _generate_streaming_chart_data(user, days=30):
             if service_access and service_access.server:
                 service_type = service_access.server.service_type.value
         
+        # Determine content type based on media_type or service type
+        content_type = 'mixed'
+        if entry.media_type:
+            media_type = entry.media_type.lower()
+            if media_type in ['movie', 'film']:
+                content_type = 'movies'
+            elif media_type in ['episode', 'show', 'series']:
+                content_type = 'tv_shows'
+            elif media_type in ['track', 'song', 'album']:
+                content_type = 'music'
+            elif media_type in ['book', 'audiobook']:
+                content_type = 'books'
+            elif media_type in ['comic', 'manga']:
+                content_type = 'comics'
+            else:
+                content_type = media_type
+        else:
+            # Fallback to service-based categorization
+            if service_type == 'kavita':
+                content_type = 'comics'
+            elif service_type == 'audiobookshelf':
+                content_type = 'books'
+            elif service_type == 'komga':
+                content_type = 'comics'
+            elif service_type == 'romm':
+                content_type = 'games'
+            else:
+                content_type = 'mixed'
+        
         # Get duration in minutes for the chart
         duration_minutes = 0
         if entry.duration_seconds and entry.duration_seconds > 0:
@@ -94,8 +124,9 @@ def _generate_streaming_chart_data(user, days=30):
             # If no duration, use a small default value so streams show up on the chart
             duration_minutes = 1  # 1 minute minimum to show activity
         
-        # Add watch time per day per service (in minutes)
-        daily_data[entry_date][service_type] += duration_minutes
+        # Add watch time per day per service per content type (in minutes)
+        daily_data[entry_date][service_type][content_type] += duration_minutes
+        service_content_totals[service_type][content_type] += duration_minutes
         service_totals[service_type] += duration_minutes
         service_counts[service_type] += 1
     
@@ -103,25 +134,49 @@ def _generate_streaming_chart_data(user, days=30):
     chart_data_list = []
     current_date = start_date.date()
     
+    # Create datasets for each service-content combination
+    service_content_combinations = []
+    for service_type in service_totals.keys():
+        for content_type in service_content_totals[service_type].keys():
+            service_content_combinations.append(f"{service_type}_{content_type}")
+    
     while current_date <= end_date.date():
         day_data = {'date': current_date.isoformat()}
         
-        # Add service watch times for this day (in minutes)
+        # Add service-content watch times for this day (in minutes)
         for service_type in service_totals.keys():
-            day_data[service_type] = round(daily_data[current_date].get(service_type, 0), 1)
+            for content_type in service_content_totals[service_type].keys():
+                combination_key = f"{service_type}_{content_type}"
+                day_data[combination_key] = round(daily_data[current_date][service_type].get(content_type, 0), 1)
         
         chart_data_list.append(day_data)
         current_date += timedelta(days=1)
     
-    # Prepare service information for legend
+    # Content type color mapping
+    content_colors = {
+        'movies': '#ef4444',      # Red
+        'tv_shows': '#3b82f6',    # Blue  
+        'music': '#10b981',       # Green
+        'books': '#f59e0b',       # Amber
+        'comics': '#8b5cf6',      # Purple
+        'games': '#06b6d4',       # Cyan
+        'mixed': '#6b7280',       # Gray
+        'unknown': '#64748b'      # Slate
+    }
+    
+    # Prepare service information for legend (with content breakdown)
     services = []
     for service_type, total_minutes in service_totals.items():
+        # Get service colors from the original mapping
+        service_color = service_colors.get(service_type, '#64748b')
+        
         services.append({
             'type': service_type,
             'name': service_type.title(),
             'watch_time': format_duration(total_minutes * 60),  # Convert back to seconds for formatting
             'count': service_counts[service_type],
-            'color': service_colors.get(service_type, '#64748b')
+            'color': service_color,
+            'content_breakdown': service_content_totals[service_type]
         })
     
     # Sort services by watch time (descending)
@@ -135,6 +190,8 @@ def _generate_streaming_chart_data(user, days=30):
     return {
         'chart_data': chart_data_list,
         'services': services,
+        'service_content_combinations': service_content_combinations,
+        'content_colors': content_colors,
         'total_streams': total_streams,
         'total_duration': total_duration_formatted,
         'most_active_service': most_active_service,
