@@ -238,13 +238,9 @@
                 <i class="fa-solid fa-trash mr-0 sm:mr-2"></i>
                 <span class="hidden sm:inline-block">Delete Selected</span>
             </button>
-            <button type="button" class="btn btn-secondary" id="select_all_visible_button" title="Select all users currently visible">
-                <i class="fa-solid fa-check-square mr-0 sm:mr-2"></i>
-                <span class="hidden sm:inline-block">Select All</span>
-            </button>
-            <button type="button" class="btn btn-secondary" id="deselect_all_visible_button" title="Deselect all users">
-                <i class="fa-solid fa-square mr-0 sm:mr-2"></i>
-                <span class="hidden sm:inline-block">Deselect All</span>
+            <button type="button" class="btn btn-secondary" id="tri_state_select_button" title="Select all users currently visible">
+                <i class="fa-solid fa-square mr-0 sm:mr-2" id="tri_state_icon"></i>
+                <span class="hidden sm:inline-block" id="tri_state_text">Select All</span>
             </button>
         </div>
     </div>
@@ -951,6 +947,7 @@
             columnSelectorContainer.classList.add('hidden');
         }
         updateMassEditUI();
+        updateTriStateButton();
     }
 
     // Functions to show/hide sync loading state
@@ -1041,6 +1038,7 @@
                         }
                     }
                     updateMassEditUI();
+                    updateTriStateButton();
                 }
             });
             userListContainer.addEventListener('click', function(event) {
@@ -1055,27 +1053,63 @@
             });
         }
         
-        // Listeners for buttons outside the swap area
-        const selectAllVisibleBtn = document.getElementById('select_all_visible_button');
-        if (selectAllVisibleBtn) {
-            selectAllVisibleBtn.onclick = function() {
-                document.querySelectorAll('#user-list-container .user-select-checkbox').forEach(cb => {
-                    if (!cb.checked) {
-                        cb.checked = true;
-                        cb.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                });
-            };
+        // Function to update tri-state button appearance
+        function updateTriStateButton() {
+            const triStateBtn = document.getElementById('tri_state_select_button');
+            const triStateIcon = document.getElementById('tri_state_icon');
+            const triStateText = document.getElementById('tri_state_text');
+            
+            if (!triStateBtn || !triStateIcon || !triStateText) return;
+            
+            const checkboxes = document.querySelectorAll('#user-list-container .user-select-checkbox');
+            const checkedCount = document.querySelectorAll('#user-list-container .user-select-checkbox:checked').length;
+            const totalCount = checkboxes.length;
+            
+            if (checkedCount === 0) {
+                // No items selected - empty state
+                triStateIcon.className = 'fa-solid fa-square mr-0 sm:mr-2';
+                triStateText.textContent = 'Select All';
+                triStateBtn.title = 'Select all users currently visible';
+                triStateBtn.dataset.state = 'none';
+            } else if (checkedCount === totalCount) {
+                // All items selected - full state
+                triStateIcon.className = 'fa-solid fa-check-square mr-0 sm:mr-2';
+                triStateText.textContent = 'Unselect All';
+                triStateBtn.title = 'Unselect all users';
+                triStateBtn.dataset.state = 'all';
+            } else {
+                // Some items selected - indeterminate state
+                triStateIcon.className = 'fa-solid fa-minus-square mr-0 sm:mr-2';
+                triStateText.textContent = 'Select All';
+                triStateBtn.title = `${checkedCount} of ${totalCount} selected - click to select all`;
+                triStateBtn.dataset.state = 'some';
+            }
         }
-        const deselectAllVisibleBtn = document.getElementById('deselect_all_visible_button');
-        if (deselectAllVisibleBtn) {
-            deselectAllVisibleBtn.onclick = function() {
-                document.querySelectorAll('#user-list-container .user-select-checkbox').forEach(cb => {
-                    if (cb.checked) {
-                        cb.checked = false;
-                        cb.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                });
+        
+        // Tri-state select button listener
+        const triStateBtn = document.getElementById('tri_state_select_button');
+        if (triStateBtn) {
+            triStateBtn.onclick = function() {
+                const currentState = this.dataset.state;
+                const checkboxes = document.querySelectorAll('#user-list-container .user-select-checkbox');
+                
+                if (currentState === 'all') {
+                    // All selected -> Unselect all
+                    checkboxes.forEach(cb => {
+                        if (cb.checked) {
+                            cb.checked = false;
+                            cb.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    });
+                } else {
+                    // None or some selected -> Select all
+                    checkboxes.forEach(cb => {
+                        if (!cb.checked) {
+                            cb.checked = true;
+                            cb.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    });
+                }
             };
         }
 
