@@ -86,6 +86,7 @@ def monitor_media_sessions_task():
                             final_duration = history_record.view_offset_at_end_seconds
                             history_record.duration_seconds = final_duration if final_duration and final_duration > 0 else 0
                             history_record.stopped_at = now_utc
+                            current_app.logger.info(f"DURATION DEBUG: Session {session_key} stopped - view_offset_at_end_seconds: {history_record.view_offset_at_end_seconds}s, final duration_seconds: {history_record.duration_seconds}s")
                             current_app.logger.info(f"Marked session {session_key} (DB ID: {stream_history_id}) as stopped. Final duration: {history_record.duration_seconds}s.")
                         else:
                             current_app.logger.warning(f"Could not find or already stopped history record for DB ID {stream_history_id}")

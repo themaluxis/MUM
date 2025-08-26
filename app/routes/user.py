@@ -41,6 +41,9 @@ def _generate_streaming_chart_data(user, days=30):
         start_date = end_date - timedelta(days=days-1)
     
     # Get streaming history for this user
+    current_app.logger.info(f"CHART DATA DEBUG: Querying MediaStreamHistory for user_app_access_uuid={user.uuid}")
+    current_app.logger.info(f"CHART DATA DEBUG: Date range: {start_date} to {end_date}")
+    
     history_query = MediaStreamHistory.query.filter(
         MediaStreamHistory.user_app_access_uuid == user.uuid,
         MediaStreamHistory.started_at >= start_date,
@@ -49,7 +52,19 @@ def _generate_streaming_chart_data(user, days=30):
     
     streaming_history = history_query.all()
     
+    current_app.logger.info(f"CHART DATA DEBUG: Found {len(streaming_history)} streaming history records")
+    
+    # Log sample records for debugging
+    if streaming_history:
+        current_app.logger.info(f"CHART DATA DEBUG: Sample records (first 3):")
+        for i, record in enumerate(streaming_history[:3]):
+            current_app.logger.info(f"CHART DATA DEBUG: Record {i+1}: {record.media_title} at {record.started_at}")
+            current_app.logger.info(f"CHART DATA DEBUG:   - Duration: {record.duration_seconds}s, Media Type: {record.media_type}")
+            current_app.logger.info(f"CHART DATA DEBUG:   - User Media Access UUID: {record.user_media_access_uuid}")
+            current_app.logger.info(f"CHART DATA DEBUG:   - User App Access UUID: {record.user_app_access_uuid}")
+    
     if not streaming_history:
+        current_app.logger.info("CHART DATA DEBUG: No streaming history found, returning empty chart data")
         # Return empty chart data structure instead of None
         return {
             'chart_data': [],
@@ -98,7 +113,9 @@ def _generate_streaming_chart_data(user, days=30):
     service_counts = defaultdict(int)  # Stream counts per service
     total_duration_seconds = 0
     
-    for entry in streaming_history:
+    current_app.logger.info(f"CHART DATA DEBUG: Processing {len(streaming_history)} streaming records...")
+    
+    for i, entry in enumerate(streaming_history):
         # Get the date (without time)
         entry_date = entry.started_at.date()
         
@@ -120,6 +137,14 @@ def _generate_streaming_chart_data(user, days=30):
             service_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
             if service_access and service_access.server:
                 service_type = service_access.server.service_type.value
+                if i < 5:  # Only log first 5 records to avoid spam
+                    current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - Found service: {service_type} ({service_access.server.server_nickname})")
+            else:
+                if i < 5:
+                    current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No service access found for user_media_access_uuid: {entry.user_media_access_uuid}")
+        else:
+            if i < 5:
+                current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No user_media_access_uuid")
         
         # Determine content type based on media_type or service type
         content_type = 'mixed'
@@ -153,11 +178,25 @@ def _generate_streaming_chart_data(user, days=30):
         # Get duration in minutes for the chart
         duration_minutes = 0
         if entry.duration_seconds and entry.duration_seconds > 0:
+            # Completed session - use real final duration
             duration_minutes = entry.duration_seconds / 60  # Convert to minutes
             total_duration_seconds += entry.duration_seconds
+            if i < 5:
+                current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - Completed session duration: {entry.duration_seconds}s ({duration_minutes:.1f}m)")
+        elif entry.view_offset_at_end_seconds and entry.view_offset_at_end_seconds > 0:
+            # Active/recent session - use current progress as estimated duration
+            duration_minutes = entry.view_offset_at_end_seconds / 60  # Convert to minutes
+            total_duration_seconds += entry.view_offset_at_end_seconds  # Add estimated time to total
+            if i < 5:
+                current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - Active session estimated duration: {entry.view_offset_at_end_seconds}s ({duration_minutes:.1f}m)")
         else:
-            # If no duration, use a small default value so streams show up on the chart
+            # No data available - use small default value so streams show up on the chart
             duration_minutes = 1  # 1 minute minimum to show activity
+            if i < 5:
+                current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No duration or progress data, using 1m default")
+        
+        if i < 5:
+            current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - Final: {service_type}_{content_type} = {duration_minutes:.1f}m on {group_key}")
         
         # Add watch time per group per service per content type (in minutes)
         grouped_data[group_key][service_type][content_type] += duration_minutes
@@ -297,6 +336,31 @@ def _generate_streaming_chart_data(user, days=30):
     most_active_service = services[0]['name'] if services else 'None'
     total_duration_formatted = format_duration(total_duration_seconds)
     
+    # Final debugging output
+    current_app.logger.info(f"CHART DATA DEBUG: === FINAL AGGREGATED DATA ===")
+    current_app.logger.info(f"CHART DATA DEBUG: Service totals: {dict(service_totals)}")
+    current_app.logger.info(f"CHART DATA DEBUG: Service counts: {dict(service_counts)}")
+    current_app.logger.info(f"CHART DATA DEBUG: Total duration seconds: {total_duration_seconds}")
+    current_app.logger.info(f"CHART DATA DEBUG: Total streams: {total_streams}")
+    current_app.logger.info(f"CHART DATA DEBUG: Chart data points generated: {len(chart_data_list)}")
+    
+    # Count different types of sessions for debugging
+    completed_sessions = sum(1 for entry in streaming_history if entry.duration_seconds and entry.duration_seconds > 0)
+    active_sessions = sum(1 for entry in streaming_history if not (entry.duration_seconds and entry.duration_seconds > 0) and entry.view_offset_at_end_seconds and entry.view_offset_at_end_seconds > 0)
+    fallback_sessions = len(streaming_history) - completed_sessions - active_sessions
+    
+    current_app.logger.info(f"CHART DATA DEBUG: Session breakdown:")
+    current_app.logger.info(f"CHART DATA DEBUG: - Completed sessions (final duration): {completed_sessions}")
+    current_app.logger.info(f"CHART DATA DEBUG: - Active sessions (estimated duration): {active_sessions}")
+    current_app.logger.info(f"CHART DATA DEBUG: - Fallback sessions (1m default): {fallback_sessions}")
+    
+    # Log grouped data summary
+    current_app.logger.info(f"CHART DATA DEBUG: Grouped data summary:")
+    for date_key, services_data in list(grouped_data.items())[:3]:  # First 3 dates
+        current_app.logger.info(f"CHART DATA DEBUG: Date {date_key}: {dict(services_data)}")
+    
+    current_app.logger.info(f"CHART DATA DEBUG: === END FINAL DATA ===")
+    
     return {
         'chart_data': chart_data_list,
         'services': services,
@@ -366,11 +430,37 @@ def index():
     # Generate streaming history chart data
     chart_data = _generate_streaming_chart_data(current_user, days)
     
-    # Debug logging (simplified)
-    if chart_data and chart_data.get('services'):
-        current_app.logger.info(f"Chart generated: {len(chart_data['services'])} services, {chart_data['total_streams']} streams")
+    # Enhanced debug logging for chart data
+    current_app.logger.info(f"=== CHART DEBUG: User Dashboard Chart Data Generation ===")
+    current_app.logger.info(f"CHART DEBUG: User UUID: {current_user.uuid}")
+    current_app.logger.info(f"CHART DEBUG: Days parameter: {days}")
+    
+    if chart_data:
+        current_app.logger.info(f"CHART DEBUG: Chart data generated successfully")
+        current_app.logger.info(f"CHART DEBUG: Total services: {len(chart_data.get('services', []))}")
+        current_app.logger.info(f"CHART DEBUG: Total streams: {chart_data.get('total_streams', 0)}")
+        current_app.logger.info(f"CHART DEBUG: Total duration: {chart_data.get('total_duration', '0m')}")
+        current_app.logger.info(f"CHART DEBUG: Most active service: {chart_data.get('most_active_service', 'None')}")
+        current_app.logger.info(f"CHART DEBUG: Chart data points: {len(chart_data.get('chart_data', []))}")
+        
+        # Log detailed service information
+        for i, service in enumerate(chart_data.get('services', [])):
+            current_app.logger.info(f"CHART DEBUG: Service {i+1}: {service.get('name')} ({service.get('type')}) - {service.get('watch_time')} - {service.get('count')} streams")
+        
+        # Log sample chart data points
+        chart_data_list = chart_data.get('chart_data', [])
+        current_app.logger.info(f"CHART DEBUG: Sample chart data points (first 5):")
+        for i, point in enumerate(chart_data_list[:5]):
+            current_app.logger.info(f"CHART DEBUG: Point {i+1}: {point}")
+        
+        # Log service-content combinations
+        combinations = chart_data.get('service_content_combinations', [])
+        current_app.logger.info(f"CHART DEBUG: Service-content combinations: {combinations}")
+        
     else:
-        current_app.logger.info("Chart generated: No data available")
+        current_app.logger.info("CHART DEBUG: No chart data generated")
+    
+    current_app.logger.info(f"=== END CHART DEBUG ===")
     
     return render_template('user/index.html', 
                          title="Dashboard", 

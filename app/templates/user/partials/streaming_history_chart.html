@@ -329,6 +329,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         label: function(context) {
                             const minutes = context.parsed.y;
+                            // Don't show tooltip entries for 0 minutes
+                            if (minutes === 0) {
+                                return null;
+                            }
                             const service = context.dataset.label;
                             return `${service}: ${formatMinutes(minutes)}`;
                         },
