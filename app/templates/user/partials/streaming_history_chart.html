@@ -130,14 +130,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return `#${(newR << 16 | newG << 8 | newB).toString(16).padStart(6, '0')}`;
     }
 
-    // Convert all service colors to hex and create a darker version for hover
+    // Convert all service colors to hex (no darkening for hover)
     const serviceHexColors = {};
-    const hoverHexColors = {};
     Object.keys(serviceColors).forEach(service => {
         const hex = oklchToHex(serviceColors[service]);
         serviceHexColors[service] = hex;
-        // Darken the color by a fixed amount (e.g., 50)
-        hoverHexColors[service] = darkenHexColor(hex, 50); 
     });
     
     // Content type color mapping for stacking within service bars
@@ -163,7 +160,6 @@ document.addEventListener('DOMContentLoaded', function() {
     serviceCombinations.forEach(combination => {
         const [serviceType, contentType] = combination.split('_');
         const baseColor = serviceHexColors[serviceType] || '#64748b';
-        const hoverColor = hoverHexColors[serviceType] || '#64748b';
         const opacity = contentOpacities[contentType] || 0.30;
         
         // Convert hex to rgba for opacity
@@ -176,8 +172,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         segmentColors[combination] = hexToRgba(baseColor, opacity);
         segmentBorderColors[combination] = hexToRgba(baseColor, opacity);
-        segmentHoverColors[combination] = hexToRgba(hoverColor, 0.9); // Use a higher opacity for the hover state
-        segmentHoverBorderColors[combination] = hexToRgba(hoverColor, 0.9);
+        segmentHoverColors[combination] = hexToRgba(baseColor, 1.0); // 100% opacity for hover state
+        segmentHoverBorderColors[combination] = hexToRgba(baseColor, 1.0);
     });
     
     // Prepare datasets for Chart.js
@@ -375,9 +371,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         labelColor: function(context) {
                             const combination = context.dataset._segmentId;
+                            const [serviceType, contentType] = combination.split('_');
+                            const solidColor = serviceHexColors[serviceType] || '#64748b';
                             return {
-                                backgroundColor: segmentColors[combination],
-                                borderColor: segmentBorderColors[combination],
+                                backgroundColor: solidColor,
+                                borderColor: solidColor,
                             };
                         },
                         footer: function(context) {
