@@ -1,6 +1,6 @@
 import os
 from app import create_app, db
-from app.models import Setting, AdminAccount # Import models that might be needed for initial checks or commands
+from app.models import Setting, Owner # Import models that might be needed for initial checks or commands
 from flask_migrate import Migrate
 
 # Determine if the app is running inside Docker
@@ -22,9 +22,10 @@ def make_shell_context():
     return {
         'db': db,
         'Setting': Setting,
-        'AdminAccount': AdminAccount,
+        'Owner': Owner,
         # Add other models here as you create them and find them useful in the shell
-        # 'User': User,
+        # 'AppUser': AppUser,
+        # 'ServiceAccount': ServiceAccount,
         # 'Invite': Invite,
     }
 

@@ -115,10 +115,29 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return colorMap[oklchValue] || '#64748b';
     }
-    
-    // Convert all service colors to hex
+
+    // Helper function to darken a hex color
+    function darkenHexColor(hex, amount) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = (num >> 16) - amount;
+        const g = (num >> 8 & 0x00FF) - amount;
+        const b = (num & 0x0000FF) - amount;
+
+        const newR = Math.max(0, r);
+        const newG = Math.max(0, g);
+        const newB = Math.max(0, b);
+        
+        return `#${(newR << 16 | newG << 8 | newB).toString(16).padStart(6, '0')}`;
+    }
+
+    // Convert all service colors to hex and create a darker version for hover
+    const serviceHexColors = {};
+    const hoverHexColors = {};
     Object.keys(serviceColors).forEach(service => {
-        serviceColors[service] = oklchToHex(serviceColors[service]);
+        const hex = oklchToHex(serviceColors[service]);
+        serviceHexColors[service] = hex;
+        // Darken the color by a fixed amount (e.g., 50)
+        hoverHexColors[service] = darkenHexColor(hex, 50); 
     });
     
     // Content type color mapping for stacking within service bars
@@ -129,36 +148,43 @@ document.addEventListener('DOMContentLoaded', function() {
     const services = {{ chart_data.services | tojson | safe }};
     const serviceCombinations = {{ chart_data.service_content_combinations | tojson | safe }};
     
-    // Create gradient backgrounds for bars using service colors with content type variations
-    const gradients = {};
+    // Create consistent light service colors with 30% opacity for all content types
     const contentOpacities = {
-        'movies': 'FF',      // 100% opacity
-        'tv_shows': 'CC',    // 80% opacity  
-        'music': 'AA',       // 67% opacity
-        'books': '88',       // 53% opacity
-        'comics': '66',      // 40% opacity
-        'games': '44',       // 27% opacity
-        'mixed': '33',       // 20% opacity
-        'unknown': '22'      // 13% opacity
+        'movies': 0.30, 'tv_shows': 0.30, 'music': 0.30, 'books': 0.30,
+        'comics': 0.30, 'games': 0.30, 'mixed': 0.30, 'unknown': 0.30
     };
     
+    // Store colors for each combination (solid colors with opacity)
+    const segmentColors = {};
+    const segmentBorderColors = {};
+    const segmentHoverColors = {};
+    const segmentHoverBorderColors = {};
+
     serviceCombinations.forEach(combination => {
         const [serviceType, contentType] = combination.split('_');
-        const baseColor = serviceColors[serviceType] || '#64748b';
-        const opacity = contentOpacities[contentType] || 'FF';
+        const baseColor = serviceHexColors[serviceType] || '#64748b';
+        const hoverColor = hoverHexColors[serviceType] || '#64748b';
+        const opacity = contentOpacities[contentType] || 0.30;
         
-        const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-        gradient.addColorStop(0, baseColor + opacity); // Service color with content opacity
-        gradient.addColorStop(1, baseColor + '66'); // Fade to 40% opacity
-        gradients[combination] = gradient;
+        // Convert hex to rgba for opacity
+        const hexToRgba = (hex, alpha) => {
+            const r = parseInt(hex.substr(1, 2), 16);
+            const g = parseInt(hex.substr(3, 2), 16);
+            const b = parseInt(hex.substr(5, 2), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        };
+        
+        segmentColors[combination] = hexToRgba(baseColor, opacity);
+        segmentBorderColors[combination] = hexToRgba(baseColor, opacity);
+        segmentHoverColors[combination] = hexToRgba(hoverColor, 0.9); // Use a higher opacity for the hover state
+        segmentHoverBorderColors[combination] = hexToRgba(hoverColor, 0.9);
     });
     
     // Prepare datasets for Chart.js
     const datasets = [];
     
-    // Handle empty data case
+    // Handle empty data case (existing code)
     if (!chartData || chartData.length === 0) {
-        // Create empty chart with at least 7 days of data
         const today = new Date();
         const emptyChartData = [];
         for (let i = 6; i >= 0; i--) {
@@ -202,7 +228,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             font: { size: 11 },
                             callback: function(value) {
                                 return value === 0 ? '0m' : value + 'm';
-                            }
+                            },
+                            autoSkip: true,
+                            maxTicksLimit: 10
                         }
                     }
                 }
@@ -212,7 +240,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Create datasets for each service-content combination (for stacking)
-    // Group combinations by service to determine which are first/last for proper rounding
     const serviceGroups = {};
     serviceCombinations.forEach(combination => {
         const [serviceType, contentType] = combination.split('_');
@@ -226,27 +253,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const [serviceType, contentType] = combination.split('_');
         const service = services.find(s => s.type === serviceType);
         const contentDisplayName = contentType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-        const serviceColor = serviceColors[serviceType] || '#64748b';
         
-        // Determine if this is the first or last segment in the service stack
         const serviceCombs = serviceGroups[serviceType];
         const isFirst = serviceCombs.indexOf(combination) === 0;
         const isLast = serviceCombs.indexOf(combination) === serviceCombs.length - 1;
         
-        // Set border radius based on position in stack
         let borderRadius = 4;
         if (serviceCombs.length > 1) {
             if (isFirst && isLast) {
-                // Single segment - round all corners
                 borderRadius = 4;
             } else if (isFirst) {
-                // Bottom segment - round bottom corners only
                 borderRadius = { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 };
             } else if (isLast) {
-                // Top segment - round top corners only
                 borderRadius = { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 };
             } else {
-                // Middle segment - no rounding
                 borderRadius = 0;
             }
         }
@@ -254,16 +274,18 @@ document.addEventListener('DOMContentLoaded', function() {
         datasets.push({
             label: `${service ? service.name : serviceType} - ${contentDisplayName}`,
             data: chartData.map(day => day[combination] || 0),
-            backgroundColor: gradients[combination] || serviceColor,
-            borderColor: serviceColor,
+            backgroundColor: segmentColors[combination],
+            borderColor: segmentBorderColors[combination],
+            // Removed hoverBackgroundColor and hoverBorderColor from here
             borderWidth: 1,
             borderRadius: borderRadius,
             borderSkipped: false,
-            stack: serviceType, // Stack by service type
+            stack: serviceType,
+            _segmentId: combination // Store original combination for easy lookup
         });
     });
     
-    // Helper function to format minutes to readable time
+    // Helper function to format minutes to readable time (existing code)
     function formatMinutes(minutes) {
         if (minutes < 60) {
             return Math.round(minutes) + 'm';
@@ -278,11 +300,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: chartData.map(period => {
-                // Use the label if available, otherwise format the date
                 if (period.label) {
                     return period.label;
                 } else {
@@ -295,14 +316,41 @@ document.addEventListener('DOMContentLoaded', function() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onHover: (event, activeElements, chart) => {
+                // Reset all colors first
+                chart.data.datasets.forEach(dataset => {
+                    const combination = dataset._segmentId;
+                    for (let i = 0; i < dataset.data.length; i++) {
+                        dataset.backgroundColor[i] = segmentColors[combination];
+                        dataset.borderColor[i] = segmentBorderColors[combination];
+                    }
+                });
+
+                // Apply hover color to the active element
+                if (activeElements.length > 0) {
+                    const { datasetIndex, index } = activeElements[0].element.$context;
+                    const dataset = chart.data.datasets[datasetIndex];
+                    const combination = dataset._segmentId;
+
+                    // Ensure backgroundColor and borderColor are arrays for individual styling
+                    if (!Array.isArray(dataset.backgroundColor)) {
+                        dataset.backgroundColor = new Array(dataset.data.length).fill(segmentColors[combination]);
+                    }
+                    if (!Array.isArray(dataset.borderColor)) {
+                        dataset.borderColor = new Array(dataset.data.length).fill(segmentBorderColors[combination]);
+                    }
+
+                    dataset.backgroundColor[index] = segmentHoverColors[combination];
+                    dataset.borderColor[index] = segmentHoverBorderColors[combination];
+                }
+                chart.update(); // Update the chart to reflect color changes
+            },
             interaction: {
-                mode: 'index',
-                intersect: false,
+                mode: 'nearest',
+                intersect: true,
             },
             plugins: {
-                legend: {
-                    display: false // We use custom legend below
-                },
+                legend: { display: false },
                 tooltip: {
                     backgroundColor: 'rgba(0, 0, 0, 0.8)',
                     titleColor: '#fff',
@@ -315,32 +363,35 @@ document.addEventListener('DOMContentLoaded', function() {
                         title: function(context) {
                             const periodData = chartData[context[0].dataIndex];
                             if (periodData.label) {
-                                // For grouped data, show the label
                                 return periodData.label;
                             } else {
-                                // For daily data, show full date
                                 const date = new Date(periodData.date);
-                                return date.toLocaleDateString('en-US', { 
-                                    weekday: 'long', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                });
+                                return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                             }
                         },
                         label: function(context) {
                             const minutes = context.parsed.y;
-                            // Don't show tooltip entries for 0 minutes
-                            if (minutes === 0) {
-                                return null;
-                            }
-                            const service = context.dataset.label;
-                            return `${service}: ${formatMinutes(minutes)}`;
+                            return minutes > 0 ? `${context.dataset.label}: ${formatMinutes(minutes)}` : null;
+                        },
+                        labelColor: function(context) {
+                            const combination = context.dataset._segmentId;
+                            return {
+                                backgroundColor: segmentColors[combination],
+                                borderColor: segmentBorderColors[combination],
+                            };
                         },
                         footer: function(context) {
-                            const dayData = chartData[context[0].dataIndex];
-                            const totalMinutes = Object.keys(dayData)
-                                .filter(key => key !== 'date')
-                                .reduce((sum, key) => sum + (dayData[key] || 0), 0);
+                            const index = context[0].dataIndex;
+                            const hoveredStack = context[0].dataset.stack;
+                            const datasets = context[0].chart.data.datasets;
+                            let totalMinutes = 0;
+                            
+                            datasets.forEach(dataset => {
+                                if (dataset.stack === hoveredStack) {
+                                    totalMinutes += dataset.data[index] || 0;
+                                }
+                            });
+                            
                             return totalMinutes > 0 ? `Total: ${formatMinutes(totalMinutes)}` : '';
                         }
                     }
@@ -349,13 +400,33 @@ document.addEventListener('DOMContentLoaded', function() {
             scales: {
                 x: {
                     stacked: true,
-                    grid: {
-                        display: false
-                    },
+                    grid: { display: false },
                     ticks: {
                         color: '#9ca3af',
-                        font: {
-                            size: 11
+                        font: { size: 11 },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: false,
+                            callbacks: {
+                                title: function(context) {
+                                    const index = context[0].dataIndex;
+                                    const date = new Date(chartData[index].date);
+                                    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                                },
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const totalMinutes = Object.keys(chartData[index])
+                                        .filter(key => key !== 'date' && key !== 'label')
+                                        .reduce((sum, key) => sum + (chartData[index][key] || 0), 0);
+                                    return totalMinutes > 0 ? `Total: ${formatMinutes(totalMinutes)}` : 'No Activity';
+                                }
+                            }
                         }
                     }
                 },
@@ -373,55 +444,32 @@ document.addEventListener('DOMContentLoaded', function() {
                         display: true,
                         text: 'Watch Time',
                         color: '#9ca3af',
-                        font: {
-                            size: 12,
-                            weight: 'bold'
-                        }
+                        font: { size: 12, weight: 'bold' }
                     },
                     ticks: {
                         color: '#9ca3af',
-                        font: {
-                            size: 11
-                        },
-                        maxTicksLimit: 6,  // Limit the number of ticks
-                        stepSize: 1,       // Force 1-minute steps for small values
+                        font: { size: 11 },
+                        autoSkip: true,
+                        maxTicksLimit: 10,
                         callback: function(value) {
-                            // Format Y-axis labels as time (e.g., "2h", "30m")
                             if (value === 0) return '0m';
-                            if (value % 1 !== 0) return ''; // Hide non-integer values
+                            if (value % 1 !== 0) return null; // Only show integer ticks
                             return formatMinutes(value);
                         }
-                    },
-                    afterBuildTicks: function(axis) {
-                        // Custom logic to create cleaner tick intervals
-                        const max = Math.max(...axis.chart.data.datasets.flatMap(d => d.data));
-                        
-                        if (max <= 5) {
-                            // For small values (0-5 minutes), show every minute
-                            axis.ticks = [];
-                            for (let i = 0; i <= Math.ceil(max); i++) {
-                                axis.ticks.push({ value: i });
-                            }
-                        } else if (max <= 30) {
-                            // For medium values (5-30 minutes), show every 5 minutes
-                            axis.ticks = [];
-                            for (let i = 0; i <= Math.ceil(max/5)*5; i += 5) {
-                                axis.ticks.push({ value: i });
-                            }
-                        } else if (max <= 120) {
-                            // For larger values (30-120 minutes), show every 15 minutes
-                            axis.ticks = [];
-                            for (let i = 0; i <= Math.ceil(max/15)*15; i += 15) {
-                                axis.ticks.push({ value: i });
-                            }
-                        }
-                        // For very large values, let Chart.js handle it automatically
                     }
                 }
             },
             elements: {
                 bar: {
                     borderRadius: 2
+                }
+            },
+            datasets: {
+                bar: {
+                    categoryPercentage: 0.8,
+                    barPercentage: 0.85,
+                    borderWidth: 2,
+                    borderSkipped: false
                 }
             }
         }
