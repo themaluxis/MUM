@@ -145,10 +145,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const services = {{ chart_data.services | tojson | safe }};
     const serviceCombinations = {{ chart_data.service_content_combinations | tojson | safe }};
     
-    // Create consistent light service colors with 30% opacity for all content types
+    // Create consistent service colors with 100% opacity for all content types
     const contentOpacities = {
-        'movies': 0.30, 'tv_shows': 0.30, 'music': 0.30, 'books': 0.30,
-        'comics': 0.30, 'games': 0.30, 'mixed': 0.30, 'unknown': 0.30
+        'movies': 1.0, 'tv_shows': 1.0, 'music': 1.0, 'books': 1.0,
+        'comics': 1.0, 'games': 1.0, 'mixed': 1.0, 'unknown': 1.0
     };
     
     // Store colors for each combination (solid colors with opacity)
@@ -157,22 +157,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentHoverColors = {};
     const segmentHoverBorderColors = {};
 
+    // Convert hex to rgba for opacity
+    const hexToRgba = (hex, alpha) => {
+        const r = parseInt(hex.substr(1, 2), 16);
+        const g = parseInt(hex.substr(3, 2), 16);
+        const b = parseInt(hex.substr(5, 2), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
     serviceCombinations.forEach(combination => {
         const [serviceType, contentType] = combination.split('_');
         const baseColor = serviceHexColors[serviceType] || '#64748b';
-        const opacity = contentOpacities[contentType] || 0.30;
-        
-        // Convert hex to rgba for opacity
-        const hexToRgba = (hex, alpha) => {
-            const r = parseInt(hex.substr(1, 2), 16);
-            const g = parseInt(hex.substr(3, 2), 16);
-            const b = parseInt(hex.substr(5, 2), 16);
-            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        };
+        const opacity = contentOpacities[contentType] || 1.0;
         
         segmentColors[combination] = hexToRgba(baseColor, opacity);
         segmentBorderColors[combination] = hexToRgba(baseColor, opacity);
-        segmentHoverColors[combination] = hexToRgba(baseColor, 1.0); // 100% opacity for hover state
+        segmentHoverColors[combination] = hexToRgba(baseColor, 1.0); // Keep at 100% for hovered combination
         segmentHoverBorderColors[combination] = hexToRgba(baseColor, 1.0);
     });
     
@@ -313,31 +313,43 @@ document.addEventListener('DOMContentLoaded', function() {
             responsive: true,
             maintainAspectRatio: false,
             onHover: (event, activeElements, chart) => {
-                // Reset all colors first
-                chart.data.datasets.forEach(dataset => {
-                    const combination = dataset._segmentId;
-                    for (let i = 0; i < dataset.data.length; i++) {
-                        dataset.backgroundColor[i] = segmentColors[combination];
-                        dataset.borderColor[i] = segmentBorderColors[combination];
-                    }
-                });
-
-                // Apply hover color to the active element
                 if (activeElements.length > 0) {
-                    const { datasetIndex, index } = activeElements[0].element.$context;
-                    const dataset = chart.data.datasets[datasetIndex];
-                    const combination = dataset._segmentId;
+                    const { datasetIndex } = activeElements[0].element.$context;
+                    const hoveredDataset = chart.data.datasets[datasetIndex];
+                    const hoveredCombination = hoveredDataset._segmentId;
 
-                    // Ensure backgroundColor and borderColor are arrays for individual styling
-                    if (!Array.isArray(dataset.backgroundColor)) {
-                        dataset.backgroundColor = new Array(dataset.data.length).fill(segmentColors[combination]);
-                    }
-                    if (!Array.isArray(dataset.borderColor)) {
-                        dataset.borderColor = new Array(dataset.data.length).fill(segmentBorderColors[combination]);
-                    }
+                    // Set all datasets to 30% opacity
+                    chart.data.datasets.forEach(dataset => {
+                        const combination = dataset._segmentId;
+                        const [serviceType, contentType] = combination.split('_');
+                        const baseColor = serviceHexColors[serviceType] || '#64748b';
+                        
+                        // Ensure backgroundColor and borderColor are arrays
+                        if (!Array.isArray(dataset.backgroundColor)) {
+                            dataset.backgroundColor = new Array(dataset.data.length).fill(segmentColors[combination]);
+                        }
+                        if (!Array.isArray(dataset.borderColor)) {
+                            dataset.borderColor = new Array(dataset.data.length).fill(segmentBorderColors[combination]);
+                        }
 
-                    dataset.backgroundColor[index] = segmentHoverColors[combination];
-                    dataset.borderColor[index] = segmentHoverBorderColors[combination];
+                        // Set opacity based on whether this combination matches the hovered one
+                        const opacity = (combination === hoveredCombination) ? 1.0 : 0.3;
+                        const color = hexToRgba(baseColor, opacity);
+                        
+                        for (let i = 0; i < dataset.data.length; i++) {
+                            dataset.backgroundColor[i] = color;
+                            dataset.borderColor[i] = color;
+                        }
+                    });
+                } else {
+                    // Reset all to 100% opacity when not hovering
+                    chart.data.datasets.forEach(dataset => {
+                        const combination = dataset._segmentId;
+                        for (let i = 0; i < dataset.data.length; i++) {
+                            dataset.backgroundColor[i] = segmentColors[combination];
+                            dataset.borderColor[i] = segmentBorderColors[combination];
+                        }
+                    });
                 }
                 chart.update(); // Update the chart to reflect color changes
             },
