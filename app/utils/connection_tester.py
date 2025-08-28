@@ -140,35 +140,67 @@ def check_audiobookshelf(url: str, token: str) -> Tuple[bool, str]:
         return False, f"Unexpected error testing AudioBookshelf connection: {str(e)}"
 
 
-def check_kavita(url: str, token: str) -> Tuple[bool, str]:
+def check_kavita(url: str, api_key: str) -> Tuple[bool, str]:
     """Test connection to Kavita server."""
     try:
         # Clean up URL
         url = url.rstrip('/')
         
-        # Test basic connectivity
-        response = requests.get(
-            f"{url}/api/Account/user-info",
-            headers={"Authorization": f"Bearer {token}"},
+        # Step 1: Authenticate with API key to get JWT token
+        auth_url = f"{url}/api/Plugin/authenticate"
+        auth_headers = {'accept': 'text/plain'}
+        auth_params = {
+            'apiKey': api_key,
+            'pluginName': 'MUM'  # Using MUM as the plugin name
+        }
+        
+        auth_response = requests.post(
+            auth_url, 
+            headers=auth_headers, 
+            params=auth_params, 
             timeout=get_api_timeout_with_fallback(10)
         )
-        response.raise_for_status()
+        auth_response.raise_for_status()
         
-        user_info = response.json()
-        username = user_info.get('username', 'Unknown')
+        # Try to parse as JSON first (Kavita returns JSON with token field)
+        try:
+            response_data = auth_response.json()
+            jwt_token = response_data.get('token', '').strip()
+        except ValueError:
+            # Fallback to plain text if not JSON
+            jwt_token = auth_response.text.strip()
         
-        # Get server info
-        server_response = requests.get(
-            f"{url}/api/Server/server-info",
-            headers={"Authorization": f"Bearer {token}"},
+        if not jwt_token:
+            return False, "No JWT token returned from Kavita authentication"
+        
+        # Step 2: Test the JWT token with a simple API call
+        headers = {"Authorization": f"Bearer {jwt_token}"}
+        
+        # Try the Health endpoint first as it's simpler
+        health_response = requests.get(
+            f"{url}/api/Health",
+            headers=headers,
             timeout=get_api_timeout_with_fallback(10)
         )
-        server_response.raise_for_status()
+        health_response.raise_for_status()
         
-        server_info = server_response.json()
-        version = server_info.get('kavitaVersion', 'Unknown')
-        
-        return True, f"Successfully connected to Kavita server (v{version}) as user '{username}'"
+        # Try to get server info for version
+        try:
+            server_response = requests.get(
+                f"{url}/api/Server/server-info-slim",
+                headers=headers,
+                timeout=get_api_timeout_with_fallback(10)
+            )
+            server_response.raise_for_status()
+            
+            server_info = server_response.json()
+            version = server_info.get('kavitaVersion', 'Unknown')
+            install_id = server_info.get('installId', 'Unknown')
+            
+            return True, f"Successfully connected to Kavita server (v{version}, ID: {install_id})"
+        except:
+            # If server info fails, just return success from health check
+            return True, "Successfully connected to Kavita server"
         
     except requests.exceptions.RequestException as e:
         return handle_connection_error(e, "Kavita")
@@ -293,10 +325,10 @@ def test_server_connection(service_type: str, url: str, **credentials) -> Tuple[
             return check_audiobookshelf(url, token)
             
         elif service_type == 'kavita':
-            token = credentials.get('token') or credentials.get('api_key')
-            if not token:
+            api_key = credentials.get('token') or credentials.get('api_key')
+            if not api_key:
                 return False, "API token is required for Kavita"
-            return check_kavita(url, token)
+            return check_kavita(url, api_key)
             
         elif service_type == 'komga':
             username = credentials.get('username')
