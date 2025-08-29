@@ -1027,6 +1027,13 @@ class PlexMediaService(BaseMediaService):
                     elif hasattr(item, 'year') and item.year:
                         year = str(item.year)
                     
+                    # Get edition information for movies
+                    edition = None
+                    if hasattr(item, 'editionTitle') and item.editionTitle:
+                        edition = item.editionTitle
+                    elif hasattr(item, 'edition') and item.edition:
+                        edition = item.edition
+                    
                     # Get rating
                     rating = None
                     if hasattr(item, 'rating') and item.rating:
@@ -1043,6 +1050,7 @@ class PlexMediaService(BaseMediaService):
                         'id': getattr(item, 'ratingKey', ''),
                         'title': getattr(item, 'title', 'Unknown Title'),
                         'year': year,
+                        'edition': edition,
                         'thumb': thumb_url,
                         'type': getattr(item, 'type', 'unknown'),
                         'summary': getattr(item, 'summary', ''),
@@ -1059,6 +1067,7 @@ class PlexMediaService(BaseMediaService):
                             'type': getattr(item, 'type', ''),
                             'thumb': getattr(item, 'thumb', ''),
                             'art': getattr(item, 'art', ''),
+                            'edition': edition,
                         }
                     }
                     

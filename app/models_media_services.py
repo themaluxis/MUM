@@ -345,6 +345,7 @@ class MediaItem(db.Model):
             'id': self.external_id,
             'title': self.title,
             'year': self.year,
+            'edition': self.extra_metadata.get('edition') if self.extra_metadata else None,
             'thumb': thumb_url,
             'type': self.item_type,
             'summary': self.summary,
