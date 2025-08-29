@@ -128,11 +128,15 @@ class JellyfinMediaService(BaseMediaService):
                 if not external_id:
                     # Skip libraries without a valid identifier
                     continue
+                
+                # Get item count for this library
+                item_count = self._get_library_item_count(external_id)
                     
                 libraries.append({
                     'external_id': external_id,
                     'name': folder.get('Name', 'Unknown Library'),
                     'type': folder.get('CollectionType', 'mixed'),
+                    'item_count': item_count,
                     'locations': folder.get('Locations', [])
                 })
             
@@ -142,6 +146,36 @@ class JellyfinMediaService(BaseMediaService):
         except Exception as e:
             self.log_error(f"Error retrieving libraries: {e}")
             return []
+    
+    def _get_library_item_count(self, library_id: str) -> int:
+        """Get the item count for a specific Jellyfin library"""
+        try:
+            if not self._authenticated and not self._authenticate():
+                self.log_error("Failed to authenticate for library item count")
+                return 0
+            
+            # Use the Jellyfin API to get item count
+            # Set Limit=0 to get only the count without actual items
+            response = self.session.get(
+                f"{self.url.rstrip('/')}/Items",
+                params={
+                    'ParentId': library_id,
+                    'Recursive': 'true',
+                    'Limit': 0
+                },
+                timeout=get_api_timeout_with_fallback(10)
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            item_count = data.get('TotalRecordCount', 0)
+            
+            self.log_info(f"Library {library_id} has {item_count} items")
+            return item_count
+            
+        except Exception as e:
+            self.log_error(f"Error getting item count for library {library_id}: {e}")
+            return 0
     
     def get_users(self) -> List[Dict[str, Any]]:
         """Get all users from Jellyfin"""
