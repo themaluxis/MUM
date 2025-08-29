@@ -800,13 +800,13 @@ def get_library_media_content(library, page=1, per_page=24):
             # Handle thumb URLs for different services
             if processed_item['thumb']:
                 thumb_url = processed_item['thumb']
-                # For Plex, construct full URL if needed
-                if library.server.service_type.value == 'plex' and not thumb_url.startswith('http'):
+                # For Plex, construct full URL if needed (but skip proxy URLs)
+                if library.server.service_type.value == 'plex' and not thumb_url.startswith('http') and not thumb_url.startswith('/api/'):
                     if thumb_url.startswith('/'):
                         thumb_url = f"{library.server.url}{thumb_url}"
                     processed_item['thumb'] = thumb_url
-                # For other services, use as-is or construct URL as needed
-                elif not thumb_url.startswith('http'):
+                # For other services, use as-is or construct URL as needed (but skip proxy URLs)
+                elif not thumb_url.startswith('http') and not thumb_url.startswith('/api/'):
                     # Try to construct full URL
                     if thumb_url.startswith('/'):
                         thumb_url = f"{library.server.url}{thumb_url}"
