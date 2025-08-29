@@ -494,24 +494,30 @@ def sync_library_content(library_id):
             result['duration'] = duration
             
             # Check if there are any changes to determine response type
-            has_changes = (result.get('added_items', 0) > 0 or 
-                          result.get('updated_items', 0) > 0 or 
-                          result.get('removed_items', 0) > 0 or 
+            # Handle both field name formats from MediaSyncService
+            added = result.get('added_items', result.get('added', 0))
+            updated = result.get('updated_items', result.get('updated', 0))
+            removed = result.get('removed_items', result.get('removed', 0))
+            
+            has_changes = (added > 0 or updated > 0 or removed > 0 or 
                           (result.get('errors') and len(result.get('errors', [])) > 0))
             
             if has_changes:
+                # Normalize field names for the template
+                normalized_result = result.copy()
+                normalized_result['added_items'] = added
+                normalized_result['updated_items'] = updated
+                normalized_result['removed_items'] = removed
+                
                 # Show modal for changes or errors
                 modal_html = render_template('libraries/partials/library_content_sync_results_modal.html',
-                                           sync_result=result,
+                                           sync_result=normalized_result,
                                            library_name=library.name)
                 
                 if result.get('errors') and len(result.get('errors', [])) > 0:
                     message = f"Library sync completed with {len(result.get('errors', []))} errors. See details."
                     category = "warning"
                 else:
-                    added = result.get('added_items', 0)
-                    updated = result.get('updated_items', 0)
-                    removed = result.get('removed_items', 0)
                     message = f"Library sync complete. {added} added, {updated} updated, {removed} removed."
                     category = "success"
                 

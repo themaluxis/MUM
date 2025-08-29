@@ -359,82 +359,27 @@ document.addEventListener('DOMContentLoaded', function() {
             btnText.textContent = 'Syncing...';
             btnIcon.classList.add('fa-spin');
             
-            // Make sync request
-            fetch(`/api/libraries/${libraryId}/sync`, {
-                method: 'POST',
+            // Make sync request using HTMX to handle modal responses properly
+            htmx.ajax('POST', `/api/libraries/${libraryId}/sync`, {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
                 }
-            })
-            .then(response => {
-                // Get response text first to check if it's empty
-                return response.text().then(text => {
-                    if (text.trim() === '') {
-                        // Empty response - sync completed with no changes
-                        btnText.textContent = 'Sync Complete!';
-                        btnIcon.classList.remove('fa-spin');
-                        btnIcon.classList.remove('fa-sync');
-                        btnIcon.classList.add('fa-check');
-                        
-                        // Show toast for no changes
-                        if (window.showToast) {
-                            window.showToast('Library sync complete. No changes were made.', 'success');
-                        }
-                        
-                        // Reset button after delay
-                        setTimeout(() => {
-                            this.disabled = false;
-                            btnText.textContent = 'Sync Library';
-                            btnIcon.classList.remove('fa-check');
-                            btnIcon.classList.add('fa-sync');
-                        }, 2000);
-                        
-                        return null; // No JSON to parse
-                    } else {
-                        // Parse the text as JSON
-                        return JSON.parse(text);
-                    }
-                });
-            })
-            .then(data => {
-                if (data === null) {
-                    // Already handled empty response above
-                    return;
-                }
+            }).then(() => {
+                // Success - HTMX will handle the response (modal or toast)
+                btnText.textContent = 'Sync Complete!';
+                btnIcon.classList.remove('fa-spin');
+                btnIcon.classList.remove('fa-sync');
+                btnIcon.classList.add('fa-check');
                 
-                if (data && data.success) {
-                    btnText.textContent = 'Sync Complete!';
-                    btnIcon.classList.remove('fa-spin');
-                    btnIcon.classList.remove('fa-sync');
-                    btnIcon.classList.add('fa-check');
-                    
-                    // Show success message
-                    if (data.total_items !== undefined) {
-                        console.log(`Synced ${data.total_items} items from ${data.library_name}`);
-                    }
-                    
-                    // Reload page after short delay to show updated content
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } else if (data) {
-                    btnText.textContent = 'Sync Failed';
-                    btnIcon.classList.remove('fa-spin');
-                    btnIcon.classList.remove('fa-sync');
-                    btnIcon.classList.add('fa-exclamation-triangle');
-                    console.error('Sync failed:', data.error);
-                    
-                    // Reset button after delay
-                    setTimeout(() => {
-                        this.disabled = false;
-                        btnText.textContent = 'Sync Library';
-                        btnIcon.classList.remove('fa-exclamation-triangle');
-                        btnIcon.classList.add('fa-sync');
-                    }, 3000);
-                }
-            })
-            .catch(error => {
+                // Reset button after delay
+                setTimeout(() => {
+                    this.disabled = false;
+                    btnText.textContent = 'Sync Library';
+                    btnIcon.classList.remove('fa-check');
+                    btnIcon.classList.add('fa-sync');
+                }, 2000);
+            }).catch((error) => {
                 console.error('Sync request failed:', error);
                 btnText.textContent = 'Sync Failed';
                 btnIcon.classList.remove('fa-spin');
