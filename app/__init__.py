@@ -501,13 +501,27 @@ def create_app(config_name=None):
         if local_timezone_str:
             try:
                 import pytz
+                from flask import current_app
+                
                 local_tz = pytz.timezone(local_timezone_str)
+                #current_app.logger.debug(f"Timezone conversion: original dt = {dt}, timezone = {local_timezone_str}")
+                
                 # Ensure datetime has timezone info before conversion
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
+                    #current_app.logger.debug(f"Timezone conversion: added UTC timezone, dt = {dt}")
+                
                 local_dt = dt.astimezone(local_tz)
-                return local_dt.strftime(format_str)
-            except pytz.UnknownTimeZoneError:
+                #current_app.logger.debug(f"Timezone conversion: converted to local, local_dt = {local_dt}")
+                
+                formatted = local_dt.strftime(format_str)
+                #current_app.logger.debug(f"Timezone conversion: formatted result = {formatted}")
+                return formatted
+            except pytz.UnknownTimeZoneError as e:
+                current_app.logger.error(f"Unknown timezone: {local_timezone_str}, error: {e}")
+                pass
+            except Exception as e:
+                current_app.logger.error(f"Timezone conversion error: {e}")
                 pass
         
         # Fallback to UTC
