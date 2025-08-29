@@ -78,6 +78,91 @@
     </div>
 </div>
 
+<!-- User Statistics Section -->
+{% if user_stats and user_stats|length > 0 %}
+<div class="card bg-base-100 shadow-xl mt-6">
+    <div class="card-body">
+        <h2 class="card-title text-lg mb-4">
+            <i class="fa-solid fa-users text-primary mr-2"></i>
+            User Statistics
+            <span class="text-sm text-base-content/60 ml-2">({{ user_stats|length }} users)</span>
+        </h2>
+        
+        <!-- User Cards Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+            {% for user in user_stats %}
+            <div class="bg-base-200/50 rounded-lg p-4 border border-base-300 hover:bg-base-200/70 transition-colors text-center">
+                <div class="flex flex-col items-center mb-3">
+                    <div class="avatar mb-2">
+                        <div class="mask mask-circle w-12 h-12">
+                            {% if user.avatar_url %}
+                                <img src="{{ user.avatar_url }}" 
+                                     alt="{{ user.display_name }}"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <!-- Fallback avatar -->
+                                <div class="w-full h-full bg-primary flex items-center justify-center text-base-content font-semibold text-sm" style="display: none;">
+                                    {{ user.display_name[0].upper() if user.display_name else 'U' }}
+                                </div>
+                            {% else %}
+                                <!-- Default avatar with initials -->
+                                <div class="w-full h-full bg-primary flex items-center justify-center text-base-content font-semibold text-sm">
+                                    {{ user.display_name[0].upper() if user.display_name else 'U' }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="w-full">
+                        <div class="font-semibold text-sm truncate" title="{{ user.display_name }}">{{ user.display_name }}</div>
+                        {% if user.username and user.username != user.display_name %}
+                            <div class="text-xs text-base-content/60 truncate" title="@{{ user.username }}">@{{ user.username }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-base-content/60">Plays:</span>
+                        <div class="flex items-center gap-1">
+                            <i class="fa-solid fa-play text-primary text-xs"></i>
+                            <span class="font-semibold text-sm">{{ user.play_count }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-base-content/60">Time:</span>
+                        <div class="flex items-center gap-1">
+                            <i class="fa-solid fa-clock text-secondary text-xs"></i>
+                            <span class="font-semibold text-sm">{{ user.total_duration_formatted }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        {% if user_stats|length >= 10 %}
+        <div class="text-center mt-4">
+            <p class="text-sm text-base-content/60">Showing top {{ user_stats|length }} users by play count</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% elif chart_data %}
+<!-- No user activity message (only show if we have chart data but no user stats) -->
+<div class="card bg-base-100 shadow-xl mt-6">
+    <div class="card-body">
+        <h2 class="card-title text-lg mb-4">
+            <i class="fa-solid fa-users text-primary mr-2"></i>
+            User Statistics
+        </h2>
+        <div class="text-center py-8">
+            <i class="fa-solid fa-users text-4xl text-base-content/20 mb-4"></i>
+            <p class="text-base-content/60">No user activity found for this library in the selected time period</p>
+            <p class="text-sm text-base-content/40 mt-2">User statistics will appear here once users start watching content from this library</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% if chart_data %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {

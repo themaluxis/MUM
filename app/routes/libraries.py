@@ -393,6 +393,7 @@ def library_detail(server_nickname, library_name):
     
     # Get chart data for stats tab
     chart_data = None
+    user_stats = None
     if tab == 'stats':
         days_param = request.args.get('days', '30')
         try:
@@ -407,6 +408,7 @@ def library_detail(server_nickname, library_name):
             days = 30
         
         chart_data = generate_library_chart_data(library, days)
+        user_stats = get_library_user_stats(library, days)
     
     # Get media content for media tab
     media_content = None
@@ -484,6 +486,7 @@ def library_detail(server_nickname, library_name):
                          library_stats=library_stats,
                          recent_activity=recent_activity,
                          chart_data=chart_data,
+                         user_stats=user_stats,
                          media_content=media_content,
                          active_tab=tab,
                          selected_days=request.args.get('days', 30) if tab == 'stats' else None,
@@ -733,6 +736,103 @@ def generate_library_chart_data(library, days=30):
         'total_duration': total_duration_formatted,
         'date_range_days': days
     }
+
+def get_library_user_stats(library, days=30):
+    """Get user statistics for a library"""
+    from datetime import datetime, timezone, timedelta
+    from app.models_media_services import UserMediaAccess
+    
+    try:
+        # Calculate date range based on days parameter
+        end_date = datetime.now(timezone.utc)
+        if days == -1:  # All time
+            # Get the earliest stream date for this library
+            earliest_stream = MediaStreamHistory.query.filter(
+                MediaStreamHistory.server_id == library.server_id,
+                MediaStreamHistory.library_name == library.name
+            ).order_by(MediaStreamHistory.started_at.asc()).first()
+            
+            if earliest_stream:
+                start_date = earliest_stream.started_at
+            else:
+                start_date = end_date - timedelta(days=30)  # Fallback to 30 days
+        else:
+            start_date = end_date - timedelta(days=days-1)
+        
+        # Get user statistics for this library
+        user_stats_query = db.session.query(
+            MediaStreamHistory.user_media_access_uuid,
+            UserMediaAccess.external_username,
+            UserMediaAccess.external_email,
+            UserMediaAccess.external_avatar_url,
+            db.func.count(MediaStreamHistory.id).label('play_count'),
+            db.func.sum(MediaStreamHistory.duration_seconds).label('total_duration')
+        ).join(
+            UserMediaAccess, 
+            MediaStreamHistory.user_media_access_uuid == UserMediaAccess.uuid
+        ).filter(
+            MediaStreamHistory.server_id == library.server_id,
+            MediaStreamHistory.library_name == library.name,
+            MediaStreamHistory.started_at >= start_date,
+            MediaStreamHistory.started_at <= end_date,
+            MediaStreamHistory.user_media_access_uuid.isnot(None)
+        ).group_by(
+            MediaStreamHistory.user_media_access_uuid,
+            UserMediaAccess.external_username,
+            UserMediaAccess.external_email,
+            UserMediaAccess.external_avatar_url
+        ).order_by(db.func.count(MediaStreamHistory.id).desc()).all()
+        
+        # Format user stats
+        user_stats = []
+        for stat in user_stats_query:
+            # Get display name (prefer external_username, fallback to external_email)
+            display_name = stat.external_username or stat.external_email or 'Unknown User'
+            
+            # Format duration
+            total_seconds = stat.total_duration or 0
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            
+            if hours > 0:
+                duration_formatted = f"{hours}h {minutes}m"
+            else:
+                duration_formatted = f"{minutes}m"
+            
+            # Determine avatar URL based on server type
+            avatar_url = None
+            if stat.external_avatar_url:
+                # Use the stored external avatar URL directly
+                avatar_url = stat.external_avatar_url
+            elif stat.user_media_access_uuid:
+                # Try to construct avatar URL based on service type
+                if library.server.service_type.value.lower() == 'plex':
+                    # For Plex, we might need to get the thumb path from the user record
+                    user_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
+                    if user_access and user_access.service_settings.get('thumb'):
+                        avatar_url = f"/api/media/plex/images/proxy?path={user_access.service_settings['thumb']}"
+                elif library.server.service_type.value.lower() == 'jellyfin':
+                    # For Jellyfin, use the external_user_id to get avatar
+                    user_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
+                    if user_access and user_access.external_user_id:
+                        avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user_access.external_user_id}"
+            
+            user_stats.append({
+                'uuid': stat.user_media_access_uuid,
+                'display_name': display_name,
+                'username': stat.external_username,
+                'email': stat.external_email,
+                'avatar_url': avatar_url,
+                'play_count': stat.play_count,
+                'total_duration_seconds': total_seconds,
+                'total_duration_formatted': duration_formatted
+            })
+        
+        return user_stats
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting library user stats: {e}")
+        return []
 
 def get_library_media_content(library, page=1, per_page=24, search_query=''):
     """Get media content from the library using cached data or live API"""
