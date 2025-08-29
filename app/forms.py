@@ -537,6 +537,29 @@ class TimezonePreferenceForm(FlaskForm):
     )
     local_timezone = HiddenField() # This will be populated by JavaScript
     submit = SubmitField('Save Timezone Setting')
+    
+    def __init__(self, *args, **kwargs):
+        # Extract user_timezone from kwargs before calling super()
+        user_timezone = kwargs.pop('user_timezone', None)
+        super(TimezonePreferenceForm, self).__init__(*args, **kwargs)
+        
+        from flask import current_app
+        current_app.logger.debug(f"TimezonePreferenceForm init: user_timezone parameter = {user_timezone}")
+        
+        # Update the choices to include the actual timezone name
+        if user_timezone:
+            current_app.logger.debug(f"TimezonePreferenceForm init: Setting choices with timezone {user_timezone}")
+            self.timezone_preference.choices = [
+                ('local', f'My Timezone ({user_timezone})'),
+                ('utc', 'UTC')
+            ]
+        else:
+            current_app.logger.debug(f"TimezonePreferenceForm init: Using fallback choices")
+            # Fallback if timezone detection fails
+            self.timezone_preference.choices = [
+                ('local', 'My Timezone'),
+                ('utc', 'UTC')
+            ]
 
 class UserResetPasswordForm(FlaskForm):
     new_password = PasswordField(

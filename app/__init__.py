@@ -461,4 +461,61 @@ def create_app(config_name=None):
 
     register_error_handlers(app)
 
+    # Register template filters
+    from app.utils.timezone_utils import format_datetime_user
+    from datetime import timezone
+    
+    @app.template_filter('format_datetime_with_user_timezone')
+    def format_datetime_with_user_timezone_filter(dt, format_str='%Y-%m-%d %H:%M'):
+        """Template filter to format datetime with user's timezone preference."""
+        if dt is None:
+            return "N/A"
+        
+        from flask_login import current_user
+        from app.models import UserPreferences
+        
+        if not current_user.is_authenticated:
+            # Fallback to UTC if no user
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.strftime(format_str)
+        
+        prefs = UserPreferences.get_timezone_preference(current_user.id)
+        preference = prefs.get('preference', 'local')
+        local_timezone_str = prefs.get('local_timezone')
+        time_format = prefs.get('time_format', '12')
+        
+        # Adjust format string based on user's time format preference
+        if '%H' in format_str and time_format == '12':
+            format_str = format_str.replace('%H:%M', '%I:%M %p')
+        elif '%I' in format_str and time_format == '24':
+            format_str = format_str.replace('%I:%M %p', '%H:%M')
+        
+        if preference == 'utc':
+            # Show in UTC
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            utc_dt = dt.astimezone(timezone.utc)
+            return utc_dt.strftime(format_str)
+        
+        if local_timezone_str:
+            try:
+                import pytz
+                local_tz = pytz.timezone(local_timezone_str)
+                # Ensure datetime has timezone info before conversion
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                local_dt = dt.astimezone(local_tz)
+                return local_dt.strftime(format_str)
+            except pytz.UnknownTimeZoneError:
+                pass
+        
+        # Fallback to UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.strftime(format_str)
+    
+    # Make the function available as a global template function too
+    app.jinja_env.globals['format_datetime_with_user_timezone'] = format_datetime_with_user_timezone_filter
+    
     return app

@@ -110,7 +110,7 @@
                         </button>
                         <div class="text-xs text-base-content/50 hidden sm:block">
                             {% if server_data.last_sync_at %}
-                                Last synced: {{ server_data.last_sync_at.strftime('%m/%d %H:%M') }}
+                                Last synced: {{ format_datetime_with_user_timezone(server_data.last_sync_at, '%m/%d %H:%M') }}
                             {% else %}
                                 Never synced
                             {% endif %}

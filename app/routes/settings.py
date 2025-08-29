@@ -130,11 +130,16 @@ def user_accounts():
 def account():
     set_password_form = SetPasswordForm()
     change_password_form = ChangePasswordForm()
-    timezone_form = TimezonePreferenceForm()
+    # Get timezone preferences first
+    prefs = UserPreferences.get_timezone_preference(current_user.id)
+    current_app.logger.debug(f"Settings account route: timezone prefs = {prefs}")
+    
+    timezone_form = TimezonePreferenceForm(user_timezone=prefs.get('local_timezone'))
+    current_app.logger.debug(f"Settings account route: form created with timezone = {prefs.get('local_timezone')}")
 
     if 'submit_timezone' in request.form and timezone_form.validate_on_submit():
         UserPreferences.set_timezone_preference(
-            admin_id=current_user.id,
+            owner_id=current_user.id,
             preference=timezone_form.timezone_preference.data,
             local_timezone=timezone_form.local_timezone.data,
             time_format=timezone_form.time_format.data

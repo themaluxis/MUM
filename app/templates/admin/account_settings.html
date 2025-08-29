@@ -66,3 +66,28 @@
     </div>
 </div>
 {% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Detect user's timezone and populate the hidden field
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        // Get user's timezone using Intl API
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        console.log('Detected timezone:', userTimezone);
+        
+        // Find the local_timezone hidden field and populate it
+        const timezoneField = document.getElementById('local_timezone');
+        if (timezoneField) {
+            timezoneField.value = userTimezone;
+            console.log('Set local_timezone field to:', userTimezone);
+        } else {
+            console.error('Could not find local_timezone field');
+        }
+    } catch (error) {
+        console.error('Error detecting timezone:', error);
+    }
+});
+</script>
+{% endblock %}
