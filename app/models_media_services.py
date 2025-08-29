@@ -270,6 +270,90 @@ class UserMediaAccess(db.Model):
         elif data_type == 'stream':
             self.stream_raw_data = data or {}
 
+class MediaItem(db.Model):
+    """Store individual media items from libraries for faster access and search"""
+    __tablename__ = 'media_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Foreign keys
+    library_id = db.Column(db.Integer, db.ForeignKey('media_libraries.id'), nullable=False)
+    server_id = db.Column(db.Integer, db.ForeignKey('media_servers.id'), nullable=False)
+    
+    # External identifiers
+    external_id = db.Column(db.String(255), nullable=False)  # ID from the media service
+    parent_id = db.Column(db.String(255))  # Parent folder/collection ID
+    
+    # Basic metadata
+    title = db.Column(db.String(500), nullable=False)
+    sort_title = db.Column(db.String(500))  # For proper sorting
+    item_type = db.Column(db.String(50), nullable=False)  # movie, show, episode, folder, etc.
+    
+    # Content metadata
+    summary = db.Column(db.Text)
+    year = db.Column(db.Integer)
+    rating = db.Column(db.Float)
+    duration = db.Column(db.BigInteger)  # Duration in milliseconds/ticks
+    
+    # Media file info
+    file_path = db.Column(db.String(1000))
+    file_size = db.Column(db.BigInteger)
+    
+    # Thumbnail/artwork
+    thumb_path = db.Column(db.String(500))  # Relative path for proxy
+    art_path = db.Column(db.String(500))
+    
+    # Timestamps
+    added_at = db.Column(db.DateTime)  # When added to media server
+    updated_at = db.Column(db.DateTime)  # Last modified on media server
+    last_synced = db.Column(db.DateTime, default=datetime.utcnow)  # When we last synced this item
+    
+    # Additional metadata (JSON for flexibility)
+    extra_metadata = db.Column(db.JSON)
+    
+    # Relationships
+    library = db.relationship('MediaLibrary', backref='media_items')
+    server = db.relationship('MediaServer', backref='media_items')
+    
+    # Indexes for performance
+    __table_args__ = (
+        db.Index('idx_media_items_library_type', 'library_id', 'item_type'),
+        db.Index('idx_media_items_external_id', 'external_id'),
+        db.Index('idx_media_items_title', 'title'),
+        db.Index('idx_media_items_year', 'year'),
+        db.Index('idx_media_items_added_at', 'added_at'),
+        db.Index('idx_media_items_last_synced', 'last_synced'),
+        db.UniqueConstraint('library_id', 'external_id', name='uq_library_external_id'),
+    )
+    
+    def __repr__(self):
+        return f'<MediaItem {self.title} ({self.item_type})>'
+    
+    def to_dict(self):
+        """Convert to dictionary format compatible with current media grid"""
+        # Handle different thumbnail formats for different services
+        thumb_url = None
+        if self.thumb_path:
+            if self.thumb_path.startswith('/api/'):
+                # Already a proxy URL (Jellyfin or other services)
+                thumb_url = self.thumb_path
+            else:
+                # Plex format: regular path that needs proxy construction
+                thumb_url = f"/api/media/{self.server.service_type.value}/images/proxy?path={self.thumb_path.lstrip('/')}"
+        
+        return {
+            'id': self.external_id,
+            'title': self.title,
+            'year': self.year,
+            'thumb': thumb_url,
+            'type': self.item_type,
+            'summary': self.summary,
+            'rating': self.rating,
+            'duration': self.duration,
+            'added_at': self.added_at.isoformat() if self.added_at else None,
+            'raw_data': self.extra_metadata or {}
+        }
+
 class MediaStreamHistory(db.Model):
     """Enhanced stream history that supports multiple services"""
     __tablename__ = 'media_stream_history'

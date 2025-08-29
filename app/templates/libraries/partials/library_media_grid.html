@@ -1,23 +1,77 @@
 <!-- File: app/templates/libraries/partials/library_media_grid.html -->
 <div class="space-y-6">
     <!-- Media Grid Header -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h3 class="text-lg font-semibold flex items-center">
-            <i class="fa-solid fa-film text-primary mr-2"></i>
-            Library Content
-            {% if media_content and media_content.total %}
-                <span class="text-sm text-base-content/60 ml-2">({{ media_content.total }} items)</span>
-            {% endif %}
-        </h3>
-        
-        <!-- View Options (Future: Grid/List toggle, Sort options) -->
-        <div class="flex items-center gap-2">
+    <div class="flex flex-col gap-4">
+        <!-- Title and Stats Row -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h3 class="text-lg font-semibold flex items-center">
+                <i class="fa-solid fa-film text-primary mr-2"></i>
+                Library Content
+                {% if media_content and media_content.total %}
+                    <span class="text-sm text-base-content/60 ml-2">({{ media_content.total }} items)</span>
+                {% endif %}
+            </h3>
+            
+            <!-- Results Info -->
             <div class="text-sm text-base-content/60">
                 {% if media_content and media_content.total %}
                     Showing {{ ((media_content.page - 1) * media_content.per_page) + 1 }}-{{ 
                         [media_content.page * media_content.per_page, media_content.total] | min 
                     }} of {{ media_content.total }}
                 {% endif %}
+            </div>
+        </div>
+        
+        <!-- Search and Controls Row -->
+        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <!-- Search Box -->
+            <div class="flex-1 max-w-md">
+                <div class="relative">
+                    <input type="text" 
+                           id="library-search" 
+                           placeholder="Search library content..." 
+                           class="input input-bordered w-full pl-10 pr-4"
+                           value="{{ request.args.get('search', '') }}">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-search text-base-content/40"></i>
+                    </div>
+                    {% if request.args.get('search') %}
+                    <button type="button" 
+                            id="clear-search"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-base-content/60 hover:text-base-content">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Items Per Page Dropdown -->
+            <div class="flex items-center gap-2">
+                <label for="items-per-page" class="text-sm text-base-content/60 whitespace-nowrap">Items per page:</label>
+                <select id="items-per-page" class="select select-bordered select-sm w-20">
+                    <option value="12" {{ 'selected' if media_content.per_page == 12 else '' }}>12</option>
+                    <option value="24" {{ 'selected' if media_content.per_page == 24 else '' }}>24</option>
+                    <option value="48" {{ 'selected' if media_content.per_page == 48 else '' }}>48</option>
+                    <option value="96" {{ 'selected' if media_content.per_page == 96 else '' }}>96</option>
+                </select>
+            </div>
+            
+            <!-- Sync Library Button -->
+            <div class="flex items-center gap-2">
+                <button id="sync-library-btn" 
+                        class="btn btn-outline btn-sm"
+                        data-library-id="{{ library.id }}"
+                        title="Sync library content to database for faster loading">
+                    <i class="fa-solid fa-sync mr-2"></i>
+                    <span class="sync-btn-text">Sync Library</span>
+                </button>
+                <button id="purge-library-btn" 
+                        class="btn btn-outline btn-error btn-sm"
+                        data-library-id="{{ library.id }}"
+                        title="Delete all cached items for this library from database">
+                    <i class="fa-solid fa-trash mr-2"></i>
+                    <span class="purge-btn-text">Purge DB</span>
+                </button>
             </div>
         </div>
     </div>
@@ -186,17 +240,34 @@
         <div class="bg-base-200/50 rounded-lg p-12 text-center border border-base-300">
             <div class="flex flex-col items-center space-y-4">
                 <div class="w-16 h-16 rounded-full bg-base-300/50 flex items-center justify-center">
-                    <i class="fa-solid fa-folder-open text-2xl text-base-content/40"></i>
+                    {% if media_content and media_content.get('needs_sync') %}
+                        <i class="fa-solid fa-database text-2xl text-base-content/40"></i>
+                    {% else %}
+                        <i class="fa-solid fa-folder-open text-2xl text-base-content/40"></i>
+                    {% endif %}
                 </div>
                 <div>
-                    <h3 class="text-lg font-medium text-base-content mb-2">No Media Found</h3>
-                    <p class="text-base-content/60">This library appears to be empty or the content could not be loaded.</p>
-                    <p class="text-sm text-base-content/40 mt-2">Content may still be scanning or there might be a connection issue.</p>
+                    {% if media_content and media_content.get('needs_sync') %}
+                        <h3 class="text-lg font-medium text-base-content mb-2">No Cached Data</h3>
+                        <p class="text-base-content/60">This library has no cached content in the database.</p>
+                        <p class="text-sm text-base-content/40 mt-2">Click "Sync Library" above to populate the cache with fresh content from your media server.</p>
+                    {% else %}
+                        <h3 class="text-lg font-medium text-base-content mb-2">No Media Found</h3>
+                        <p class="text-base-content/60">This library appears to be empty or the content could not be loaded.</p>
+                        <p class="text-sm text-base-content/40 mt-2">Content may still be scanning or there might be a connection issue.</p>
+                    {% endif %}
                 </div>
-                <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media') }}" 
-                   class="btn btn-primary btn-sm">
-                    <i class="fa-solid fa-refresh mr-2"></i>Refresh
-                </a>
+                {% if media_content and media_content.get('needs_sync') %}
+                    <button onclick="document.getElementById('sync-library-btn').click()" 
+                            class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-sync mr-2"></i>Sync Library
+                    </button>
+                {% else %}
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media') }}" 
+                       class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-refresh mr-2"></i>Refresh
+                    </a>
+                {% endif %}
             </div>
         </div>
     {% endif %}
@@ -211,3 +282,211 @@
     overflow: hidden;
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('library-search');
+    const itemsPerPageSelect = document.getElementById('items-per-page');
+    const clearSearchBtn = document.getElementById('clear-search');
+    const syncLibraryBtn = document.getElementById('sync-library-btn');
+    const purgeLibraryBtn = document.getElementById('purge-library-btn');
+    
+    let searchTimeout;
+    
+    // Function to update URL and reload page with new parameters
+    function updateLibraryView() {
+        const currentUrl = new URL(window.location);
+        const searchValue = searchInput.value.trim();
+        const itemsPerPage = itemsPerPageSelect.value;
+        
+        // Update URL parameters
+        if (searchValue) {
+            currentUrl.searchParams.set('search', searchValue);
+        } else {
+            currentUrl.searchParams.delete('search');
+        }
+        
+        currentUrl.searchParams.set('per_page', itemsPerPage);
+        currentUrl.searchParams.set('page', '1'); // Reset to first page
+        
+        // Navigate to updated URL
+        window.location.href = currentUrl.toString();
+    }
+    
+    // Search input handler with debounce
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(updateLibraryView, 500); // 500ms debounce
+        });
+        
+        // Handle Enter key
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(searchTimeout);
+                updateLibraryView();
+            }
+        });
+    }
+    
+    // Items per page change handler
+    if (itemsPerPageSelect) {
+        itemsPerPageSelect.addEventListener('change', updateLibraryView);
+    }
+    
+    // Clear search button handler
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            updateLibraryView();
+        });
+    }
+    
+    // Sync library button handler
+    if (syncLibraryBtn) {
+        syncLibraryBtn.addEventListener('click', function() {
+            const libraryId = this.getAttribute('data-library-id');
+            const btnText = this.querySelector('.sync-btn-text');
+            const btnIcon = this.querySelector('i');
+            
+            // Update button state
+            this.disabled = true;
+            btnText.textContent = 'Syncing...';
+            btnIcon.classList.add('fa-spin');
+            
+            // Make sync request
+            fetch(`/api/libraries/${libraryId}/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    btnText.textContent = 'Sync Complete!';
+                    btnIcon.classList.remove('fa-spin');
+                    btnIcon.classList.remove('fa-sync');
+                    btnIcon.classList.add('fa-check');
+                    
+                    // Show success message
+                    if (data.total_items !== undefined) {
+                        console.log(`Synced ${data.total_items} items from ${data.library_name}`);
+                    }
+                    
+                    // Reload page after short delay to show updated content
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    btnText.textContent = 'Sync Failed';
+                    btnIcon.classList.remove('fa-spin');
+                    btnIcon.classList.remove('fa-sync');
+                    btnIcon.classList.add('fa-exclamation-triangle');
+                    console.error('Sync failed:', data.error);
+                    
+                    // Reset button after delay
+                    setTimeout(() => {
+                        this.disabled = false;
+                        btnText.textContent = 'Sync Library';
+                        btnIcon.classList.remove('fa-exclamation-triangle');
+                        btnIcon.classList.add('fa-sync');
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Sync request failed:', error);
+                btnText.textContent = 'Sync Failed';
+                btnIcon.classList.remove('fa-spin');
+                btnIcon.classList.remove('fa-sync');
+                btnIcon.classList.add('fa-exclamation-triangle');
+                
+                // Reset button after delay
+                setTimeout(() => {
+                    this.disabled = false;
+                    btnText.textContent = 'Sync Library';
+                    btnIcon.classList.remove('fa-exclamation-triangle');
+                    btnIcon.classList.add('fa-sync');
+                }, 3000);
+            });
+        });
+    }
+    
+    // Purge library button handler
+    if (purgeLibraryBtn) {
+        purgeLibraryBtn.addEventListener('click', function() {
+            const libraryId = this.getAttribute('data-library-id');
+            const btnText = this.querySelector('.purge-btn-text');
+            const btnIcon = this.querySelector('i');
+            
+            // Show confirmation dialog
+            if (!confirm('Are you sure you want to purge all cached items for this library from the database? This will delete all stored media items and they will need to be re-synced.')) {
+                return;
+            }
+            
+            // Update button state
+            this.disabled = true;
+            btnText.textContent = 'Purging...';
+            btnIcon.classList.add('fa-spin');
+            btnIcon.classList.remove('fa-trash');
+            btnIcon.classList.add('fa-spinner');
+            
+            // Make purge request
+            fetch(`/api/libraries/${libraryId}/purge`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    btnText.textContent = 'Purged!';
+                    btnIcon.classList.remove('fa-spin');
+                    btnIcon.classList.remove('fa-spinner');
+                    btnIcon.classList.add('fa-check');
+                    
+                    // Show success message
+                    console.log(`Purged ${data.deleted_count || 0} items from library`);
+                    
+                    // Reload page after short delay to show updated content
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    btnText.textContent = 'Purge Failed';
+                    btnIcon.classList.remove('fa-spin');
+                    btnIcon.classList.remove('fa-spinner');
+                    btnIcon.classList.add('fa-exclamation-triangle');
+                    console.error('Purge failed:', data.error);
+                    
+                    // Reset button after delay
+                    setTimeout(() => {
+                        this.disabled = false;
+                        btnText.textContent = 'Purge DB';
+                        btnIcon.classList.remove('fa-exclamation-triangle');
+                        btnIcon.classList.add('fa-trash');
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Purge request failed:', error);
+                btnText.textContent = 'Purge Failed';
+                btnIcon.classList.remove('fa-spin');
+                btnIcon.classList.remove('fa-spinner');
+                btnIcon.classList.add('fa-exclamation-triangle');
+                
+                // Reset button after delay
+                setTimeout(() => {
+                    this.disabled = false;
+                    btnText.textContent = 'Purge DB';
+                    btnIcon.classList.remove('fa-exclamation-triangle');
+                    btnIcon.classList.add('fa-trash');
+                }, 3000);
+            });
+        });
+    }
+});
+</script>

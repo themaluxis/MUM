@@ -1,0 +1,362 @@
+"""
+Media Sync Service
+Handles syncing media items from external services to local database for faster access
+"""
+
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
+from flask import current_app
+from sqlalchemy import and_, or_
+from app.extensions import db
+from app.models_media_services import MediaItem, MediaLibrary, MediaServer
+from app.services.media_service_factory import MediaServiceFactory
+
+
+class MediaSyncService:
+    """Service for syncing media items from external services to local database"""
+    
+    @staticmethod
+    def sync_library_content(library_id: int, force_full_sync: bool = False) -> Dict[str, Any]:
+        """
+        Sync content for a specific library
+        
+        Args:
+            library_id: ID of the library to sync
+            force_full_sync: If True, sync all items regardless of last sync time
+            
+        Returns:
+            Dict with sync results
+        """
+        try:
+            library = MediaLibrary.query.get(library_id)
+            if not library:
+                return {'success': False, 'error': 'Library not found'}
+            
+            current_app.logger.info(f"Starting media sync for library: {library.name}")
+            
+            # Create service instance
+            service = MediaServiceFactory.create_service_from_db(library.server)
+            if not service:
+                return {'success': False, 'error': 'Could not create service instance'}
+            
+            # Check if service supports get_library_content
+            if not hasattr(service, 'get_library_content'):
+                return {'success': False, 'error': 'Service does not support library content retrieval'}
+            
+            # Get all items from the service (no pagination for sync)
+            all_items = []
+            page = 1
+            per_page = 100  # Larger batches for sync
+            
+            while True:
+                try:
+                    content_data = service.get_library_content(library.external_id, page=page, per_page=per_page)
+                    items = content_data.get('items', [])
+                    
+                    if not items:
+                        break
+                        
+                    all_items.extend(items)
+                    
+                    # Check if we've got all items
+                    if len(items) < per_page:
+                        break
+                        
+                    page += 1
+                    
+                except Exception as e:
+                    current_app.logger.error(f"Error fetching page {page} for library {library.name}: {e}")
+                    break
+            
+            current_app.logger.info(f"Retrieved {len(all_items)} items from {library.name}")
+            
+            # Sync items to database
+            sync_results = MediaSyncService._sync_items_to_db(library, all_items)
+            
+            # Update library last sync time
+            library.last_scanned = datetime.utcnow()
+            db.session.add(library)
+            db.session.commit()
+            
+            current_app.logger.info(f"Completed sync for library {library.name}: {sync_results}")
+            
+            return {
+                'success': True,
+                'library_name': library.name,
+                'total_items': len(all_items),
+                **sync_results
+            }
+            
+        except Exception as e:
+            current_app.logger.error(f"Error syncing library {library_id}: {e}")
+            db.session.rollback()
+            return {'success': False, 'error': str(e)}
+    
+    @staticmethod
+    def _sync_items_to_db(library: MediaLibrary, items: List[Dict[str, Any]]) -> Dict[str, int]:
+        """
+        Sync items to database
+        
+        Args:
+            library: MediaLibrary instance
+            items: List of item dictionaries from service
+            
+        Returns:
+            Dict with counts of added, updated, removed items
+        """
+        added_count = 0
+        updated_count = 0
+        
+        # Get existing items for this library
+        existing_items = {item.external_id: item for item in 
+                         MediaItem.query.filter_by(library_id=library.id).all()}
+        
+        current_external_ids = set()
+        
+        for item_data in items:
+            try:
+                external_id = str(item_data.get('id', ''))
+                if not external_id:
+                    continue
+                    
+                current_external_ids.add(external_id)
+                
+                # Check if item exists
+                existing_item = existing_items.get(external_id)
+                
+                if existing_item:
+                    # Update existing item
+                    if MediaSyncService._update_media_item(existing_item, item_data):
+                        updated_count += 1
+                else:
+                    # Create new item
+                    new_item = MediaSyncService._create_media_item(library, item_data)
+                    if new_item:
+                        added_count += 1
+                        
+            except Exception as e:
+                current_app.logger.warning(f"Error processing item {item_data.get('id', 'unknown')}: {e}")
+                continue
+        
+        # Remove items that no longer exist on the service
+        items_to_remove = [item for external_id, item in existing_items.items() 
+                          if external_id not in current_external_ids]
+        
+        removed_count = 0
+        for item in items_to_remove:
+            db.session.delete(item)
+            removed_count += 1
+        
+        # Commit all changes
+        try:
+            db.session.commit()
+            current_app.logger.info(f"Sync completed: {added_count} added, {updated_count} updated, {removed_count} removed")
+        except Exception as e:
+            current_app.logger.error(f"Error committing sync changes: {e}")
+            db.session.rollback()
+            raise
+        
+        return {
+            'added': added_count,
+            'updated': updated_count,
+            'removed': removed_count
+        }
+    
+    @staticmethod
+    def _create_media_item(library: MediaLibrary, item_data: Dict[str, Any]) -> Optional[MediaItem]:
+        """Create a new MediaItem from service data"""
+        try:
+            # Extract thumbnail path (handle different service formats)
+            thumb_path = None
+            if item_data.get('thumb'):
+                thumb_url = item_data['thumb']
+                if thumb_url.startswith('/api/'):
+                    # Already a proxy URL (Jellyfin or other services) - store as-is
+                    thumb_path = thumb_url
+                elif '/api/media/plex/images/proxy' in thumb_url and 'path=' in thumb_url:
+                    # Plex proxy URL: extract path
+                    thumb_path = thumb_url.split('path=')[1]
+                elif thumb_url.startswith('/'):
+                    # Direct path
+                    thumb_path = thumb_url
+            
+            # Parse duration (handle different formats)
+            duration = item_data.get('duration')
+            if duration and isinstance(duration, str):
+                try:
+                    duration = int(duration)
+                except ValueError:
+                    duration = None
+            
+            # Parse added_at date
+            added_at = None
+            if item_data.get('added_at'):
+                try:
+                    if isinstance(item_data['added_at'], str):
+                        added_at = datetime.fromisoformat(item_data['added_at'].replace('Z', '+00:00'))
+                    else:
+                        added_at = item_data['added_at']
+                except (ValueError, TypeError):
+                    pass
+            
+            media_item = MediaItem(
+                library_id=library.id,
+                server_id=library.server_id,
+                external_id=str(item_data.get('id', '')),
+                title=item_data.get('title', 'Unknown Title'),
+                sort_title=item_data.get('sort_title') or item_data.get('title', 'Unknown Title'),
+                item_type=item_data.get('type', 'unknown'),
+                summary=item_data.get('summary') or item_data.get('plot') or item_data.get('overview'),
+                year=item_data.get('year'),
+                rating=item_data.get('rating'),
+                duration=duration,
+                thumb_path=thumb_path,
+                added_at=added_at,
+                last_synced=datetime.utcnow(),
+                extra_metadata=item_data.get('raw_data', {})
+            )
+            
+            db.session.add(media_item)
+            return media_item
+            
+        except Exception as e:
+            current_app.logger.error(f"Error creating media item: {e}")
+            return None
+    
+    @staticmethod
+    def _update_media_item(item: MediaItem, item_data: Dict[str, Any]) -> bool:
+        """Update an existing MediaItem with new data"""
+        try:
+            updated = False
+            
+            # Check if key fields have changed
+            new_title = item_data.get('title', 'Unknown Title')
+            new_summary = item_data.get('summary') or item_data.get('plot') or item_data.get('overview')
+            new_year = item_data.get('year')
+            new_rating = item_data.get('rating')
+            
+            if item.title != new_title:
+                item.title = new_title
+                item.sort_title = item_data.get('sort_title') or new_title
+                updated = True
+            
+            if item.summary != new_summary:
+                item.summary = new_summary
+                updated = True
+            
+            if item.year != new_year:
+                item.year = new_year
+                updated = True
+            
+            if item.rating != new_rating:
+                item.rating = new_rating
+                updated = True
+            
+            # Always update last_synced and extra_metadata
+            item.last_synced = datetime.utcnow()
+            item.extra_metadata = item_data.get('raw_data', {})
+            
+            if updated:
+                db.session.add(item)
+            
+            return updated
+            
+        except Exception as e:
+            current_app.logger.error(f"Error updating media item {item.external_id}: {e}")
+            return False
+    
+    @staticmethod
+    def get_cached_library_content(library_id: int, page: int = 1, per_page: int = 24, 
+                                 search_query: str = '') -> Dict[str, Any]:
+        """
+        Get library content from cached database
+        
+        Args:
+            library_id: ID of the library
+            page: Page number
+            per_page: Items per page
+            search_query: Search query string
+            
+        Returns:
+            Dict with paginated results
+        """
+        try:
+            # Build query
+            query = MediaItem.query.filter_by(library_id=library_id)
+            
+            # Apply search filter if provided
+            if search_query:
+                search_term = f"%{search_query.lower()}%"
+                query = query.filter(
+                    or_(
+                        MediaItem.title.ilike(search_term),
+                        MediaItem.summary.ilike(search_term)
+                    )
+                )
+            
+            # Order by title
+            query = query.order_by(MediaItem.sort_title.asc())
+            
+            # Get total count
+            total = query.count()
+            
+            # Apply pagination
+            items = query.offset((page - 1) * per_page).limit(per_page).all()
+            
+            # Convert to dict format
+            items_data = [item.to_dict() for item in items]
+            
+            # Calculate pagination info
+            total_pages = (total + per_page - 1) // per_page
+            
+            return {
+                'items': items_data,
+                'total': total,
+                'page': page,
+                'per_page': per_page,
+                'pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages
+            }
+            
+        except Exception as e:
+            current_app.logger.error(f"Error getting cached library content: {e}")
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False,
+                'error': str(e)
+            }
+    
+    @staticmethod
+    def is_library_synced(library_id: int, max_age_hours: int = 24) -> bool:
+        """
+        Check if library has been synced recently
+        
+        Args:
+            library_id: ID of the library
+            max_age_hours: Maximum age of sync in hours
+            
+        Returns:
+            True if library has been synced within max_age_hours
+        """
+        try:
+            cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
+            
+            # Check if we have any items synced recently
+            recent_item = MediaItem.query.filter(
+                and_(
+                    MediaItem.library_id == library_id,
+                    MediaItem.last_synced >= cutoff_time
+                )
+            ).first()
+            
+            return recent_item is not None
+            
+        except Exception as e:
+            current_app.logger.error(f"Error checking library sync status: {e}")
+            return False

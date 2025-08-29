@@ -463,6 +463,74 @@ def sync_server_users(server_id):
     result = MediaServiceManager.sync_server_users(server_id)
     return jsonify(result)
 
+@bp.route('/libraries/<int:library_id>/sync', methods=['POST'])
+@login_required
+@csrf.exempt
+def sync_library_content(library_id):
+    """Sync content for a specific library"""
+    try:
+        from app.services.media_sync_service import MediaSyncService
+        from app.models_media_services import MediaLibrary
+        
+        # Check if library exists
+        library = MediaLibrary.query.get(library_id)
+        if not library:
+            return jsonify({'success': False, 'error': 'Library not found'}), 404
+        
+        current_app.logger.info(f"Starting library sync for: {library.name}")
+        
+        # Perform the sync
+        result = MediaSyncService.sync_library_content(library_id)
+        
+        if result['success']:
+            current_app.logger.info(f"Library sync completed successfully: {result}")
+            return jsonify(result)
+        else:
+            current_app.logger.error(f"Library sync failed: {result.get('error', 'Unknown error')}")
+            return jsonify(result), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Error in library sync endpoint: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@bp.route('/libraries/<int:library_id>/purge', methods=['POST'])
+@login_required
+@csrf.exempt
+def purge_library_content(library_id):
+    """Purge all cached media items for a specific library from the database"""
+    try:
+        from app.models_media_services import MediaLibrary, MediaItem
+        
+        # Check if library exists
+        library = MediaLibrary.query.get(library_id)
+        if not library:
+            return jsonify({'success': False, 'error': 'Library not found'}), 404
+        
+        current_app.logger.info(f"Starting library purge for: {library.name}")
+        
+        # Count items before deletion
+        item_count = MediaItem.query.filter_by(library_id=library_id).count()
+        
+        # Delete all media items for this library
+        deleted_count = MediaItem.query.filter_by(library_id=library_id).delete()
+        
+        # Commit the changes
+        db.session.commit()
+        
+        current_app.logger.info(f"Library purge completed: deleted {deleted_count} items from {library.name}")
+        
+        return jsonify({
+            'success': True,
+            'deleted_count': deleted_count,
+            'library_name': library.name,
+            'message': f'Successfully purged {deleted_count} items from library {library.name}'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in library purge endpoint: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # =============================================================================
 # MEDIA SERVICES API
 # =============================================================================

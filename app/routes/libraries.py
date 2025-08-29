@@ -411,7 +411,14 @@ def library_detail(server_nickname, library_name):
     media_content = None
     if tab == 'media':
         page = request.args.get('page', 1, type=int)
-        media_content = get_library_media_content(library, page)
+        per_page = request.args.get('per_page', 24, type=int)
+        search_query = request.args.get('search', '').strip()
+        
+        # Validate per_page parameter
+        if per_page not in [12, 24, 48, 96]:
+            per_page = 24
+            
+        media_content = get_library_media_content(library, page, per_page, search_query)
     
     # Get recent activity for this library
     recent_activity = []
@@ -726,98 +733,34 @@ def generate_library_chart_data(library, days=30):
         'date_range_days': days
     }
 
-def get_library_media_content(library, page=1, per_page=24):
-    """Get media content from the library using the media service API"""
+def get_library_media_content(library, page=1, per_page=24, search_query=''):
+    """Get media content from the library using cached data or live API"""
     try:
-        # Create service instance for the library's server
-        service = MediaServiceFactory.create_service_from_db(library.server)
-        if not service:
-            current_app.logger.error(f"Could not create service for server {library.server.server_nickname}")
-            return {
-                'items': [],
-                'total': 0,
-                'page': page,
-                'per_page': per_page,
-                'pages': 0,
-                'has_prev': False,
-                'has_next': False
-            }
+        from app.services.media_sync_service import MediaSyncService
         
-        # Get library content from the service
-        if hasattr(service, 'get_library_content'):
-            # Use dedicated method if available
-            content_data = service.get_library_content(library.external_id, page=page, per_page=per_page)
-        else:
-            # Fallback to getting all content and paginating manually
-            all_content = []
-            if hasattr(service, 'get_movies') and library.library_type in ['movie', 'movies']:
-                all_content = service.get_movies()
-            elif hasattr(service, 'get_shows') and library.library_type in ['show', 'shows', 'tv']:
-                all_content = service.get_shows()
-            elif hasattr(service, 'get_music') and library.library_type in ['music', 'audio']:
-                all_content = service.get_music()
-            elif hasattr(service, 'get_books') and library.library_type in ['book', 'books']:
-                all_content = service.get_books()
-            else:
-                # Generic content fetch
-                if hasattr(service, 'get_content'):
-                    all_content = service.get_content(library.external_id)
-                else:
-                    all_content = []
-            
-            # Manual pagination
-            total = len(all_content)
-            start_idx = (page - 1) * per_page
-            end_idx = start_idx + per_page
-            items = all_content[start_idx:end_idx]
-            
-            content_data = {
-                'items': items,
-                'total': total,
-                'page': page,
-                'per_page': per_page,
-                'pages': (total + per_page - 1) // per_page,
-                'has_prev': page > 1,
-                'has_next': end_idx < total
-            }
+        # Check if we have cached data that's recent enough
+        if MediaSyncService.is_library_synced(library.id, max_age_hours=24):
+            current_app.logger.debug(f"Using cached data for library {library.name}")
+            return MediaSyncService.get_cached_library_content(library.id, page, per_page, search_query)
         
-        # Process and enhance the content data
-        processed_items = []
-        for item in content_data.get('items', []):
-            processed_item = {
-                'id': item.get('id') or item.get('ratingKey') or item.get('key', ''),
-                'title': item.get('title') or item.get('name', 'Unknown Title'),
-                'year': item.get('year') or item.get('originallyAvailableAt', '').split('-')[0] if item.get('originallyAvailableAt') else '',
-                'thumb': item.get('thumb') or item.get('art') or item.get('poster') or item.get('image'),
-                'type': item.get('type') or library.library_type or 'unknown',
-                'summary': item.get('summary') or item.get('plot') or item.get('overview', ''),
-                'rating': item.get('rating') or item.get('audienceRating') or item.get('imdbRating'),
-                'duration': item.get('duration') or item.get('runtime'),
-                'added_at': item.get('addedAt') or item.get('dateAdded'),
-                'raw_data': item  # Store raw data for debugging
-            }
-            
-            # Handle thumb URLs for different services
-            if processed_item['thumb']:
-                thumb_url = processed_item['thumb']
-                # For Plex, construct full URL if needed (but skip proxy URLs)
-                if library.server.service_type.value == 'plex' and not thumb_url.startswith('http') and not thumb_url.startswith('/api/'):
-                    if thumb_url.startswith('/'):
-                        thumb_url = f"{library.server.url}{thumb_url}"
-                    processed_item['thumb'] = thumb_url
-                # For other services, use as-is or construct URL as needed (but skip proxy URLs)
-                elif not thumb_url.startswith('http') and not thumb_url.startswith('/api/'):
-                    # Try to construct full URL
-                    if thumb_url.startswith('/'):
-                        thumb_url = f"{library.server.url}{thumb_url}"
-                    processed_item['thumb'] = thumb_url
-            
-            processed_items.append(processed_item)
+        # Check if we have any cached data at all (regardless of age)
+        cached_content = MediaSyncService.get_cached_library_content(library.id, page, per_page, search_query)
+        if cached_content and cached_content.get('items'):
+            current_app.logger.debug(f"Using older cached data for library {library.name}")
+            return cached_content
         
-        content_data['items'] = processed_items
-        current_app.logger.info(f"Retrieved {len(processed_items)} media items from library {library.name}")
-        
-        return content_data
+        # Return empty result - no cached data available, user needs to sync first
+        current_app.logger.info(f"No cached data for library {library.name}, returning empty result. User needs to sync first.")
+        return {
+            'items': [],
+            'total': 0,
+            'page': page,
+            'per_page': per_page,
+            'pages': 0,
+            'has_prev': False,
+            'has_next': False,
+            'needs_sync': True  # Flag to indicate sync is needed
+        }
         
     except Exception as e:
         current_app.logger.error(f"Error fetching media content for library {library.name}: {e}")

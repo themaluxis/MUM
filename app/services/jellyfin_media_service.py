@@ -716,11 +716,12 @@ class JellyfinMediaService(BaseMediaService):
             processed_items = []
             for item in items:
                 try:
-                    # Get thumbnail URL using proxy method
+                    # Get thumbnail URL using proxy method (manually construct to avoid url_for issues)
                     thumb_url = None
                     if item.get('Id'):
-                        from flask import url_for
-                        thumb_url = url_for('api.jellyfin_image_proxy', item_id=item['Id'], image_type='Primary')
+                        # Manually construct relative URL to avoid url_for issues with external hosts
+                        thumb_url = f"/api/media/jellyfin/images/proxy?item_id={item['Id']}&image_type=Primary"
+                        current_app.logger.debug(f"Generated Jellyfin thumb URL: {thumb_url}")
                     
                     # Extract year from PremiereDate
                     year = None

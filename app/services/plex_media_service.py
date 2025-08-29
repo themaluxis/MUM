@@ -1006,14 +1006,16 @@ class PlexMediaService(BaseMediaService):
             processed_items = []
             for item in page_items:
                 try:
-                    # Get thumbnail URL using proxy method (exactly like streaming sessions)
+                    # Get thumbnail URL using proxy method (manually construct to avoid url_for issues)
                     thumb_url = None
                     if hasattr(item, 'thumb') and item.thumb:
-                        from flask import url_for
-                        thumb_url = url_for('api.plex_image_proxy', path=item.thumb.lstrip('/'))
+                        # Manually construct relative URL to avoid url_for issues with external hosts
+                        thumb_url = f"/api/media/plex/images/proxy?path={item.thumb.lstrip('/')}"
+                        current_app.logger.debug(f"Generated Plex thumb URL: {thumb_url}")
                     elif hasattr(item, 'art') and item.art:
-                        from flask import url_for
-                        thumb_url = url_for('api.plex_image_proxy', path=item.art.lstrip('/'))
+                        # Manually construct relative URL to avoid url_for issues with external hosts
+                        thumb_url = f"/api/media/plex/images/proxy?path={item.art.lstrip('/')}"
+                        current_app.logger.debug(f"Generated Plex art URL: {thumb_url}")
                     
                     # Extract year from originallyAvailableAt
                     year = None
