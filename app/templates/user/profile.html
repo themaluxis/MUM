@@ -98,27 +98,46 @@
                     <!-- Avatar -->
                     <div class="avatar">
                         <div class="w-24 h-24 rounded-full ring-4 ring-primary/30 ring-offset-4 ring-offset-base-100">
-                            {# Always use colored circular avatars with service-specific colors #}
-                            {% if primary_service and primary_service.value == 'plex' %}
-                                <div class="bg-plex text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
-                                    {{ user.get_display_name()[0]|upper if user.get_display_name() else 'P' }}
+                            {% if user.avatar_url %}
+                                <img src="{{ user.avatar_url }}" 
+                                     alt="{{ user.get_display_name() }}"
+                                     class="w-24 h-24 rounded-full object-cover"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <!-- Fallback colored avatar -->
+                                <div class="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal text-white" style="display: none;
+                                    {% if primary_service and primary_service.value == 'plex' %}background-color: var(--color-plex, #e5a00d);
+                                    {% elif primary_service and primary_service.value == 'jellyfin' %}background-color: var(--color-jellyfin, #00a4dc);
+                                    {% elif primary_service and primary_service.value == 'emby' %}background-color: var(--color-emby, #52b54b);
+                                    {% elif primary_service and primary_service.value == 'kavita' %}background-color: var(--color-kavita, #f39c12);
+                                    {% elif primary_service and primary_service.value == 'audiobookshelf' %}background-color: var(--color-audiobookshelf, #8b5cf6);
+                                    {% elif primary_service and primary_service.value == 'komga' %}background-color: var(--color-komga, #ef4444);
+                                    {% elif primary_service and primary_service.value == 'romm' %}background-color: var(--color-romm, #10b981);
+                                    {% else %}background-color: var(--color-primary, #3b82f6);
+                                    {% endif %}">
+                                    {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
                                 </div>
-                            {% elif primary_service and primary_service.value == 'jellyfin' %}
-                                <div class="bg-jellyfin text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
-                                    {{ user.get_display_name()[0]|upper if user.get_display_name() else 'J' }}
-                                </div>
-                            {% elif primary_service and primary_service.value == 'emby' %}
-                                <div class="bg-emby text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
-                                    {{ user.get_display_name()[0]|upper if user.get_display_name() else 'E' }}
-                                </div>
-                            {% elif primary_service and primary_service.value == 'kavita' %}
-                                <div class="bg-kavita text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
-                                    {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
-                                </div>
-                            {% elif primary_service and primary_service.value == 'audiobookshelf' %}
-                                <div class="bg-audiobookshelf text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
-                                    {{ user.get_display_name()[0]|upper if user.get_display_name() else 'A' }}
-                                </div>
+                            {% else %}
+                                {# Fallback to colored circular avatars with service-specific colors when no avatar URL #}
+                                {% if primary_service and primary_service.value == 'plex' %}
+                                    <div class="bg-plex text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
+                                        {{ user.get_display_name()[0]|upper if user.get_display_name() else 'P' }}
+                                    </div>
+                                {% elif primary_service and primary_service.value == 'jellyfin' %}
+                                    <div class="bg-jellyfin text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
+                                        {{ user.get_display_name()[0]|upper if user.get_display_name() else 'J' }}
+                                    </div>
+                                {% elif primary_service and primary_service.value == 'emby' %}
+                                    <div class="bg-emby text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
+                                        {{ user.get_display_name()[0]|upper if user.get_display_name() else 'E' }}
+                                    </div>
+                                {% elif primary_service and primary_service.value == 'kavita' %}
+                                    <div class="bg-kavita text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
+                                        {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
+                                    </div>
+                                {% elif primary_service and primary_service.value == 'audiobookshelf' %}
+                                    <div class="bg-audiobookshelf text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
+                                        {{ user.get_display_name()[0]|upper if user.get_display_name() else 'A' }}
+                                    </div>
                             {% elif primary_service and primary_service.value == 'komga' %}
                                 <div class="bg-komga text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
                                     {{ user.get_display_name()[0]|upper if user.get_display_name() else 'K' }}
@@ -131,6 +150,7 @@
                                 <div class="bg-gray-500 text-white w-24 h-24 rounded-full flex items-center justify-center text-3xl font-normal">
                                     {{ user.get_display_name()[0]|upper if user.get_display_name() else 'U' }}
                                 </div>
+                            {% endif %}
                             {% endif %}
                         </div>
                     </div>
