@@ -72,6 +72,13 @@
                     <i class="fa-solid fa-trash mr-2"></i>
                     <span class="purge-btn-text">Purge DB</span>
                 </button>
+                <div class="text-xs text-base-content/50 hidden sm:block">
+                    {% if library.last_scanned %}
+                        Last updated: {{ format_datetime_with_user_timezone(library.last_scanned, '%m/%d %H:%M') }}
+                    {% else %}
+                        Never updated
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
