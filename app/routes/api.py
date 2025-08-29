@@ -564,8 +564,8 @@ def plex_image_proxy():
         plex = plex_service._get_server_instance()
         full_authed_plex_image_url = plex.url(path_for_plexapi, includeToken=True)
         
-        current_app.logger.debug(f"API plex_image_proxy: Corrected path for plex.url(): {path_for_plexapi}")
-        current_app.logger.debug(f"API plex_image_proxy: Fetching image from Plex URL: {full_authed_plex_image_url}")
+        # current_app.logger.debug(f"API plex_image_proxy: Corrected path for plex.url(): {path_for_plexapi}")
+        # current_app.logger.debug(f"API plex_image_proxy: Fetching image from Plex URL: {full_authed_plex_image_url}")
 
         plex_timeout = current_app.config.get('PLEX_TIMEOUT', 10)
         

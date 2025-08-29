@@ -1011,11 +1011,11 @@ class PlexMediaService(BaseMediaService):
                     if hasattr(item, 'thumb') and item.thumb:
                         # Manually construct relative URL to avoid url_for issues with external hosts
                         thumb_url = f"/api/media/plex/images/proxy?path={item.thumb.lstrip('/')}"
-                        current_app.logger.debug(f"Generated Plex thumb URL: {thumb_url}")
+                        # current_app.logger.debug(f"Generated Plex thumb URL: {thumb_url}")
                     elif hasattr(item, 'art') and item.art:
                         # Manually construct relative URL to avoid url_for issues with external hosts
                         thumb_url = f"/api/media/plex/images/proxy?path={item.art.lstrip('/')}"
-                        current_app.logger.debug(f"Generated Plex art URL: {thumb_url}")
+                        # current_app.logger.debug(f"Generated Plex art URL: {thumb_url}")
                     
                     # Extract year from originallyAvailableAt
                     year = None
