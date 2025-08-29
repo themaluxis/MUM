@@ -209,12 +209,25 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
+    // Get DaisyUI colors from computed styles
+    const tempDiv = document.createElement('div');
+    tempDiv.className = 'bg-primary';
+    document.body.appendChild(tempDiv);
+    const primaryColor = getComputedStyle(tempDiv).backgroundColor;
+    tempDiv.className = 'bg-secondary';
+    const secondaryColor = getComputedStyle(tempDiv).backgroundColor;
+    document.body.removeChild(tempDiv);
+    
+    // Convert RGB to RGBA for transparency
+    const primaryColorWithAlpha = primaryColor.replace('rgb', 'rgba').replace(')', ', 0.8)');
+    const secondaryColorWithAlpha = secondaryColor.replace('rgb', 'rgba').replace(')', ', 0.8)');
+    
     // Create datasets for plays and time
     datasets.push({
         label: 'Total Plays',
         data: chartData.map(day => day.plays || 0),
-        backgroundColor: 'rgba(59, 130, 246, 0.8)', // Primary color
-        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: primaryColorWithAlpha, // Primary color from DaisyUI
+        borderColor: primaryColor,
         borderWidth: 1,
         borderRadius: 4,
         borderSkipped: false,
@@ -224,8 +237,8 @@ document.addEventListener('DOMContentLoaded', function() {
     datasets.push({
         label: 'Watch Time (minutes)',
         data: chartData.map(day => day.time || 0),
-        backgroundColor: 'rgba(16, 185, 129, 0.8)', // Secondary color
-        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: secondaryColorWithAlpha, // Secondary color from DaisyUI
+        borderColor: secondaryColor,
         borderWidth: 1,
         borderRadius: 4,
         borderSkipped: false,

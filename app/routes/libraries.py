@@ -805,17 +805,36 @@ def get_library_user_stats(library, days=30):
                 # Use the stored external avatar URL directly
                 avatar_url = stat.external_avatar_url
             elif stat.user_media_access_uuid:
-                # Try to construct avatar URL based on service type
-                if library.server.service_type.value.lower() == 'plex':
-                    # For Plex, we might need to get the thumb path from the user record
-                    user_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
-                    if user_access and user_access.service_settings.get('thumb'):
-                        avatar_url = f"/api/media/plex/images/proxy?path={user_access.service_settings['thumb']}"
-                elif library.server.service_type.value.lower() == 'jellyfin':
-                    # For Jellyfin, use the external_user_id to get avatar
-                    user_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
-                    if user_access and user_access.external_user_id:
-                        avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user_access.external_user_id}"
+                # Get the full user record to access raw_data and service_settings
+                user_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
+                if user_access:
+                    if library.server.service_type.value.lower() == 'plex':
+                        # For Plex, check multiple possible locations for the thumb URL
+                        thumb_url = None
+                        
+                        # First try service_settings
+                        if user_access.service_settings and user_access.service_settings.get('thumb'):
+                            thumb_url = user_access.service_settings['thumb']
+                        # Then try raw_data from the user sync
+                        elif user_access.user_raw_data and user_access.user_raw_data.get('thumb'):
+                            thumb_url = user_access.user_raw_data['thumb']
+                        # Also check nested raw data structure
+                        elif (user_access.user_raw_data and 
+                              user_access.user_raw_data.get('plex_user_obj_attrs') and 
+                              user_access.user_raw_data['plex_user_obj_attrs'].get('thumb')):
+                            thumb_url = user_access.user_raw_data['plex_user_obj_attrs']['thumb']
+                        
+                        if thumb_url:
+                            # Check if it's already a full URL (plex.tv avatars) or needs proxy
+                            if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
+                                avatar_url = thumb_url
+                            else:
+                                avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                    
+                    elif library.server.service_type.value.lower() == 'jellyfin':
+                        # For Jellyfin, use the external_user_id to get avatar
+                        if user_access.external_user_id:
+                            avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user_access.external_user_id}"
             
             user_stats.append({
                 'uuid': stat.user_media_access_uuid,
