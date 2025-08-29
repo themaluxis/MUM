@@ -44,6 +44,48 @@ def get_libraries_from_database(servers):
     
     return libraries_by_server
 
+def _get_local_user_avatar_url(app_user):
+    """Get avatar URL for local users by checking their linked media access accounts"""
+    from app.models_media_services import UserMediaAccess
+    
+    # Get all media access records for this local user
+    access_records = UserMediaAccess.query.filter_by(user_app_access_id=app_user.id).all()
+    
+    for access in access_records:
+        # First check for external avatar URL
+        if access.external_avatar_url:
+            return access.external_avatar_url
+        elif access.server.service_type.value.lower() == 'plex':
+            # For Plex, check multiple possible locations for the thumb URL
+            thumb_url = None
+            
+            # First try service_settings
+            if access.service_settings and access.service_settings.get('thumb'):
+                thumb_url = access.service_settings['thumb']
+            # Then try raw_data from the user sync
+            elif access.user_raw_data and access.user_raw_data.get('thumb'):
+                thumb_url = access.user_raw_data['thumb']
+            # Also check nested raw data structure
+            elif (access.user_raw_data and 
+                  access.user_raw_data.get('plex_user_obj_attrs') and 
+                  access.user_raw_data['plex_user_obj_attrs'].get('thumb')):
+                thumb_url = access.user_raw_data['plex_user_obj_attrs']['thumb']
+            
+            if thumb_url:
+                # Check if it's already a full URL (plex.tv avatars) or needs proxy
+                if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
+                    return thumb_url
+                else:
+                    return f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+        
+        elif access.server.service_type.value.lower() == 'jellyfin':
+            # For Jellyfin, use the external_user_id to get avatar
+            if access.external_user_id:
+                return f"/api/media/jellyfin/users/avatar?user_id={access.external_user_id}"
+    
+    # No avatar found
+    return None
+
 @bp.route('/')
 @login_required
 @setup_required
@@ -209,6 +251,9 @@ def list_users():
                     self._is_standalone = True  # Flag to identify standalone users
                     self._access_record = access  # Store the original access record
                     
+                    # Process avatar URL using the same logic as library stats
+                    self.avatar_url = self._get_avatar_url(access)
+                    
                     # Add last_streamed_at property for template compatibility
                     self.last_streamed_at = None
                     from app.models_media_services import MediaStreamHistory
@@ -225,6 +270,43 @@ def list_users():
                             user_media_access_uuid=access.uuid
                         ).order_by(MediaStreamHistory.started_at.desc()).first()
                         self.last_streamed_at = last_stream.started_at if last_stream else None
+                
+                def _get_avatar_url(self, access):
+                    """Process avatar URL using the same logic as library stats chart"""
+                    avatar_url = None
+                    
+                    # First check for external avatar URL
+                    if access.external_avatar_url:
+                        avatar_url = access.external_avatar_url
+                    elif access.server.service_type.value.lower() == 'plex':
+                        # For Plex, check multiple possible locations for the thumb URL
+                        thumb_url = None
+                        
+                        # First try service_settings
+                        if access.service_settings and access.service_settings.get('thumb'):
+                            thumb_url = access.service_settings['thumb']
+                        # Then try raw_data from the user sync
+                        elif access.user_raw_data and access.user_raw_data.get('thumb'):
+                            thumb_url = access.user_raw_data['thumb']
+                        # Also check nested raw data structure
+                        elif (access.user_raw_data and 
+                              access.user_raw_data.get('plex_user_obj_attrs') and 
+                              access.user_raw_data['plex_user_obj_attrs'].get('thumb')):
+                            thumb_url = access.user_raw_data['plex_user_obj_attrs']['thumb']
+                        
+                        if thumb_url:
+                            # Check if it's already a full URL (plex.tv avatars) or needs proxy
+                            if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
+                                avatar_url = thumb_url
+                            else:
+                                avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                    
+                    elif access.server.service_type.value.lower() == 'jellyfin':
+                        # For Jellyfin, use the external_user_id to get avatar
+                        if access.external_user_id:
+                            avatar_url = f"/api/media/jellyfin/users/avatar?user_id={access.external_user_id}"
+                    
+                    return avatar_url
                 
                 def get_display_name(self):
                     return self._access_record.external_username or 'Unknown'
@@ -249,10 +331,12 @@ def list_users():
     # Combine and paginate results
     all_users = []
     
-    # Add local users with a type indicator and prefixed IDs
+    # Add local users with a type indicator and process their avatars
     current_app.logger.info(f"DEBUG: Found {len(app_users)} local users")
     for app_user in app_users:
         app_user._user_type = 'local'
+        # Process avatar URL for local users using their linked media access accounts
+        app_user.avatar_url = _get_local_user_avatar_url(app_user)
         # UUID is already available on the user object
         all_users.append(app_user)
         current_app.logger.info(f"DEBUG: Local user {app_user.username} (UUID: {app_user.uuid}) added to list")
