@@ -118,11 +118,18 @@ def monitor_media_sessions_task():
                             ).first()
                             if user_media_access:
                                 # Check if it's linked to a UserAppAccess account
+                                current_app.logger.info(f"DEBUG LINKED: Found UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id})")
+                                current_app.logger.info(f"DEBUG LINKED: user_app_access_id = {user_media_access.user_app_access_id}")
+                                current_app.logger.info(f"DEBUG LINKED: external_username = {user_media_access.external_username}")
+                                current_app.logger.info(f"DEBUG LINKED: server = {user_media_access.server.server_nickname}")
+                                
                                 mum_user = user_media_access.user_app_access
+                                current_app.logger.info(f"DEBUG LINKED: user_app_access relationship = {mum_user}")
+                                
                                 if not mum_user:
                                     current_app.logger.info(f"Found standalone UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}). Processing as standalone user.")
                                 else:
-                                    current_app.logger.info(f"Found linked UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}) linked to UserAppAccess (ID: {mum_user.id}). Processing as linked user.")
+                                    current_app.logger.info(f"Found linked UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}) linked to UserAppAccess (ID: {mum_user.id}, username: {mum_user.username}). Processing as linked user.")
                             else:
                                 current_app.logger.warning(f"No UserMediaAccess found for Jellyfin username '{jellyfin_username}' on server '{jellyfin_server.server_nickname}'. Skipping session.")
                                 continue
@@ -158,9 +165,18 @@ def monitor_media_sessions_task():
                             ).first()
                             if user_media_access:
                                 # Check if it's linked to a UserAppAccess account
+                                current_app.logger.info(f"DEBUG LINKED: Found UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id})")
+                                current_app.logger.info(f"DEBUG LINKED: user_app_access_id = {user_media_access.user_app_access_id}")
+                                current_app.logger.info(f"DEBUG LINKED: external_username = {user_media_access.external_username}")
+                                current_app.logger.info(f"DEBUG LINKED: server = {user_media_access.server.server_nickname}")
+                                
                                 mum_user = user_media_access.user_app_access
+                                current_app.logger.info(f"DEBUG LINKED: user_app_access relationship = {mum_user}")
+                                
                                 if not mum_user:
                                     current_app.logger.info(f"Found standalone UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id}). Processing as standalone user.")
+                                else:
+                                    current_app.logger.info(f"Found linked UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id}) linked to UserAppAccess (ID: {mum_user.id}, username: {mum_user.username}). Processing as linked user.")
                             else:
                                 current_app.logger.warning(f"Could not find UserMediaAccess for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
                                 continue
@@ -195,6 +211,9 @@ def monitor_media_sessions_task():
                         rating_key = str(getattr(session, 'ratingKey', None))
                         view_offset_ms = getattr(session, 'viewOffset', 0)
                         view_offset_s = int(view_offset_ms / 1000) if view_offset_ms else 0
+                        
+                        # Extract library name from Plex session
+                        library_name = getattr(session, 'librarySectionTitle', None)
                     else:
                         # Jellyfin session format (dict)
                         now_playing = session.get('NowPlayingItem', {})
@@ -218,6 +237,13 @@ def monitor_media_sessions_task():
                         # Position in ticks for Jellyfin
                         position_ticks = play_state.get('PositionTicks', 0)
                         view_offset_s = int(position_ticks / 10000000) if position_ticks else 0  # Convert ticks to seconds
+                        
+                        # Extract library name from Jellyfin session
+                        # For Jellyfin, we might need to look up the library name by ParentId or LibraryId
+                        library_name = now_playing.get('ParentName', None)  # This might contain library info
+                        if not library_name:
+                            # Try alternative fields that might contain library information
+                            library_name = now_playing.get('ChannelName', None) or now_playing.get('CollectionType', None)
 
                     # Determine which server this session belongs to
                     if isinstance(session, dict):
@@ -269,6 +295,7 @@ def monitor_media_sessions_task():
                         media_type=media_type,
                         grandparent_title=grandparent_title,
                         parent_title=parent_title,
+                        library_name=library_name,
                         media_duration_seconds=media_duration_s,
                         view_offset_at_end_seconds=view_offset_s
                     )

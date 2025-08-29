@@ -303,6 +303,7 @@ class MediaStreamHistory(db.Model):
     media_type = db.Column(db.String(50), nullable=True)
     grandparent_title = db.Column(db.String(255), nullable=True)
     parent_title = db.Column(db.String(255), nullable=True)
+    library_name = db.Column(db.String(255), nullable=True)
     
     media_duration_seconds = db.Column(db.Integer, nullable=True)
     view_offset_at_end_seconds = db.Column(db.Integer, nullable=True)

@@ -16,7 +16,7 @@ import urllib.parse
 # Note the new blueprint name and singular URL prefix
 bp = Blueprint('user', __name__, url_prefix='/user')
 
-def _generate_streaming_chart_data(user, days=30):
+def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
     """Generate streaming history chart data for the specified number of days"""
     from datetime import datetime, timezone, timedelta
     from collections import defaultdict
@@ -69,6 +69,8 @@ def _generate_streaming_chart_data(user, days=30):
         return {
             'chart_data': [],
             'services': [],
+            'service_content_combinations': [],
+            'content_colors': {},
             'total_streams': 0,
             'total_duration': '0m',
             'most_active_service': 'None',
@@ -146,34 +148,40 @@ def _generate_streaming_chart_data(user, days=30):
             if i < 5:
                 current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No user_media_access_uuid")
         
-        # Determine content type based on media_type or service type
-        content_type = 'mixed'
-        if entry.media_type:
-            media_type = entry.media_type.lower()
-            if media_type in ['movie', 'film']:
-                content_type = 'movies'
-            elif media_type in ['episode', 'show', 'series']:
-                content_type = 'tv_shows'
-            elif media_type in ['track', 'song', 'album']:
-                content_type = 'music'
-            elif media_type in ['book', 'audiobook']:
-                content_type = 'books'
-            elif media_type in ['comic', 'manga']:
-                content_type = 'comics'
-            else:
-                content_type = media_type
+        # Determine grouping category based on group_by parameter
+        if group_by == 'library_name':
+            # Group by library name
+            grouping_category = entry.library_name or 'Unknown Library'
         else:
-            # Fallback to service-based categorization
-            if service_type == 'kavita':
-                content_type = 'comics'
-            elif service_type == 'audiobookshelf':
-                content_type = 'books'
-            elif service_type == 'komga':
-                content_type = 'comics'
-            elif service_type == 'romm':
-                content_type = 'games'
+            # Group by library type (content type) - default behavior
+            content_type = 'mixed'
+            if entry.media_type:
+                media_type = entry.media_type.lower()
+                if media_type in ['movie', 'film']:
+                    content_type = 'movies'
+                elif media_type in ['episode', 'show', 'series']:
+                    content_type = 'tv_shows'
+                elif media_type in ['track', 'song', 'album']:
+                    content_type = 'music'
+                elif media_type in ['book', 'audiobook']:
+                    content_type = 'books'
+                elif media_type in ['comic', 'manga']:
+                    content_type = 'comics'
+                else:
+                    content_type = media_type
             else:
-                content_type = 'mixed'
+                # Fallback to service-based categorization
+                if service_type == 'kavita':
+                    content_type = 'comics'
+                elif service_type == 'audiobookshelf':
+                    content_type = 'books'
+                elif service_type == 'komga':
+                    content_type = 'comics'
+                elif service_type == 'romm':
+                    content_type = 'games'
+                else:
+                    content_type = 'mixed'
+            grouping_category = content_type
         
         # Get duration in minutes for the chart
         duration_minutes = 0
@@ -196,22 +204,22 @@ def _generate_streaming_chart_data(user, days=30):
                 current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No duration or progress data, using 1m default")
         
         if i < 5:
-            current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - Final: {service_type}_{content_type} = {duration_minutes:.1f}m on {group_key}")
+            current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - Final: {service_type}_{grouping_category} = {duration_minutes:.1f}m on {group_key}")
         
-        # Add watch time per group per service per content type (in minutes)
-        grouped_data[group_key][service_type][content_type] += duration_minutes
-        service_content_totals[service_type][content_type] += duration_minutes
+        # Add watch time per group per service per grouping category (in minutes)
+        grouped_data[group_key][service_type][grouping_category] += duration_minutes
+        service_content_totals[service_type][grouping_category] += duration_minutes
         service_totals[service_type] += duration_minutes
         service_counts[service_type] += 1
     
     # Generate chart data for the date range (including periods with no activity)
     chart_data_list = []
     
-    # Create datasets for each service-content combination
+    # Create datasets for each service-grouping combination
     service_content_combinations = []
     for service_type in service_totals.keys():
-        for content_type in service_content_totals[service_type].keys():
-            service_content_combinations.append(f"{service_type}_{content_type}")
+        for grouping_category in service_content_totals[service_type].keys():
+            service_content_combinations.append(f"{service_type}_{grouping_category}")
     
     # Generate time periods based on grouping type
     if grouping_type == 'monthly':
@@ -234,11 +242,11 @@ def _generate_streaming_chart_data(user, days=30):
             
             period_data = {'date': month_key, 'label': month_label}
             
-            # Add service-content watch times for this month (in minutes)
+            # Add service-grouping watch times for this month (in minutes)
             for service_type in service_totals.keys():
-                for content_type in service_content_totals[service_type].keys():
-                    combination_key = f"{service_type}_{content_type}"
-                    period_data[combination_key] = round(grouped_data[month_key][service_type].get(content_type, 0), 1)
+                for grouping_category in service_content_totals[service_type].keys():
+                    combination_key = f"{service_type}_{grouping_category}"
+                    period_data[combination_key] = round(grouped_data[month_key][service_type].get(grouping_category, 0), 1)
             
             chart_data_list.append(period_data)
             
@@ -270,11 +278,11 @@ def _generate_streaming_chart_data(user, days=30):
             
             period_data = {'date': week_key, 'label': week_label}
             
-            # Add service-content watch times for this week (in minutes)
+            # Add service-grouping watch times for this week (in minutes)
             for service_type in service_totals.keys():
-                for content_type in service_content_totals[service_type].keys():
-                    combination_key = f"{service_type}_{content_type}"
-                    period_data[combination_key] = round(grouped_data[week_key][service_type].get(content_type, 0), 1)
+                for grouping_category in service_content_totals[service_type].keys():
+                    combination_key = f"{service_type}_{grouping_category}"
+                    period_data[combination_key] = round(grouped_data[week_key][service_type].get(grouping_category, 0), 1)
             
             chart_data_list.append(period_data)
             current_week_start += timedelta(days=7)
@@ -292,26 +300,53 @@ def _generate_streaming_chart_data(user, days=30):
             
             period_data = {'date': day_key, 'label': day_label}
             
-            # Add service-content watch times for this day (in minutes)
+            # Add service-grouping watch times for this day (in minutes)
             for service_type in service_totals.keys():
-                for content_type in service_content_totals[service_type].keys():
-                    combination_key = f"{service_type}_{content_type}"
-                    period_data[combination_key] = round(grouped_data[day_key][service_type].get(content_type, 0), 1)
+                for grouping_category in service_content_totals[service_type].keys():
+                    combination_key = f"{service_type}_{grouping_category}"
+                    period_data[combination_key] = round(grouped_data[day_key][service_type].get(grouping_category, 0), 1)
             
             chart_data_list.append(period_data)
             current_date += timedelta(days=1)
     
-    # Content type color mapping
-    content_colors = {
-        'movies': '#ef4444',      # Red
-        'tv_shows': '#3b82f6',    # Blue  
-        'music': '#10b981',       # Green
-        'books': '#f59e0b',       # Amber
-        'comics': '#8b5cf6',      # Purple
-        'games': '#06b6d4',       # Cyan
-        'mixed': '#6b7280',       # Gray
-        'unknown': '#64748b'      # Slate
-    }
+    # Generate colors for grouping categories
+    if group_by == 'library_name':
+        # For library names, generate colors dynamically
+        content_colors = {}
+        library_names = set()
+        for service_type in service_content_totals.keys():
+            library_names.update(service_content_totals[service_type].keys())
+        
+        # Predefined colors for common library names
+        predefined_colors = [
+            '#ef4444',  # Red
+            '#3b82f6',  # Blue  
+            '#10b981',  # Green
+            '#f59e0b',  # Amber
+            '#8b5cf6',  # Purple
+            '#06b6d4',  # Cyan
+            '#ec4899',  # Pink
+            '#84cc16',  # Lime
+            '#f97316',  # Orange
+            '#6366f1',  # Indigo
+            '#14b8a6',  # Teal
+            '#f43f5e',  # Rose
+        ]
+        
+        for i, library_name in enumerate(sorted(library_names)):
+            content_colors[library_name] = predefined_colors[i % len(predefined_colors)]
+    else:
+        # Content type color mapping (default)
+        content_colors = {
+            'movies': '#ef4444',      # Red
+            'tv_shows': '#3b82f6',    # Blue  
+            'music': '#10b981',       # Green
+            'books': '#f59e0b',       # Amber
+            'comics': '#8b5cf6',      # Purple
+            'games': '#06b6d4',       # Cyan
+            'mixed': '#6b7280',       # Gray
+            'unknown': '#64748b'      # Slate
+        }
     
     # Prepare service information for legend (with content breakdown)
     services = []
@@ -427,8 +462,13 @@ def index():
     except (ValueError, TypeError):
         days = 30
     
+    # Get group by parameter
+    group_by = request.args.get('group_by', 'library_type')
+    if group_by not in ['library_type', 'library_name']:
+        group_by = 'library_type'
+    
     # Generate streaming history chart data
-    chart_data = _generate_streaming_chart_data(current_user, days)
+    chart_data = _generate_streaming_chart_data(current_user, days, group_by)
     
     # Enhanced debug logging for chart data
     current_app.logger.info(f"=== CHART DEBUG: User Dashboard Chart Data Generation ===")
@@ -467,7 +507,8 @@ def index():
                          app_name=app_name,
                          user=current_user,
                          chart_data=chart_data,
-                         selected_days=days)
+                         selected_days=days,
+                         selected_group_by=group_by)
 
 @bp.route('/<server_nickname>/<server_username>', methods=['GET', 'POST'])
 @login_required

@@ -17,7 +17,12 @@
                     <tbody>
                         {% for lib in simple_libraries %}
                         <tr class="hover">
-                            <td class="font-semibold">{{ lib.name }}</td>
+                            <td class="font-semibold">
+                                <a href="{{ url_for('libraries.library_detail', server_nickname=lib.server_name, library_name=lib.name) }}" 
+                                   class="link link-hover text-primary">
+                                    {{ lib.name }}
+                                </a>
+                            </td>
                             <td>
                                 <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1">
                                     <i class="fa-solid fa-folder w-2.5 h-2.5 mr-1 bottom-px relative"></i>
@@ -111,7 +116,12 @@
                         <tbody>
                             {% for lib in server_data.libraries %}
                             <tr class="hover">
-                                <td class="font-semibold">{{ lib.name }}</td>
+                                <td class="font-semibold">
+                                    <a href="{{ url_for('libraries.library_detail', server_nickname=lib.server_name, library_name=lib.name) }}" 
+                                       class="link link-hover text-primary">
+                                        {{ lib.name }}
+                                    </a>
+                                </td>
                                 <td>
                                     <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1">
                                         <i class="fa-solid fa-folder w-2.5 h-2.5 mr-1 bottom-px relative"></i>

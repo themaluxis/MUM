@@ -10,29 +10,50 @@
                 Watch Time Activity
             </h2>
             
-            <!-- Date Range Selector -->
-            <div class="dropdown dropdown-end">
-                <div tabindex="0" role="button" class="btn btn-sm btn-outline">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {% if selected_days == 7 %}Last 7 Days
-                    {% elif selected_days == 30 %}Last 30 Days  
-                    {% elif selected_days == 90 %}Last 90 Days
-                    {% elif selected_days == 365 %}Last Year
-                    {% elif selected_days == -1 %}All Time
-                    {% else %}Last 30 Days{% endif %}
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
+            <!-- Controls Container -->
+            <div class="flex gap-2">
+                <!-- Group By Selector -->
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-sm btn-outline">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14-4H5m14 8H5m14 4H5" />
+                        </svg>
+                        {% if selected_group_by == 'library_name' %}Library Name
+                        {% else %}Library Type{% endif %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
+                        <li><a href="{{ url_for('user.index', days=selected_days, group_by='library_type') }}" class="{% if selected_group_by != 'library_name' %}active{% endif %}">Library Type</a></li>
+                        <li><a href="{{ url_for('user.index', days=selected_days, group_by='library_name') }}" class="{% if selected_group_by == 'library_name' %}active{% endif %}">Library Name</a></li>
+                    </ul>
                 </div>
-                <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
-                    <li><a href="{{ url_for('user.index', days=7) }}" class="{% if selected_days == 7 %}active{% endif %}">Last 7 Days</a></li>
-                    <li><a href="{{ url_for('user.index', days=30) }}" class="{% if selected_days == 30 %}active{% endif %}">Last 30 Days</a></li>
-                    <li><a href="{{ url_for('user.index', days=90) }}" class="{% if selected_days == 90 %}active{% endif %}">Last 90 Days</a></li>
-                    <li><a href="{{ url_for('user.index', days=365) }}" class="{% if selected_days == 365 %}active{% endif %}">Last Year</a></li>
-                    <li><a href="{{ url_for('user.index', days='all') }}" class="{% if selected_days == -1 %}active{% endif %}">All Time</a></li>
-                </ul>
+                
+                <!-- Date Range Selector -->
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-sm btn-outline">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        {% if selected_days == 7 %}Last 7 Days
+                        {% elif selected_days == 30 %}Last 30 Days  
+                        {% elif selected_days == 90 %}Last 90 Days
+                        {% elif selected_days == 365 %}Last Year
+                        {% elif selected_days == -1 %}All Time
+                        {% else %}Last 30 Days{% endif %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
+                        <li><a href="{{ url_for('user.index', days=7, group_by=selected_group_by) }}" class="{% if selected_days == 7 %}active{% endif %}">Last 7 Days</a></li>
+                        <li><a href="{{ url_for('user.index', days=30, group_by=selected_group_by) }}" class="{% if selected_days == 30 %}active{% endif %}">Last 30 Days</a></li>
+                        <li><a href="{{ url_for('user.index', days=90, group_by=selected_group_by) }}" class="{% if selected_days == 90 %}active{% endif %}">Last 90 Days</a></li>
+                        <li><a href="{{ url_for('user.index', days=365, group_by=selected_group_by) }}" class="{% if selected_days == 365 %}active{% endif %}">Last Year</a></li>
+                        <li><a href="{{ url_for('user.index', days='all', group_by=selected_group_by) }}" class="{% if selected_days == -1 %}active{% endif %}">All Time</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
         

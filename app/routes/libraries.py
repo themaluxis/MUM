@@ -1,11 +1,12 @@
-from flask import Blueprint, render_template, current_app, request, make_response, json, flash, redirect, url_for
+from flask import Blueprint, render_template, current_app, request, make_response, json, flash, redirect, url_for, abort
 from flask_login import login_required, current_user
 from app.utils.helpers import setup_required, permission_required
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
-from app.models_media_services import MediaLibrary, MediaServer
+from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory, UserMediaAccess
 from app.extensions import db
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+import urllib.parse
 
 bp = Blueprint('libraries', __name__)
 
@@ -355,3 +356,478 @@ def get_library_raw_data(server_id, library_id):
     except Exception as e:
         current_app.logger.error(f"Error fetching raw library data: {e}")
         return {'error': str(e)}, 500
+
+@bp.route('/library/<server_nickname>/<library_name>')
+@login_required
+@setup_required
+@permission_required('view_libraries')
+def library_detail(server_nickname, library_name):
+    """Display detailed library information and statistics"""
+    # URL decode the parameters to handle special characters
+    try:
+        server_nickname = urllib.parse.unquote(server_nickname)
+        library_name = urllib.parse.unquote(library_name)
+    except Exception as e:
+        current_app.logger.warning(f"Error decoding URL parameters: {e}")
+        abort(400)
+    
+    # Validate parameters
+    if not server_nickname or not library_name:
+        abort(400)
+    
+    # Find the server by nickname
+    server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
+    
+    # Find the library by name and server
+    library = MediaLibrary.query.filter_by(
+        server_id=server.id,
+        name=library_name
+    ).first_or_404()
+    
+    # Get the active tab from the URL query, default to 'overview'
+    tab = request.args.get('tab', 'overview')
+    
+    # Get library statistics
+    library_stats = get_library_statistics(library)
+    
+    # Get chart data for stats tab
+    chart_data = None
+    if tab == 'stats':
+        days_param = request.args.get('days', '30')
+        try:
+            if days_param == 'all':
+                days = -1
+            else:
+                days = int(days_param)
+                # Validate days parameter
+                if days not in [7, 30, 90, 365]:
+                    days = 30
+        except (ValueError, TypeError):
+            days = 30
+        
+        chart_data = generate_library_chart_data(library, days)
+    
+    # Get media content for media tab
+    media_content = None
+    if tab == 'media':
+        page = request.args.get('page', 1, type=int)
+        media_content = get_library_media_content(library, page)
+    
+    # Get recent activity for this library
+    recent_activity = []
+    if tab == 'activity':
+        page = request.args.get('page', 1, type=int)
+        days_filter = int(request.args.get('days', 30))
+        
+        # Calculate date range
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days_filter)
+        
+        # Get streaming history for this library
+        activity_query = MediaStreamHistory.query.filter(
+            MediaStreamHistory.server_id == server.id,
+            MediaStreamHistory.library_name == library_name,
+            MediaStreamHistory.started_at >= start_date,
+            MediaStreamHistory.started_at <= end_date
+        ).order_by(MediaStreamHistory.started_at.desc())
+        
+        # Paginate the results
+        activity_pagination = activity_query.paginate(
+            page=page, per_page=20, error_out=False
+        )
+        
+        # Enhance activity entries with user info
+        for entry in activity_pagination.items:
+            if entry.user_media_access_uuid:
+                user_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
+                if user_access:
+                    entry.user_display_name = user_access.get_display_name()
+                    entry.user_type = 'service'
+                else:
+                    entry.user_display_name = 'Unknown User'
+                    entry.user_type = 'unknown'
+            elif entry.user_app_access_uuid:
+                from app.models import UserAppAccess
+                user_app = UserAppAccess.query.filter_by(uuid=entry.user_app_access_uuid).first()
+                if user_app:
+                    entry.user_display_name = user_app.get_display_name()
+                    entry.user_type = 'local'
+                else:
+                    entry.user_display_name = 'Unknown User'
+                    entry.user_type = 'unknown'
+            else:
+                entry.user_display_name = 'Unknown User'
+                entry.user_type = 'unknown'
+        
+        recent_activity = activity_pagination
+    
+    # Handle HTMX requests for tab content
+    if request.headers.get('HX-Request') and tab == 'activity':
+        return render_template('libraries/partials/library_activity_tab.html',
+                             library=library,
+                             server=server,
+                             recent_activity=recent_activity,
+                             days_filter=request.args.get('days', 30))
+    
+    return render_template('libraries/library_detail.html',
+                         title=f"Library: {library_name}",
+                         library=library,
+                         server=server,
+                         library_stats=library_stats,
+                         recent_activity=recent_activity,
+                         chart_data=chart_data,
+                         media_content=media_content,
+                         active_tab=tab,
+                         selected_days=request.args.get('days', 30) if tab == 'stats' else None,
+                         days_filter=request.args.get('days', 30) if tab == 'activity' else None)
+
+def get_library_statistics(library):
+    """Get statistics for a library"""
+    try:
+        # Get streaming statistics for this library
+        total_streams = MediaStreamHistory.query.filter(
+            MediaStreamHistory.server_id == library.server_id,
+            MediaStreamHistory.library_name == library.name
+        ).count()
+        
+        # Get unique users who have accessed this library
+        unique_users = db.session.query(MediaStreamHistory.user_media_access_uuid)\
+            .filter(
+                MediaStreamHistory.server_id == library.server_id,
+                MediaStreamHistory.library_name == library.name,
+                MediaStreamHistory.user_media_access_uuid.isnot(None)
+            ).distinct().count()
+        
+        # Get total watch time (in seconds)
+        total_watch_time = db.session.query(db.func.sum(MediaStreamHistory.duration_seconds))\
+            .filter(
+                MediaStreamHistory.server_id == library.server_id,
+                MediaStreamHistory.library_name == library.name,
+                MediaStreamHistory.duration_seconds.isnot(None)
+            ).scalar() or 0
+        
+        # Get most popular content
+        popular_content = db.session.query(
+            MediaStreamHistory.media_title,
+            db.func.count(MediaStreamHistory.id).label('play_count')
+        ).filter(
+            MediaStreamHistory.server_id == library.server_id,
+            MediaStreamHistory.library_name == library.name
+        ).group_by(MediaStreamHistory.media_title)\
+         .order_by(db.func.count(MediaStreamHistory.id).desc())\
+         .limit(5).all()
+        
+        # Format watch time
+        def format_duration(seconds):
+            if not seconds:
+                return "0m"
+            hours = seconds // 3600
+            minutes = (seconds % 3600) // 60
+            if hours > 0:
+                return f"{hours}h {minutes}m"
+            else:
+                return f"{minutes}m"
+        
+        return {
+            'total_streams': total_streams,
+            'unique_users': unique_users,
+            'total_watch_time': total_watch_time,
+            'total_watch_time_formatted': format_duration(total_watch_time),
+            'popular_content': popular_content,
+            'item_count': library.item_count or 0,
+            'library_type': library.library_type or 'Unknown'
+        }
+    except Exception as e:
+        current_app.logger.error(f"Error getting library statistics: {e}")
+        return {
+            'total_streams': 0,
+            'unique_users': 0,
+            'total_watch_time': 0,
+            'total_watch_time_formatted': '0m',
+            'popular_content': [],
+            'item_count': library.item_count or 0,
+            'library_type': library.library_type or 'Unknown'
+        }
+
+def generate_library_chart_data(library, days=30):
+    """Generate chart data for library streaming activity by user"""
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    from app.utils.helpers import format_duration
+    
+    # Calculate date range based on days parameter
+    end_date = datetime.now(timezone.utc)
+    if days == -1:  # All time
+        # Get the earliest stream date for this library
+        earliest_stream = MediaStreamHistory.query.filter(
+            MediaStreamHistory.server_id == library.server_id,
+            MediaStreamHistory.library_name == library.name
+        ).order_by(MediaStreamHistory.started_at.asc()).first()
+        
+        if earliest_stream:
+            start_date = earliest_stream.started_at
+        else:
+            start_date = end_date - timedelta(days=30)  # Fallback to 30 days
+    else:
+        start_date = end_date - timedelta(days=days-1)
+    
+    # Get streaming history for this library
+    streaming_history = MediaStreamHistory.query.filter(
+        MediaStreamHistory.server_id == library.server_id,
+        MediaStreamHistory.library_name == library.name,
+        MediaStreamHistory.started_at >= start_date,
+        MediaStreamHistory.started_at <= end_date
+    ).all()
+    
+    if not streaming_history:
+        return {
+            'chart_data': [],
+            'users': [],
+            'user_combinations': [],
+            'user_colors': {},
+            'total_streams': 0,
+            'total_duration': '0m',
+            'most_active_user': 'None',
+            'date_range_days': days
+        }
+    
+    # Determine grouping strategy based on days parameter
+    if days == 7:
+        grouping_type = 'daily'
+    elif days in [30, 90]:
+        grouping_type = 'weekly'
+    elif days == 365 or days == -1:
+        grouping_type = 'monthly'
+    else:
+        grouping_type = 'daily'
+    
+    # Group data by time period (total plays and total time)
+    grouped_data = defaultdict(lambda: {'plays': 0, 'time': 0})
+    total_duration_seconds = 0
+    total_plays = 0
+    
+    for entry in streaming_history:
+        # Get the date (without time)
+        entry_date = entry.started_at.date()
+        
+        # Determine the grouping key based on grouping type
+        if grouping_type == 'monthly':
+            group_key = entry_date.strftime('%Y-%m')
+        elif grouping_type == 'weekly':
+            days_since_monday = entry_date.weekday()
+            week_start = entry_date - timedelta(days=days_since_monday)
+            group_key = week_start.isoformat()
+        else:  # daily
+            group_key = entry_date.isoformat()
+        
+        # Get duration in minutes for the chart
+        duration_minutes = 0
+        if entry.duration_seconds and entry.duration_seconds > 0:
+            duration_minutes = entry.duration_seconds / 60
+            total_duration_seconds += entry.duration_seconds
+        elif entry.view_offset_at_end_seconds and entry.view_offset_at_end_seconds > 0:
+            duration_minutes = entry.view_offset_at_end_seconds / 60
+            total_duration_seconds += entry.view_offset_at_end_seconds
+        else:
+            duration_minutes = 1  # 1 minute minimum to show activity
+        
+        # Add plays and time per group
+        grouped_data[group_key]['plays'] += 1
+        grouped_data[group_key]['time'] += duration_minutes
+        total_plays += 1
+    
+    # Generate chart data for the date range
+    chart_data_list = []
+    
+    # Generate time periods based on grouping type
+    if grouping_type == 'monthly':
+        # Generate monthly periods
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+            
+        current_date = start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end_date_month = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        while current_date <= end_date_month:
+            month_key = current_date.strftime('%Y-%m')
+            month_label = current_date.strftime('%b %Y')
+            
+            period_data = {
+                'date': month_key, 
+                'label': month_label,
+                'plays': grouped_data[month_key]['plays'],
+                'time': round(grouped_data[month_key]['time'], 1)
+            }
+            
+            chart_data_list.append(period_data)
+            
+            # Move to next month
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1)
+                
+    elif grouping_type == 'weekly':
+        # Generate weekly periods
+        start_date_only = start_date.date() if hasattr(start_date, 'date') else start_date
+        end_date_only = end_date.date() if hasattr(end_date, 'date') else end_date
+        
+        days_since_monday = start_date_only.weekday()
+        current_week_start = start_date_only - timedelta(days=days_since_monday)
+        
+        while current_week_start <= end_date_only:
+            week_key = current_week_start.isoformat()
+            week_end = current_week_start + timedelta(days=6)
+            
+            if current_week_start.month == week_end.month:
+                week_label = f"{current_week_start.strftime('%b %d')}-{week_end.day}"
+            else:
+                week_label = f"{current_week_start.strftime('%b %d')}-{week_end.strftime('%b %d')}"
+            
+            period_data = {
+                'date': week_key, 
+                'label': week_label,
+                'plays': grouped_data[week_key]['plays'],
+                'time': round(grouped_data[week_key]['time'], 1)
+            }
+            
+            chart_data_list.append(period_data)
+            current_week_start += timedelta(days=7)
+            
+    else:  # daily
+        # Generate daily periods
+        start_date_only = start_date.date() if hasattr(start_date, 'date') else start_date
+        end_date_only = end_date.date() if hasattr(end_date, 'date') else end_date
+        
+        current_date = start_date_only
+        while current_date <= end_date_only:
+            day_key = current_date.isoformat()
+            day_label = current_date.strftime('%b %d')
+            
+            period_data = {
+                'date': day_key, 
+                'label': day_label,
+                'plays': grouped_data[day_key]['plays'],
+                'time': round(grouped_data[day_key]['time'], 1)
+            }
+            
+            chart_data_list.append(period_data)
+            current_date += timedelta(days=1)
+    
+    # Calculate summary stats
+    total_duration_formatted = format_duration(total_duration_seconds)
+    
+    return {
+        'chart_data': chart_data_list,
+        'total_streams': total_plays,
+        'total_duration': total_duration_formatted,
+        'date_range_days': days
+    }
+
+def get_library_media_content(library, page=1, per_page=24):
+    """Get media content from the library using the media service API"""
+    try:
+        # Create service instance for the library's server
+        service = MediaServiceFactory.create_service_from_db(library.server)
+        if not service:
+            current_app.logger.error(f"Could not create service for server {library.server.server_nickname}")
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False
+            }
+        
+        # Get library content from the service
+        if hasattr(service, 'get_library_content'):
+            # Use dedicated method if available
+            content_data = service.get_library_content(library.external_id, page=page, per_page=per_page)
+        else:
+            # Fallback to getting all content and paginating manually
+            all_content = []
+            if hasattr(service, 'get_movies') and library.library_type in ['movie', 'movies']:
+                all_content = service.get_movies()
+            elif hasattr(service, 'get_shows') and library.library_type in ['show', 'shows', 'tv']:
+                all_content = service.get_shows()
+            elif hasattr(service, 'get_music') and library.library_type in ['music', 'audio']:
+                all_content = service.get_music()
+            elif hasattr(service, 'get_books') and library.library_type in ['book', 'books']:
+                all_content = service.get_books()
+            else:
+                # Generic content fetch
+                if hasattr(service, 'get_content'):
+                    all_content = service.get_content(library.external_id)
+                else:
+                    all_content = []
+            
+            # Manual pagination
+            total = len(all_content)
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            items = all_content[start_idx:end_idx]
+            
+            content_data = {
+                'items': items,
+                'total': total,
+                'page': page,
+                'per_page': per_page,
+                'pages': (total + per_page - 1) // per_page,
+                'has_prev': page > 1,
+                'has_next': end_idx < total
+            }
+        
+        # Process and enhance the content data
+        processed_items = []
+        for item in content_data.get('items', []):
+            processed_item = {
+                'id': item.get('id') or item.get('ratingKey') or item.get('key', ''),
+                'title': item.get('title') or item.get('name', 'Unknown Title'),
+                'year': item.get('year') or item.get('originallyAvailableAt', '').split('-')[0] if item.get('originallyAvailableAt') else '',
+                'thumb': item.get('thumb') or item.get('art') or item.get('poster') or item.get('image'),
+                'type': item.get('type') or library.library_type or 'unknown',
+                'summary': item.get('summary') or item.get('plot') or item.get('overview', ''),
+                'rating': item.get('rating') or item.get('audienceRating') or item.get('imdbRating'),
+                'duration': item.get('duration') or item.get('runtime'),
+                'added_at': item.get('addedAt') or item.get('dateAdded'),
+                'raw_data': item  # Store raw data for debugging
+            }
+            
+            # Handle thumb URLs for different services
+            if processed_item['thumb']:
+                thumb_url = processed_item['thumb']
+                # For Plex, construct full URL if needed
+                if library.server.service_type.value == 'plex' and not thumb_url.startswith('http'):
+                    if thumb_url.startswith('/'):
+                        thumb_url = f"{library.server.url}{thumb_url}"
+                    processed_item['thumb'] = thumb_url
+                # For other services, use as-is or construct URL as needed
+                elif not thumb_url.startswith('http'):
+                    # Try to construct full URL
+                    if thumb_url.startswith('/'):
+                        thumb_url = f"{library.server.url}{thumb_url}"
+                    processed_item['thumb'] = thumb_url
+            
+            processed_items.append(processed_item)
+        
+        content_data['items'] = processed_items
+        current_app.logger.info(f"Retrieved {len(processed_items)} media items from library {library.name}")
+        
+        return content_data
+        
+    except Exception as e:
+        current_app.logger.error(f"Error fetching media content for library {library.name}: {e}")
+        return {
+            'items': [],
+            'total': 0,
+            'page': page,
+            'per_page': per_page,
+            'pages': 0,
+            'has_prev': False,
+            'has_next': False,
+            'error': str(e)
+        }

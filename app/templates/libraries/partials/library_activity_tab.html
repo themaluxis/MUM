@@ -1,0 +1,176 @@
+<!-- File: app/templates/libraries/partials/library_activity_tab.html -->
+<div class="space-y-6">
+    <!-- Activity Filters -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h3 class="text-lg font-semibold flex items-center">
+            <i class="fa-solid fa-history text-info mr-2"></i>
+            Recent Activity
+        </h3>
+        
+        <!-- Date Filter -->
+        <div class="dropdown dropdown-end">
+            <div tabindex="0" role="button" class="btn btn-sm btn-outline">
+                <i class="fa-solid fa-calendar mr-2"></i>
+                {% if days_filter == '7' %}Last 7 Days
+                {% elif days_filter == '30' %}Last 30 Days
+                {% elif days_filter == '90' %}Last 90 Days
+                {% else %}Last 30 Days{% endif %}
+                <i class="fa-solid fa-chevron-down ml-2"></i>
+            </div>
+            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow border border-base-300">
+                <li><a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='activity', days=7) }}" 
+                       class="{% if days_filter == '7' %}active{% endif %}">Last 7 Days</a></li>
+                <li><a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='activity', days=30) }}" 
+                       class="{% if days_filter == '30' %}active{% endif %}">Last 30 Days</a></li>
+                <li><a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='activity', days=90) }}" 
+                       class="{% if days_filter == '90' %}active{% endif %}">Last 90 Days</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Activity List -->
+    {% if recent_activity and recent_activity.items %}
+        <div class="bg-base-200/50 rounded-lg border border-base-300 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr class="bg-base-300/50">
+                            <th class="font-semibold">Content</th>
+                            <th class="font-semibold">User</th>
+                            <th class="font-semibold">Started</th>
+                            <th class="font-semibold">Duration</th>
+                            <th class="font-semibold">Platform</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for activity in recent_activity.items %}
+                        <tr class="hover">
+                            <td>
+                                <div class="flex flex-col">
+                                    <span class="font-medium">{{ activity.media_title or 'Unknown' }}</span>
+                                    {% if activity.grandparent_title or activity.parent_title %}
+                                        <span class="text-sm text-base-content/60">
+                                            {% if activity.grandparent_title %}{{ activity.grandparent_title }}{% endif %}
+                                            {% if activity.grandparent_title and activity.parent_title %} • {% endif %}
+                                            {% if activity.parent_title %}{{ activity.parent_title }}{% endif %}
+                                        </span>
+                                    {% endif %}
+                                    {% if activity.media_type %}
+                                        <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1 w-fit mt-1">
+                                            <i class="fa-solid fa-tag w-2.5 h-2.5"></i>
+                                            {{ activity.media_type }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    {% if activity.user_type == 'local' %}
+                                        <i class="fa-solid fa-user text-primary text-sm"></i>
+                                    {% elif activity.user_type == 'service' %}
+                                        <i class="fa-solid fa-link text-secondary text-sm"></i>
+                                    {% else %}
+                                        <i class="fa-solid fa-question text-base-content/40 text-sm"></i>
+                                    {% endif %}
+                                    <span class="font-medium">{{ activity.user_display_name }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="flex flex-col">
+                                    <span class="font-medium">{{ activity.started_at.strftime('%m/%d/%Y') }}</span>
+                                    <span class="text-sm text-base-content/60">{{ activity.started_at.strftime('%I:%M %p') }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if activity.duration_seconds %}
+                                    <span class="font-medium">{{ activity.get_duration_formatted() }}</span>
+                                {% elif activity.view_offset_at_end_seconds %}
+                                    <span class="font-medium text-warning">{{ (activity.view_offset_at_end_seconds // 60) }}m (partial)</span>
+                                {% else %}
+                                    <span class="text-base-content/40">Unknown</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="flex flex-col">
+                                    {% if activity.platform %}
+                                        <span class="font-medium">{{ activity.platform }}</span>
+                                    {% endif %}
+                                    {% if activity.player %}
+                                        <span class="text-sm text-base-content/60">{{ activity.player }}</span>
+                                    {% endif %}
+                                    {% if not activity.platform and not activity.player %}
+                                        <span class="text-base-content/40">Unknown</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if recent_activity.pages > 1 %}
+            <div class="flex justify-center">
+                <div class="join">
+                    {% if recent_activity.has_prev %}
+                        <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='activity', days=days_filter, page=recent_activity.prev_num) }}" 
+                           class="join-item btn btn-sm">«</a>
+                    {% endif %}
+                    
+                    {% for page_num in recent_activity.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != recent_activity.page %}
+                                <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='activity', days=days_filter, page=page_num) }}" 
+                                   class="join-item btn btn-sm">{{ page_num }}</a>
+                            {% else %}
+                                <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
+                            {% endif %}
+                        {% else %}
+                            <button class="join-item btn btn-sm btn-disabled">…</button>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if recent_activity.has_next %}
+                        <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='activity', days=days_filter, page=recent_activity.next_num) }}" 
+                           class="join-item btn btn-sm">»</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Activity Summary -->
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/50">
+            <div class="flex flex-wrap items-center justify-center gap-6 text-sm">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-play text-primary"></i>
+                    <span><strong>{{ recent_activity.total }}</strong> total streams</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-calendar text-secondary"></i>
+                    <span>in the last <strong>{{ days_filter }}</strong> days</span>
+                </div>
+                {% if recent_activity.total > 0 %}
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-accent"></i>
+                        <span><strong>{{ (recent_activity.total / (days_filter|int)) | round(1) }}</strong> streams/day average</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <!-- No Activity State -->
+        <div class="bg-base-200/50 rounded-lg p-12 text-center border border-base-300">
+            <div class="flex flex-col items-center space-y-4">
+                <div class="w-16 h-16 rounded-full bg-base-300/50 flex items-center justify-center">
+                    <i class="fa-solid fa-history text-2xl text-base-content/40"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-medium text-base-content mb-2">No Recent Activity</h3>
+                    <p class="text-base-content/60">No streaming activity found for this library in the last {{ days_filter }} days.</p>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
