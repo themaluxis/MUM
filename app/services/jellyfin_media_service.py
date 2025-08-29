@@ -674,6 +674,121 @@ class JellyfinMediaService(BaseMediaService):
         
         return feature in jellyfin_features
     
+    def get_library_content(self, library_key: str, page: int = 1, per_page: int = 24) -> Dict[str, Any]:
+        """Get content from a specific Jellyfin library using /Items API"""
+        try:
+            # Calculate pagination parameters for Jellyfin API
+            start_index = (page - 1) * per_page
+            
+            # Construct the API URL
+            url = f"{self.url.rstrip('/')}/Items"
+            
+            # Set up parameters for the request
+            params = {
+                'ParentId': library_key,
+                'Recursive': 'true',
+                'StartIndex': start_index,
+                'Limit': per_page,
+                'Fields': 'BasicSyncInfo,CanDelete,PrimaryImageAspectRatio,ProductionYear,Status,EndDate',
+                'SortBy': 'SortName',
+                'SortOrder': 'Ascending'
+            }
+            
+            # Set up headers
+            headers = {
+                'X-Emby-Token': self.api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            current_app.logger.debug(f"Jellyfin get_library_content: Fetching from {url} with ParentId={library_key}")
+            
+            # Make the API request
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            items = data.get('Items', [])
+            total_record_count = data.get('TotalRecordCount', 0)
+            
+            current_app.logger.debug(f"Jellyfin get_library_content: Retrieved {len(items)} items, total: {total_record_count}")
+            
+            # Process items for consistent format
+            processed_items = []
+            for item in items:
+                try:
+                    # Get thumbnail URL using proxy method
+                    thumb_url = None
+                    if item.get('Id'):
+                        from flask import url_for
+                        thumb_url = url_for('api.jellyfin_image_proxy', item_id=item['Id'], image_type='Primary')
+                    
+                    # Extract year from PremiereDate
+                    year = None
+                    if item.get('PremiereDate'):
+                        try:
+                            year = int(item['PremiereDate'][:4])
+                        except (ValueError, TypeError):
+                            pass
+                    elif item.get('ProductionYear'):
+                        year = item['ProductionYear']
+                    
+                    processed_item = {
+                        'id': item.get('Id', ''),
+                        'title': item.get('Name', 'Unknown Title'),
+                        'year': year,
+                        'thumb': thumb_url,
+                        'type': item.get('Type', '').lower(),
+                        'summary': item.get('Overview', ''),
+                        'rating': item.get('CommunityRating'),
+                        'duration': item.get('RunTimeTicks'),  # Jellyfin uses ticks
+                        'added_at': item.get('DateCreated'),
+                        'raw_data': item
+                    }
+                    
+                    processed_items.append(processed_item)
+                    
+                except Exception as e:
+                    current_app.logger.warning(f"Error processing Jellyfin item {item.get('Id', 'unknown')}: {e}")
+                    continue
+            
+            # Calculate pagination info
+            total_pages = (total_record_count + per_page - 1) // per_page
+            
+            return {
+                'items': processed_items,
+                'total': total_record_count,
+                'page': page,
+                'per_page': per_page,
+                'pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages
+            }
+            
+        except requests.exceptions.RequestException as e:
+            current_app.logger.error(f"Jellyfin API error getting library content: {e}")
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False,
+                'error': f'Failed to connect to Jellyfin server: {str(e)}'
+            }
+        except Exception as e:
+            current_app.logger.error(f"Error getting Jellyfin library content: {e}")
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False,
+                'error': str(e)
+            }
+
     def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
         """Get GeoIP information for a given IP address"""
         # Use the base class implementation
