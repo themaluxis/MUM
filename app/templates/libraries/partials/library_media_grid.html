@@ -29,7 +29,12 @@
             <div class="group cursor-pointer">
                 <!-- Poster Container -->
                 <div class="relative aspect-[2/3] bg-base-200 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-                    {% if item.thumb %}
+                    {% if item.type in ['folder', 'directory'] or (item.type == 'collectionfolder') %}
+                        <!-- Folder Icon Display -->
+                        <div class="absolute inset-0 bg-base-200 flex items-center justify-center">
+                            <i class="fa-solid fa-folder text-6xl text-base-content/60"></i>
+                        </div>
+                    {% elif item.thumb %}
                         <img src="{{ item.thumb }}" 
                              alt="{{ item.title }}" 
                              class="w-full h-full object-cover"
@@ -37,12 +42,18 @@
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                         <!-- Fallback when image fails to load -->
                         <div class="absolute inset-0 bg-base-300 flex items-center justify-center text-base-content/40" style="display: none;">
-                            <i class="fa-solid fa-image text-4xl"></i>
+                            {% if item.type in ['folder', 'directory'] or (item.type == 'collectionfolder') %}
+                                <i class="fa-solid fa-folder text-4xl text-amber-600"></i>
+                            {% else %}
+                                <i class="fa-solid fa-image text-4xl"></i>
+                            {% endif %}
                         </div>
                     {% else %}
                         <!-- No image placeholder -->
                         <div class="absolute inset-0 bg-base-300 flex items-center justify-center text-base-content/40">
-                            {% if item.type == 'movie' %}
+                            {% if item.type in ['folder', 'directory'] or (item.type == 'collectionfolder') %}
+                                <i class="fa-solid fa-folder text-4xl text-amber-600"></i>
+                            {% elif item.type == 'movie' %}
                                 <i class="fa-solid fa-film text-4xl"></i>
                             {% elif item.type in ['show', 'episode'] %}
                                 <i class="fa-solid fa-tv text-4xl"></i>
@@ -61,8 +72,13 @@
                     <!-- Hover Overlay -->
                     <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                         <div class="text-center text-white p-2">
-                            <i class="fa-solid fa-play text-2xl mb-2"></i>
-                            <div class="text-xs">View Details</div>
+                            {% if item.type in ['folder', 'directory'] or (item.type == 'collectionfolder') %}
+                                <i class="fa-solid fa-folder-open text-2xl mb-2"></i>
+                                <div class="text-xs">Browse Folder</div>
+                            {% else %}
+                                <i class="fa-solid fa-play text-2xl mb-2"></i>
+                                <div class="text-xs">View Details</div>
+                            {% endif %}
                         </div>
                     </div>
                     
@@ -76,7 +92,11 @@
                     
                     <!-- Type Badge -->
                     <div class="absolute top-2 left-2 bg-primary/80 text-white text-xs px-2 py-1 rounded-full capitalize">
-                        {{ item.type }}
+                        {% if item.type in ['folder', 'directory'] or (item.type == 'collectionfolder') %}
+                            Folder
+                        {% else %}
+                            {{ item.type }}
+                        {% endif %}
                     </div>
                 </div>
                 
