@@ -6167,6 +6167,12 @@
       color: color-mix(in oklab, var(--color-error) 70%, transparent);
     }
   }
+  .text-error\/80 {
+    color: var(--color-error);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-error) 80%, transparent);
+    }
+  }
   .text-gray-100 {
     color: var(--color-gray-100);
   }
@@ -6341,6 +6347,12 @@
   .text-success {
     color: var(--color-success);
   }
+  .text-success\/80 {
+    color: var(--color-success);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-success) 80%, transparent);
+    }
+  }
   .text-violet-600 {
     color: var(--color-violet-600);
   }
@@ -6349,6 +6361,12 @@
   }
   .text-warning-content {
     color: var(--color-warning-content);
+  }
+  .text-warning\/80 {
+    color: var(--color-warning);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-warning) 80%, transparent);
+    }
   }
   .text-white {
     color: var(--color-white);

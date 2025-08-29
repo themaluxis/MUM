@@ -198,10 +198,48 @@
         </div>
     </div>
 </div>
+
+<!-- Library Content Sync Results Modal -->
+<dialog id="library_content_sync_results_modal" class="modal modal-bottom sm:modal-middle">
+    <!-- Modal content will be loaded here -->
+</dialog>
+
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <!-- Chart.js for the library stats chart -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Handle library content sync results modal
+document.body.addEventListener('openLibraryContentSyncResultsModal', function() {
+    const modal = document.getElementById('library_content_sync_results_modal');
+    if (modal) {
+        modal.showModal();
+    }
+});
+
+// Refresh page when library content sync results modal is closed
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('library_content_sync_results_modal');
+    if (modal) {
+        modal.addEventListener('close', function() {
+            // Check if we need to refresh the page
+            if (modal.dataset.shouldRefresh === 'true') {
+                window.location.reload();
+                modal.dataset.shouldRefresh = 'false';
+            }
+        });
+    }
+});
+
+// Handle refresh library page event
+document.body.addEventListener('refreshLibraryPage', function() {
+    const modal = document.getElementById('library_content_sync_results_modal');
+    if (modal) {
+        modal.dataset.shouldRefresh = 'true';
+    }
+});
+</script>
 {% endblock %}

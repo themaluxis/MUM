@@ -362,9 +362,43 @@ document.addEventListener('DOMContentLoaded', function() {
                     'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                // Get response text first to check if it's empty
+                return response.text().then(text => {
+                    if (text.trim() === '') {
+                        // Empty response - sync completed with no changes
+                        btnText.textContent = 'Sync Complete!';
+                        btnIcon.classList.remove('fa-spin');
+                        btnIcon.classList.remove('fa-sync');
+                        btnIcon.classList.add('fa-check');
+                        
+                        // Show toast for no changes
+                        if (window.showToast) {
+                            window.showToast('Library sync complete. No changes were made.', 'success');
+                        }
+                        
+                        // Reset button after delay
+                        setTimeout(() => {
+                            this.disabled = false;
+                            btnText.textContent = 'Sync Library';
+                            btnIcon.classList.remove('fa-check');
+                            btnIcon.classList.add('fa-sync');
+                        }, 2000);
+                        
+                        return null; // No JSON to parse
+                    } else {
+                        // Parse the text as JSON
+                        return JSON.parse(text);
+                    }
+                });
+            })
             .then(data => {
-                if (data.success) {
+                if (data === null) {
+                    // Already handled empty response above
+                    return;
+                }
+                
+                if (data && data.success) {
                     btnText.textContent = 'Sync Complete!';
                     btnIcon.classList.remove('fa-spin');
                     btnIcon.classList.remove('fa-sync');
@@ -379,7 +413,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(() => {
                         window.location.reload();
                     }, 1500);
-                } else {
+                } else if (data) {
                     btnText.textContent = 'Sync Failed';
                     btnIcon.classList.remove('fa-spin');
                     btnIcon.classList.remove('fa-sync');

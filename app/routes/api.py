@@ -1,7 +1,8 @@
 # File: app/routes/api.py
-from flask import Blueprint, request, current_app, render_template, Response, abort, jsonify
+from flask import Blueprint, request, current_app, render_template, Response, abort, jsonify, make_response
 from flask_login import login_required, current_user
 import requests
+import json
 from app.models import EventType, Invite, Setting
 from app.utils.helpers import log_event, permission_required
 from app.utils.timeout_helper import get_api_timeout
@@ -471,27 +472,103 @@ def sync_library_content(library_id):
     try:
         from app.services.media_sync_service import MediaSyncService
         from app.models_media_services import MediaLibrary
+        import time
         
         # Check if library exists
         library = MediaLibrary.query.get(library_id)
         if not library:
             return jsonify({'success': False, 'error': 'Library not found'}), 404
         
-        current_app.logger.info(f"Starting library sync for: {library.name}")
+        current_app.logger.info(f"Starting library content sync for: {library.name}")
+        start_time = time.time()
         
         # Perform the sync
         result = MediaSyncService.sync_library_content(library_id)
+        end_time = time.time()
+        duration = end_time - start_time
         
         if result['success']:
-            current_app.logger.info(f"Library sync completed successfully: {result}")
-            return jsonify(result)
+            current_app.logger.info(f"Library content sync completed successfully: {result}")
+            
+            # Add duration to result
+            result['duration'] = duration
+            
+            # Check if there are any changes to determine response type
+            has_changes = (result.get('added_items', 0) > 0 or 
+                          result.get('updated_items', 0) > 0 or 
+                          result.get('removed_items', 0) > 0 or 
+                          (result.get('errors') and len(result.get('errors', [])) > 0))
+            
+            if has_changes:
+                # Show modal for changes or errors
+                modal_html = render_template('libraries/partials/library_content_sync_results_modal.html',
+                                           sync_result=result,
+                                           library_name=library.name)
+                
+                if result.get('errors') and len(result.get('errors', [])) > 0:
+                    message = f"Library sync completed with {len(result.get('errors', []))} errors. See details."
+                    category = "warning"
+                else:
+                    added = result.get('added_items', 0)
+                    updated = result.get('updated_items', 0)
+                    removed = result.get('removed_items', 0)
+                    message = f"Library sync complete. {added} added, {updated} updated, {removed} removed."
+                    category = "success"
+                
+                trigger_payload = {
+                    "showToastEvent": {"message": message, "category": category},
+                    "openLibraryContentSyncResultsModal": True,
+                    "refreshLibraryPage": True
+                }
+                headers = {
+                    'HX-Retarget': '#library_content_sync_results_modal',
+                    'HX-Reswap': 'innerHTML',
+                    'HX-Trigger-After-Swap': json.dumps(trigger_payload)
+                }
+                return make_response(modal_html, 200, headers)
+            else:
+                # No changes - just show toast
+                total_items = result.get('total_items', 0)
+                trigger_payload = {
+                    "showToastEvent": {
+                        "message": f"Library sync complete. No changes were made to {total_items} items.",
+                        "category": "success"
+                    },
+                    "refreshLibraryPage": True
+                }
+                headers = {
+                    'HX-Trigger': json.dumps(trigger_payload)
+                }
+                return make_response("", 200, headers)
         else:
             current_app.logger.error(f"Library sync failed: {result.get('error', 'Unknown error')}")
-            return jsonify(result), 500
+            
+            # Return error response
+            toast_payload = {
+                "showToastEvent": {
+                    "message": f"Library sync failed: {result.get('error', 'Unknown error')}",
+                    "category": "error"
+                }
+            }
+            
+            response = make_response("", 500)
+            response.headers['HX-Trigger'] = json.dumps(toast_payload)
+            return response
             
     except Exception as e:
         current_app.logger.error(f"Error in library sync endpoint: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        
+        # Return error response
+        toast_payload = {
+            "showToastEvent": {
+                "message": f"Library sync failed: {str(e)}",
+                "category": "error"
+            }
+        }
+        
+        response = make_response("", 500)
+        response.headers['HX-Trigger'] = json.dumps(toast_payload)
+        return response
 
 @bp.route('/libraries/<int:library_id>/purge', methods=['POST'])
 @login_required
@@ -592,7 +669,7 @@ def jellyfin_image_proxy():
     item_id = request.args.get('item_id')
     image_type = request.args.get('image_type', 'Primary')
     
-    current_app.logger.info(f"API jellyfin_image_proxy: Received request for item_id='{item_id}', image_type='{image_type}'")
+    #current_app.logger.info(f"API jellyfin_image_proxy: Received request for item_id='{item_id}', image_type='{image_type}'")
     
     if not item_id:
         current_app.logger.warning("API jellyfin_image_proxy: 'item_id' parameter is missing.")
@@ -606,7 +683,7 @@ def jellyfin_image_proxy():
             return "No Jellyfin servers available", 404
 
         jellyfin_server = jellyfin_servers[0]  # Use first available server
-        current_app.logger.info(f"API jellyfin_image_proxy: Using Jellyfin server: {jellyfin_server.server_nickname} at {jellyfin_server.url}")
+        #current_app.logger.info(f"API jellyfin_image_proxy: Using Jellyfin server: {jellyfin_server.server_nickname} at {jellyfin_server.url}")
         
         jellyfin_service = MediaServiceFactory.create_service_from_db(jellyfin_server)
         
@@ -617,13 +694,13 @@ def jellyfin_image_proxy():
         # Construct Jellyfin image URL
         jellyfin_image_url = f"{jellyfin_server.url.rstrip('/')}/Items/{item_id}/Images/{image_type}"
         
-        current_app.logger.info(f"API jellyfin_image_proxy: Fetching image from Jellyfin URL: {jellyfin_image_url}")
+        #current_app.logger.info(f"API jellyfin_image_proxy: Fetching image from Jellyfin URL: {jellyfin_image_url}")
 
         # Make request with authentication headers
         headers = {
             'X-Emby-Token': jellyfin_server.api_key,
         }
-        current_app.logger.info(f"API jellyfin_image_proxy: Using API key: {jellyfin_server.api_key[:8]}...")
+        #current_app.logger.info(f"API jellyfin_image_proxy: Using API key: {jellyfin_server.api_key[:8]}...")
         
         timeout = get_api_timeout()
         img_response = requests.get(jellyfin_image_url, headers=headers, stream=True, timeout=timeout)
@@ -649,7 +726,7 @@ def jellyfin_user_avatar_proxy():
     """Proxy Jellyfin user avatars through the application"""
     user_id = request.args.get('user_id')
     
-    current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Received request for user_id='{user_id}'")
+    #current_app.logger.debug(f"API jellyfin_user_avatar_proxy: Received request for user_id='{user_id}'")
     
     if not user_id:
         current_app.logger.warning("API jellyfin_user_avatar_proxy: 'user_id' parameter is missing.")
