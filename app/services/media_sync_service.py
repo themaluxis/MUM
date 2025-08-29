@@ -93,7 +93,7 @@ class MediaSyncService:
             return {'success': False, 'error': str(e)}
     
     @staticmethod
-    def _sync_items_to_db(library: MediaLibrary, items: List[Dict[str, Any]]) -> Dict[str, int]:
+    def _sync_items_to_db(library: MediaLibrary, items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Sync items to database
         
@@ -102,10 +102,13 @@ class MediaSyncService:
             items: List of item dictionaries from service
             
         Returns:
-            Dict with counts of added, updated, removed items
+            Dict with counts and details of added, updated, removed items
         """
         added_count = 0
         updated_count = 0
+        added_items = []
+        updated_items = []
+        errors = []
         
         # Get existing items for this library
         existing_items = {item.external_id: item for item in 
@@ -126,16 +129,30 @@ class MediaSyncService:
                 
                 if existing_item:
                     # Update existing item
-                    if MediaSyncService._update_media_item(existing_item, item_data):
+                    changes = MediaSyncService._update_media_item(existing_item, item_data)
+                    if changes:
                         updated_count += 1
+                        updated_items.append({
+                            'title': item_data.get('title', 'Unknown Title'),
+                            'type': item_data.get('type', 'unknown'),
+                            'year': item_data.get('year'),
+                            'changes': changes
+                        })
                 else:
                     # Create new item
                     new_item = MediaSyncService._create_media_item(library, item_data)
                     if new_item:
                         added_count += 1
+                        added_items.append({
+                            'title': item_data.get('title', 'Unknown Title'),
+                            'type': item_data.get('type', 'unknown'),
+                            'year': item_data.get('year')
+                        })
                         
             except Exception as e:
-                current_app.logger.warning(f"Error processing item {item_data.get('id', 'unknown')}: {e}")
+                error_msg = f"Error processing item {item_data.get('title', 'unknown')}: {str(e)}"
+                current_app.logger.warning(error_msg)
+                errors.append(error_msg)
                 continue
         
         # Remove items that no longer exist on the service
@@ -143,7 +160,13 @@ class MediaSyncService:
                           if external_id not in current_external_ids]
         
         removed_count = 0
+        removed_items = []
         for item in items_to_remove:
+            removed_items.append({
+                'title': item.title,
+                'type': item.item_type,
+                'year': item.year
+            })
             db.session.delete(item)
             removed_count += 1
         
@@ -159,7 +182,11 @@ class MediaSyncService:
         return {
             'added': added_count,
             'updated': updated_count,
-            'removed': removed_count
+            'removed': removed_count,
+            'added_items': added_items[:50],  # Limit to first 50 for display
+            'updated_items': updated_items[:50],  # Limit to first 50 for display
+            'removed_items': removed_items[:50],  # Limit to first 50 for display
+            'errors': errors
         }
     
     @staticmethod
@@ -224,10 +251,10 @@ class MediaSyncService:
             return None
     
     @staticmethod
-    def _update_media_item(item: MediaItem, item_data: Dict[str, Any]) -> bool:
+    def _update_media_item(item: MediaItem, item_data: Dict[str, Any]) -> List[str]:
         """Update an existing MediaItem with new data"""
         try:
-            updated = False
+            changes = []
             
             # Check if key fields have changed
             new_title = item_data.get('title', 'Unknown Title')
@@ -236,34 +263,36 @@ class MediaSyncService:
             new_rating = item_data.get('rating')
             
             if item.title != new_title:
+                changes.append(f"Title: '{item.title}' → '{new_title}'")
                 item.title = new_title
                 item.sort_title = item_data.get('sort_title') or new_title
-                updated = True
             
             if item.summary != new_summary:
+                changes.append("Summary updated")
                 item.summary = new_summary
-                updated = True
             
             if item.year != new_year:
+                changes.append(f"Year: {item.year} → {new_year}")
                 item.year = new_year
-                updated = True
             
             if item.rating != new_rating:
+                old_rating = f"{item.rating:.1f}" if item.rating else "None"
+                new_rating_str = f"{new_rating:.1f}" if new_rating else "None"
+                changes.append(f"Rating: {old_rating} → {new_rating_str}")
                 item.rating = new_rating
-                updated = True
             
             # Always update last_synced and extra_metadata
             item.last_synced = datetime.utcnow()
             item.extra_metadata = item_data.get('raw_data', {})
             
-            if updated:
+            if changes:
                 db.session.add(item)
             
-            return updated
+            return changes
             
         except Exception as e:
             current_app.logger.error(f"Error updating media item {item.external_id}: {e}")
-            return False
+            return []
     
     @staticmethod
     def get_cached_library_content(library_id: int, page: int = 1, per_page: int = 24, 
