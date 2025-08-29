@@ -196,6 +196,120 @@ document.getElementById('librarySyncResultModal').addEventListener('close', func
     });
 });
 
+// Handle refresh libraries page event (for modal cases)
+document.body.addEventListener('refreshLibrariesPage', function() {
+    htmx.ajax('GET', '{{ url_for("libraries.index") }}', {
+        target: '#libraries-list-container',
+        swap: 'innerHTML'
+    });
+});
+
+// Handle individual server sync buttons
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.sync-server-btn')) {
+        const btn = e.target.closest('.sync-server-btn');
+        const serverId = btn.getAttribute('data-server-id');
+        const serverName = btn.getAttribute('data-server-name');
+        const btnText = btn.querySelector('.sync-server-btn-text');
+        const btnIcon = btn.querySelector('i');
+        
+        // Update button state
+        btn.disabled = true;
+        btnText.textContent = 'Syncing...';
+        btnIcon.classList.add('fa-spin');
+        
+        // Make sync request for individual server using fetch to avoid HTMX content swapping issues
+        fetch(`/api/servers/${serverId}/sync/libraries`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            }
+        }).then(response => {
+            console.log('Server sync response status:', response.status);
+            
+            if (response.ok) {
+                // Success - handle HTMX triggers manually
+                btnText.textContent = 'Synced!';
+                btnIcon.classList.remove('fa-spin');
+                btnIcon.classList.remove('fa-sync');
+                btnIcon.classList.add('fa-check');
+                
+                // Check for HTMX trigger header and process manually
+                const htmxTrigger = response.headers.get('HX-Trigger');
+                if (htmxTrigger) {
+                    try {
+                        const triggers = JSON.parse(htmxTrigger);
+                        console.log('Processing triggers:', triggers);
+                        
+                        // Trigger events manually
+                        Object.keys(triggers).forEach(eventName => {
+                            const eventData = triggers[eventName];
+                            console.log(`Triggering event: ${eventName}`, eventData);
+                            document.body.dispatchEvent(new CustomEvent(eventName, { detail: eventData }));
+                        });
+                    } catch (e) {
+                        console.error('Error parsing HX-Trigger:', e);
+                    }
+                }
+                
+                // Handle modal content if present
+                const htmxRetarget = response.headers.get('HX-Retarget');
+                if (htmxRetarget) {
+                    response.text().then(html => {
+                        if (html.trim()) {
+                            console.log('Loading modal content');
+                            const target = document.querySelector(htmxRetarget);
+                            if (target) {
+                                target.innerHTML = html;
+                                
+                                // Process after-swap triggers
+                                const htmxTriggerAfterSwap = response.headers.get('HX-Trigger-After-Swap');
+                                if (htmxTriggerAfterSwap) {
+                                    try {
+                                        const afterSwapTriggers = JSON.parse(htmxTriggerAfterSwap);
+                                        Object.keys(afterSwapTriggers).forEach(eventName => {
+                                            const eventData = afterSwapTriggers[eventName];
+                                            console.log(`Triggering after-swap event: ${eventName}`, eventData);
+                                            document.body.dispatchEvent(new CustomEvent(eventName, { detail: eventData }));
+                                        });
+                                    } catch (e) {
+                                        console.error('Error parsing HX-Trigger-After-Swap:', e);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                // Reset button after delay
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btnText.textContent = 'Sync';
+                    btnIcon.classList.remove('fa-check');
+                    btnIcon.classList.add('fa-sync');
+                }, 2000);
+            } else {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        }).catch((error) => {
+            console.error('Server sync request failed:', error);
+            btnText.textContent = 'Failed';
+            btnIcon.classList.remove('fa-spin');
+            btnIcon.classList.remove('fa-sync');
+            btnIcon.classList.add('fa-exclamation-triangle');
+            
+            // Reset button after delay
+            setTimeout(() => {
+                btn.disabled = false;
+                btnText.textContent = 'Sync';
+                btnIcon.classList.remove('fa-exclamation-triangle');
+                btnIcon.classList.add('fa-sync');
+            }, 3000);
+        });
+    }
+});
+
 // Function to show library raw data modal
 function showLibraryRawData(button) {
     try {

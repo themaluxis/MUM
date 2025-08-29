@@ -453,8 +453,163 @@ def test_existing_server(server_id):
 @csrf.exempt
 def sync_server_libraries(server_id):
     """Sync libraries for a server"""
-    result = MediaServiceManager.sync_server_libraries(server_id)
-    return jsonify(result)
+    try:
+        current_app.logger.debug(f"Starting server sync for server_id: {server_id}")
+        result = MediaServiceManager.sync_server_libraries(server_id)
+        current_app.logger.debug(f"Server sync result: {result}")
+        
+        if result.get('success'):
+            current_app.logger.debug(f"Server sync successful, processing response...")
+            # Get server name for the message
+            from app.models_media_services import MediaServer
+            server = MediaServer.query.get(server_id)
+            server_name = server.server_nickname if server else f"Server {server_id}"
+            
+            # Create success message
+            added = result.get('added', 0)
+            updated = result.get('updated', 0)
+            removed = result.get('removed', 0)
+            # Handle different error field formats - be very defensive
+            errors = 0
+            error_messages = []
+            try:
+                errors = result.get('errors', result.get('error_count', 0))
+                if not isinstance(errors, (int, float)):
+                    errors = 0
+                error_messages = result.get('error_messages', [])
+                if not isinstance(error_messages, list):
+                    error_messages = []
+            except Exception as e:
+                current_app.logger.warning(f"Error accessing error fields: {e}")
+                errors = 0
+                error_messages = []
+            
+            # Check if there are any changes to determine response type
+            has_changes = (added > 0 or updated > 0 or removed > 0 or errors > 0 or len(error_messages) > 0)
+            
+            if has_changes:
+                # Ensure the result has all expected fields for the template
+                template_result = {
+                    'success': result.get('success', True),
+                    'servers_synced': 1,
+                    'libraries_added': added,
+                    'libraries_updated': updated,
+                    'libraries_removed': removed,
+                    'errors': errors,
+                    'error_messages': error_messages,
+                    'added_libraries': [],
+                    'updated_libraries': [],
+                    'removed_libraries': []
+                }
+                
+                # Add detailed library information for display
+                if updated > 0:
+                    # Get the actual updated libraries from the result
+                    updated_libs = result.get('updated_libraries', [])
+                    if updated_libs:
+                        # Use the detailed library information
+                        template_result['updated_libraries'] = updated_libs
+                    else:
+                        # Fallback to generic message if no details available
+                        template_result['updated_libraries'] = [{
+                            'name': f"{server_name} Libraries",
+                            'server_name': server_name,
+                            'changes': [f"Updated {updated} libraries"]
+                        }]
+                
+                # Add added libraries if any
+                if added > 0:
+                    added_libs = result.get('added_libraries', [])
+                    if added_libs:
+                        template_result['added_libraries'] = added_libs
+                    else:
+                        template_result['added_libraries'] = [{
+                            'name': f"{server_name} Libraries",
+                            'server_name': server_name,
+                            'changes': [f"Added {added} libraries"]
+                        }]
+                
+                # Add removed libraries if any
+                if removed > 0:
+                    removed_libs = result.get('removed_libraries', [])
+                    if removed_libs:
+                        template_result['removed_libraries'] = removed_libs
+                    else:
+                        template_result['removed_libraries'] = [{
+                            'name': f"{server_name} Libraries",
+                            'server_name': server_name,
+                            'changes': [f"Removed {removed} libraries"]
+                        }]
+                
+                # Show modal for changes or errors
+                modal_html = render_template('libraries/partials/server_sync_results_modal.html',
+                                           sync_result=result,
+                                           server_name=server_name)
+                
+                if errors > 0 or len(error_messages) > 0:
+                    error_count = errors if errors > 0 else len(error_messages)
+                    message = f"{server_name}: Sync completed with {error_count} errors. See details."
+                    category = "warning"
+                else:
+                    message = f"{server_name}: {added} added, {updated} updated, {removed} removed."
+                    category = "success"
+                
+                trigger_payload = {
+                    "showToastEvent": {"message": message, "category": category},
+                    "openLibrarySyncResultsModal": True,
+                    "refreshLibrariesPage": True
+                }
+                headers = {
+                    'HX-Retarget': '#librarySyncResultModalContainer',
+                    'HX-Reswap': 'innerHTML',
+                    'HX-Trigger-After-Swap': json.dumps(trigger_payload)
+                }
+                return make_response(modal_html, 200, headers)
+            else:
+                # No changes - just show toast
+                current_app.logger.debug(f"No changes for server {server_name}, returning toast-only response")
+                trigger_payload = {
+                    "showToastEvent": {
+                        "message": f"{server_name}: No changes were made.",
+                        "category": "success"
+                    }
+                }
+                headers = {
+                    'HX-Trigger': json.dumps(trigger_payload)
+                }
+                current_app.logger.debug(f"Returning empty response with headers: {headers}")
+                # Return empty response with just the toast trigger
+                response = make_response("", 200, headers)
+                current_app.logger.debug(f"Response created successfully")
+                return response
+        else:
+            # Handle error case
+            error_message = result.get('message', 'Unknown error')
+            trigger_payload = {
+                "showToastEvent": {
+                    "message": f"Server sync failed: {error_message}",
+                    "category": "error"
+                }
+            }
+            headers = {
+                'HX-Trigger': json.dumps(trigger_payload)
+            }
+            return make_response("", 500, headers)
+            
+    except Exception as e:
+        current_app.logger.error(f"Error in server sync endpoint: {e}")
+        
+        # Return error response
+        trigger_payload = {
+            "showToastEvent": {
+                "message": f"Server sync failed: {str(e)}",
+                "category": "error"
+            }
+        }
+        headers = {
+            'HX-Trigger': json.dumps(trigger_payload)
+        }
+        return make_response("", 500, headers)
 
 @bp.route('/servers/<int:server_id>/sync/users', methods=['POST'])
 @login_required

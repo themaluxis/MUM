@@ -100,6 +100,15 @@
                         </span>
                         {% endif %}
                     </h3>
+                    <div class="flex items-center gap-2">
+                        <button class="btn btn-primary btn-xs sync-server-btn"
+                                data-server-id="{{ server_data.server_id }}"
+                                data-server-name="{{ server_name }}"
+                                title="Sync libraries for {{ server_name }}">
+                            <i class="fa-solid fa-sync sm:mr-1"></i>
+                            <span class="sync-server-btn-text hidden sm:inline">Sync</span>
+                        </button>
+                    </div>
                 </div>
                 
                 {% if server_data.libraries %}

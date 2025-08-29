@@ -69,6 +69,8 @@ class MediaServiceManager:
             current_app.logger.info(f"Found {len(existing_libs)} existing libraries in database")
             updated_count = 0
             added_count = 0
+            updated_libraries = []
+            added_libraries = []
             
             for lib_data in libraries_data:
                 external_id = lib_data['external_id']
@@ -77,12 +79,33 @@ class MediaServiceManager:
                 if external_id in existing_libs:
                     # Update existing library
                     lib = existing_libs[external_id]
-                    lib.name = lib_data['name']
-                    lib.library_type = lib_data.get('type')
-                    lib.item_count = lib_data.get('item_count')
-                    lib.updated_at = datetime.utcnow()
-                    updated_count += 1
-                    current_app.logger.debug(f"Updated existing library: {lib_data['name']}")
+                    changes = []
+                    
+                    if lib.name != lib_data['name']:
+                        changes.append(f"Name changed from '{lib.name}' to '{lib_data['name']}'")
+                        lib.name = lib_data['name']
+                    
+                    if lib.library_type != lib_data.get('type'):
+                        changes.append(f"Type changed from '{lib.library_type}' to '{lib_data.get('type')}'")
+                        lib.library_type = lib_data.get('type')
+                    
+                    if lib.item_count != lib_data.get('item_count'):
+                        old_count = lib.item_count or 0
+                        new_count = lib_data.get('item_count') or 0
+                        changes.append(f"Item count changed from {old_count} to {new_count}")
+                        lib.item_count = lib_data.get('item_count')
+                    
+                    if changes:
+                        lib.updated_at = datetime.utcnow()
+                        updated_count += 1
+                        updated_libraries.append({
+                            'name': lib_data['name'],
+                            'server_name': server.server_nickname,
+                            'changes': changes
+                        })
+                        current_app.logger.debug(f"Updated existing library: {lib_data['name']} - Changes: {changes}")
+                    else:
+                        current_app.logger.debug(f"No changes for library: {lib_data['name']}")
                 else:
                     # Add new library
                     lib = MediaLibrary(
@@ -94,6 +117,12 @@ class MediaServiceManager:
                     )
                     db.session.add(lib)
                     added_count += 1
+                    added_libraries.append({
+                        'name': lib_data['name'],
+                        'server_name': server.server_nickname,
+                        'type': lib_data.get('type'),
+                        'item_count': lib_data.get('item_count')
+                    })
                     current_app.logger.debug(f"Added new library: {lib_data['name']}")
             
             server.last_sync_at = datetime.utcnow()
@@ -104,7 +133,9 @@ class MediaServiceManager:
                 'success': True,
                 'message': f'Synced {len(libraries_data)} libraries',
                 'added': added_count,
-                'updated': updated_count
+                'updated': updated_count,
+                'added_libraries': added_libraries,
+                'updated_libraries': updated_libraries
             }
             
         except Exception as e:
