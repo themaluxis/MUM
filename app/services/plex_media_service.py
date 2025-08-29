@@ -957,6 +957,147 @@ class PlexMediaService(BaseMediaService):
             'version': 'Unknown'
         }
 
+    def get_library_content(self, library_key: str, page: int = 1, per_page: int = 24) -> Dict[str, Any]:
+        """Get content from a specific Plex library"""
+        try:
+            server = self._get_server_instance()
+            if not server:
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': 'Could not connect to Plex server'
+                }
+            
+            # Find the library section by key or UUID
+            library_section = None
+            for section in server.library.sections():
+                # Try matching by UUID first (preferred), then by key as fallback
+                if (hasattr(section, 'uuid') and str(section.uuid) == str(library_key)) or str(section.key) == str(library_key):
+                    library_section = section
+                    break
+            
+            if not library_section:
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': f'Library with key/UUID {library_key} not found'
+                }
+            
+            # Get all items from the library
+            all_items = library_section.all()
+            total_items = len(all_items)
+            
+            # Calculate pagination
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            page_items = all_items[start_idx:end_idx]
+            
+            # Process items into standardized format
+            processed_items = []
+            for item in page_items:
+                try:
+                    # Get thumbnail URL using proxy method (same as streaming sessions)
+                    thumb_url = None
+                    if hasattr(item, 'thumb') and item.thumb:
+                        # Manually construct relative URL to avoid url_for issues with external hosts
+                        thumb_url = f"/api/media/plex/images/proxy?path={item.thumb.lstrip('/')}"
+                    elif hasattr(item, 'art') and item.art:
+                        # Manually construct relative URL to avoid url_for issues with external hosts
+                        thumb_url = f"/api/media/plex/images/proxy?path={item.art.lstrip('/')}"
+                    
+                    # Extract year from originallyAvailableAt
+                    year = None
+                    if hasattr(item, 'originallyAvailableAt') and item.originallyAvailableAt:
+                        try:
+                            year = str(item.originallyAvailableAt).split('-')[0]
+                        except:
+                            year = None
+                    elif hasattr(item, 'year') and item.year:
+                        year = str(item.year)
+                    
+                    # Get rating
+                    rating = None
+                    if hasattr(item, 'rating') and item.rating:
+                        rating = float(item.rating)
+                    elif hasattr(item, 'audienceRating') and item.audienceRating:
+                        rating = float(item.audienceRating)
+                    
+                    # Get duration in milliseconds
+                    duration = None
+                    if hasattr(item, 'duration') and item.duration:
+                        duration = item.duration
+                    
+                    processed_item = {
+                        'id': getattr(item, 'ratingKey', ''),
+                        'title': getattr(item, 'title', 'Unknown Title'),
+                        'year': year,
+                        'thumb': thumb_url,
+                        'type': getattr(item, 'type', 'unknown'),
+                        'summary': getattr(item, 'summary', ''),
+                        'rating': rating,
+                        'duration': duration,
+                        'added_at': getattr(item, 'addedAt', None),
+                        'key': getattr(item, 'key', ''),
+                        'guid': getattr(item, 'guid', ''),
+                        'studio': getattr(item, 'studio', ''),
+                        'contentRating': getattr(item, 'contentRating', ''),
+                        'raw_data': {
+                            'ratingKey': getattr(item, 'ratingKey', ''),
+                            'title': getattr(item, 'title', ''),
+                            'type': getattr(item, 'type', ''),
+                            'thumb': getattr(item, 'thumb', ''),
+                            'art': getattr(item, 'art', ''),
+                        }
+                    }
+                    
+                    processed_items.append(processed_item)
+                    
+                except Exception as item_error:
+                    self.log_error(f"Error processing Plex library item: {item_error}")
+                    continue
+            
+            # Calculate pagination info
+            total_pages = (total_items + per_page - 1) // per_page
+            has_prev = page > 1
+            has_next = page < total_pages
+            
+            self.log_info(f"Retrieved {len(processed_items)} items from Plex library {library_section.title} (page {page}/{total_pages})")
+            
+            return {
+                'items': processed_items,
+                'total': total_items,
+                'page': page,
+                'per_page': per_page,
+                'pages': total_pages,
+                'has_prev': has_prev,
+                'has_next': has_next,
+                'library_title': getattr(library_section, 'title', 'Unknown Library'),
+                'library_type': getattr(library_section, 'type', 'unknown')
+            }
+            
+        except Exception as e:
+            self.log_error(f"Error getting Plex library content: {e}")
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False,
+                'error': str(e)
+            }
+
     def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
         """Get GeoIP information for a given IP address using Plex's API."""
         current_app.logger.debug(f"GeoIP lookup requested for IP: {ip_address}")
