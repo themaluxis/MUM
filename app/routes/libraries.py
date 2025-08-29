@@ -69,7 +69,8 @@ def index():
             'libraries': server_data['libraries'],
             'server_id': server.id,
             'online': server_data['has_data'],
-            'needs_sync': not server_data['has_data']
+            'needs_sync': not server_data['has_data'],
+            'last_sync_at': server.last_sync_at
         }
         
         libraries_by_service[service_type]['total_libraries'] += len(server_data['libraries'])

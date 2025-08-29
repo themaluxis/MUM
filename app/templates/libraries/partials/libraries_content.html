@@ -80,7 +80,7 @@
             
             {% for server_name, server_data in service_data.servers.items() %}
             <div class="mb-6 last:mb-0">
-                <div class="flex items-center justify-between mb-3 p-3 bg-base-100 rounded-lg">
+                <div class="flex items-center mb-3 p-3 bg-base-100 rounded-lg">
                     <h3 class="text-lg font-semibold flex items-center">
                         <i class="fa-solid fa-server mr-2 text-base-content/60"></i> {{ server_name }}
                         {% if server_data.needs_sync %}
@@ -100,7 +100,7 @@
                         </span>
                         {% endif %}
                     </h3>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 ml-2">
                         <button class="btn btn-primary btn-xs sync-server-btn"
                                 data-server-id="{{ server_data.server_id }}"
                                 data-server-name="{{ server_name }}"
@@ -108,6 +108,13 @@
                             <i class="fa-solid fa-sync sm:mr-1"></i>
                             <span class="sync-server-btn-text hidden sm:inline">Sync</span>
                         </button>
+                        <div class="text-xs text-base-content/50 hidden sm:block">
+                            {% if server_data.last_sync_at %}
+                                Last synced: {{ server_data.last_sync_at.strftime('%m/%d %H:%M') }}
+                            {% else %}
+                                Never synced
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 
