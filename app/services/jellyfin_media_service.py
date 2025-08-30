@@ -129,13 +129,16 @@ class JellyfinMediaService(BaseMediaService):
                     # Skip libraries without a valid identifier
                     continue
                 
-                # Get item count for this library
-                item_count = self._get_library_item_count(external_id)
+                # Get library type for proper count formatting
+                library_type = folder.get('CollectionType', 'mixed')
+                
+                # Get item count for this library (with type-specific formatting)
+                item_count = self._get_library_item_count(external_id, library_type)
                     
                 libraries.append({
                     'external_id': external_id,
                     'name': folder.get('Name', 'Unknown Library'),
-                    'type': folder.get('CollectionType', 'mixed'),
+                    'type': library_type,
                     'item_count': item_count,
                     'locations': folder.get('Locations', [])
                 })
@@ -147,35 +150,70 @@ class JellyfinMediaService(BaseMediaService):
             self.log_error(f"Error retrieving libraries: {e}")
             return []
     
-    def _get_library_item_count(self, library_id: str) -> int:
-        """Get the item count for a specific Jellyfin library"""
+    def _get_library_item_count(self, library_id: str, library_type: str = None) -> str:
+        """Get the item count for a specific Jellyfin library with proper formatting for TV shows"""
         try:
             if not self._authenticated and not self._authenticate():
                 self.log_error("Failed to authenticate for library item count")
-                return 0
+                return "0"
             
-            # Use the Jellyfin API to get item count
-            # Set Limit=0 to get only the count without actual items
-            response = self.session.get(
-                f"{self.url.rstrip('/')}/Items",
-                params={
-                    'ParentId': library_id,
-                    'Recursive': 'true',
-                    'Limit': 0
-                },
-                timeout=get_api_timeout_with_fallback(10)
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            item_count = data.get('TotalRecordCount', 0)
-            
-            self.log_info(f"Library {library_id} has {item_count} items")
-            return item_count
+            # For TV show libraries, get both series and episode counts
+            if library_type == 'tvshows':
+                # Get series count
+                series_response = self.session.get(
+                    f"{self.url.rstrip('/')}/Items",
+                    params={
+                        'ParentId': library_id,
+                        'IncludeItemTypes': 'Series',
+                        'Limit': 0
+                    },
+                    timeout=get_api_timeout_with_fallback(10)
+                )
+                series_response.raise_for_status()
+                series_data = series_response.json()
+                series_count = series_data.get('TotalRecordCount', 0)
+                
+                # Get episode count
+                episode_response = self.session.get(
+                    f"{self.url.rstrip('/')}/Items",
+                    params={
+                        'ParentId': library_id,
+                        'IncludeItemTypes': 'Episode',
+                        'Recursive': 'true',
+                        'Limit': 0
+                    },
+                    timeout=get_api_timeout_with_fallback(10)
+                )
+                episode_response.raise_for_status()
+                episode_data = episode_response.json()
+                episode_count = episode_data.get('TotalRecordCount', 0)
+                
+                # Format as "seriesCount (episodeCountep)"
+                formatted_count = f"{series_count} ({episode_count}ep)"
+                self.log_info(f"TV Library {library_id} has {series_count} series and {episode_count} episodes")
+                return formatted_count
+            else:
+                # For other library types, use the original logic
+                response = self.session.get(
+                    f"{self.url.rstrip('/')}/Items",
+                    params={
+                        'ParentId': library_id,
+                        'Recursive': 'true',
+                        'Limit': 0
+                    },
+                    timeout=get_api_timeout_with_fallback(10)
+                )
+                response.raise_for_status()
+                
+                data = response.json()
+                item_count = data.get('TotalRecordCount', 0)
+                
+                self.log_info(f"Library {library_id} has {item_count} items")
+                return str(item_count)
             
         except Exception as e:
             self.log_error(f"Error getting item count for library {library_id}: {e}")
-            return 0
+            return "0"
     
     def get_users(self) -> List[Dict[str, Any]]:
         """Get all users from Jellyfin"""
