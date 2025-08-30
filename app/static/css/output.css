@@ -6423,6 +6423,9 @@
   .capitalize {
     text-transform: capitalize;
   }
+  .lowercase {
+    text-transform: lowercase;
+  }
   .normal-case {
     text-transform: none;
   }
@@ -6601,6 +6604,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       --tw-ring-color: color-mix(in oklab, var(--color-komga-600) 20%, transparent);
     }
+  }
+  .ring-orange-600 {
+    --tw-ring-color: var(--color-orange-600);
   }
   .ring-orange-600\/20 {
     --tw-ring-color: color-mix(in srgb, oklch(64.6% 0.222 41.116) 20%, transparent);

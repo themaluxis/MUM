@@ -124,19 +124,19 @@
             <!-- Tab Navigation -->
             <div class="overflow-x-auto border-b border-base-300">
                 <div role="tablist" class="tabs tabs-border whitespace-nowrap flex-nowrap">
-                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='overview') }}"
+                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='overview') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'overview' else '' }}">
                         <i class="fa-solid fa-info-circle mr-2"></i>Overview
                     </a>
-                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media') }}"
+                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'media' else '' }}">
                         <i class="fa-solid fa-film mr-2"></i>Media
                     </a>
-                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='stats') }}"
+                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='stats') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'stats' else '' }}">
                         <i class="fa-solid fa-chart-bar mr-2"></i>Stats
                     </a>
-                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='activity') }}"
+                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='activity') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'activity' else '' }}">
                         <i class="fa-solid fa-history mr-2"></i>
                         Recent Activity
@@ -226,7 +226,7 @@
                     </div>
                 {% elif active_tab == 'activity' %}
                     <!-- Activity Tab -->
-                    <div hx-get="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='activity', days=days_filter or 30) }}"
+                    <div hx-get="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='activity', days=days_filter or 30) }}"
                          hx-trigger="load"
                          hx-target="this"
                          hx-swap="innerHTML">

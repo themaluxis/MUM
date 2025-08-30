@@ -665,3 +665,186 @@ def resolve_user_route_conflict(path_segment):
         result['server'] = server
     
     return result
+
+
+def encode_url_component(text):
+    """
+    Encode URL components by replacing special characters with dashes.
+    Replaces %20 (URL-encoded spaces), forward slashes, dots, and spaces with dashes.
+    
+    Args:
+        text (str): The text to encode for URL usage
+        
+    Returns:
+        str: URL-safe string with special characters replaced by dashes
+    """
+    if not text:
+        return text
+    
+    # First decode any existing URL encoding
+    import urllib.parse
+    decoded_text = urllib.parse.unquote(text)
+    
+    # Replace special characters with dashes
+    # Order matters: do spaces first, then other characters
+    encoded = decoded_text.replace(' ', '-')  # Replace spaces
+    encoded = encoded.replace('/', '-')       # Replace forward slashes
+    encoded = encoded.replace('.', '-')       # Replace dots
+    encoded = encoded.replace('%20', '-')     # Replace URL-encoded spaces (if any remain)
+    
+    # Clean up multiple consecutive dashes
+    while '--' in encoded:
+        encoded = encoded.replace('--', '-')
+    
+    # Remove leading/trailing dashes
+    encoded = encoded.strip('-')
+    
+    # Debug logging
+    try:
+        from flask import current_app
+        current_app.logger.info(f"DEBUG encode_url_component: '{text}' -> '{encoded}'")
+    except:
+        pass  # Ignore if not in Flask context
+    
+    return encoded
+
+
+def decode_url_component_variations(text):
+    """
+    Generate multiple possible variations of what the original text could have been.
+    Since dashes could represent spaces, slashes, dots, or original hyphens, we need to try different combinations.
+    
+    Args:
+        text (str): The URL-encoded text to decode
+        
+    Returns:
+        list: List of possible original strings to try for database lookup
+    """
+    if not text:
+        return [text]
+    
+    # First decode any URL encoding
+    import urllib.parse
+    decoded_text = urllib.parse.unquote(text)
+    
+    variations = []
+    
+    # IMPORTANT: Add the original text as-is first (in case it already had hyphens)
+    variations.append(decoded_text)
+    
+    # Most common case: dashes represent spaces
+    variations.append(decoded_text.replace('-', ' '))
+    
+    # Try dashes as slashes (for cases like "50/50" -> "50-50")
+    variations.append(decoded_text.replace('-', '/'))
+    
+    # Try dashes as dots (for cases like "file.name" -> "file-name")
+    variations.append(decoded_text.replace('-', '.'))
+    
+    # Try mixed patterns for complex titles with multiple dashes
+    if '-' in decoded_text:
+        # For titles like "ChID-BLITS-EBU", try preserving some hyphens while converting others
+        # This handles cases where some dashes are original hyphens and others are encoded characters
+        
+        # Try converting only every other dash to space (common pattern)
+        parts = decoded_text.split('-')
+        if len(parts) > 2:
+            # Try: "A-B-C-D" -> "A B-C D" (spaces for odd positions)
+            temp = []
+            for i, part in enumerate(parts):
+                if i > 0 and i % 2 == 1:
+                    temp.append(' ' + part)
+                elif i > 0:
+                    temp.append('-' + part)
+                else:
+                    temp.append(part)
+            variations.append(''.join(temp))
+            
+            # Try: "A-B-C-D" -> "A-B C-D" (spaces for even positions)
+            temp = []
+            for i, part in enumerate(parts):
+                if i > 0 and i % 2 == 0:
+                    temp.append(' ' + part)
+                elif i > 0:
+                    temp.append('-' + part)
+                else:
+                    temp.append(part)
+            variations.append(''.join(temp))
+            
+        # Special case: Handle version numbers like "5-1" -> "5.1"
+        # This is common for audio/video content
+        if len(parts) >= 2:
+            # Look for numeric patterns that might be version numbers
+            for i in range(len(parts) - 1):
+                if parts[i].isdigit() and parts[i + 1].isdigit():
+                    # Create a version with period instead of dash for this numeric pair
+                    temp_parts = parts.copy()
+                    temp_parts[i] = parts[i] + '.' + parts[i + 1]
+                    # Remove the next part since we combined it
+                    temp_parts.pop(i + 1)
+                    # Rejoin with spaces for other dashes
+                    variations.append(' '.join(temp_parts))
+                    # Also try with original hyphens preserved elsewhere
+                    if len(temp_parts) > 1:
+                        # Convert some dashes to spaces, keep others as hyphens
+                        result = temp_parts[0]
+                        for j in range(1, len(temp_parts)):
+                            if j == 1:  # First connection uses space
+                                result += ' ' + temp_parts[j]
+                            else:  # Others use hyphens
+                                result += '-' + temp_parts[j]
+                        variations.append(result)
+                        
+                    # Special case for the exact pattern we're seeing:
+                    # "Fraunhofer-ChID-BLITS-EBU-5-1" -> "Fraunhofer ChID-BLITS-EBU 5.1"
+                    if len(temp_parts) >= 2:
+                        # Keep all hyphens except convert first dash to space and last to period
+                        result = temp_parts[0]
+                        for j in range(1, len(temp_parts)):
+                            if j == 1:  # First connection uses space
+                                result += ' ' + temp_parts[j]
+                            elif j == len(temp_parts) - 1:  # Last part already has the period
+                                result += ' ' + temp_parts[j]
+                            else:  # Middle connections use hyphens
+                                result += '-' + temp_parts[j]
+                        variations.append(result)
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_variations = []
+    for variation in variations:
+        if variation not in seen:
+            seen.add(variation)
+            unique_variations.append(variation)
+    
+    # Debug logging
+    try:
+        from flask import current_app
+        current_app.logger.info(f"DEBUG decode_url_component_variations: '{text}' -> {unique_variations}")
+    except:
+        pass  # Ignore if not in Flask context
+    
+    return unique_variations
+
+
+def decode_url_component(text):
+    """
+    Decode URL components by converting dashes back to spaces (most common case).
+    For more complex cases, use decode_url_component_variations() in route handlers.
+    
+    Args:
+        text (str): The URL-encoded text to decode
+        
+    Returns:
+        str: Decoded string with dashes converted back to spaces
+    """
+    if not text:
+        return text
+    
+    # First decode any URL encoding
+    import urllib.parse
+    decoded_text = urllib.parse.unquote(text)
+    
+    # For backward compatibility, convert dashes back to spaces
+    # This assumes the most common case where dashes represent spaces
+    return decoded_text.replace('-', ' ')

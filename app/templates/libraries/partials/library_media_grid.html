@@ -87,7 +87,7 @@
         <!-- Media Grid -->
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
             {% for item in media_content.get('items', []) %}
-            <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=item.title.replace(' ', '-')) }}" class="group cursor-pointer block">
+            <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), content_name=encode_url_component(item.title)) }}" class="group cursor-pointer block">
                 <!-- Poster Container -->
                 <div class="relative aspect-[2/3] bg-base-200 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                     {% if item.type in ['folder', 'directory'] or (item.type == 'collectionfolder') %}
@@ -184,7 +184,7 @@
         <div class="flex justify-center mt-8">
             <div class="join">
                 {% if media_content.has_prev %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media', page=media_content.page-1) }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.page-1) }}" 
                        class="join-item btn btn-sm">
                         <i class="fa-solid fa-chevron-left"></i>
                     </a>
@@ -194,7 +194,7 @@
                 {% set end_page = [media_content.pages, media_content.page + 2] | min %}
                 
                 {% if start_page > 1 %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media', page=1) }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=1) }}" 
                        class="join-item btn btn-sm">1</a>
                     {% if start_page > 2 %}
                         <button class="join-item btn btn-sm btn-disabled">...</button>
@@ -205,7 +205,7 @@
                     {% if page_num == media_content.page %}
                         <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
                     {% else %}
-                        <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media', page=page_num) }}" 
+                        <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=page_num) }}" 
                            class="join-item btn btn-sm">{{ page_num }}</a>
                     {% endif %}
                 {% endfor %}
@@ -214,12 +214,12 @@
                     {% if end_page < media_content.pages - 1 %}
                         <button class="join-item btn btn-sm btn-disabled">...</button>
                     {% endif %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media', page=media_content.pages) }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.pages) }}" 
                        class="join-item btn btn-sm">{{ media_content.pages }}</a>
                 {% endif %}
                 
                 {% if media_content.has_next %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media', page=media_content.page+1) }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.page+1) }}" 
                        class="join-item btn btn-sm">
                         <i class="fa-solid fa-chevron-right"></i>
                     </a>
@@ -240,7 +240,7 @@
                     <p class="text-base-content/60">{{ media_content.error }}</p>
                     <p class="text-sm text-base-content/40 mt-2">Please check your server connection and try again.</p>
                 </div>
-                <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media') }}" 
+                <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media') }}" 
                    class="btn btn-error btn-sm">
                     <i class="fa-solid fa-refresh mr-2"></i>Retry
                 </a>
@@ -275,7 +275,7 @@
                         <i class="fa-solid fa-sync mr-2"></i>Sync Library
                     </button>
                 {% else %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=library.name, tab='media') }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media') }}" 
                        class="btn btn-primary btn-sm">
                         <i class="fa-solid fa-refresh mr-2"></i>Refresh
                     </a>

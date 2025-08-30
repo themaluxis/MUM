@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, current_app, request, make_response, json, flash, redirect, url_for, abort
 from flask_login import login_required, current_user
-from app.utils.helpers import setup_required, permission_required
+from app.utils.helpers import setup_required, permission_required, encode_url_component, decode_url_component, decode_url_component_variations
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
 from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory, UserMediaAccess
@@ -370,28 +370,28 @@ def media_detail(server_nickname, library_name, content_name):
         library_name = urllib.parse.unquote(library_name)
         content_name = urllib.parse.unquote(content_name)
         
-        # Replace dashes back to spaces for lookups
-        library_name_for_lookup = library_name.replace('-', ' ')
-        content_name_for_lookup = content_name.replace('-', ' ')
+        # Decode URL components back to original names for lookups
+        library_name_for_lookup = decode_url_component(library_name)
+        content_name_for_lookup = decode_url_component(content_name)
         
-        # If the URL contains spaces instead of dashes, redirect to the proper format
-        needs_redirect = False
-        proper_library_name = library_name
-        proper_content_name = content_name
+        # If the URL contains spaces or other special characters, redirect to the proper format
+        proper_library_name = encode_url_component(library_name)
+        proper_content_name = encode_url_component(content_name)
+        needs_redirect = (library_name != proper_library_name or content_name != proper_content_name)
         
-        if ' ' in library_name:
-            proper_library_name = library_name.replace(' ', '-')
-            needs_redirect = True
-            
-        if ' ' in content_name:
-            proper_content_name = content_name.replace(' ', '-')
-            needs_redirect = True
+        current_app.logger.info(f"DEBUG URL encoding check:")
+        current_app.logger.info(f"  Original library_name: '{library_name}' -> Proper: '{proper_library_name}'")
+        current_app.logger.info(f"  Original content_name: '{content_name}' -> Proper: '{proper_content_name}'")
+        current_app.logger.info(f"  Needs redirect: {needs_redirect}")
             
         if needs_redirect:
-            return redirect(url_for('libraries.media_detail', 
-                                  server_nickname=server_nickname,
-                                  library_name=proper_library_name,
-                                  content_name=proper_content_name))
+            redirect_url = url_for('libraries.media_detail', 
+                                 server_nickname=server_nickname,
+                                 library_name=proper_library_name,
+                                 content_name=proper_content_name,
+                                 **request.args)
+            current_app.logger.info(f"DEBUG: Redirecting to: {redirect_url}")
+            return redirect(redirect_url)
         
     except Exception as e:
         current_app.logger.warning(f"Error decoding URL parameters: {e}")
@@ -404,19 +404,52 @@ def media_detail(server_nickname, library_name, content_name):
     # Find the server by nickname
     server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
     
-    # Find the library by name and server
-    library = MediaLibrary.query.filter_by(
-        server_id=server.id,
-        name=library_name
-    ).first_or_404()
+    # Find the library by name and server - try multiple variations for library name
+    library = None
+    library_name_variations = decode_url_component_variations(library_name)
+    
+    for variation in library_name_variations:
+        library = MediaLibrary.query.filter_by(
+            server_id=server.id,
+            name=variation
+        ).first()
+        if library:
+            # Store the actual library name that worked
+            library_name_for_lookup = variation
+            break
+    
+    if not library:
+        abort(404)
     
     # Get the active tab from the URL query, default to 'overview'
     tab = request.args.get('tab', 'overview')
     
-    # Get media details from the service (use the original name with spaces)
-    media_details = get_media_details(server, library, content_name_for_lookup)
+    # Get media details from the service - try multiple variations for content name
+    media_details = None
+    content_name_variations = decode_url_component_variations(content_name)
+    
+    current_app.logger.info(f"DEBUG: Looking up content '{content_name}' in library '{library.name}'")
+    current_app.logger.info(f"DEBUG: Content name variations: {content_name_variations}")
+    
+    for i, variation in enumerate(content_name_variations):
+        current_app.logger.info(f"DEBUG: Trying variation {i+1}: '{variation}'")
+        media_details = get_media_details_cached_only(server, library, variation)
+        if media_details:
+            current_app.logger.info(f"DEBUG: SUCCESS! Found media with variation: '{variation}'")
+            current_app.logger.info(f"DEBUG: Media details title: '{media_details.get('title', 'N/A')}'")
+            # Store the actual content name that worked for later use
+            content_name_for_lookup = variation
+            break
+        else:
+            current_app.logger.info(f"DEBUG: No match for variation: '{variation}'")
+    
     if not media_details:
-        abort(404)
+        current_app.logger.warning(f"DEBUG: No cached match found, falling back to API call with original content name")
+        # If no cached version found, fall back to API call with the most likely variation
+        media_details = get_media_details(server, library, content_name_for_lookup)
+        if not media_details:
+            current_app.logger.warning(f"DEBUG: FAILED to find any media for content '{content_name}' with variations {content_name_variations}")
+            abort(404)
     
     # Get streaming history for this specific content
     streaming_history = None
@@ -496,12 +529,12 @@ def library_detail(server_nickname, library_name):
         server_nickname = urllib.parse.unquote(server_nickname)
         library_name = urllib.parse.unquote(library_name)
         
-        # Replace dashes back to spaces for library name lookup
-        library_name_for_lookup = library_name.replace('-', ' ')
+        # Decode URL component back to original name for lookup
+        library_name_for_lookup = decode_url_component(library_name)
         
-        # If the URL contains spaces instead of dashes, redirect to the proper format
-        if ' ' in library_name:
-            proper_library_name = library_name.replace(' ', '-')
+        # If the URL contains spaces or other special characters, redirect to the proper format
+        proper_library_name = encode_url_component(library_name)
+        if library_name != proper_library_name:
             return redirect(url_for('libraries.library_detail', 
                                   server_nickname=server_nickname,
                                   library_name=proper_library_name,
@@ -518,11 +551,22 @@ def library_detail(server_nickname, library_name):
     # Find the server by nickname
     server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
     
-    # Find the library by name and server (use the original name with spaces)
-    library = MediaLibrary.query.filter_by(
-        server_id=server.id,
-        name=library_name_for_lookup
-    ).first_or_404()
+    # Find the library by name and server - try multiple variations for library name
+    library = None
+    library_name_variations = decode_url_component_variations(library_name)
+    
+    for variation in library_name_variations:
+        library = MediaLibrary.query.filter_by(
+            server_id=server.id,
+            name=variation
+        ).first()
+        if library:
+            # Store the actual library name that worked
+            library_name_for_lookup = variation
+            break
+    
+    if not library:
+        abort(404)
     
     # Get the active tab from the URL query, default to 'overview'
     tab = request.args.get('tab', 'overview')
@@ -992,11 +1036,54 @@ def get_library_user_stats(library, days=30):
         current_app.logger.error(f"Error getting library user stats: {e}")
         return []
 
+def get_media_details_cached_only(server, library, content_name):
+    """Get detailed information about a specific media item from database cache only"""
+    try:
+        from app.models_media_services import MediaItem
+        from flask import current_app
+        
+        current_app.logger.info(f"DEBUG get_media_details_cached_only: Looking for title='{content_name}' in library_id={library.id}")
+        
+        # Only check cached database, no API calls
+        media_item = MediaItem.query.filter_by(
+            library_id=library.id,
+            title=content_name
+        ).first()
+        
+        if media_item:
+            current_app.logger.info(f"DEBUG: Found media item in database cache: '{media_item.title}'")
+            # Convert database item to dict format
+            return {
+                'id': media_item.external_id,
+                'title': media_item.title,
+                'sort_title': media_item.sort_title,
+                'type': media_item.item_type,
+                'summary': media_item.summary,
+                'year': media_item.year,
+                'rating': media_item.rating,
+                'duration': media_item.duration,
+                'thumb': media_item.thumb_path,
+                'added_at': media_item.added_at,
+                'last_synced': media_item.last_synced,
+                'raw_data': media_item.extra_metadata or {}
+            }
+        
+        current_app.logger.info(f"DEBUG: No cached media item found for '{content_name}'")
+        return None
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting cached media details for '{content_name}': {e}")
+        return None
+
+
 def get_media_details(server, library, content_name):
     """Get detailed information about a specific media item"""
     try:
         from app.services.media_service_factory import MediaServiceFactory
         from app.models_media_services import MediaItem
+        from flask import current_app
+        
+        current_app.logger.info(f"DEBUG get_media_details: Looking for title='{content_name}' in library_id={library.id}")
         
         # First try to get from cached database
         media_item = MediaItem.query.filter_by(
@@ -1004,7 +1091,12 @@ def get_media_details(server, library, content_name):
             title=content_name
         ).first()
         
+        # Debug: Show what titles are actually in the database for this library
+        all_titles = MediaItem.query.filter_by(library_id=library.id).with_entities(MediaItem.title).all()
+        current_app.logger.info(f"DEBUG: Available titles in library: {[t[0] for t in all_titles[:10]]}...")  # Show first 10
+        
         if media_item:
+            current_app.logger.info(f"DEBUG: Found media item in database: '{media_item.title}'")
             # Convert database item to dict format
             return {
                 'id': media_item.external_id,

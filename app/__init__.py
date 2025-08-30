@@ -216,6 +216,11 @@ def create_app(config_name=None):
     def inject_current_year():
         from app.utils.timezone_utils import now
         return {'current_year': now().year}
+    
+    @app.context_processor
+    def inject_url_helpers():
+        from app.utils.helpers import encode_url_component
+        return {'encode_url_component': encode_url_component}
 
     @login_manager.user_loader
     def load_user(user_id):

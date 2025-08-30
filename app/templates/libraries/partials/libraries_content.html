@@ -18,7 +18,7 @@
                         {% for lib in simple_libraries %}
                         <tr class="hover">
                             <td class="font-semibold">
-                                <a href="{{ url_for('libraries.library_detail', server_nickname=lib.server_name, library_name=lib.name.replace(' ', '-')) }}" 
+                                <a href="{{ url_for('libraries.library_detail', server_nickname=lib.server_name, library_name=encode_url_component(lib.name)) }}" 
                                    class="link link-hover text-primary">
                                     {{ lib.name }}
                                 </a>
@@ -133,7 +133,7 @@
                             {% for lib in server_data.libraries %}
                             <tr class="hover">
                                 <td class="font-semibold">
-                                    <a href="{{ url_for('libraries.library_detail', server_nickname=lib.server_name, library_name=lib.name.replace(' ', '-')) }}" 
+                                    <a href="{{ url_for('libraries.library_detail', server_nickname=lib.server_name, library_name=encode_url_component(lib.name)) }}" 
                                        class="link link-hover text-primary">
                                         {{ lib.name }}
                                     </a>
