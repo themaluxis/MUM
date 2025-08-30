@@ -369,6 +369,30 @@ def media_detail(server_nickname, library_name, content_name):
         server_nickname = urllib.parse.unquote(server_nickname)
         library_name = urllib.parse.unquote(library_name)
         content_name = urllib.parse.unquote(content_name)
+        
+        # Replace dashes back to spaces for lookups
+        library_name_for_lookup = library_name.replace('-', ' ')
+        content_name_for_lookup = content_name.replace('-', ' ')
+        
+        # If the URL contains spaces instead of dashes, redirect to the proper format
+        needs_redirect = False
+        proper_library_name = library_name
+        proper_content_name = content_name
+        
+        if ' ' in library_name:
+            proper_library_name = library_name.replace(' ', '-')
+            needs_redirect = True
+            
+        if ' ' in content_name:
+            proper_content_name = content_name.replace(' ', '-')
+            needs_redirect = True
+            
+        if needs_redirect:
+            return redirect(url_for('libraries.media_detail', 
+                                  server_nickname=server_nickname,
+                                  library_name=proper_library_name,
+                                  content_name=proper_content_name))
+        
     except Exception as e:
         current_app.logger.warning(f"Error decoding URL parameters: {e}")
         abort(400)
@@ -389,8 +413,8 @@ def media_detail(server_nickname, library_name, content_name):
     # Get the active tab from the URL query, default to 'overview'
     tab = request.args.get('tab', 'overview')
     
-    # Get media details from the service
-    media_details = get_media_details(server, library, content_name)
+    # Get media details from the service (use the original name with spaces)
+    media_details = get_media_details(server, library, content_name_for_lookup)
     if not media_details:
         abort(404)
     
@@ -404,11 +428,11 @@ def media_detail(server_nickname, library_name, content_name):
         end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=days_filter)
         
-        # Get streaming history for this specific content
+        # Get streaming history for this specific content (use the original names with spaces)
         activity_query = MediaStreamHistory.query.filter(
             MediaStreamHistory.server_id == server.id,
-            MediaStreamHistory.library_name == library_name,
-            MediaStreamHistory.media_title == content_name,
+            MediaStreamHistory.library_name == library_name_for_lookup,
+            MediaStreamHistory.media_title == content_name_for_lookup,
             MediaStreamHistory.started_at >= start_date,
             MediaStreamHistory.started_at <= end_date
         ).order_by(MediaStreamHistory.started_at.desc())
@@ -471,6 +495,18 @@ def library_detail(server_nickname, library_name):
     try:
         server_nickname = urllib.parse.unquote(server_nickname)
         library_name = urllib.parse.unquote(library_name)
+        
+        # Replace dashes back to spaces for library name lookup
+        library_name_for_lookup = library_name.replace('-', ' ')
+        
+        # If the URL contains spaces instead of dashes, redirect to the proper format
+        if ' ' in library_name:
+            proper_library_name = library_name.replace(' ', '-')
+            return redirect(url_for('libraries.library_detail', 
+                                  server_nickname=server_nickname,
+                                  library_name=proper_library_name,
+                                  **request.args))
+        
     except Exception as e:
         current_app.logger.warning(f"Error decoding URL parameters: {e}")
         abort(400)
@@ -482,10 +518,10 @@ def library_detail(server_nickname, library_name):
     # Find the server by nickname
     server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
     
-    # Find the library by name and server
+    # Find the library by name and server (use the original name with spaces)
     library = MediaLibrary.query.filter_by(
         server_id=server.id,
-        name=library_name
+        name=library_name_for_lookup
     ).first_or_404()
     
     # Get the active tab from the URL query, default to 'overview'

@@ -87,7 +87,7 @@
         <!-- Media Grid -->
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
             {% for item in media_content.get('items', []) %}
-            <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=item.title) }}" class="group cursor-pointer block">
+            <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=item.title.replace(' ', '-')) }}" class="group cursor-pointer block">
                 <!-- Poster Container -->
                 <div class="relative aspect-[2/3] bg-base-200 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                     {% if item.type in ['folder', 'directory'] or (item.type == 'collectionfolder') %}

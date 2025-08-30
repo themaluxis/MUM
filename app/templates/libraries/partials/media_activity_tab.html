@@ -18,11 +18,11 @@
                 <i class="fa-solid fa-chevron-down ml-2"></i>
             </div>
             <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
-                <li><a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title, tab='activity', days=7) }}"
+                <li><a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title.replace(' ', '-'), tab='activity', days=7) }}"
                        class="{% if days_filter == 7 %}active{% endif %}">Last 7 days</a></li>
-                <li><a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title, tab='activity', days=30) }}"
+                <li><a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title.replace(' ', '-'), tab='activity', days=30) }}"
                        class="{% if days_filter == 30 %}active{% endif %}">Last 30 days</a></li>
-                <li><a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title, tab='activity', days=90) }}"
+                <li><a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title.replace(' ', '-'), tab='activity', days=90) }}"
                        class="{% if days_filter == 90 %}active{% endif %}">Last 90 days</a></li>
             </ul>
         </div>
@@ -136,7 +136,7 @@
         <div class="flex items-center justify-center gap-2">
             <!-- Previous Page -->
             {% if streaming_history.has_prev %}
-                <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title, tab='activity', days=days_filter, page=streaming_history.prev_num) }}"
+                <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title.replace(' ', '-'), tab='activity', days=days_filter, page=streaming_history.prev_num) }}"
                    class="btn btn-sm btn-outline">
                     <i class="fa-solid fa-chevron-left"></i>
                     Previous
@@ -147,7 +147,7 @@
             {% for page_num in streaming_history.iter_pages() %}
                 {% if page_num %}
                     {% if page_num != streaming_history.page %}
-                        <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title, tab='activity', days=days_filter, page=page_num) }}"
+                        <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title.replace(' ', '-'), tab='activity', days=days_filter, page=page_num) }}"
                            class="btn btn-sm btn-outline">{{ page_num }}</a>
                     {% else %}
                         <span class="btn btn-sm btn-primary">{{ page_num }}</span>
@@ -159,7 +159,7 @@
 
             <!-- Next Page -->
             {% if streaming_history.has_next %}
-                <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title, tab='activity', days=days_filter, page=streaming_history.next_num) }}"
+                <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title.replace(' ', '-'), tab='activity', days=days_filter, page=streaming_history.next_num) }}"
                    class="btn btn-sm btn-outline">
                     Next
                     <i class="fa-solid fa-chevron-right"></i>

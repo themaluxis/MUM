@@ -191,11 +191,11 @@
             <!-- Tab Navigation -->
             <div class="overflow-x-auto border-b border-base-300">
                 <div role="tablist" class="tabs tabs-border whitespace-nowrap flex-nowrap">
-                    <a role="tab" href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title, tab='overview') }}"
+                    <a role="tab" href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title.replace(' ', '-'), tab='overview') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'overview' else '' }}">
                         <i class="fa-solid fa-info-circle mr-2"></i>Overview
                     </a>
-                    <a role="tab" href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title, tab='activity') }}"
+                    <a role="tab" href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=media_details.title.replace(' ', '-'), tab='activity') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'activity' else '' }}">
                         <i class="fa-solid fa-chart-line mr-2"></i>Activity
                     </a>
