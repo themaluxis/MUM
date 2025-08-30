@@ -6438,6 +6438,9 @@
   .opacity-70 {
     opacity: 70%;
   }
+  .opacity-100 {
+    opacity: 100%;
+  }
   .opacity-\[\.15\] {
     opacity: .15;
   }
@@ -6762,6 +6765,10 @@
     --badge-color: var(--color-info);
     --badge-fg: var(--color-info-content);
   }
+  .badge-neutral {
+    --badge-color: var(--color-neutral);
+    --badge-fg: var(--color-neutral-content);
+  }
   .badge-primary {
     --badge-color: var(--color-primary);
     --badge-fg: var(--color-primary-content);
@@ -6814,6 +6821,9 @@
     &, &:focus, &:focus-within {
       --input-color: var(--color-error);
     }
+  }
+  .radio-primary {
+    --input-color: var(--color-primary);
   }
   .ring-inset {
     --tw-ring-inset: inset;
@@ -7247,6 +7257,13 @@
     &:hover {
       @media (hover: hover) {
         color: var(--color-primary);
+      }
+    }
+  }
+  .hover\:opacity-100 {
+    &:hover {
+      @media (hover: hover) {
+        opacity: 100%;
       }
     }
   }
@@ -8007,6 +8024,11 @@
   .dark\:text-audiobookshelf-400 {
     &:where([data-theme=dark], [data-theme=dark] *) {
       color: var(--color-audiobookshelf-400);
+    }
+  }
+  .dark\:text-base-content {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      color: var(--color-base-content);
     }
   }
   .dark\:text-blue-300 {

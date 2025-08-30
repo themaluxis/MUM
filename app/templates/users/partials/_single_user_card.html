@@ -205,6 +205,15 @@
                                 </span>
                             {% endif %}
                     {% endif %}
+                    
+                    {# Add Service Account Button - Show for local users only #}
+                    {% if user._user_type is defined and user._user_type == 'local' %}
+                        <button class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1 mt-1 hover:bg-gray-100 dark:hover:bg-gray-400/20 transition-colors cursor-pointer"
+                                title="Add service account">
+                            <i class="fa-solid fa-plus w-3 h-3"></i>
+                            Add Service
+                        </button>
+                    {% endif %}
                 {% endif %}
                 
                 {# Linked Account Badge - Show for service users that have a linked local account #}
