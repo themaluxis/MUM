@@ -959,6 +959,37 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
                 is_eligible_for_purge = True
         
         if is_eligible_for_purge:
+            # Process avatar URL using the same logic as user cards
+            avatar_url = None
+            if user.external_avatar_url:
+                avatar_url = user.external_avatar_url
+            elif user.server and user.server.service_type.value == 'plex':
+                # For Plex, check multiple possible locations for the thumb URL
+                thumb_url = None
+                
+                # First try service_settings
+                if user.service_settings and user.service_settings.get('thumb'):
+                    thumb_url = user.service_settings['thumb']
+                # Then try raw_data from the user sync
+                elif user.user_raw_data and user.user_raw_data.get('thumb'):
+                    thumb_url = user.user_raw_data['thumb']
+                # Also check nested raw data structure
+                elif (user.user_raw_data and 
+                      user.user_raw_data.get('plex_user_obj_attrs') and 
+                      user.user_raw_data['plex_user_obj_attrs'].get('thumb')):
+                    thumb_url = user.user_raw_data['plex_user_obj_attrs']['thumb']
+                
+                if thumb_url:
+                    # Check if it's already a full URL (plex.tv avatars) or needs proxy
+                    if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
+                        avatar_url = thumb_url
+                    else:
+                        avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+            elif user.server and user.server.service_type.value == 'jellyfin':
+                # For Jellyfin, use the external_user_id to get avatar
+                if user.external_user_id:
+                    avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user.external_user_id}"
+            
             eligible_users_list.append({ 
                 'id': user.id, 
                 'username': user.external_username or 'Unknown', 
@@ -966,7 +997,8 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
                 'last_streamed_at': last_streamed_at, 
                 'created_at': user.created_at,
                 'server_name': user.server.server_nickname if user.server else 'Unknown Server',
-                'service_type': user.server.service_type.value if user.server else 'unknown'
+                'service_type': user.server.service_type.value if user.server else 'unknown',
+                'avatar_url': avatar_url
             })
             
     return eligible_users_list
