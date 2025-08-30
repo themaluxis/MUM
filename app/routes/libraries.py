@@ -358,6 +358,135 @@ def get_library_raw_data(server_id, library_id):
         current_app.logger.error(f"Error fetching raw library data: {e}")
         return {'error': str(e)}, 500
 
+@bp.route('/library/<server_nickname>/<library_name>/<int:media_id>/<tv_show_slug>/<episode_slug>')
+@login_required
+@setup_required
+@permission_required('view_libraries')
+def episode_detail(server_nickname, library_name, media_id, tv_show_slug, episode_slug):
+    """Display detailed episode information"""
+    # URL decode the parameters to handle special characters
+    try:
+        server_nickname = urllib.parse.unquote(server_nickname)
+        library_name = urllib.parse.unquote(library_name)
+        tv_show_slug = urllib.parse.unquote(tv_show_slug)
+        episode_slug = urllib.parse.unquote(episode_slug)
+        
+        # Decode URL component back to original name for lookup
+        library_name_for_lookup = decode_url_component(library_name)
+        tv_show_name = decode_url_component(tv_show_slug)
+        episode_name = decode_url_component(episode_slug)
+        
+    except Exception as e:
+        current_app.logger.warning(f"Error decoding URL parameters: {e}")
+        abort(400)
+    
+    # Validate parameters
+    if not server_nickname or not library_name or not media_id or not tv_show_slug or not episode_slug:
+        abort(400)
+    
+    # Find the server by nickname
+    server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
+    
+    # Find the library by name and server - try multiple variations for library name
+    library = None
+    library_name_variations = decode_url_component_variations(library_name)
+    
+    for variation in library_name_variations:
+        library = MediaLibrary.query.filter_by(
+            server_id=server.id,
+            name=variation
+        ).first()
+        if library:
+            # Store the actual library name that worked
+            library_name_for_lookup = variation
+            break
+    
+    if not library:
+        abort(404)
+    
+    # Get the TV show details by database ID
+    from app.models_media_services import MediaItem
+    tv_show_item = MediaItem.query.filter_by(
+        id=media_id,
+        library_id=library.id  # Ensure the media belongs to this library
+    ).first_or_404()
+    
+    # Get episode details from the service
+    from app.services.media_service_factory import MediaServiceFactory
+    service = MediaServiceFactory.create_service_from_db(server)
+    if not service:
+        abort(500)
+    
+    # Get episodes for the show to find the specific episode
+    episode_details = None
+    if hasattr(service, 'get_show_episodes'):
+        episodes_data = service.get_show_episodes(tv_show_item.external_id, page=1, per_page=1000)
+        if episodes_data and episodes_data.get('items'):
+            for episode in episodes_data['items']:
+                if generate_url_slug(episode.get('title', '')) == episode_slug:
+                    episode_details = episode
+                    break
+    
+    if not episode_details:
+        abort(404)
+    
+    # Get streaming history for this specific episode
+    streaming_history = None
+    page = request.args.get('page', 1, type=int)
+    days_filter = int(request.args.get('days', 30))
+    
+    # Calculate date range
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=days_filter)
+    
+    # Get streaming history for this specific episode
+    activity_query = MediaStreamHistory.query.filter(
+        MediaStreamHistory.server_id == server.id,
+        MediaStreamHistory.library_name == library_name_for_lookup,
+        MediaStreamHistory.media_title == episode_details.get('title'),
+        MediaStreamHistory.started_at >= start_date,
+        MediaStreamHistory.started_at <= end_date
+    ).order_by(MediaStreamHistory.started_at.desc())
+    
+    # Paginate the results
+    activity_pagination = activity_query.paginate(
+        page=page, per_page=20, error_out=False
+    )
+    
+    # Enhance activity entries with user info
+    for entry in activity_pagination.items:
+        if entry.user_media_access_uuid:
+            user_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
+            if user_access:
+                entry.user_display_name = user_access.get_display_name()
+                entry.user_type = 'service'
+            else:
+                entry.user_display_name = 'Unknown User'
+                entry.user_type = 'unknown'
+        elif entry.user_app_access_uuid:
+            from app.models import UserAppAccess
+            user_app = UserAppAccess.query.filter_by(uuid=entry.user_app_access_uuid).first()
+            if user_app:
+                entry.user_display_name = user_app.get_display_name()
+                entry.user_type = 'local'
+            else:
+                entry.user_display_name = 'Unknown User'
+                entry.user_type = 'unknown'
+        else:
+            entry.user_display_name = 'Unknown User'
+            entry.user_type = 'unknown'
+    
+    streaming_history = activity_pagination
+    
+    return render_template('libraries/episode_detail.html',
+                         title=f"Episode: {episode_details.get('title')}",
+                         episode_details=episode_details,
+                         tv_show_item=tv_show_item,
+                         library=library,
+                         server=server,
+                         streaming_history=streaming_history,
+                         days_filter=days_filter)
+
 @bp.route('/library/<server_nickname>/<library_name>/<int:media_id>')
 @bp.route('/library/<server_nickname>/<library_name>/<int:media_id>/<slug>')
 @login_required

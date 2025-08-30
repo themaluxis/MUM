@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Breadcrumb Navigation -->
+    <div class="breadcrumbs text-sm mb-6">
+        <ul>
+            <li><a href="{{ url_for('libraries.index') }}" class="text-primary hover:text-primary-focus">Libraries</a></li>
+            <li><a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name)) }}" class="text-primary hover:text-primary-focus">{{ library.name }}</a></li>
+            <li><a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, slug=generate_url_slug(tv_show_item.title), tab='episodes') }}" class="text-primary hover:text-primary-focus">{{ tv_show_item.title }}</a></li>
+            <li class="text-base-content/60">{{ episode_details.title }}</li>
+        </ul>
+    </div>
+
+    <!-- Episode Header -->
+    <div class="bg-base-200 rounded-lg p-6 mb-6">
+        <div class="flex flex-col lg:flex-row gap-6">
+            <!-- Episode Poster -->
+            <div class="flex-shrink-0">
+                <div class="w-48 h-72 bg-base-300 rounded-lg overflow-hidden shadow-lg">
+                    {% if episode_details.thumb %}
+                        <img src="{{ episode_details.thumb }}" 
+                             alt="{{ episode_details.title }}" 
+                             class="w-full h-full object-cover"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <!-- Fallback when image fails to load -->
+                        <div class="w-full h-full bg-base-300 flex items-center justify-center text-base-content/40" style="display: none;">
+                            <i class="fa-solid fa-tv text-6xl"></i>
+                        </div>
+                    {% else %}
+                        <!-- No image placeholder -->
+                        <div class="w-full h-full bg-base-300 flex items-center justify-center text-base-content/40">
+                            <i class="fa-solid fa-tv text-6xl"></i>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Episode Details -->
+            <div class="flex-1">
+                <div class="mb-4">
+                    <h1 class="text-3xl font-bold mb-2">{{ episode_details.title }}</h1>
+                    <div class="flex flex-wrap items-center gap-4 text-sm text-base-content/60">
+                        {% if episode_details.season_number and episode_details.episode_number %}
+                            <span class="badge badge-primary">S{{ "%02d"|format(episode_details.season_number) }}E{{ "%02d"|format(episode_details.episode_number) }}</span>
+                        {% endif %}
+                        {% if episode_details.year %}
+                            <span><i class="fa-solid fa-calendar mr-1"></i>{{ episode_details.year }}</span>
+                        {% endif %}
+                        {% if episode_details.duration %}
+                            <span><i class="fa-solid fa-clock mr-1"></i>{{ episode_details.duration }}</span>
+                        {% endif %}
+                        {% if episode_details.rating %}
+                            <span><i class="fa-solid fa-star text-yellow-400 mr-1"></i>{{ "%.1f"|format(episode_details.rating) }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Episode Summary -->
+                {% if episode_details.summary %}
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-2">Summary</h3>
+                    <p class="text-base-content/80 leading-relaxed">{{ episode_details.summary }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Episode Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="stat bg-base-100 rounded-lg p-4">
+                        <div class="stat-title text-xs">Total Streams</div>
+                        <div class="stat-value text-lg">{{ streaming_history.total if streaming_history else 0 }}</div>
+                    </div>
+                    {% if episode_details.added_at %}
+                    <div class="stat bg-base-100 rounded-lg p-4">
+                        <div class="stat-title text-xs">Added</div>
+                        <div class="stat-value text-lg">{{ episode_details.added_at.strftime('%b %d, %Y') if episode_details.added_at else 'Unknown' }}</div>
+                    </div>
+                    {% endif %}
+                    {% if episode_details.air_date %}
+                    <div class="stat bg-base-100 rounded-lg p-4">
+                        <div class="stat-title text-xs">Air Date</div>
+                        <div class="stat-value text-lg">{{ episode_details.air_date.strftime('%b %d, %Y') if episode_details.air_date else 'Unknown' }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Episode Activity -->
+    <div class="bg-base-200 rounded-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">
+                <i class="fa-solid fa-chart-line text-primary mr-2"></i>
+                Recent Activity
+            </h2>
+            
+            <!-- Days Filter -->
+            <div class="flex items-center gap-2">
+                <label for="days-filter" class="text-sm text-base-content/60">Last:</label>
+                <select id="days-filter" class="select select-bordered select-sm" onchange="updateDaysFilter()">
+                    <option value="7" {{ 'selected' if days_filter == 7 else '' }}>7 days</option>
+                    <option value="30" {{ 'selected' if days_filter == 30 else '' }}>30 days</option>
+                    <option value="90" {{ 'selected' if days_filter == 90 else '' }}>90 days</option>
+                    <option value="365" {{ 'selected' if days_filter == 365 else '' }}>1 year</option>
+                </select>
+            </div>
+        </div>
+
+        {% if streaming_history and streaming_history.items %}
+            <!-- Activity List -->
+            <div class="space-y-3">
+                {% for entry in streaming_history.items %}
+                <div class="bg-base-100 rounded-lg p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="avatar placeholder">
+                            <div class="bg-primary text-primary-content rounded-full w-10 h-10">
+                                <span class="text-sm">{{ entry.user_display_name[0].upper() if entry.user_display_name else 'U' }}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="font-medium">{{ entry.user_display_name or 'Unknown User' }}</div>
+                            <div class="text-sm text-base-content/60">
+                                {{ entry.started_at.strftime('%b %d, %Y at %I:%M %p') }}
+                                {% if entry.duration_seconds %}
+                                    • {{ (entry.duration_seconds // 60) }}m {{ (entry.duration_seconds % 60) }}s
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-sm text-base-content/60">
+                        <span class="badge badge-{{ 'success' if entry.user_type == 'service' else 'info' }} badge-sm">
+                            {{ entry.user_type.title() }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if streaming_history.pages > 1 %}
+            <div class="flex justify-center mt-6">
+                <div class="join">
+                    {% if streaming_history.has_prev %}
+                        <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), page=streaming_history.page-1, days=days_filter) }}" 
+                           class="join-item btn btn-sm">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </a>
+                    {% endif %}
+                    
+                    {% set start_page = [1, streaming_history.page - 2] | max %}
+                    {% set end_page = [streaming_history.pages, streaming_history.page + 2] | min %}
+                    
+                    {% if start_page > 1 %}
+                        <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), page=1, days=days_filter) }}" 
+                           class="join-item btn btn-sm">1</a>
+                        {% if start_page > 2 %}
+                            <button class="join-item btn btn-sm btn-disabled">...</button>
+                        {% endif %}
+                    {% endif %}
+                    
+                    {% for page_num in range(start_page, end_page + 1) %}
+                        {% if page_num == streaming_history.page %}
+                            <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
+                        {% else %}
+                            <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), page=page_num, days=days_filter) }}" 
+                               class="join-item btn btn-sm">{{ page_num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if end_page < streaming_history.pages %}
+                        {% if end_page < streaming_history.pages - 1 %}
+                            <button class="join-item btn btn-sm btn-disabled">...</button>
+                        {% endif %}
+                        <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), page=streaming_history.pages, days=days_filter) }}" 
+                           class="join-item btn btn-sm">{{ streaming_history.pages }}</a>
+                    {% endif %}
+                    
+                    {% if streaming_history.has_next %}
+                        <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), page=streaming_history.page+1, days=days_filter) }}" 
+                           class="join-item btn btn-sm">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+        {% else %}
+            <!-- No Activity -->
+            <div class="text-center py-12">
+                <div class="w-16 h-16 rounded-full bg-base-300 flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-chart-line text-2xl text-base-content/40"></i>
+                </div>
+                <h3 class="text-lg font-medium text-base-content mb-2">No Activity Found</h3>
+                <p class="text-sm text-base-content/60 max-w-md mx-auto">
+                    No streaming activity has been recorded for this episode in the selected time period.
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function updateDaysFilter() {
+    const daysSelect = document.getElementById('days-filter');
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('days', daysSelect.value);
+    currentUrl.searchParams.set('page', '1'); // Reset to first page
+    window.location.href = currentUrl.toString();
+}
+</script>
+{% endblock %}

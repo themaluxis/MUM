@@ -1051,20 +1051,26 @@ class PlexMediaService(BaseMediaService):
                     # Try different methods to get the show
                     show = None
                     try:
-                        # Method 1: Direct fetchItem
-                        show = server.fetchItem(rating_key)
+                        # Method 1: Search by rating key in the library (most reliable)
+                        for item in library_section.all():
+                            if hasattr(item, 'ratingKey') and str(item.ratingKey) == rating_key:
+                                show = item
+                                break
+                        
+                        # Method 2: If not found, try direct fetchItem as fallback
+                        if not show:
+                            try:
+                                show = server.fetchItem(int(rating_key))
+                            except (ValueError, Exception) as e2:
+                                self.log_warning(f"fetchItem with int rating key failed: {e2}")
+                                # Method 3: Try with string rating key
+                                try:
+                                    show = server.fetchItem(rating_key)
+                                except Exception as e3:
+                                    self.log_warning(f"fetchItem with string rating key failed: {e3}")
+                                    
                     except Exception as e1:
-                        self.log_warning(f"fetchItem failed: {e1}")
-                        try:
-                            # Method 2: Use library section to find the show
-                            show = library_section.fetchItem(rating_key)
-                        except Exception as e2:
-                            self.log_warning(f"library fetchItem failed: {e2}")
-                            # Method 3: Search by rating key in the library
-                            for item in library_section.all():
-                                if hasattr(item, 'ratingKey') and str(item.ratingKey) == rating_key:
-                                    show = item
-                                    break
+                        self.log_warning(f"Error searching library for rating key {rating_key}: {e1}")
                     if not show:
                         return {
                             'items': [],
@@ -1203,6 +1209,156 @@ class PlexMediaService(BaseMediaService):
             
         except Exception as e:
             self.log_error(f"Error getting Plex library content: {e}")
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False,
+                'error': str(e)
+            }
+
+    def get_show_episodes(self, show_id: str, page: int = 1, per_page: int = 24, search_query: str = '') -> Dict[str, Any]:
+        """Get episodes for a specific TV show"""
+        try:
+            server = self._get_server_instance()
+            if not server:
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': 'Could not connect to Plex server'
+                }
+            
+            # Find the show by rating key
+            show = None
+            rating_key = str(show_id).strip()
+            self.log_info(f"Fetching episodes for show with rating key: {rating_key}")
+            
+            # Search through all library sections to find the show
+            for section in server.library.sections():
+                if section.type == 'show':  # Only check TV show libraries
+                    try:
+                        for item in section.all():
+                            if hasattr(item, 'ratingKey') and str(item.ratingKey) == rating_key:
+                                show = item
+                                break
+                        if show:
+                            break
+                    except Exception as e:
+                        self.log_warning(f"Error searching section {section.title}: {e}")
+                        continue
+            
+            if not show:
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': f'Show with ID {show_id} not found'
+                }
+            
+            # Get all episodes from all seasons
+            all_episodes = []
+            try:
+                for season in show.seasons():
+                    for episode in season.episodes():
+                        all_episodes.append(episode)
+            except Exception as e:
+                self.log_warning(f"Error getting episodes: {e}")
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': f'Error retrieving episodes: {str(e)}'
+                }
+            
+            # Filter episodes by search query if provided
+            if search_query:
+                filtered_episodes = []
+                search_lower = search_query.lower()
+                for episode in all_episodes:
+                    if (search_lower in episode.title.lower() if episode.title else False) or \
+                       (search_lower in episode.summary.lower() if episode.summary else False):
+                        filtered_episodes.append(episode)
+                all_episodes = filtered_episodes
+            
+            # Calculate pagination
+            total_episodes = len(all_episodes)
+            total_pages = (total_episodes + per_page - 1) // per_page
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            episodes_page = all_episodes[start_idx:end_idx]
+            
+            # Format episodes for response
+            formatted_episodes = []
+            for episode in episodes_page:
+                try:
+                    # Format thumbnail URL properly for the image proxy
+                    thumb_url = None
+                    if hasattr(episode, 'thumb') and episode.thumb:
+                        # Manually construct relative URL to avoid url_for issues with external hosts
+                        thumb_url = f"/api/media/plex/images/proxy?path={episode.thumb.lstrip('/')}"
+                    elif hasattr(episode, 'art') and episode.art:
+                        # Fallback to art if thumb is not available
+                        thumb_url = f"/api/media/plex/images/proxy?path={episode.art.lstrip('/')}"
+                    
+                    # Extract year from originallyAvailableAt
+                    year = None
+                    if hasattr(episode, 'originallyAvailableAt') and episode.originallyAvailableAt:
+                        try:
+                            year = str(episode.originallyAvailableAt).split('-')[0]
+                        except:
+                            year = None
+                    elif hasattr(episode, 'year') and episode.year:
+                        year = str(episode.year)
+                    
+                    episode_data = {
+                        'id': episode.ratingKey,
+                        'title': episode.title or 'Unknown Episode',
+                        'summary': episode.summary or '',
+                        'year': year,
+                        'rating': float(episode.rating) if hasattr(episode, 'rating') and episode.rating else None,
+                        'duration': episode.duration if hasattr(episode, 'duration') and episode.duration else None,
+                        'thumb': thumb_url,
+                        'season_number': episode.seasonNumber if hasattr(episode, 'seasonNumber') else None,
+                        'episode_number': episode.episodeNumber if hasattr(episode, 'episodeNumber') else None,
+                        'air_date': episode.originallyAvailableAt if hasattr(episode, 'originallyAvailableAt') else None,
+                        'added_at': episode.addedAt if hasattr(episode, 'addedAt') else None,
+                        'type': 'episode'
+                    }
+                    formatted_episodes.append(episode_data)
+                except Exception as e:
+                    self.log_warning(f"Error formatting episode {episode.title}: {e}")
+                    continue
+            
+            self.log_info(f"Retrieved {len(formatted_episodes)} episodes from Plex show (page {page}/{total_pages})")
+            
+            return {
+                'items': formatted_episodes,
+                'total': total_episodes,
+                'page': page,
+                'per_page': per_page,
+                'pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages
+            }
+            
+        except Exception as e:
+            self.log_error(f"Error getting show episodes: {e}")
             return {
                 'items': [],
                 'total': 0,
