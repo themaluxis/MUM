@@ -1159,4 +1159,124 @@ def mass_clear_expiration(user_uuids: list, admin_id: int = None):
         db.session.commit()
     log_event(EventType.SETTING_CHANGE, f"Mass cleared expiration for {processed_count} service users.", admin_id=admin_id, details={"count": processed_count})
     return processed_count, error_count
+
+def merge_service_users_into_local_account(user_uuids: list, username: str, password: str, admin_id: int = None):
+    """
+    Merge multiple service users into a new local account.
+    Creates a new UserAppAccess record and links the service users to it.
+    """
+    from app.utils.helpers import get_user_by_uuid
+    from werkzeug.security import generate_password_hash
+    from app.models_media_services import UserMediaAccess
+    
+    processed_count = 0
+    error_count = 0
+    local_user_id = None
+    
+    try:
+        # Validate that all provided UUIDs are service users
+        service_users = []
+        already_linked_users = []
+        invalid_users = []
+        
+        for uuid_str in user_uuids:
+            try:
+                user_obj, user_type = get_user_by_uuid(uuid_str)
+                if user_obj and user_type == "user_media_access":
+                    # Check if this service user is already linked to a local account
+                    if user_obj.user_app_access_id:
+                        # Get the linked local account info for better error message
+                        linked_account = UserAppAccess.query.get(user_obj.user_app_access_id)
+                        linked_username = linked_account.username if linked_account else "Unknown"
+                        already_linked_users.append(f"{user_obj.external_username or 'Unknown'} (linked to {linked_username})")
+                        current_app.logger.warning(f"Service user {uuid_str} is already linked to local account {user_obj.user_app_access_id}")
+                        error_count += 1
+                        continue
+                    service_users.append(user_obj)
+                else:
+                    invalid_users.append(uuid_str)
+                    current_app.logger.error(f"Invalid user type for merge operation: {user_type} for UUID {uuid_str}")
+                    error_count += 1
+            except Exception as e:
+                invalid_users.append(uuid_str)
+                current_app.logger.error(f"Error validating user UUID {uuid_str}: {e}")
+                error_count += 1
+        
+        # Provide detailed error messages for different failure scenarios
+        if not service_users:
+            error_details = []
+            if already_linked_users:
+                error_details.append(f"Already linked users: {', '.join(already_linked_users)}")
+            if invalid_users:
+                error_details.append(f"Invalid/not found users: {len(invalid_users)} users")
+            
+            if already_linked_users and not invalid_users:
+                raise Exception(f"All selected users are already linked to local accounts. {error_details[0]}")
+            elif invalid_users and not already_linked_users:
+                raise Exception(f"No valid service users selected. Only standalone service users can be merged.")
+            else:
+                raise Exception(f"No valid service users found for merge operation. {' | '.join(error_details)}")
+        
+        # If we have some valid users but also some errors, log a warning
+        if already_linked_users or invalid_users:
+            warning_parts = []
+            if already_linked_users:
+                warning_parts.append(f"{len(already_linked_users)} users already linked")
+            if invalid_users:
+                warning_parts.append(f"{len(invalid_users)} invalid users")
+            current_app.logger.warning(f"Merge operation proceeding with {len(service_users)} valid users. Skipped: {', '.join(warning_parts)}")
+        
+        # Create the new local user account
+        new_local_user = UserAppAccess(
+            username=username,
+            password_hash=generate_password_hash(password),
+            email=None,  # Will be set from first service user if available
+            is_active=True,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        # Set email from the first service user that has one
+        for service_user in service_users:
+            if service_user.external_email:
+                new_local_user.email = service_user.external_email
+                break
+        
+        db.session.add(new_local_user)
+        db.session.flush()  # Get the ID without committing
+        local_user_id = new_local_user.id
+        
+        # Link all service users to the new local account
+        for service_user in service_users:
+            try:
+                service_user.user_app_access_id = new_local_user.id
+                processed_count += 1
+                current_app.logger.info(f"Linked service user {service_user.external_username} to new local account {username}")
+            except Exception as e:
+                current_app.logger.error(f"Error linking service user {service_user.id} to local account: {e}")
+                error_count += 1
+        
+        # Commit all changes
+        db.session.commit()
+        
+        # Log the event
+        log_event(EventType.SETTING_CHANGE, 
+                  f"Created local account '{username}' and linked {processed_count} service users",
+                  admin_id=admin_id,
+                  details={
+                      "local_username": username,
+                      "linked_service_users": processed_count,
+                      "errors": error_count
+                  })
+        
+        current_app.logger.info(f"Successfully created local account '{username}' and linked {processed_count} service users")
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error creating local account and merging service users: {e}", exc_info=True)
+        error_count += len(user_uuids)  # Count all as errors if the operation fails
+        processed_count = 0
+        raise Exception(f"Failed to create local account: {str(e)}")
+    
+    return processed_count, error_count, local_user_id
     

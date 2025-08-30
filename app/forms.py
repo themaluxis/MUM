@@ -238,6 +238,7 @@ class MassUserEditForm(FlaskForm): # As updated
         ('remove_from_purge_whitelist', 'Remove Purge Whitelist'),
         ('add_to_bot_whitelist', 'Whitelist from Bot Actions'),
         ('remove_from_bot_whitelist', 'Remove Bot Whitelist'),
+        ('merge_into_local_account', 'Merge into Local Account'),
         ('delete_users', 'Delete Users')
     ], validators=[DataRequired()])
     libraries = SelectMultipleField('Libraries', coerce=str, validators=[Optional()])
@@ -606,3 +607,28 @@ class UserAppAccessResetPasswordForm(FlaskForm):
     password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
     confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Reset Password')
+
+class MergeIntoLocalAccountForm(FlaskForm):
+    username = StringField(
+        'Username',
+        validators=[DataRequired(), Length(min=3, max=50), Regexp(r'^[a-zA-Z0-9_-]+$', message="Username can only contain letters, numbers, underscores, and hyphens")],
+        description="Choose a unique username for the new local account"
+    )
+    password = PasswordField(
+        'Password',
+        validators=[DataRequired(), Length(min=8)],
+        description="Choose a secure password (minimum 8 characters)"
+    )
+    confirm_password = PasswordField(
+        'Confirm Password',
+        validators=[DataRequired(), EqualTo('password', message='Passwords must match')],
+        description="Re-enter your password to confirm"
+    )
+    submit = SubmitField('Create Local Account')
+
+    def validate_username(self, field):
+        # Check if username already exists in UserAppAccess table
+        from app.models import UserAppAccess
+        existing_user = UserAppAccess.query.filter_by(username=field.data).first()
+        if existing_user:
+            raise ValidationError('Username already exists. Please choose a different one.')

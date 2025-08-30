@@ -1234,6 +1234,49 @@ def mass_edit_users():
                     processed_count, error_count = user_service.mass_clear_expiration(user_ids, admin_id=current_user.id)
                     toast_message = f"Cleared expiration for {processed_count} service users, {error_count} errors."
                     toast_category = "success" if error_count == 0 else "warning"
+                elif action == 'merge_into_local_account':
+                    # Get form data for the new local account
+                    merge_username = request.form.get('merge_username', '').strip()
+                    merge_password = request.form.get('merge_password', '')
+                    merge_confirm_password = request.form.get('merge_confirm_password', '')
+                    
+                    # Validate the merge form data
+                    if not merge_username or not merge_password or not merge_confirm_password:
+                        toast_message = "Username and password are required for creating a local account."
+                        toast_category = "error"
+                    elif len(merge_username) < 3 or len(merge_username) > 50:
+                        toast_message = "Username must be between 3 and 50 characters."
+                        toast_category = "error"
+                    elif len(merge_password) < 8:
+                        toast_message = "Password must be at least 8 characters."
+                        toast_category = "error"
+                    elif merge_password != merge_confirm_password:
+                        toast_message = "Passwords do not match."
+                        toast_category = "error"
+                    elif not all(c.isalnum() or c in '_-' for c in merge_username):
+                        toast_message = "Username can only contain letters, numbers, underscores, and hyphens."
+                        toast_category = "error"
+                    else:
+                        # Check if username already exists
+                        existing_user = UserAppAccess.query.filter_by(username=merge_username).first()
+                        if existing_user:
+                            toast_message = f"Username '{merge_username}' already exists. Please choose a different one."
+                            toast_category = "error"
+                        else:
+                            try:
+                                # Create the merge operation
+                                processed_count, error_count, local_user_id = user_service.merge_service_users_into_local_account(
+                                    user_ids, merge_username, merge_password, admin_id=current_user.id
+                                )
+                                if processed_count > 0:
+                                    toast_message = f"Successfully created local account '{merge_username}' and linked {processed_count} service users. {error_count} errors."
+                                    toast_category = "success" if error_count == 0 else "warning"
+                                else:
+                                    toast_message = f"Failed to create local account. {error_count} errors occurred."
+                                    toast_category = "error"
+                            except Exception as e:
+                                toast_message = f"Error creating local account: {str(e)}"
+                                toast_category = "error"
                 elif action == 'delete_users':
                     if not form.confirm_delete.data:
                         toast_message = "Deletion was not confirmed. No action taken."

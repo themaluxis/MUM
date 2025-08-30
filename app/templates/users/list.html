@@ -393,6 +393,66 @@
                     </div>
                 </div>
 
+                <!-- Merge into Local Account Section -->
+                <div id="mass_edit_merge_local_section" class="space-y-4 mb-6 hidden">
+                    <h4 class="font-medium text-base-content text-lg mb-3">
+                        <i class="fa-solid fa-user-plus text-primary text-sm mr-2"></i>
+                        Create Local Account
+                    </h4>
+                    
+                    <div class="bg-info/10 rounded-lg p-4 border border-info/30 mb-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fa-solid fa-info-circle text-info text-lg mt-0.5"></i>
+                            <div>
+                                <h5 class="font-medium text-base-content mb-1">Merge Service Users</h5>
+                                <p class="text-sm text-base-content/80">
+                                    This will create a new local account and link all selected service users to it. 
+                                    The selected users must be service users (not already linked to local accounts).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="label">
+                                <span class="label-text font-medium">Username</span>
+                            </label>
+                            <input type="text" name="merge_username" id="merge_username" 
+                                   class="input input-bordered w-full" 
+                                   placeholder="Enter username"
+                                   pattern="[a-zA-Z0-9_-]+"
+                                   title="Username can only contain letters, numbers, underscores, and hyphens">
+                            <div class="label">
+                                <span class="label-text-alt text-base-content/60">3-50 characters, letters, numbers, _, - only</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="label">
+                                <span class="label-text font-medium">Password</span>
+                            </label>
+                            <input type="password" name="merge_password" id="merge_password" 
+                                   class="input input-bordered w-full" 
+                                   placeholder="Enter password"
+                                   minlength="8">
+                            <div class="label">
+                                <span class="label-text-alt text-base-content/60">Minimum 8 characters</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="label">
+                                <span class="label-text font-medium">Confirm Password</span>
+                            </label>
+                            <input type="password" name="merge_confirm_password" id="merge_confirm_password" 
+                                   class="input input-bordered w-full" 
+                                   placeholder="Confirm password"
+                                   minlength="8">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Delete Confirmation Section -->
                 <div id="mass_edit_delete_confirmation_section" class="space-y-4 mb-6 hidden">
                     <h4 class="font-medium text-base-content text-lg mb-3">
@@ -1206,9 +1266,11 @@
             const extendAccessSection = document.getElementById('mass_edit_extend_access_section');
             const setExpirationSection = document.getElementById('mass_edit_set_expiration_section');
             const clearExpirationSection = document.getElementById('mass_edit_clear_expiration_section');
+            const mergeLocalSection = document.getElementById('mass_edit_merge_local_section');
             if(extendAccessSection) extendAccessSection.classList.add('hidden');
             if(setExpirationSection) setExpirationSection.classList.add('hidden');
             if(clearExpirationSection) clearExpirationSection.classList.add('hidden');
+            if(mergeLocalSection) mergeLocalSection.classList.add('hidden');
             
             const submitBtn = document.getElementById('mass_edit_submit_button');
             if(submitBtn) submitBtn.disabled = (action === '');
@@ -1226,6 +1288,8 @@
                 setExpirationSection.classList.remove('hidden');
             } else if (action === 'clear_expiration' && clearExpirationSection) {
                 clearExpirationSection.classList.remove('hidden');
+            } else if (action === 'merge_into_local_account' && mergeLocalSection) {
+                mergeLocalSection.classList.remove('hidden');
             } else if (action === 'delete_users' && deleteConfirmSection) {
                 deleteConfirmSection.classList.remove('hidden');
                 if (submitBtn && confirmDeleteCheckbox) {
