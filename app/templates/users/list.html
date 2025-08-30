@@ -1367,17 +1367,28 @@
 
 <!-- Link User Modal -->
 <dialog id="linkUserModal" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box max-w-2xl">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="font-bold text-lg">Link Service Account</h3>
+    <div class="modal-box max-w-3xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Professional Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <i class="fa-solid fa-plus text-primary text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Link Service Account</h3>
+                    <p class="text-sm text-base-content/60">Select service accounts to link to this local user</p>
+                </div>
+            </div>
             <form method="dialog">
-                <button class="btn btn-sm btn-circle btn-ghost">✕</button>
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200" type="button" 
+                        onclick="this.closest('dialog').close()">
+                    <i class="fa-solid fa-times"></i>
+                </button>
             </form>
         </div>
-        
-        <div class="mb-4">
-            <p class="text-sm text-base-content/70">Select service accounts to link to this local user:</p>
-        </div>
+
+        <!-- Content -->
+        <div class="p-6">
         
         <!-- Search Bar -->
         <div class="form-control mb-4">
@@ -1394,15 +1405,20 @@
             </div>
         </div>
         
-        <!-- User List -->
-        <div id="userListContainer" class="max-h-96 overflow-y-auto">
-            <div class="loading loading-spinner loading-md mx-auto"></div>
+            <!-- User List -->
+            <div id="userListContainer" class="max-h-96 overflow-y-auto">
+                <div class="loading loading-spinner loading-md mx-auto"></div>
+            </div>
         </div>
-        
-        <!-- Modal Actions -->
-        <div class="modal-action">
-            <button type="button" class="btn btn-ghost" onclick="linkUserModal.close()">Cancel</button>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 p-6 border-t border-base-300">
+            <button type="button" class="btn btn-ghost" onclick="linkUserModal.close()">
+                <i class="fa-solid fa-times mr-2"></i>
+                Cancel
+            </button>
             <button type="button" class="btn btn-primary" onclick="linkSelectedUsers()" id="linkButton" disabled>
+                <i class="fa-solid fa-link mr-2"></i>
                 <span id="linkButtonText">Link Users</span>
                 <span id="selectedCount" class="badge badge-neutral ml-2" style="display: none;">0</span>
             </button>
