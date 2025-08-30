@@ -919,7 +919,7 @@ def jellyfin_user_avatar_proxy():
         primary_image_tag = user_data.get('PrimaryImageTag')
         if not primary_image_tag:
             current_app.logger.debug(f"API jellyfin_user_avatar_proxy: User {user_id} has no PrimaryImageTag, no avatar available")
-            abort(404)
+            return '', 404
         
         # Construct Jellyfin user avatar URL with tag parameter (required for Jellyfin avatars)
         avatar_url = f"{jellyfin_server.url.rstrip('/')}/Users/{user_id}/Images/Primary?tag={primary_image_tag}&width=64&quality=90"

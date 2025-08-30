@@ -2071,7 +2071,7 @@ def link_service_user():
         current_app.logger.error(f"Error linking service user: {e}")
         return {'success': False, 'message': str(e)}, 500
 
-@bp.route('/api/link-service-users', methods=['POST'])
+@bp.route('/link-service-users-api', methods=['GET'])
 @login_required
 @permission_required('edit_user')
 def link_service_users():
@@ -2079,11 +2079,17 @@ def link_service_users():
     from app.models_media_services import UserMediaAccess
     
     try:
-        data = request.get_json()
-        local_user_uuid = data.get('local_user_id')
-        service_user_ids = data.get('service_user_ids', [])
+        # Debug logging
+        current_app.logger.debug(f"link_service_users: Request args: {request.args}")
+        
+        local_user_uuid = request.args.get('local_user_id')
+        service_user_ids_str = request.args.get('service_user_ids', '')
+        service_user_ids = service_user_ids_str.split(',') if service_user_ids_str else []
+        
+        current_app.logger.debug(f"link_service_users: local_user_uuid={local_user_uuid}, service_user_ids={service_user_ids}")
         
         if not local_user_uuid or not service_user_ids:
+            current_app.logger.error(f"link_service_users: Missing parameters - local_user_uuid: {local_user_uuid}, service_user_ids: {service_user_ids}")
             return {'success': False, 'message': 'Missing required parameters'}, 400
         
         # Get the local user
@@ -2100,16 +2106,39 @@ def link_service_users():
             service_user = UserMediaAccess.query.get(service_user_id)
             if not service_user:
                 not_found.append(service_user_id)
+                current_app.logger.debug(f"Service user {service_user_id} not found")
                 continue
+            
+            current_app.logger.debug(f"Service user {service_user_id}: external_username={service_user.external_username}, user_app_access_id={service_user.user_app_access_id}, server_id={service_user.server_id}")
             
             # Check if service user is already linked
             if service_user.user_app_access_id:
-                already_linked.append(service_user.external_username or f"ID:{service_user_id}")
+                linked_to_user = UserAppAccess.query.get(service_user.user_app_access_id)
+                linked_to_username = linked_to_user.username if linked_to_user else "Unknown User"
+                current_app.logger.debug(f"Service user {service_user_id} is already linked to user_app_access_id={service_user.user_app_access_id} (username: {linked_to_username})")
+                already_linked.append(f"{service_user.external_username or f'ID:{service_user_id}'} (linked to {linked_to_username})")
                 continue
+            
+            current_app.logger.debug(f"Service user {service_user_id} is not linked, checking for server conflicts...")
+            
+            # Check if local user already has an account on this server
+            existing_account = UserMediaAccess.query.filter_by(
+                user_app_access_id=local_user.id,
+                server_id=service_user.server_id
+            ).first()
+            
+            if existing_account:
+                current_app.logger.debug(f"Server conflict: local user {local_user.id} already has account {existing_account.id} on server {service_user.server_id}")
+                server_name = existing_account.server.server_nickname if existing_account.server else f"Server {service_user.server_id}"
+                already_linked.append(f"{service_user.external_username or f'ID:{service_user_id}'} (user already has account '{existing_account.external_username}' on {server_name})")
+                continue
+            
+            current_app.logger.debug(f"No conflicts found, linking service user {service_user_id} to local user {local_user.id}")
             
             # Link the account
             service_user.user_app_access_id = local_user.id
             linked_users.append(service_user.external_username or f"ID:{service_user_id}")
+            current_app.logger.debug(f"Successfully linked service user {service_user_id}")
         
         # Commit all changes
         db.session.commit()

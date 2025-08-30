@@ -1667,15 +1667,13 @@ function linkSelectedUsers() {
     linkButton.disabled = true;
     linkButton.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Linking...';
     
-    fetch('/users/api/link-service-users', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            local_user_id: currentLocalUserId,
-            service_user_ids: selectedLinkUserIds
-        })
+    const params = new URLSearchParams({
+        local_user_id: currentLocalUserId,
+        service_user_ids: selectedLinkUserIds.join(',')
+    });
+    
+    fetch(`/users/link-service-users-api?${params}`, {
+        method: 'GET'
     })
     .then(response => response.json())
     .then(data => {
