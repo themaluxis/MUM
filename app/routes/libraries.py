@@ -577,14 +577,26 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
         end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=days_filter)
         
-        # Get streaming history for this specific content (use the original names with spaces)
-        activity_query = MediaStreamHistory.query.filter(
-            MediaStreamHistory.server_id == server.id,
-            MediaStreamHistory.library_name == library_name_for_lookup,
-            MediaStreamHistory.media_title == content_name_for_lookup,
-            MediaStreamHistory.started_at >= start_date,
-            MediaStreamHistory.started_at <= end_date
-        ).order_by(MediaStreamHistory.started_at.desc())
+        # Get streaming history for this specific content
+        # For TV shows, we need to check grandparent_title (show name) instead of media_title (episode name)
+        if library.library_type and library.library_type.lower() in ['show', 'tv', 'series', 'tvshows']:
+            # For TV shows, filter by grandparent_title to get all episodes of the show
+            activity_query = MediaStreamHistory.query.filter(
+                MediaStreamHistory.server_id == server.id,
+                MediaStreamHistory.library_name == library_name_for_lookup,
+                MediaStreamHistory.grandparent_title == content_name_for_lookup,
+                MediaStreamHistory.started_at >= start_date,
+                MediaStreamHistory.started_at <= end_date
+            ).order_by(MediaStreamHistory.started_at.desc())
+        else:
+            # For movies and other content, filter by media_title
+            activity_query = MediaStreamHistory.query.filter(
+                MediaStreamHistory.server_id == server.id,
+                MediaStreamHistory.library_name == library_name_for_lookup,
+                MediaStreamHistory.media_title == content_name_for_lookup,
+                MediaStreamHistory.started_at >= start_date,
+                MediaStreamHistory.started_at <= end_date
+            ).order_by(MediaStreamHistory.started_at.desc())
         
         # Paginate the results
         activity_pagination = activity_query.paginate(
@@ -598,21 +610,55 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                 if user_access:
                     entry.user_display_name = user_access.get_display_name()
                     entry.user_type = 'service'
+                    
+                    # Get avatar URL for Plex users
+                    entry.user_avatar_url = None
+                    if server.service_type.value.lower() == 'plex':
+                        # For Plex, check multiple possible locations for the thumb URL
+                        thumb_url = None
+                        
+                        # First try service_settings
+                        if user_access.service_settings and user_access.service_settings.get('thumb'):
+                            thumb_url = user_access.service_settings['thumb']
+                        # Then try raw_data from the user sync
+                        elif user_access.user_raw_data and user_access.user_raw_data.get('thumb'):
+                            thumb_url = user_access.user_raw_data['thumb']
+                        # Also check nested raw data structure
+                        elif (user_access.user_raw_data and 
+                              user_access.user_raw_data.get('plex_user_obj_attrs') and 
+                              user_access.user_raw_data['plex_user_obj_attrs'].get('thumb')):
+                            thumb_url = user_access.user_raw_data['plex_user_obj_attrs']['thumb']
+                        
+                        if thumb_url:
+                            # Check if it's already a full URL (plex.tv avatars) or needs proxy
+                            if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
+                                entry.user_avatar_url = thumb_url
+                            else:
+                                entry.user_avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                    
+                    elif server.service_type.value.lower() == 'jellyfin':
+                        # For Jellyfin, use the external_user_id to get avatar
+                        if user_access.external_user_id:
+                            entry.user_avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user_access.external_user_id}"
                 else:
                     entry.user_display_name = 'Unknown User'
                     entry.user_type = 'unknown'
+                    entry.user_avatar_url = None
             elif entry.user_app_access_uuid:
                 from app.models import UserAppAccess
                 user_app = UserAppAccess.query.filter_by(uuid=entry.user_app_access_uuid).first()
                 if user_app:
                     entry.user_display_name = user_app.get_display_name()
                     entry.user_type = 'local'
+                    entry.user_avatar_url = None  # Local users don't have service avatars
                 else:
                     entry.user_display_name = 'Unknown User'
                     entry.user_type = 'unknown'
+                    entry.user_avatar_url = None
             else:
                 entry.user_display_name = 'Unknown User'
                 entry.user_type = 'unknown'
+                entry.user_avatar_url = None
         
         streaming_history = activity_pagination
     

@@ -48,23 +48,36 @@
                             <td>
                                 <div class="flex items-center gap-3">
                                     <div class="avatar">
-                                        <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                            {% if activity.user_type == 'service' %}
-                                                <i class="fa-solid fa-user text-primary text-xs"></i>
-                                            {% elif activity.user_type == 'local' %}
-                                                <i class="fa-solid fa-user-gear text-primary text-xs"></i>
+                                        <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                                            {% if activity.user_avatar_url %}
+                                                <img src="{{ activity.user_avatar_url }}" 
+                                                     alt="{{ activity.user_display_name }}" 
+                                                     class="w-full h-full object-cover"
+                                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <!-- Fallback icon if avatar fails to load -->
+                                                <div class="w-full h-full flex items-center justify-center" style="display: none;">
+                                                    {% if activity.user_type == 'service' %}
+                                                        <i class="fa-solid fa-user text-primary text-xs"></i>
+                                                    {% elif activity.user_type == 'local' %}
+                                                        <i class="fa-solid fa-user-gear text-primary text-xs"></i>
+                                                    {% else %}
+                                                        <i class="fa-solid fa-user-question text-primary text-xs"></i>
+                                                    {% endif %}
+                                                </div>
                                             {% else %}
-                                                <i class="fa-solid fa-user-question text-primary text-xs"></i>
+                                                <!-- No avatar available, show icon -->
+                                                {% if activity.user_type == 'service' %}
+                                                    <i class="fa-solid fa-user text-primary text-xs"></i>
+                                                {% elif activity.user_type == 'local' %}
+                                                    <i class="fa-solid fa-user-gear text-primary text-xs"></i>
+                                                {% else %}
+                                                    <i class="fa-solid fa-user-question text-primary text-xs"></i>
+                                                {% endif %}
                                             {% endif %}
                                         </div>
                                     </div>
                                     <div>
                                         <div class="font-medium text-sm">{{ activity.user_display_name }}</div>
-                                        <div class="text-xs text-base-content/60">
-                                            {% if activity.user_type == 'service' %}Service User
-                                            {% elif activity.user_type == 'local' %}Local User
-                                            {% else %}Unknown{% endif %}
-                                        </div>
                                     </div>
                                 </div>
                             </td>

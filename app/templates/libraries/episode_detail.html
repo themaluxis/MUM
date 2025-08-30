@@ -336,9 +336,23 @@
                                 {% for entry in streaming_history.items %}
                                 <div class="bg-base-100 rounded-lg p-4 flex items-center justify-between">
                                     <div class="flex items-center gap-3">
-                                        <div class="avatar placeholder">
-                                            <div class="bg-primary text-primary-content rounded-full w-10 h-10">
-                                                <span class="text-sm">{{ entry.user_display_name[0].upper() if entry.user_display_name else 'U' }}</span>
+                                        <div class="avatar">
+                                            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                                                {% if entry.user_avatar_url %}
+                                                    <img src="{{ entry.user_avatar_url }}" 
+                                                         alt="{{ entry.user_display_name }}" 
+                                                         class="w-full h-full object-cover"
+                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                    <!-- Fallback if avatar fails to load -->
+                                                    <div class="w-full h-full bg-primary text-primary-content rounded-full flex items-center justify-center" style="display: none;">
+                                                        <span class="text-sm">{{ entry.user_display_name[0].upper() if entry.user_display_name else 'U' }}</span>
+                                                    </div>
+                                                {% else %}
+                                                    <!-- No avatar available, show initials -->
+                                                    <div class="w-full h-full bg-primary text-primary-content rounded-full flex items-center justify-center">
+                                                        <span class="text-sm">{{ entry.user_display_name[0].upper() if entry.user_display_name else 'U' }}</span>
+                                                    </div>
+                                                {% endif %}
                                             </div>
                                         </div>
                                         <div>
@@ -350,11 +364,6 @@
                                                 {% endif %}
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="text-sm text-base-content/60">
-                                        <span class="badge badge-{{ 'success' if entry.user_type == 'service' else 'info' }} badge-sm">
-                                            {{ entry.user_type.title() }}
-                                        </span>
                                     </div>
                                 </div>
                                 {% endfor %}
