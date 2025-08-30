@@ -844,7 +844,7 @@ def update_user_last_streamed_by_id(user_id, last_streamed_at_datetime: datetime
 
 def purge_inactive_users(user_ids_to_purge: list[int], admin_id: int, inactive_days_threshold: int, exclude_sharers: bool, exclude_whitelisted: bool, ignore_creation_date_for_never_streamed: bool):
     """
-    Deletes a specific list of users, but only after re-validating them
+    Deletes a specific list of service users, but only after re-validating them
     against the provided criteria as a final safety check.
     """
     if not user_ids_to_purge:
@@ -859,25 +859,60 @@ def purge_inactive_users(user_ids_to_purge: list[int], admin_id: int, inactive_d
     purged_count = 0
     error_count = 0
     
-    users_to_process = UserAppAccess.query.filter(UserAppAccess.id.in_(final_ids_to_delete)).all()
+    # Query UserMediaAccess (service users) instead of UserAppAccess
+    from app.models_media_services import UserMediaAccess
+    users_to_process = UserMediaAccess.query.filter(
+        UserMediaAccess.id.in_(final_ids_to_delete),
+        UserMediaAccess.user_app_access_id.is_(None)  # Only standalone service users
+    ).all()
 
     for user in users_to_process:
         try:
-            from app.services.unified_user_service import UnifiedUserService
-            UnifiedUserService.delete_user_completely(user.id, admin_id=admin_id)
+            username = user.external_username or 'Unknown'
+            server = user.server
+            
+            # Try to delete from the actual server first
+            if user.external_user_id and server:
+                try:
+                    service = MediaServiceFactory.create_service_from_db(server)
+                    if service and hasattr(service, 'delete_user'):
+                        service.delete_user(user.external_user_id)
+                        current_app.logger.info(f"Deleted service user {username} from {server.service_type.value} server {server.server_nickname}")
+                    else:
+                        current_app.logger.warning(f"Cannot delete user from {server.service_type.value} server {server.server_nickname} - service not available or doesn't support deletion")
+                except Exception as e:
+                    current_app.logger.error(f"Failed to delete service user {username} from {server.service_type.value} server {server.server_nickname}: {e}")
+                    # Continue with deletion from MUM even if server deletion fails
+            
+            # Delete the UserMediaAccess record from MUM
+            db.session.delete(user)
             purged_count += 1
+            current_app.logger.info(f"Purged service user {username} (ID: {user.id})")
+            
         except Exception as e:
             error_count += 1
-            current_app.logger.error(f"User_Service.py - purge_inactive_users(): Error purging user {user.get_display_name()} (ID: {user.id}): {e}")
+            username = getattr(user, 'external_username', 'Unknown') or 'Unknown'
+            current_app.logger.error(f"User_Service.py - purge_inactive_users(): Error purging service user {username} (ID: {user.id}): {e}")
 
-    result_message = f"Purge complete: {purged_count} users removed."
+    # Commit all deletions
+    if purged_count > 0:
+        try:
+            db.session.commit()
+            current_app.logger.info(f"Purge: Successfully committed deletion of {purged_count} service users")
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Purge: DB commit error: {e}")
+            error_count += purged_count
+            purged_count = 0
+
+    result_message = f"Purge complete: {purged_count} service users removed."
     if len(final_ids_to_delete) != len(user_ids_to_purge):
         result_message += f" ({len(user_ids_to_purge) - len(final_ids_to_delete)} skipped by final safety check)."
     if error_count > 0:
         result_message += f" {error_count} errors."
 
     log_event(EventType.MUM_USER_DELETED_FROM_MUM, result_message, admin_id=admin_id, details={
-        "action": "purge_selected_inactive_users", "purged_count": purged_count, "errors": error_count
+        "action": "purge_selected_inactive_service_users", "purged_count": purged_count, "errors": error_count
     })
     
     return {"message": result_message, "purged_count": purged_count, "errors": error_count}
@@ -888,22 +923,17 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
 
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=inactive_days_threshold)
     
-    # Base query for UserAppAccess (no home_user concept in new architecture)
-    query = UserAppAccess.query
+    # Base query for UserMediaAccess (service users) - standalone users only
+    from app.models_media_services import UserMediaAccess
+    query = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id.is_(None))
 
-    # --- START OF FIX ---
-    # Conditionally add filters based on the checkboxes.
-    # Note: home_user and shares_back concepts don't exist in UserAppAccess
-    # These were Plex-specific concepts that are now handled differently
-    
+    # Apply filters based on the checkboxes
     if exclude_whitelisted: 
-        # Check if any of the user's media accesses are purge whitelisted
-        from app.models_media_services import UserMediaAccess
-        whitelisted_user_ids = db.session.query(UserMediaAccess.user_app_access_id).filter(
-            UserMediaAccess.is_purge_whitelisted == True
-        ).distinct().subquery()
-        query = query.filter(~UserAppAccess.id.in_(whitelisted_user_ids))
-    # --- END OF FIX ---
+        query = query.filter(UserMediaAccess.is_purge_whitelisted != True)
+    
+    if exclude_sharers:
+        # Filter out users who share back their servers (if this field exists)
+        query = query.filter(UserMediaAccess.shares_back != True)
         
     eligible_users_list = []
     potential_users = query.all()
@@ -911,9 +941,9 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
     for user in potential_users:
         is_eligible_for_purge = False
         
-        # UserAppAccess doesn't have last_streamed_at - need to check MediaStreamHistory
+        # Check MediaStreamHistory for service users using user_media_access_uuid
         from app.models_media_services import MediaStreamHistory
-        last_stream = MediaStreamHistory.query.filter_by(user_app_access_uuid=user.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
+        last_stream = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
         last_streamed_at = last_stream.started_at if last_stream else None
         
         if last_streamed_at is None:
@@ -929,7 +959,15 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
                 is_eligible_for_purge = True
         
         if is_eligible_for_purge:
-            eligible_users_list.append({ 'id': user.id, 'username': user.get_display_name(), 'email': user.email, 'last_streamed_at': last_streamed_at, 'created_at': user.created_at })
+            eligible_users_list.append({ 
+                'id': user.id, 
+                'username': user.external_username or 'Unknown', 
+                'email': user.external_email, 
+                'last_streamed_at': last_streamed_at, 
+                'created_at': user.created_at,
+                'server_name': user.server.server_nickname if user.server else 'Unknown Server',
+                'service_type': user.server.service_type.value if user.server else 'unknown'
+            })
             
     return eligible_users_list
 
