@@ -862,8 +862,7 @@ def purge_inactive_users(user_ids_to_purge: list[int], admin_id: int, inactive_d
     # Query UserMediaAccess (service users) instead of UserAppAccess
     from app.models_media_services import UserMediaAccess
     users_to_process = UserMediaAccess.query.filter(
-        UserMediaAccess.id.in_(final_ids_to_delete),
-        UserMediaAccess.user_app_access_id.is_(None)  # Only standalone service users
+        UserMediaAccess.id.in_(final_ids_to_delete)
     ).all()
 
     for user in users_to_process:
@@ -923,9 +922,9 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
 
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=inactive_days_threshold)
     
-    # Base query for UserMediaAccess (service users) - standalone users only
+    # Base query for UserMediaAccess (service users) - both standalone and linked
     from app.models_media_services import UserMediaAccess
-    query = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id.is_(None))
+    query = UserMediaAccess.query
 
     # Apply filters based on the checkboxes
     if exclude_whitelisted: 
