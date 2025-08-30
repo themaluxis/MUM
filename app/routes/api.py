@@ -643,7 +643,8 @@ def sync_library_content(library_id):
         duration = end_time - start_time
         
         if result['success']:
-            current_app.logger.info(f"Library content sync completed successfully: {result}")
+            current_app.logger.info(f"Library content sync completed successfully")
+            current_app.logger.debug(f"DEBUG: Full sync result keys: {list(result.keys())}")
             
             # Add duration to result
             result['duration'] = duration
@@ -655,15 +656,30 @@ def sync_library_content(library_id):
             removed = result.get('removed', 0)
             
             # Debug logging to identify the issue
-            current_app.logger.debug(f"DEBUG: added = {added} (type: {type(added)})")
-            current_app.logger.debug(f"DEBUG: updated = {updated} (type: {type(updated)})")
-            current_app.logger.debug(f"DEBUG: removed = {removed} (type: {type(removed)})")
-            current_app.logger.debug(f"DEBUG: result.get('errors') = {result.get('errors')} (type: {type(result.get('errors'))})")
+            current_app.logger.info(f"DEBUG SYNC RESULT: added={added} (type: {type(added)})")
+            current_app.logger.info(f"DEBUG SYNC RESULT: updated={updated} (type: {type(updated)})")
+            current_app.logger.info(f"DEBUG SYNC RESULT: removed={removed} (type: {type(removed)})")
+            current_app.logger.info(f"DEBUG SYNC RESULT: errors={result.get('errors')} (type: {type(result.get('errors'))})")
+            current_app.logger.info(f"DEBUG SYNC RESULT: total_items={result.get('total_items', 'NOT_SET')}")
             
             try:
-                has_changes = (added > 0 or updated > 0 or removed > 0 or 
-                              (result.get('errors') and len(result.get('errors', [])) > 0))
-                current_app.logger.debug(f"DEBUG: has_changes = {has_changes}")
+                errors_list = result.get('errors', [])
+                current_app.logger.info(f"DEBUG SYNC RESULT: errors_list = {errors_list} (type: {type(errors_list)})")
+                current_app.logger.info(f"DEBUG SYNC RESULT: len(errors_list) = {len(errors_list)}")
+                
+                # Break down the logic step by step
+                added_check = added > 0
+                updated_check = updated > 0
+                removed_check = removed > 0
+                errors_check = bool(errors_list and len(errors_list) > 0)
+                
+                current_app.logger.info(f"DEBUG SYNC RESULT: added_check = {added_check}")
+                current_app.logger.info(f"DEBUG SYNC RESULT: updated_check = {updated_check}")
+                current_app.logger.info(f"DEBUG SYNC RESULT: removed_check = {removed_check}")
+                current_app.logger.info(f"DEBUG SYNC RESULT: errors_check = {errors_check}")
+                
+                has_changes = added_check or updated_check or removed_check or errors_check
+                current_app.logger.info(f"DEBUG SYNC RESULT: has_changes = {has_changes} (type: {type(has_changes)})")
             except Exception as e:
                 current_app.logger.error(f"DEBUG: Error in has_changes comparison: {e}")
                 current_app.logger.error(f"DEBUG: Full result data: {result}")
@@ -709,19 +725,23 @@ def sync_library_content(library_id):
                 }
                 return make_response(modal_html, 200, headers)
             else:
-                # No changes - just show toast
+                # No changes - just show toast (no page refresh needed)
+                current_app.logger.info("DEBUG: Taking NO CHANGES path - should show toast only")
                 total_items = result.get('total_items', 0)
                 trigger_payload = {
                     "showToastEvent": {
                         "message": f"Library sync complete. No changes were made to {total_items} items.",
                         "category": "success"
-                    },
-                    "refreshLibraryPage": True
+                    }
                 }
                 headers = {
                     'HX-Trigger': json.dumps(trigger_payload)
                 }
-                return make_response("", 200, headers)
+                current_app.logger.info(f"DEBUG: Returning empty response with headers: {headers}")
+                current_app.logger.info(f"DEBUG: Trigger payload: {trigger_payload}")
+                response = make_response("", 200, headers)
+                current_app.logger.info(f"DEBUG: Response created successfully, returning to client")
+                return response
         else:
             current_app.logger.error(f"Library sync failed: {result.get('error', 'Unknown error')}")
             

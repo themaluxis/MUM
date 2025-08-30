@@ -401,6 +401,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Make sync request using HTMX to handle modal responses properly
             htmx.ajax('POST', `/api/libraries/${libraryId}/sync`, {
+                target: '#library_content_sync_results_modal',
+                swap: 'innerHTML',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
