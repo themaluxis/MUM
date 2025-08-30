@@ -670,7 +670,7 @@ def resolve_user_route_conflict(path_segment):
 def encode_url_component(text):
     """
     Encode URL components by replacing special characters with dashes.
-    Replaces %20 (URL-encoded spaces), forward slashes, dots, and spaces with dashes.
+    Replaces %20 (URL-encoded spaces), forward slashes, dots, colons, and spaces with dashes.
     
     Args:
         text (str): The text to encode for URL usage
@@ -690,6 +690,7 @@ def encode_url_component(text):
     encoded = decoded_text.replace(' ', '-')  # Replace spaces
     encoded = encoded.replace('/', '-')       # Replace forward slashes
     encoded = encoded.replace('.', '-')       # Replace dots
+    encoded = encoded.replace(':', '-')       # Replace colons
     encoded = encoded.replace('%20', '-')     # Replace URL-encoded spaces (if any remain)
     
     # Clean up multiple consecutive dashes
@@ -735,11 +736,32 @@ def decode_url_component_variations(text):
     # Most common case: dashes represent spaces
     variations.append(decoded_text.replace('-', ' '))
     
+    # Special case: Convert dashes to spaces but preserve compound words ending in -chan, -kun, -san, etc.
+    # This handles Japanese/anime titles where some hyphens are part of compound words
+    if '-chan' in decoded_text or '-kun' in decoded_text or '-san' in decoded_text:
+        temp = decoded_text.replace('-', ' ')  # Convert all dashes to spaces first
+        # Then restore common Japanese compound word patterns
+        temp = temp.replace(' chan', '-chan')
+        temp = temp.replace(' kun', '-kun') 
+        temp = temp.replace(' san', '-san')
+        variations.append(temp)
+        
+        # Also try with colon restoration for patterns like "Ribbon-chan-Eigo" -> "Ribbon-chan: Eigo"
+        # This handles cases where the colon was encoded as a dash
+        if 'chan ' in temp or 'kun ' in temp or 'san ' in temp:
+            temp_with_colon = temp.replace('chan ', 'chan: ')
+            temp_with_colon = temp_with_colon.replace('kun ', 'kun: ')
+            temp_with_colon = temp_with_colon.replace('san ', 'san: ')
+            variations.append(temp_with_colon)
+    
     # Try dashes as slashes (for cases like "50/50" -> "50-50")
     variations.append(decoded_text.replace('-', '/'))
     
     # Try dashes as dots (for cases like "file.name" -> "file-name")
     variations.append(decoded_text.replace('-', '.'))
+    
+    # Try dashes as colons (for cases like "title: subtitle" -> "title- subtitle")
+    variations.append(decoded_text.replace('-', ':'))
     
     # Try mixed patterns for complex titles with multiple dashes
     if '-' in decoded_text:
@@ -809,6 +831,59 @@ def decode_url_component_variations(text):
                                 result += '-' + temp_parts[j]
                         variations.append(result)
     
+    # Special handling for mixed patterns with colons
+    # Handle cases like "Maji-de-Otaku-na-English!-Ribbon-chan:-Eigo-de-Tatakau-Mahou-Shoujo"
+    # where some dashes are spaces, some are original hyphens, and some are colons
+    if '-' in decoded_text and ':' in decoded_text:
+        # Split by colon first to handle the colon separately
+        colon_parts = decoded_text.split(':')
+        if len(colon_parts) == 2:
+            # Process each part separately
+            left_part = colon_parts[0]  # "Maji-de-Otaku-na-English!-Ribbon-chan-"
+            right_part = colon_parts[1]  # "-Eigo-de-Tatakau-Mahou-Shoujo"
+            
+            # For the left part, convert most dashes to spaces but keep some as hyphens
+            # Pattern: "Maji-de-Otaku-na-English!-Ribbon-chan-" -> "Maji de Otaku na English! Ribbon-chan"
+            left_processed = left_part.replace('-', ' ').strip()
+            # But restore the hyphen in "Ribbon-chan"
+            left_processed = left_processed.replace('Ribbon chan', 'Ribbon-chan')
+            
+            # For the right part, convert dashes to spaces
+            # Pattern: "-Eigo-de-Tatakau-Mahou-Shoujo" -> " Eigo de Tatakau Mahou Shoujo"
+            right_processed = right_part.replace('-', ' ').strip()
+            
+            # Combine with colon
+            combined = left_processed + ': ' + right_processed
+            variations.append(combined)
+            
+            # Also try without the space after colon
+            combined_no_space = left_processed + ':' + right_processed
+            variations.append(combined_no_space)
+    
+    # Additional pattern for anime/Japanese titles with mixed encoding
+    # Handle "Maji-de-Otaku-na-English!-Ribbon-chan:-Eigo-de-Tatakau-Mahou-Shoujo"
+    if '-' in decoded_text:
+        # Try converting spaces around specific patterns while preserving hyphens in compound words
+        temp = decoded_text
+        # Convert word boundary dashes to spaces, but preserve hyphens in compound words
+        # This is a heuristic approach for Japanese/anime titles
+        
+        # Pattern 1: Convert dashes between lowercase/uppercase boundaries to spaces
+        import re
+        # Replace dashes that are likely word separators
+        pattern1 = re.sub(r'-([A-Z])', r' \1', temp)  # "word-Word" -> "word Word"
+        pattern1 = re.sub(r'([a-z])-([a-z])', r'\1 \2', pattern1)  # "word-word" -> "word word"
+        if pattern1 != temp:
+            variations.append(pattern1)
+        
+        # Pattern 2: Handle the specific case with colon
+        if ':' in temp:
+            # "Maji-de-Otaku-na-English!-Ribbon-chan:-Eigo-de-Tatakau-Mahou-Shoujo"
+            # -> "Maji de Otaku na English! Ribbon-chan: Eigo de Tatakau Mahou Shoujo"
+            pattern2 = temp.replace('-', ' ')  # Convert all dashes to spaces first
+            pattern2 = pattern2.replace('Ribbon chan:', 'Ribbon-chan:')  # Restore compound word hyphen
+            variations.append(pattern2)
+    
     # Remove duplicates while preserving order
     seen = set()
     unique_variations = []
@@ -848,3 +923,39 @@ def decode_url_component(text):
     # For backward compatibility, convert dashes back to spaces
     # This assumes the most common case where dashes represent spaces
     return decoded_text.replace('-', ' ')
+
+
+def generate_url_slug(text, max_length=100):
+    """
+    Generate a URL-safe slug from text for use in URLs.
+    This creates human-readable URLs while keeping them safe.
+    
+    Args:
+        text (str): The text to convert to a slug
+        max_length (int): Maximum length of the slug
+        
+    Returns:
+        str: URL-safe slug
+    """
+    if not text:
+        return ''
+    
+    import re
+    import unicodedata
+    
+    # Convert to lowercase and normalize unicode characters
+    slug = unicodedata.normalize('NFKD', text.lower())
+    
+    # Remove non-ASCII characters
+    slug = slug.encode('ascii', 'ignore').decode('ascii')
+    
+    # Replace spaces and special characters with hyphens
+    slug = re.sub(r'[^a-z0-9]+', '-', slug)
+    
+    # Remove leading/trailing hyphens and limit length
+    slug = slug.strip('-')[:max_length]
+    
+    # Remove trailing hyphen if truncation created one
+    slug = slug.rstrip('-')
+    
+    return slug or 'media'  # Fallback if slug is empty

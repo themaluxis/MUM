@@ -156,7 +156,7 @@
         <div class="flex justify-center mt-8">
             <div class="join">
                 {% if episodes_content.has_prev %}
-                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), content_name=encode_url_component(media_details.title), tab='episodes', page=episodes_content.page-1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.page-1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">
                         <i class="fa-solid fa-chevron-left"></i>
                     </a>
@@ -166,7 +166,7 @@
                 {% set end_page = [episodes_content.pages, episodes_content.page + 2] | min %}
                 
                 {% if start_page > 1 %}
-                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), content_name=encode_url_component(media_details.title), tab='episodes', page=1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">1</a>
                     {% if start_page > 2 %}
                         <button class="join-item btn btn-sm btn-disabled">...</button>
@@ -177,7 +177,7 @@
                     {% if page_num == episodes_content.page %}
                         <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
                     {% else %}
-                        <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), content_name=encode_url_component(media_details.title), tab='episodes', page=page_num, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                        <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=page_num, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                            class="join-item btn btn-sm">{{ page_num }}</a>
                     {% endif %}
                 {% endfor %}
@@ -186,12 +186,12 @@
                     {% if end_page < episodes_content.pages - 1 %}
                         <button class="join-item btn btn-sm btn-disabled">...</button>
                     {% endif %}
-                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), content_name=encode_url_component(media_details.title), tab='episodes', page=episodes_content.pages, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.pages, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">{{ episodes_content.pages }}</a>
                 {% endif %}
                 
                 {% if episodes_content.has_next %}
-                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), content_name=encode_url_component(media_details.title), tab='episodes', page=episodes_content.page+1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.page+1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">
                         <i class="fa-solid fa-chevron-right"></i>
                     </a>

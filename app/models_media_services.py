@@ -346,7 +346,8 @@ class MediaItem(db.Model):
                 thumb_url = f"/api/media/{self.server.service_type.value}/images/proxy?path={self.thumb_path.lstrip('/')}"
         
         return {
-            'id': self.external_id,
+            'id': self.id,  # Use database ID for new URL structure
+            'external_id': self.external_id,  # Keep external_id for backward compatibility
             'title': self.title,
             'year': self.year,
             'edition': self.extra_metadata.get('edition') if self.extra_metadata else None,

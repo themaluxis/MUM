@@ -219,8 +219,11 @@ def create_app(config_name=None):
     
     @app.context_processor
     def inject_url_helpers():
-        from app.utils.helpers import encode_url_component
-        return {'encode_url_component': encode_url_component}
+        from app.utils.helpers import encode_url_component, generate_url_slug
+        return {
+            'encode_url_component': encode_url_component,
+            'generate_url_slug': generate_url_slug
+        }
 
     @login_manager.user_loader
     def load_user(user_id):

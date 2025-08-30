@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, current_app, request, make_response, json, flash, redirect, url_for, abort
 from flask_login import login_required, current_user
-from app.utils.helpers import setup_required, permission_required, encode_url_component, decode_url_component, decode_url_component_variations
+from app.utils.helpers import setup_required, permission_required, encode_url_component, decode_url_component, decode_url_component_variations, generate_url_slug
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
 from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory, UserMediaAccess
@@ -358,47 +358,27 @@ def get_library_raw_data(server_id, library_id):
         current_app.logger.error(f"Error fetching raw library data: {e}")
         return {'error': str(e)}, 500
 
-@bp.route('/library/<server_nickname>/<library_name>/<content_name>')
+@bp.route('/library/<server_nickname>/<library_name>/<int:media_id>')
+@bp.route('/library/<server_nickname>/<library_name>/<int:media_id>/<slug>')
 @login_required
 @setup_required
 @permission_required('view_libraries')
-def media_detail(server_nickname, library_name, content_name):
-    """Display detailed media information"""
+def media_detail(server_nickname, library_name, media_id, slug=None):
+    """Display detailed media information using database ID lookup"""
     # URL decode the parameters to handle special characters
     try:
         server_nickname = urllib.parse.unquote(server_nickname)
         library_name = urllib.parse.unquote(library_name)
-        content_name = urllib.parse.unquote(content_name)
         
-        # Decode URL components back to original names for lookups
+        # Decode URL component back to original name for lookup
         library_name_for_lookup = decode_url_component(library_name)
-        content_name_for_lookup = decode_url_component(content_name)
-        
-        # If the URL contains spaces or other special characters, redirect to the proper format
-        proper_library_name = encode_url_component(library_name)
-        proper_content_name = encode_url_component(content_name)
-        needs_redirect = (library_name != proper_library_name or content_name != proper_content_name)
-        
-        current_app.logger.info(f"DEBUG URL encoding check:")
-        current_app.logger.info(f"  Original library_name: '{library_name}' -> Proper: '{proper_library_name}'")
-        current_app.logger.info(f"  Original content_name: '{content_name}' -> Proper: '{proper_content_name}'")
-        current_app.logger.info(f"  Needs redirect: {needs_redirect}")
-            
-        if needs_redirect:
-            redirect_url = url_for('libraries.media_detail', 
-                                 server_nickname=server_nickname,
-                                 library_name=proper_library_name,
-                                 content_name=proper_content_name,
-                                 **request.args)
-            current_app.logger.info(f"DEBUG: Redirecting to: {redirect_url}")
-            return redirect(redirect_url)
         
     except Exception as e:
         current_app.logger.warning(f"Error decoding URL parameters: {e}")
         abort(400)
     
     # Validate parameters
-    if not server_nickname or not library_name or not content_name:
+    if not server_nickname or not library_name or not media_id:
         abort(400)
     
     # Find the server by nickname
@@ -424,36 +404,20 @@ def media_detail(server_nickname, library_name, content_name):
     # Get the active tab from the URL query, default to 'overview'
     tab = request.args.get('tab', 'overview')
     
-    # Get media details from the service - try multiple variations for content name
-    media_details = None
-    content_name_variations = decode_url_component_variations(content_name)
+    # Get media details by database ID - this is fast and reliable!
+    from app.models_media_services import MediaItem
+    media_item = MediaItem.query.filter_by(
+        id=media_id,
+        library_id=library.id  # Ensure the media belongs to this library
+    ).first_or_404()
     
-    current_app.logger.info(f"DEBUG: Looking up content '{content_name}' in library '{library.name}'")
-    current_app.logger.info(f"DEBUG: Content name variations: {content_name_variations}")
-    
-    for i, variation in enumerate(content_name_variations):
-        current_app.logger.info(f"DEBUG: Trying variation {i+1}: '{variation}'")
-        media_details = get_media_details_cached_only(server, library, variation)
-        if media_details:
-            current_app.logger.info(f"DEBUG: SUCCESS! Found media with variation: '{variation}'")
-            current_app.logger.info(f"DEBUG: Media details title: '{media_details.get('title', 'N/A')}'")
-            # Store the actual content name that worked for later use
-            content_name_for_lookup = variation
-            break
-        else:
-            current_app.logger.info(f"DEBUG: No match for variation: '{variation}'")
-    
-    if not media_details:
-        current_app.logger.warning(f"DEBUG: No cached match found, falling back to API call with original content name")
-        # If no cached version found, fall back to API call with the most likely variation
-        media_details = get_media_details(server, library, content_name_for_lookup)
-        if not media_details:
-            current_app.logger.warning(f"DEBUG: FAILED to find any media for content '{content_name}' with variations {content_name_variations}")
-            abort(404)
+    # Convert database item to the expected format
+    media_details = media_item.to_dict()
+    content_name_for_lookup = media_item.title  # Use the actual title from database
     
     # Get episodes for TV shows
     episodes_content = None
-    if tab == 'episodes' and library.library_type and library.library_type.lower() in ['show', 'tv', 'series']:
+    if tab == 'episodes' and library.library_type and library.library_type.lower() in ['show', 'tv', 'series', 'tvshows']:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 24, type=int)
         search_query = request.args.get('search', '').strip()
@@ -533,8 +497,9 @@ def media_detail(server_nickname, library_name, content_name):
                              days_filter=request.args.get('days', 30))
     
     return render_template('libraries/media_detail.html',
-                         title=f"Media: {content_name}",
+                         title=f"Media: {media_item.title}",
                          media_details=media_details,
+                         media_item=media_item,  # Pass the database object for URL generation
                          library=library,
                          server=server,
                          streaming_history=streaming_history,
