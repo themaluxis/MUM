@@ -728,6 +728,25 @@ class JellyfinMediaService(BaseMediaService):
                 'SortOrder': 'Ascending'
             }
             
+            # Add filtering based on library type to prevent getting episodes/seasons for TV libraries
+            try:
+                library_info = self._get_library_info(library_key)
+                if library_info and library_info.get('CollectionType') == 'tvshows':
+                    # For TV libraries, only get Series (shows), not episodes or seasons
+                    params['IncludeItemTypes'] = 'Series'
+                    current_app.logger.debug(f"Jellyfin: Filtering TV library to Series only")
+                elif library_info and library_info.get('CollectionType') == 'movies':
+                    # For movie libraries, only get Movies
+                    params['IncludeItemTypes'] = 'Movie'
+                    current_app.logger.debug(f"Jellyfin: Filtering movie library to Movies only")
+                elif library_info and library_info.get('CollectionType') == 'music':
+                    # For music libraries, only get Albums
+                    params['IncludeItemTypes'] = 'MusicAlbum'
+                    current_app.logger.debug(f"Jellyfin: Filtering music library to Albums only")
+            except Exception as e:
+                current_app.logger.warning(f"Could not determine library type for filtering: {e}")
+                # Continue without filtering if we can't determine library type
+            
             # Set up headers
             headers = {
                 'X-Emby-Token': self.api_key,
@@ -736,9 +755,35 @@ class JellyfinMediaService(BaseMediaService):
             
             current_app.logger.debug(f"Jellyfin get_library_content: Fetching from {url} with ParentId={library_key}")
             
-            # Make the API request
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            response.raise_for_status()
+            # Make the API request with shorter timeout to prevent worker timeouts
+            try:
+                response = requests.get(url, params=params, headers=headers, timeout=5)
+                response.raise_for_status()
+            except requests.exceptions.Timeout:
+                current_app.logger.warning(f"Jellyfin API timeout for library {library_key}, page {page}")
+                # Return partial results to prevent complete failure
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': 'Request timeout - try reducing items per page'
+                }
+            except requests.exceptions.RequestException as e:
+                current_app.logger.error(f"Jellyfin API error for library {library_key}: {e}")
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': f'API error: {str(e)}'
+                }
             
             data = response.json()
             items = data.get('Items', [])
@@ -823,6 +868,75 @@ class JellyfinMediaService(BaseMediaService):
                 'has_next': False,
                 'error': str(e)
             }
+
+    def _get_library_info(self, library_key: str) -> Dict[str, Any]:
+        """Get library information including CollectionType for filtering"""
+        try:
+            if not self._authenticated and not self._authenticate():
+                self.log_error("Failed to authenticate for library info retrieval")
+                return {}
+            
+            # Get library info from VirtualFolders endpoint
+            response = self.session.get(
+                f"{self.url.rstrip('/')}/Library/VirtualFolders",
+                timeout=get_api_timeout_with_fallback(10)
+            )
+            response.raise_for_status()
+            
+            virtual_folders = response.json()
+            
+            # Find the library with matching ItemId or Name
+            for folder in virtual_folders:
+                folder_id = folder.get('ItemId') or folder.get('Name', '')
+                if folder_id == library_key:
+                    return folder
+            
+            # If not found by ItemId/Name, try to get library details directly
+            try:
+                response = self.session.get(
+                    f"{self.url.rstrip('/')}/Items/{library_key}",
+                    timeout=get_api_timeout_with_fallback(10)
+                )
+                response.raise_for_status()
+                item_info = response.json()
+                
+                # For direct item lookup, we need to infer CollectionType from the item's Type
+                item_type = item_info.get('Type', '').lower()
+                if item_type == 'collectionfolder':
+                    # This is a collection folder, get its CollectionType
+                    return {
+                        'CollectionType': item_info.get('CollectionType', 'mixed'),
+                        'Name': item_info.get('Name', 'Unknown Library'),
+                        'ItemId': library_key
+                    }
+            except Exception:
+                pass
+            
+            self.log_warning(f"Could not find library info for key: {library_key}")
+            return {}
+            
+        except Exception as e:
+            self.log_error(f"Error getting library info for {library_key}: {e}")
+            return {}
+
+    def _get_user_info(self, user_id: str) -> Dict[str, Any]:
+        """Get user information for avatar and other details"""
+        try:
+            if not self._authenticated and not self._authenticate():
+                self.log_error("Failed to authenticate for user info retrieval")
+                return {}
+            
+            response = self.session.get(
+                f"{self.url.rstrip('/')}/Users/{user_id}",
+                timeout=get_api_timeout_with_fallback(10)
+            )
+            response.raise_for_status()
+            
+            return response.json()
+            
+        except Exception as e:
+            self.log_error(f"Error getting user info for {user_id}: {e}")
+            return {}
 
     def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
         """Get GeoIP information for a given IP address"""

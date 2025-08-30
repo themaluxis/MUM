@@ -451,6 +451,29 @@ def media_detail(server_nickname, library_name, content_name):
             current_app.logger.warning(f"DEBUG: FAILED to find any media for content '{content_name}' with variations {content_name_variations}")
             abort(404)
     
+    # Get episodes for TV shows
+    episodes_content = None
+    if tab == 'episodes' and library.library_type and library.library_type.lower() in ['show', 'tv', 'series']:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 24, type=int)
+        search_query = request.args.get('search', '').strip()
+        sort_by = request.args.get('sort_by', 'title_asc').strip()
+        
+        # Validate per_page parameter
+        if per_page not in [12, 24, 48, 96]:
+            per_page = 24
+            
+        # Validate sort_by parameter
+        valid_sorts = [
+            'title_asc', 'title_desc', 'year_asc', 'year_desc', 
+            'added_at_asc', 'added_at_desc', 'rating_asc', 'rating_desc',
+            'total_streams_asc', 'total_streams_desc'
+        ]
+        if sort_by not in valid_sorts:
+            sort_by = 'title_asc'
+            
+        episodes_content = get_show_episodes(server, library, content_name_for_lookup, page, per_page, search_query, sort_by)
+    
     # Get streaming history for this specific content
     streaming_history = None
     if tab == 'activity':
@@ -515,8 +538,10 @@ def media_detail(server_nickname, library_name, content_name):
                          library=library,
                          server=server,
                          streaming_history=streaming_history,
+                         episodes_content=episodes_content,
                          active_tab=tab,
-                         days_filter=request.args.get('days', 30) if tab == 'activity' else None)
+                         days_filter=request.args.get('days', 30) if tab == 'activity' else None,
+                         current_sort_by=request.args.get('sort_by', 'title_asc') if tab == 'episodes' else None)
 
 @bp.route('/library/<server_nickname>/<library_name>')
 @login_required
@@ -1162,6 +1187,101 @@ def get_media_details(server, library, content_name):
     except Exception as e:
         current_app.logger.error(f"Error getting media details: {e}")
         return None
+
+def get_show_episodes(server, library, show_title, page=1, per_page=24, search_query='', sort_by='title_asc'):
+    """Get episodes for a specific TV show"""
+    try:
+        from app.services.media_service_factory import MediaServiceFactory
+        
+        # Create service instance
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service:
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False,
+                'error': 'Could not create service instance'
+            }
+        
+        # Get show details first to find the show ID
+        show_details = get_media_details(server, library, show_title)
+        if not show_details:
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False,
+                'error': 'Show not found'
+            }
+        
+        # Get episodes from the service
+        if hasattr(service, 'get_show_episodes'):
+            episodes_data = service.get_show_episodes(show_details['id'], page=page, per_page=per_page, search_query=search_query)
+        elif hasattr(service, 'get_library_content'):
+            # Fallback: try to get episodes by searching for the show in the library
+            episodes_data = service.get_library_content(library.external_id, page=page, per_page=per_page, search_query=search_query, parent_id=show_details['id'])
+        else:
+            return {
+                'items': [],
+                'total': 0,
+                'page': page,
+                'per_page': per_page,
+                'pages': 0,
+                'has_prev': False,
+                'has_next': False,
+                'error': 'Service does not support episode retrieval'
+            }
+        
+        # Add stream counts to episodes
+        if episodes_data and episodes_data.get('items'):
+            from app.models_media_services import MediaStreamHistory
+            for episode in episodes_data['items']:
+                stream_count = MediaStreamHistory.query.filter(
+                    MediaStreamHistory.server_id == server.id,
+                    MediaStreamHistory.media_title == episode.get('title', '')
+                ).count()
+                episode['stream_count'] = stream_count
+        
+        # Apply sorting if needed (some services might not support server-side sorting)
+        if episodes_data and episodes_data.get('items') and sort_by != 'title_asc':
+            items = episodes_data['items']
+            reverse = sort_by.endswith('_desc')
+            
+            if sort_by.startswith('title'):
+                items.sort(key=lambda x: x.get('title', '').lower(), reverse=reverse)
+            elif sort_by.startswith('year'):
+                items.sort(key=lambda x: x.get('year', 0) or 0, reverse=reverse)
+            elif sort_by.startswith('added_at'):
+                items.sort(key=lambda x: x.get('added_at', ''), reverse=reverse)
+            elif sort_by.startswith('rating'):
+                items.sort(key=lambda x: x.get('rating', 0) or 0, reverse=reverse)
+            elif sort_by.startswith('total_streams'):
+                items.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
+            
+            episodes_data['items'] = items
+        
+        return episodes_data
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting episodes for show '{show_title}': {e}")
+        return {
+            'items': [],
+            'total': 0,
+            'page': page,
+            'per_page': per_page,
+            'pages': 0,
+            'has_prev': False,
+            'has_next': False,
+            'error': str(e)
+        }
+
 
 def get_library_media_content(library, page=1, per_page=24, search_query='', sort_by='title_asc'):
     """Get media content from the library using cached data or live API"""

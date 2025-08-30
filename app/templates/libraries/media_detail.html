@@ -195,6 +195,12 @@
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'overview' else '' }}">
                         <i class="fa-solid fa-info-circle mr-2"></i>Overview
                     </a>
+                    {% if library.library_type and library.library_type.lower() in ['show', 'tv', 'series'] %}
+                    <a role="tab" href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), content_name=encode_url_component(media_details.title), tab='episodes') }}"
+                       class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'episodes' else '' }}">
+                        <i class="fa-solid fa-list mr-2"></i>Episodes
+                    </a>
+                    {% endif %}
                     <a role="tab" href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), content_name=encode_url_component(media_details.title), tab='activity') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'activity' else '' }}">
                         <i class="fa-solid fa-chart-line mr-2"></i>Activity
@@ -281,6 +287,17 @@
                         {% endif %}
                     </div>
 
+                {% elif active_tab == 'episodes' and library.library_type and library.library_type.lower() in ['show', 'tv', 'series'] %}
+                    <!-- Episodes Tab -->
+                    {% if episodes_content %}
+                        {% include 'libraries/partials/episodes_grid.html' %}
+                    {% else %}
+                        <div class="text-center py-8">
+                            <p class="text-lg">No episodes data available.</p>
+                            <p class="text-sm text-base-content/60 mt-2">Episodes information could not be loaded.</p>
+                        </div>
+                    {% endif %}
+                
                 {% elif active_tab == 'activity' %}
                     <!-- Activity Tab -->
                     {% include 'libraries/partials/media_activity_tab.html' %}

@@ -43,20 +43,29 @@ class MediaSyncService:
             if not hasattr(service, 'get_library_content'):
                 return {'success': False, 'error': 'Service does not support library content retrieval'}
             
-            # Get all items from the service (no pagination for sync)
+            # Get all items from the service with timeout protection
             all_items = []
             page = 1
-            per_page = 100  # Larger batches for sync
+            per_page = 50  # Smaller batches to prevent timeouts
+            max_pages = 100  # Limit total pages to prevent infinite loops
             
-            while True:
+            while page <= max_pages:
                 try:
+                    current_app.logger.debug(f"Syncing library {library.name}, page {page}")
                     content_data = service.get_library_content(library.external_id, page=page, per_page=per_page)
+                    
+                    # Handle error responses
+                    if content_data.get('error'):
+                        current_app.logger.warning(f"API error on page {page}: {content_data['error']}")
+                        break
+                    
                     items = content_data.get('items', [])
                     
                     if not items:
                         break
                         
                     all_items.extend(items)
+                    current_app.logger.debug(f"Retrieved {len(items)} items from page {page}, total so far: {len(all_items)}")
                     
                     # Check if we've got all items
                     if len(items) < per_page:
@@ -64,8 +73,13 @@ class MediaSyncService:
                         
                     page += 1
                     
+                    # Add a small delay to prevent overwhelming the API
+                    import time
+                    time.sleep(0.1)
+                    
                 except Exception as e:
                     current_app.logger.error(f"Error fetching page {page} for library {library.name}: {e}")
+                    # Continue with partial data rather than failing completely
                     break
             
             current_app.logger.info(f"Retrieved {len(all_items)} items from {library.name}")
