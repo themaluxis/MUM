@@ -1005,7 +1005,7 @@ class PlexMediaService(BaseMediaService):
             'version': 'Unknown'
         }
 
-    def get_library_content(self, library_key: str, page: int = 1, per_page: int = 24) -> Dict[str, Any]:
+    def get_library_content(self, library_key: str, page: int = 1, per_page: int = 24, parent_id: str = None) -> Dict[str, Any]:
         """Get content from a specific Plex library"""
         try:
             server = self._get_server_instance()
@@ -1041,8 +1041,65 @@ class PlexMediaService(BaseMediaService):
                     'error': f'Library with key/UUID {library_key} not found'
                 }
             
-            # Get all items from the library
-            all_items = library_section.all()
+            # If parent_id is provided, get episodes for that specific show
+            if parent_id:
+                try:
+                    # Get the show by its rating key (ensure it's just the numeric ID)
+                    rating_key = str(parent_id).strip()
+                    self.log_info(f"Fetching show with rating key: {rating_key}")
+                    
+                    # Try different methods to get the show
+                    show = None
+                    try:
+                        # Method 1: Direct fetchItem
+                        show = server.fetchItem(rating_key)
+                    except Exception as e1:
+                        self.log_warning(f"fetchItem failed: {e1}")
+                        try:
+                            # Method 2: Use library section to find the show
+                            show = library_section.fetchItem(rating_key)
+                        except Exception as e2:
+                            self.log_warning(f"library fetchItem failed: {e2}")
+                            # Method 3: Search by rating key in the library
+                            for item in library_section.all():
+                                if hasattr(item, 'ratingKey') and str(item.ratingKey) == rating_key:
+                                    show = item
+                                    break
+                    if not show:
+                        return {
+                            'items': [],
+                            'total': 0,
+                            'page': page,
+                            'per_page': per_page,
+                            'pages': 0,
+                            'has_prev': False,
+                            'has_next': False,
+                            'error': f'Show with ID {parent_id} not found'
+                        }
+                    
+                    # Get all episodes from all seasons using the PlexAPI approach
+                    all_episodes = []
+                    for season in show.seasons():
+                        for episode in season.episodes():
+                            all_episodes.append(episode)
+                    
+                    all_items = all_episodes
+                    
+                except Exception as e:
+                    self.log_error(f"Error getting episodes for show {parent_id}: {e}")
+                    return {
+                        'items': [],
+                        'total': 0,
+                        'page': page,
+                        'per_page': per_page,
+                        'pages': 0,
+                        'has_prev': False,
+                        'has_next': False,
+                        'error': f'Error getting episodes: {str(e)}'
+                    }
+            else:
+                # Get all items from the library
+                all_items = library_section.all()
             total_items = len(all_items)
             
             # Calculate pagination

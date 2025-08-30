@@ -1191,7 +1191,7 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
             episodes_data = service.get_show_episodes(show_details['id'], page=page, per_page=per_page, search_query=search_query)
         elif hasattr(service, 'get_library_content'):
             # Fallback: try to get episodes by searching for the show in the library
-            episodes_data = service.get_library_content(library.external_id, page=page, per_page=per_page, search_query=search_query, parent_id=show_details['id'])
+            episodes_data = service.get_library_content(library.external_id, page=page, per_page=per_page, parent_id=show_details['id'])
         else:
             return {
                 'items': [],
