@@ -649,32 +649,53 @@ def sync_library_content(library_id):
             result['duration'] = duration
             
             # Check if there are any changes to determine response type
-            # Handle both field name formats from MediaSyncService
-            added = result.get('added_items', result.get('added', 0))
-            updated = result.get('updated_items', result.get('updated', 0))
-            removed = result.get('removed_items', result.get('removed', 0))
+            # Use the count values, not the list values
+            added = result.get('added', 0)
+            updated = result.get('updated', 0)
+            removed = result.get('removed', 0)
             
-            has_changes = (added > 0 or updated > 0 or removed > 0 or 
-                          (result.get('errors') and len(result.get('errors', [])) > 0))
+            # Debug logging to identify the issue
+            current_app.logger.debug(f"DEBUG: added = {added} (type: {type(added)})")
+            current_app.logger.debug(f"DEBUG: updated = {updated} (type: {type(updated)})")
+            current_app.logger.debug(f"DEBUG: removed = {removed} (type: {type(removed)})")
+            current_app.logger.debug(f"DEBUG: result.get('errors') = {result.get('errors')} (type: {type(result.get('errors'))})")
+            
+            try:
+                has_changes = (added > 0 or updated > 0 or removed > 0 or 
+                              (result.get('errors') and len(result.get('errors', [])) > 0))
+                current_app.logger.debug(f"DEBUG: has_changes = {has_changes}")
+            except Exception as e:
+                current_app.logger.error(f"DEBUG: Error in has_changes comparison: {e}")
+                current_app.logger.error(f"DEBUG: Full result data: {result}")
+                raise
             
             if has_changes:
-                # Normalize field names for the template
+                # Use the original result (which already has the correct list and count fields)
                 normalized_result = result.copy()
-                normalized_result['added_items'] = added
-                normalized_result['updated_items'] = updated
-                normalized_result['removed_items'] = removed
+                current_app.logger.debug(f"DEBUG: About to render template with normalized_result keys: {list(normalized_result.keys())}")
                 
-                # Show modal for changes or errors
-                modal_html = render_template('libraries/partials/library_content_sync_results_modal.html',
-                                           sync_result=normalized_result,
-                                           library_name=library.name)
+                try:
+                    # Show modal for changes or errors
+                    modal_html = render_template('libraries/partials/library_content_sync_results_modal.html',
+                                               sync_result=normalized_result,
+                                               library_name=library.name)
+                    current_app.logger.debug(f"DEBUG: Template rendered successfully")
+                except Exception as e:
+                    current_app.logger.error(f"DEBUG: Error rendering template: {e}")
+                    current_app.logger.error(f"DEBUG: normalized_result data: {normalized_result}")
+                    raise
                 
-                if result.get('errors') and len(result.get('errors', [])) > 0:
-                    message = f"Library sync completed with {len(result.get('errors', []))} errors. See details."
-                    category = "warning"
-                else:
-                    message = f"Library sync complete. {added} added, {updated} updated, {removed} removed."
-                    category = "success"
+                try:
+                    if result.get('errors') and len(result.get('errors', [])) > 0:
+                        message = f"Library sync completed with {len(result.get('errors', []))} errors. See details."
+                        category = "warning"
+                    else:
+                        message = f"Library sync complete. {added} added, {updated} updated, {removed} removed."
+                        category = "success"
+                    current_app.logger.debug(f"DEBUG: Message created: {message}")
+                except Exception as e:
+                    current_app.logger.error(f"DEBUG: Error creating message: {e}")
+                    raise
                 
                 trigger_payload = {
                     "showToastEvent": {"message": message, "category": category},

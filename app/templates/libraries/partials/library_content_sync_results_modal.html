@@ -32,13 +32,13 @@
                     <p class="text-sm text-base-content/70 leading-relaxed">
                         {% if sync_result.get('total_items', 0) == 0 %}
                             No items were found in this library during synchronization.
-                        {% elif sync_result.get('added_items', 0) == 0 and sync_result.get('updated_items', 0) == 0 and sync_result.get('removed_items', 0) == 0 %}
+                        {% elif sync_result.get('added', 0) == 0 and sync_result.get('updated', 0) == 0 and sync_result.get('removed', 0) == 0 %}
                             Library content is synchronized and up to date. No changes were required for {{ sync_result.get('total_items', 0) }} items.
                         {% else %}
                             Library synchronization completed with 
-                            {% if sync_result.get('added_items', 0) > 0 %}<span class="text-success font-medium">{{ sync_result.get('added_items', 0) }} items added</span>{% endif %}{% if sync_result.get('added_items', 0) > 0 and (sync_result.get('updated_items', 0) > 0 or sync_result.get('removed_items', 0) > 0) %}, {% endif %}
-                            {% if sync_result.get('updated_items', 0) > 0 %}<span class="text-warning font-medium">{{ sync_result.get('updated_items', 0) }} items updated</span>{% endif %}{% if sync_result.get('updated_items', 0) > 0 and sync_result.get('removed_items', 0) > 0 %}, and {% endif %}
-                            {% if sync_result.get('removed_items', 0) > 0 %}<span class="text-error font-medium">{{ sync_result.get('removed_items', 0) }} items removed</span>{% endif %}
+                            {% if sync_result.get('added', 0) > 0 %}<span class="text-success font-medium">{{ sync_result.get('added', 0) }} items added</span>{% endif %}{% if sync_result.get('added', 0) > 0 and (sync_result.get('updated', 0) > 0 or sync_result.get('removed', 0) > 0) %}, {% endif %}
+                            {% if sync_result.get('updated', 0) > 0 %}<span class="text-warning font-medium">{{ sync_result.get('updated', 0) }} items updated</span>{% endif %}{% if sync_result.get('updated', 0) > 0 and sync_result.get('removed', 0) > 0 %}, and {% endif %}
+                            {% if sync_result.get('removed', 0) > 0 %}<span class="text-error font-medium">{{ sync_result.get('removed', 0) }} items removed</span>{% endif %}
                             out of {{ sync_result.get('total_items', 0) }} total items.
                         {% endif %}
                     </p>
@@ -54,15 +54,15 @@
             </div>
             <div class="stat bg-success/10 rounded-lg p-4 border border-success/20">
                 <div class="stat-title text-xs text-success/80">Added</div>
-                <div class="stat-value text-lg text-success">{{ sync_result.get('added_items', 0) }}</div>
+                <div class="stat-value text-lg text-success">{{ sync_result.get('added', 0) }}</div>
             </div>
             <div class="stat bg-warning/10 rounded-lg p-4 border border-warning/20">
                 <div class="stat-title text-xs text-warning/80">Updated</div>
-                <div class="stat-value text-lg text-warning">{{ sync_result.get('updated_items', 0) }}</div>
+                <div class="stat-value text-lg text-warning">{{ sync_result.get('updated', 0) }}</div>
             </div>
             <div class="stat bg-error/10 rounded-lg p-4 border border-error/20">
                 <div class="stat-title text-xs text-error/80">Removed</div>
-                <div class="stat-value text-lg text-error">{{ sync_result.get('removed_items', 0) }}</div>
+                <div class="stat-value text-lg text-error">{{ sync_result.get('removed', 0) }}</div>
             </div>
         </div>
 
