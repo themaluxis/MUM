@@ -58,19 +58,19 @@
             
             <!-- Sync Library Button -->
             <div class="flex items-center gap-2">
-                <button id="sync-library-btn" 
-                        class="btn btn-primary btn-sm"
-                        data-library-id="{{ library.id }}"
-                        title="Sync library content to database for faster loading">
-                    <i class="fa-solid fa-sync mr-2"></i>
-                    <span class="sync-btn-text">Sync Library</span>
-                </button>
                 <button id="purge-library-btn" 
                         class="btn btn-error btn-sm"
                         data-library-id="{{ library.id }}"
                         title="Delete all cached items for this library from database">
                     <i class="fa-solid fa-trash mr-2"></i>
                     <span class="purge-btn-text">Purge DB</span>
+                </button>
+                <button id="sync-library-btn" 
+                        class="btn btn-primary btn-sm"
+                        data-library-id="{{ library.id }}"
+                        title="Sync library content to database for faster loading">
+                    <i class="fa-solid fa-sync mr-2"></i>
+                    <span class="sync-btn-text">Sync Library</span>
                 </button>
                 <div class="text-xs text-base-content/50 hidden sm:block">
                     {% if library.last_scanned %}
@@ -87,7 +87,7 @@
         <!-- Media Grid -->
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
             {% for item in media_content.get('items', []) %}
-            <div class="group cursor-pointer">
+            <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=library.name, content_name=item.title) }}" class="group cursor-pointer block">
                 <!-- Poster Container -->
                 <div class="relative aspect-[2/3] bg-base-200 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                     {% if item.type in ['folder', 'directory'] or (item.type == 'collectionfolder') %}
@@ -175,7 +175,7 @@
                     </p>
                     {% endif %}
                 </div>
-            </div>
+            </a>
             {% endfor %}
         </div>
 

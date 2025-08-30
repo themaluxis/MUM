@@ -3922,6 +3922,9 @@
   .h-45 {
     height: calc(var(--spacing) * 45);
   }
+  .h-72 {
+    height: calc(var(--spacing) * 72);
+  }
   .h-\[unset\] {
     height: unset;
   }
@@ -4044,6 +4047,9 @@
   }
   .w-40 {
     width: calc(var(--spacing) * 40);
+  }
+  .w-48 {
+    width: calc(var(--spacing) * 48);
   }
   .w-52 {
     width: calc(var(--spacing) * 52);
@@ -6405,6 +6411,9 @@
   .text-yellow-400 {
     color: var(--color-yellow-400);
   }
+  .text-yellow-500 {
+    color: var(--color-yellow-500);
+  }
   .text-yellow-600 {
     color: var(--color-yellow-600);
   }
@@ -6591,6 +6600,12 @@
     --tw-ring-color: color-mix(in srgb, oklch(58% 0.20 29.4) 20%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       --tw-ring-color: color-mix(in oklab, var(--color-komga-600) 20%, transparent);
+    }
+  }
+  .ring-orange-600\/20 {
+    --tw-ring-color: color-mix(in srgb, oklch(64.6% 0.222 41.116) 20%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      --tw-ring-color: color-mix(in oklab, var(--color-orange-600) 20%, transparent);
     }
   }
   .ring-plex-600 {
@@ -7685,6 +7700,11 @@
       justify-content: space-between;
     }
   }
+  .lg\:justify-start {
+    @media (width >= 64rem) {
+      justify-content: flex-start;
+    }
+  }
   .lg\:pl-8 {
     @media (width >= 64rem) {
       padding-left: calc(var(--spacing) * 8);
@@ -7907,6 +7927,14 @@
       background-color: color-mix(in srgb, oklch(71% 0.18 29.4) 10%, transparent);
       @supports (color: color-mix(in lab, red, red)) {
         background-color: color-mix(in oklab, var(--color-komga-400) 10%, transparent);
+      }
+    }
+  }
+  .dark\:bg-orange-400\/10 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      background-color: color-mix(in srgb, oklch(75% 0.183 55.934) 10%, transparent);
+      @supports (color: color-mix(in lab, red, red)) {
+        background-color: color-mix(in oklab, var(--color-orange-400) 10%, transparent);
       }
     }
   }
@@ -8355,6 +8383,14 @@
       --tw-ring-color: color-mix(in srgb, oklch(64.9% 0.22 29.4) 20%, transparent);
       @supports (color: color-mix(in lab, red, red)) {
         --tw-ring-color: color-mix(in oklab, var(--color-komga-500) 20%, transparent);
+      }
+    }
+  }
+  .dark\:ring-orange-500\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      --tw-ring-color: color-mix(in srgb, oklch(70.5% 0.213 47.604) 20%, transparent);
+      @supports (color: color-mix(in lab, red, red)) {
+        --tw-ring-color: color-mix(in oklab, var(--color-orange-500) 20%, transparent);
       }
     }
   }

@@ -358,6 +358,109 @@ def get_library_raw_data(server_id, library_id):
         current_app.logger.error(f"Error fetching raw library data: {e}")
         return {'error': str(e)}, 500
 
+@bp.route('/library/<server_nickname>/<library_name>/<content_name>')
+@login_required
+@setup_required
+@permission_required('view_libraries')
+def media_detail(server_nickname, library_name, content_name):
+    """Display detailed media information"""
+    # URL decode the parameters to handle special characters
+    try:
+        server_nickname = urllib.parse.unquote(server_nickname)
+        library_name = urllib.parse.unquote(library_name)
+        content_name = urllib.parse.unquote(content_name)
+    except Exception as e:
+        current_app.logger.warning(f"Error decoding URL parameters: {e}")
+        abort(400)
+    
+    # Validate parameters
+    if not server_nickname or not library_name or not content_name:
+        abort(400)
+    
+    # Find the server by nickname
+    server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
+    
+    # Find the library by name and server
+    library = MediaLibrary.query.filter_by(
+        server_id=server.id,
+        name=library_name
+    ).first_or_404()
+    
+    # Get the active tab from the URL query, default to 'overview'
+    tab = request.args.get('tab', 'overview')
+    
+    # Get media details from the service
+    media_details = get_media_details(server, library, content_name)
+    if not media_details:
+        abort(404)
+    
+    # Get streaming history for this specific content
+    streaming_history = None
+    if tab == 'activity':
+        page = request.args.get('page', 1, type=int)
+        days_filter = int(request.args.get('days', 30))
+        
+        # Calculate date range
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days_filter)
+        
+        # Get streaming history for this specific content
+        activity_query = MediaStreamHistory.query.filter(
+            MediaStreamHistory.server_id == server.id,
+            MediaStreamHistory.library_name == library_name,
+            MediaStreamHistory.media_title == content_name,
+            MediaStreamHistory.started_at >= start_date,
+            MediaStreamHistory.started_at <= end_date
+        ).order_by(MediaStreamHistory.started_at.desc())
+        
+        # Paginate the results
+        activity_pagination = activity_query.paginate(
+            page=page, per_page=20, error_out=False
+        )
+        
+        # Enhance activity entries with user info
+        for entry in activity_pagination.items:
+            if entry.user_media_access_uuid:
+                user_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
+                if user_access:
+                    entry.user_display_name = user_access.get_display_name()
+                    entry.user_type = 'service'
+                else:
+                    entry.user_display_name = 'Unknown User'
+                    entry.user_type = 'unknown'
+            elif entry.user_app_access_uuid:
+                from app.models import UserAppAccess
+                user_app = UserAppAccess.query.filter_by(uuid=entry.user_app_access_uuid).first()
+                if user_app:
+                    entry.user_display_name = user_app.get_display_name()
+                    entry.user_type = 'local'
+                else:
+                    entry.user_display_name = 'Unknown User'
+                    entry.user_type = 'unknown'
+            else:
+                entry.user_display_name = 'Unknown User'
+                entry.user_type = 'unknown'
+        
+        streaming_history = activity_pagination
+    
+    # Handle HTMX requests for tab content
+    if request.headers.get('HX-Request') and tab == 'activity':
+        return render_template('libraries/partials/media_activity_tab.html',
+                             media_details=media_details,
+                             library=library,
+                             server=server,
+                             streaming_history=streaming_history,
+                             days_filter=request.args.get('days', 30))
+    
+    return render_template('libraries/media_detail.html',
+                         title=f"Media: {content_name}",
+                         media_details=media_details,
+                         library=library,
+                         server=server,
+                         streaming_history=streaming_history,
+                         active_tab=tab,
+                         days_filter=request.args.get('days', 30) if tab == 'activity' else None)
+
 @bp.route('/library/<server_nickname>/<library_name>')
 @login_required
 @setup_required
@@ -852,6 +955,74 @@ def get_library_user_stats(library, days=30):
     except Exception as e:
         current_app.logger.error(f"Error getting library user stats: {e}")
         return []
+
+def get_media_details(server, library, content_name):
+    """Get detailed information about a specific media item"""
+    try:
+        from app.services.media_service_factory import MediaServiceFactory
+        from app.models_media_services import MediaItem
+        
+        # First try to get from cached database
+        media_item = MediaItem.query.filter_by(
+            library_id=library.id,
+            title=content_name
+        ).first()
+        
+        if media_item:
+            # Convert database item to dict format
+            return {
+                'id': media_item.external_id,
+                'title': media_item.title,
+                'sort_title': media_item.sort_title,
+                'type': media_item.item_type,
+                'summary': media_item.summary,
+                'year': media_item.year,
+                'rating': media_item.rating,
+                'duration': media_item.duration,
+                'thumb': media_item.thumb_path,
+                'added_at': media_item.added_at,
+                'last_synced': media_item.last_synced,
+                'raw_data': media_item.extra_metadata or {}
+            }
+        
+        # If not in cache, try to get from service API
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service or not hasattr(service, 'get_library_content'):
+            return None
+        
+        # Search for the content in the library
+        try:
+            content_data = service.get_library_content(library.external_id, page=1, per_page=100)
+            items = content_data.get('items', [])
+            
+            # Find the specific content by title
+            for item in items:
+                if item.get('title') == content_name:
+                    return item
+            
+            # If not found in first page, search more pages
+            page = 2
+            while page <= 10:  # Limit search to 10 pages
+                content_data = service.get_library_content(library.external_id, page=page, per_page=100)
+                items = content_data.get('items', [])
+                
+                if not items:
+                    break
+                    
+                for item in items:
+                    if item.get('title') == content_name:
+                        return item
+                        
+                page += 1
+                
+        except Exception as e:
+            current_app.logger.error(f"Error searching for media content: {e}")
+        
+        return None
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting media details: {e}")
+        return None
 
 def get_library_media_content(library, page=1, per_page=24, search_query=''):
     """Get media content from the library using cached data or live API"""
