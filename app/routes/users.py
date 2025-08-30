@@ -2071,7 +2071,7 @@ def link_service_user():
         current_app.logger.error(f"Error linking service user: {e}")
         return {'success': False, 'message': str(e)}, 500
 
-@bp.route('/link-service-users-api', methods=['GET'])
+@bp.route('/link-service-users-api', methods=['POST'])
 @login_required
 @permission_required('edit_user')
 def link_service_users():
@@ -2080,10 +2080,10 @@ def link_service_users():
     
     try:
         # Debug logging
-        current_app.logger.debug(f"link_service_users: Request args: {request.args}")
+        current_app.logger.debug(f"link_service_users: Request form: {request.form}")
         
-        local_user_uuid = request.args.get('local_user_id')
-        service_user_ids_str = request.args.get('service_user_ids', '')
+        local_user_uuid = request.form.get('local_user_id')
+        service_user_ids_str = request.form.get('service_user_ids', '')
         service_user_ids = service_user_ids_str.split(',') if service_user_ids_str else []
         
         current_app.logger.debug(f"link_service_users: local_user_uuid={local_user_uuid}, service_user_ids={service_user_ids}")

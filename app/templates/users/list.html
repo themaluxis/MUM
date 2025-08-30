@@ -1667,13 +1667,19 @@ function linkSelectedUsers() {
     linkButton.disabled = true;
     linkButton.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Linking...';
     
-    const params = new URLSearchParams({
-        local_user_id: currentLocalUserId,
-        service_user_ids: selectedLinkUserIds.join(',')
-    });
+    const formData = new FormData();
+    formData.append('local_user_id', currentLocalUserId);
+    formData.append('service_user_ids', selectedLinkUserIds.join(','));
     
-    fetch(`/users/link-service-users-api?${params}`, {
-        method: 'GET'
+    // Add CSRF token
+    const csrfToken = document.querySelector('meta[name=csrf-token]');
+    if (csrfToken) {
+        formData.append('csrf_token', csrfToken.getAttribute('content'));
+    }
+    
+    fetch('/users/link-service-users-api', {
+        method: 'POST',
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
