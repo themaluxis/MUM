@@ -275,6 +275,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         title: function(context) {
                             return context[0].label;
                         },
+                        labelColor: function(context) {
+                            return {
+                                borderColor: context.dataset.borderColor,
+                                backgroundColor: context.dataset.borderColor
+                            };
+                        },
                         label: function(context) {
                             if (context.dataset.label === 'Total Plays') {
                                 return `${context.dataset.label}: ${context.parsed.y}`;
