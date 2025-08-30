@@ -185,7 +185,7 @@
                                     {% if library.last_scanned %}
                                     <div class="flex justify-between">
                                         <span class="text-base-content/60">Last Scanned:</span>
-                                        <span class="font-medium">{{ library.last_scanned.strftime('%Y-%m-%d %H:%M') }}</span>
+                                        <span class="font-medium">{{ format_datetime_with_user_timezone(library.last_scanned, '%Y-%m-%d %H:%M') }}</span>
                                     </div>
                                     {% endif %}
                                 </div>
@@ -276,8 +276,12 @@ document.addEventListener('DOMContentLoaded', function() {
 // Handle refresh library page event
 document.body.addEventListener('refreshLibraryPage', function() {
     const modal = document.getElementById('library_content_sync_results_modal');
-    if (modal) {
+    if (modal && modal.open) {
+        // Modal is open, set flag to refresh when it closes
         modal.dataset.shouldRefresh = 'true';
+    } else {
+        // No modal or modal is closed, refresh immediately
+        window.location.reload();
     }
 });
 </script>
