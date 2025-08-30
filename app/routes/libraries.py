@@ -610,6 +610,8 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                 if user_access:
                     entry.user_display_name = user_access.get_display_name()
                     entry.user_type = 'service'
+                    entry.user_server_nickname = user_access.server.server_nickname if user_access.server else None
+                    entry.user_external_username = user_access.external_username
                     
                     # Get avatar URL for Plex users
                     entry.user_avatar_url = None
@@ -651,14 +653,20 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                     entry.user_display_name = user_app.get_display_name()
                     entry.user_type = 'local'
                     entry.user_avatar_url = None  # Local users don't have service avatars
+                    entry.user_server_nickname = None
+                    entry.user_external_username = None
                 else:
                     entry.user_display_name = 'Unknown User'
                     entry.user_type = 'unknown'
                     entry.user_avatar_url = None
+                    entry.user_server_nickname = None
+                    entry.user_external_username = None
             else:
                 entry.user_display_name = 'Unknown User'
                 entry.user_type = 'unknown'
                 entry.user_avatar_url = None
+                entry.user_server_nickname = None
+                entry.user_external_username = None
         
         streaming_history = activity_pagination
     
@@ -1383,11 +1391,18 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
         if episodes_data and episodes_data.get('items'):
             from app.models_media_services import MediaStreamHistory
             for episode in episodes_data['items']:
+                # Filter by both episode title AND show title to avoid conflicts with episodes from other shows
                 stream_count = MediaStreamHistory.query.filter(
                     MediaStreamHistory.server_id == server.id,
-                    MediaStreamHistory.media_title == episode.get('title', '')
+                    MediaStreamHistory.library_name == library.name,
+                    MediaStreamHistory.media_title == episode.get('title', ''),
+                    MediaStreamHistory.grandparent_title == show_title
                 ).count()
                 episode['stream_count'] = stream_count
+                
+                # Debug logging
+                if stream_count > 0:
+                    current_app.logger.info(f"DEBUG: Episode '{episode.get('title')}' has {stream_count} streams")
         
         # Apply sorting if needed (some services might not support server-side sorting)
         if episodes_data and episodes_data.get('items') and sort_by != 'title_asc':

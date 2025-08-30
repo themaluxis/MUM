@@ -36,6 +36,7 @@
                     <thead class="bg-base-300">
                         <tr>
                             <th class="text-left">User</th>
+                            <th class="text-left">Episode</th>
                             <th class="text-left">Started</th>
                             <th class="text-left">Duration</th>
                             <th class="text-left">Progress</th>
@@ -77,8 +78,24 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <div class="font-medium text-sm">{{ activity.user_display_name }}</div>
+                                        <div class="font-medium text-sm">
+                                            {% if activity.user_server_nickname and activity.user_external_username %}
+                                                <a href="{{ url_for('user.view_service_account', server_nickname=activity.user_server_nickname, server_username=activity.user_external_username, back='users', back_view='cards') }}" class="text-primary hover:text-primary-focus" title="View user profile">
+                                                    {{ activity.user_display_name }}
+                                                </a>
+                                            {% else %}
+                                                {{ activity.user_display_name }}
+                                            {% endif %}
+                                        </div>
                                     </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="text-sm">
+                                    <div class="font-medium">{{ activity.media_title or 'Unknown Episode' }}</div>
+                                    {% if activity.parent_title %}
+                                        <div class="text-xs text-base-content/60">{{ activity.parent_title }}</div>
+                                    {% endif %}
                                 </div>
                             </td>
                             <td>
