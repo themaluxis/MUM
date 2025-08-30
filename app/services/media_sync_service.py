@@ -372,8 +372,20 @@ class MediaSyncService:
             # Apply pagination
             items = query.offset((page - 1) * per_page).limit(per_page).all()
             
-            # Convert to dict format
-            items_data = [item.to_dict() for item in items]
+            # Convert to dict format and add stream counts
+            items_data = []
+            for item in items:
+                item_dict = item.to_dict()
+                
+                # Get stream count for this item
+                from app.models_media_services import MediaStreamHistory
+                stream_count = MediaStreamHistory.query.filter(
+                    MediaStreamHistory.server_id == item.server_id,
+                    MediaStreamHistory.media_title == item.title
+                ).count()
+                
+                item_dict['stream_count'] = stream_count
+                items_data.append(item_dict)
             
             # Calculate pagination info
             total_pages = (total + per_page - 1) // per_page
