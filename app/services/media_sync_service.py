@@ -296,7 +296,7 @@ class MediaSyncService:
     
     @staticmethod
     def get_cached_library_content(library_id: int, page: int = 1, per_page: int = 24, 
-                                 search_query: str = '') -> Dict[str, Any]:
+                                 search_query: str = '', sort_by: str = 'title_asc') -> Dict[str, Any]:
         """
         Get library content from cached database
         
@@ -305,6 +305,7 @@ class MediaSyncService:
             page: Page number
             per_page: Items per page
             search_query: Search query string
+            sort_by: Sort criteria ('title_asc', 'title_desc', 'year_asc', 'year_desc', 'added_at_asc', 'added_at_desc', 'rating_asc', 'rating_desc', 'total_streams_asc', 'total_streams_desc')
             
         Returns:
             Dict with paginated results
@@ -323,8 +324,47 @@ class MediaSyncService:
                     )
                 )
             
-            # Order by title
-            query = query.order_by(MediaItem.sort_title.asc())
+            # Apply sorting
+            if sort_by.startswith('total_streams'):
+                # Join with MediaStreamHistory to get stream counts
+                from app.models_media_services import MediaStreamHistory
+                query = query.outerjoin(
+                    MediaStreamHistory,
+                    and_(
+                        MediaStreamHistory.server_id == MediaItem.server_id,
+                        MediaStreamHistory.media_title == MediaItem.title
+                    )
+                ).group_by(MediaItem.id)
+                
+                if sort_by == 'total_streams_desc':
+                    query = query.order_by(
+                        db.func.count(MediaStreamHistory.id).desc(),
+                        MediaItem.sort_title.asc()  # Secondary sort by title
+                    )
+                else:  # total_streams_asc
+                    query = query.order_by(
+                        db.func.count(MediaStreamHistory.id).asc(),
+                        MediaItem.sort_title.asc()  # Secondary sort by title
+                    )
+            elif sort_by.startswith('year'):
+                if sort_by == 'year_desc':
+                    query = query.order_by(MediaItem.year.desc().nullslast(), MediaItem.sort_title.asc())
+                else:  # year_asc
+                    query = query.order_by(MediaItem.year.asc().nullsfirst(), MediaItem.sort_title.asc())
+            elif sort_by.startswith('added_at'):
+                if sort_by == 'added_at_desc':
+                    query = query.order_by(MediaItem.added_at.desc().nullslast(), MediaItem.sort_title.asc())
+                else:  # added_at_asc
+                    query = query.order_by(MediaItem.added_at.asc().nullsfirst(), MediaItem.sort_title.asc())
+            elif sort_by.startswith('rating'):
+                if sort_by == 'rating_desc':
+                    query = query.order_by(MediaItem.rating.desc().nullslast(), MediaItem.sort_title.asc())
+                else:  # rating_asc
+                    query = query.order_by(MediaItem.rating.asc().nullsfirst(), MediaItem.sort_title.asc())
+            elif sort_by == 'title_desc':
+                query = query.order_by(MediaItem.sort_title.desc())
+            else:  # Default to title_asc
+                query = query.order_by(MediaItem.sort_title.asc())
             
             # Get total count
             total = query.count()

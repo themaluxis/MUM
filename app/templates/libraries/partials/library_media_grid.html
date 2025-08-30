@@ -45,6 +45,23 @@
                 </div>
             </div>
             
+            <!-- Sort By Dropdown -->
+            <div class="flex items-center gap-2">
+                <label for="sort-by" class="text-sm text-base-content/60 whitespace-nowrap">Sort by:</label>
+                <select id="sort-by" class="select select-bordered select-sm w-64">
+                    <option value="title_asc" {{ 'selected' if request.args.get('sort_by', 'title_asc') == 'title_asc' else '' }}>Title (A to Z)</option>
+                    <option value="title_desc" {{ 'selected' if request.args.get('sort_by') == 'title_desc' else '' }}>Title (Z to A)</option>
+                    <option value="year_desc" {{ 'selected' if request.args.get('sort_by') == 'year_desc' else '' }}>Year (Newest First)</option>
+                    <option value="year_asc" {{ 'selected' if request.args.get('sort_by') == 'year_asc' else '' }}>Year (Oldest First)</option>
+                    <option value="added_at_desc" {{ 'selected' if request.args.get('sort_by') == 'added_at_desc' else '' }}>Date Added (Newest First)</option>
+                    <option value="added_at_asc" {{ 'selected' if request.args.get('sort_by') == 'added_at_asc' else '' }}>Date Added (Oldest First)</option>
+                    <option value="rating_desc" {{ 'selected' if request.args.get('sort_by') == 'rating_desc' else '' }}>Rating (Highest First)</option>
+                    <option value="rating_asc" {{ 'selected' if request.args.get('sort_by') == 'rating_asc' else '' }}>Rating (Lowest First)</option>
+                    <option value="total_streams_desc" {{ 'selected' if request.args.get('sort_by') == 'total_streams_desc' else '' }}>Total Streams (Most Popular)</option>
+                    <option value="total_streams_asc" {{ 'selected' if request.args.get('sort_by') == 'total_streams_asc' else '' }}>Total Streams (Least Popular)</option>
+                </select>
+            </div>
+            
             <!-- Items Per Page Dropdown -->
             <div class="flex items-center gap-2">
                 <label for="items-per-page" class="text-sm text-base-content/60 whitespace-nowrap">Items per page:</label>
@@ -184,7 +201,7 @@
         <div class="flex justify-center mt-8">
             <div class="join">
                 {% if media_content.has_prev %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.page-1) }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.page-1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">
                         <i class="fa-solid fa-chevron-left"></i>
                     </a>
@@ -194,7 +211,7 @@
                 {% set end_page = [media_content.pages, media_content.page + 2] | min %}
                 
                 {% if start_page > 1 %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=1) }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">1</a>
                     {% if start_page > 2 %}
                         <button class="join-item btn btn-sm btn-disabled">...</button>
@@ -205,7 +222,7 @@
                     {% if page_num == media_content.page %}
                         <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
                     {% else %}
-                        <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=page_num) }}" 
+                        <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=page_num, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                            class="join-item btn btn-sm">{{ page_num }}</a>
                     {% endif %}
                 {% endfor %}
@@ -214,12 +231,12 @@
                     {% if end_page < media_content.pages - 1 %}
                         <button class="join-item btn btn-sm btn-disabled">...</button>
                     {% endif %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.pages) }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.pages, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">{{ media_content.pages }}</a>
                 {% endif %}
                 
                 {% if media_content.has_next %}
-                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.page+1) }}" 
+                    <a href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='media', page=media_content.page+1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">
                         <i class="fa-solid fa-chevron-right"></i>
                     </a>
@@ -299,6 +316,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('library-search');
     const itemsPerPageSelect = document.getElementById('items-per-page');
+    const sortBySelect = document.getElementById('sort-by');
     const clearSearchBtn = document.getElementById('clear-search');
     const syncLibraryBtn = document.getElementById('sync-library-btn');
     const purgeLibraryBtn = document.getElementById('purge-library-btn');
@@ -310,6 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const currentUrl = new URL(window.location);
         const searchValue = searchInput.value.trim();
         const itemsPerPage = itemsPerPageSelect.value;
+        const sortBy = sortBySelect.value;
         
         // Update URL parameters
         if (searchValue) {
@@ -319,6 +338,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         currentUrl.searchParams.set('per_page', itemsPerPage);
+        currentUrl.searchParams.set('sort_by', sortBy);
         currentUrl.searchParams.set('page', '1'); // Reset to first page
         
         // Navigate to updated URL
@@ -344,6 +364,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Items per page change handler
     if (itemsPerPageSelect) {
         itemsPerPageSelect.addEventListener('change', updateLibraryView);
+    }
+    
+    // Sort by change handler
+    if (sortBySelect) {
+        sortBySelect.addEventListener('change', updateLibraryView);
     }
     
     // Clear search button handler

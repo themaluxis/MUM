@@ -599,12 +599,22 @@ def library_detail(server_nickname, library_name):
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 24, type=int)
         search_query = request.args.get('search', '').strip()
+        sort_by = request.args.get('sort_by', 'title').strip()
         
         # Validate per_page parameter
         if per_page not in [12, 24, 48, 96]:
             per_page = 24
             
-        media_content = get_library_media_content(library, page, per_page, search_query)
+        # Validate sort_by parameter
+        valid_sorts = [
+            'title_asc', 'title_desc', 'year_asc', 'year_desc', 
+            'added_at_asc', 'added_at_desc', 'rating_asc', 'rating_desc',
+            'total_streams_asc', 'total_streams_desc'
+        ]
+        if sort_by not in valid_sorts:
+            sort_by = 'title_asc'
+            
+        media_content = get_library_media_content(library, page, per_page, search_query, sort_by)
     
     # Get recent activity for this library
     recent_activity = []
@@ -673,7 +683,8 @@ def library_detail(server_nickname, library_name):
                          media_content=media_content,
                          active_tab=tab,
                          selected_days=request.args.get('days', 30) if tab == 'stats' else None,
-                         days_filter=request.args.get('days', 30) if tab == 'activity' else None)
+                         days_filter=request.args.get('days', 30) if tab == 'activity' else None,
+                         current_sort_by=request.args.get('sort_by', 'title_asc') if tab == 'media' else None)
 
 def get_library_statistics(library):
     """Get statistics for a library"""
@@ -1152,7 +1163,7 @@ def get_media_details(server, library, content_name):
         current_app.logger.error(f"Error getting media details: {e}")
         return None
 
-def get_library_media_content(library, page=1, per_page=24, search_query=''):
+def get_library_media_content(library, page=1, per_page=24, search_query='', sort_by='title_asc'):
     """Get media content from the library using cached data or live API"""
     try:
         from app.services.media_sync_service import MediaSyncService
@@ -1160,10 +1171,10 @@ def get_library_media_content(library, page=1, per_page=24, search_query=''):
         # Check if we have cached data that's recent enough
         if MediaSyncService.is_library_synced(library.id, max_age_hours=24):
             current_app.logger.debug(f"Using cached data for library {library.name}")
-            return MediaSyncService.get_cached_library_content(library.id, page, per_page, search_query)
+            return MediaSyncService.get_cached_library_content(library.id, page, per_page, search_query, sort_by)
         
         # Check if we have any cached data at all (regardless of age)
-        cached_content = MediaSyncService.get_cached_library_content(library.id, page, per_page, search_query)
+        cached_content = MediaSyncService.get_cached_library_content(library.id, page, per_page, search_query, sort_by)
         if cached_content and cached_content.get('items'):
             current_app.logger.debug(f"Using older cached data for library {library.name}")
             return cached_content
