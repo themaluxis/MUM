@@ -6,7 +6,10 @@
             Choose how timestamps are displayed throughout the application.
         </p>
         <form method="POST" action="{{ url_for('settings.account') }}" id="timezoneForm">
-            {{ timezone_form.hidden_tag() }}
+            {{ timezone_form.csrf_token(id="csrf_token_timezone") }}
+            {% for field in timezone_form if field.type == 'HiddenField' and field.name != 'csrf_token' %}
+                {{ field(id=field.name + "_timezone") }}
+            {% endfor %}
             
             <div class="form-control w-full max-w-xs">
                 {{ timezone_form.timezone_preference.label(class="label") }}

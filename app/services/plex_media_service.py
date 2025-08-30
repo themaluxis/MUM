@@ -273,14 +273,62 @@ class PlexMediaService(BaseMediaService):
         admin_account = self._get_admin_account()
         if not admin_account: return set()
         owner_ids_sharing_with_admin = set()
+        
         try:
-            for resource in admin_account.resources():
+            # Method 1: Check admin's resources for servers shared with admin
+            resources = admin_account.resources()
+            self.log_info(f"DEBUG: Found {len(resources)} total resources from admin account")
+            
+            for resource in resources:
+                product = getattr(resource, 'product', 'Unknown')
+                owned = getattr(resource, 'owned', True)
+                name = getattr(resource, 'name', 'Unknown')
+                owner_id = getattr(resource, 'ownerId', None)
+                
+                self.log_info(f"DEBUG: Resource '{name}' - Product: {product}, Owned: {owned}, OwnerID: {owner_id}")
+                
                 if resource.product == "Plex Media Server" and getattr(resource, 'owned', True) is False:
                     owner_id_str = getattr(resource, 'ownerId', None)
                     if owner_id_str:
-                        try: owner_ids_sharing_with_admin.add(int(owner_id_str))
-                        except ValueError: self.log_warning(f"Invalid ownerId '{owner_id_str}' for resource '{resource.name}'.")
-            self.log_info(f"Found {len(owner_ids_sharing_with_admin)} users sharing their servers with admin.")
+                        try: 
+                            owner_ids_sharing_with_admin.add(int(owner_id_str))
+                            self.log_info(f"DEBUG: Added sharing user ID from resources: {owner_id_str}")
+                        except ValueError: 
+                            self.log_warning(f"Invalid ownerId '{owner_id_str}' for resource '{resource.name}'.")
+            
+            # Method 2: Also check each user's server list for servers they own but share with admin
+            # This is a backup method in case the resources() method doesn't show all shared servers
+            try:
+                all_users = admin_account.users()
+                self.log_info(f"DEBUG: Checking {len(all_users)} users for servers they own and share")
+                
+                for user in all_users:
+                    user_id = getattr(user, 'id', None)
+                    if not user_id:
+                        continue
+                        
+                    user_servers = getattr(user, 'servers', [])
+                    for server in user_servers:
+                        server_name = getattr(server, 'name', 'Unknown')
+                        server_owned = getattr(server, 'owned', True)
+                        
+                        # If user has a server they own (owned=True in their list), 
+                        # it means they own it and are potentially sharing it
+                        # We need to cross-reference with admin's resources to confirm sharing
+                        if server_owned:
+                            self.log_info(f"DEBUG: User {user_id} owns server '{server_name}' - checking if shared with admin")
+                            # This user owns a server, check if it appears in admin's resources as not owned
+                            for resource in resources:
+                                if (getattr(resource, 'name', '') == server_name and 
+                                    getattr(resource, 'owned', True) is False):
+                                    owner_ids_sharing_with_admin.add(user_id)
+                                    self.log_info(f"DEBUG: Confirmed user {user_id} shares server '{server_name}' with admin")
+                                    break
+                                    
+            except Exception as e_users:
+                self.log_warning(f"DEBUG: Error in user-based sharing detection: {e_users}")
+            
+            self.log_info(f"Found {len(owner_ids_sharing_with_admin)} users sharing their servers with admin: {list(owner_ids_sharing_with_admin)}")
         except Exception as e:
             self.log_error(f"Error fetching resources shared with admin: {e}")
         return owner_ids_sharing_with_admin

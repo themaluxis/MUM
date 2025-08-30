@@ -186,6 +186,10 @@ class UserMediaAccess(db.Model):
     is_discord_bot_whitelisted = db.Column(db.Boolean, default=False, nullable=False)  # Per-service bot whitelist
     is_purge_whitelisted = db.Column(db.Boolean, default=False, nullable=False)  # Per-service purge whitelist
     
+    # Service-specific user status (primarily for Plex)
+    is_home_user = db.Column(db.Boolean, default=False, nullable=False)  # Plex Home User status
+    shares_back = db.Column(db.Boolean, default=False, nullable=False)  # User shares libraries back to admin
+    
     # Service-specific Discord linking (can be different per service)
     discord_user_id = db.Column(db.String(255), nullable=True)  # Service-specific Discord linking
     discord_username = db.Column(db.String(255), nullable=True)  # Service-specific Discord username

@@ -9,7 +9,10 @@
         <p class="text-sm mb-4">Your account is currently "Plex SSO Only". Set a local username and password here to use as a fallback login method.</p>
         
         <form method="POST" action="{{ url_for('settings.account') }}">
-            {{ set_password_form.hidden_tag() }}
+            {{ set_password_form.csrf_token(id="csrf_token_set_password") }}
+            {% for field in set_password_form if field.type == 'HiddenField' and field.name != 'csrf_token' %}
+                {{ field(id=field.name + "_set_password") }}
+            {% endfor %}
             <div class="space-y-4 max-w-md">
                 <div class="form-control">
                     {{ set_password_form.username.label(class="label block") }}
@@ -41,7 +44,10 @@
     <div class="card-body">
         <h3 class="card-title"><i class="fa-solid fa-lock mr-2"></i> Change Password</h3>
         <form method="POST" action="{{ url_for('settings.account') }}">
-            {{ change_password_form.hidden_tag() }}
+            {{ change_password_form.csrf_token(id="csrf_token_change_password") }}
+            {% for field in change_password_form if field.type == 'HiddenField' and field.name != 'csrf_token' %}
+                {{ field(id=field.name + "_change_password") }}
+            {% endfor %}
             <div class="space-y-4 max-w-md">
                  <div class="form-control">
                     {{ change_password_form.current_password.label(class="label block") }}

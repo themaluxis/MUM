@@ -226,6 +226,9 @@ class MediaServiceManager:
                             access.user_raw_data = user_data.get('raw_data') or {}
                             access.is_active = True
                             access.updated_at = datetime.utcnow()
+                            # Update the missing status fields
+                            access.is_home_user = user_data.get('is_home_user', False)
+                            access.shares_back = user_data.get('shares_back', False)
                             
                             # Set service-specific fields
                             if server.service_type == ServiceType.PLEX:
@@ -270,7 +273,10 @@ class MediaServiceManager:
                         external_email=user_data.get('email'),
                         allowed_library_ids=user_data.get('library_ids', []),
                         user_raw_data=user_raw_data,  # Store raw data here instead of UserAppAccess
-                        is_active=True
+                        is_active=True,
+                        # Add the missing status fields
+                        is_home_user=user_data.get('is_home_user', False),
+                        shares_back=user_data.get('shares_back', False)
                     )
                     
                     # Set service-specific fields
@@ -362,6 +368,19 @@ class MediaServiceManager:
                             changes.append(f"Lost access to: {', '.join(removed_names)}")
 
                         access.allowed_library_ids = user_data.get('library_ids', [])
+                    
+                    # Check for changes in status fields (is_home_user, shares_back)
+                    if access.is_home_user != user_data.get('is_home_user', False):
+                        old_value = access.is_home_user
+                        new_value = user_data.get('is_home_user', False)
+                        changes.append(f"Home User status changed from {old_value} to {new_value}")
+                        access.is_home_user = new_value
+                    
+                    if access.shares_back != user_data.get('shares_back', False):
+                        old_value = access.shares_back
+                        new_value = user_data.get('shares_back', False)
+                        changes.append(f"Shares Back status changed from {old_value} to {new_value}")
+                        access.shares_back = new_value
                     
                     if changes:
                         updated_count += 1

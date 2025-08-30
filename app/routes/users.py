@@ -251,6 +251,11 @@ def list_users():
                     self._is_standalone = True  # Flag to identify standalone users
                     self._access_record = access  # Store the original access record
                     
+                    # Add the missing status fields for badge display
+                    self.is_home_user = access.is_home_user
+                    self.shares_back = access.shares_back
+                    self.is_purge_whitelisted = access.is_purge_whitelisted
+                    
                     # Process avatar URL using the same logic as library stats
                     self.avatar_url = self._get_avatar_url(access)
                     

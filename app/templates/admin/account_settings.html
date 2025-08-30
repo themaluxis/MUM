@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Detected timezone:', userTimezone);
         
         // Find the local_timezone hidden field and populate it
-        const timezoneField = document.getElementById('local_timezone');
+        const timezoneField = document.getElementById('local_timezone_timezone');
         if (timezoneField) {
             timezoneField.value = userTimezone;
             console.log('Set local_timezone field to:', userTimezone);
