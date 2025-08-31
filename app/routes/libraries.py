@@ -1586,26 +1586,13 @@ def get_media_api_output(server_nickname, library_name, media_id):
                 if not plex_server:
                     return {'error': 'Could not connect to Plex server'}, 500
                 
-                # Determine what ID to use for fetchItem based on external_id_type
+                # Use the dedicated rating_key column for direct API access
                 try:
-                    external_id_type = None
-                    rating_key = None
-                    
-                    if media_item.extra_metadata:
-                        external_id_type = media_item.extra_metadata.get('external_id_type')
-                        rating_key = media_item.extra_metadata.get('ratingKey')
-                    
-                    # For movies with media_id, use ratingKey; for shows, external_id is already ratingKey
-                    if external_id_type == 'media_id' and rating_key:
-                        fetch_id = int(rating_key)
-                    elif external_id_type == 'ratingKey':
-                        fetch_id = int(media_item.external_id)
+                    # Use rating_key column if available, otherwise fall back to external_id
+                    if media_item.rating_key:
+                        fetch_id = int(media_item.rating_key)
                     else:
-                        # Fallback: try ratingKey from metadata, then external_id
-                        if rating_key:
-                            fetch_id = int(rating_key)
-                        else:
-                            fetch_id = int(media_item.external_id)
+                        fetch_id = int(media_item.external_id)
                     
                     plex_item = plex_server.fetchItem(fetch_id)
                     
@@ -1728,20 +1715,11 @@ def get_episode_api_output(server_nickname, library_name, media_id, tv_show_slug
                 if not plex_server:
                     return {'error': 'Could not connect to Plex server'}, 500
                 
-                # Get the show first - for shows, external_id should be ratingKey
+                # Use the dedicated rating_key column for direct API access
                 try:
-                    external_id_type = None
-                    rating_key = None
-                    
-                    if tv_show_item.extra_metadata:
-                        external_id_type = tv_show_item.extra_metadata.get('external_id_type')
-                        rating_key = tv_show_item.extra_metadata.get('ratingKey')
-                    
-                    # For shows, external_id should be ratingKey, but fallback to metadata if needed
-                    if external_id_type == 'ratingKey':
-                        fetch_id = int(tv_show_item.external_id)
-                    elif rating_key:
-                        fetch_id = int(rating_key)
+                    # Use rating_key column if available, otherwise fall back to external_id
+                    if tv_show_item.rating_key:
+                        fetch_id = int(tv_show_item.rating_key)
                     else:
                         fetch_id = int(tv_show_item.external_id)
                     

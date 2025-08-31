@@ -287,6 +287,7 @@ class MediaItem(db.Model):
     # External identifiers
     external_id = db.Column(db.String(255), nullable=False)  # ID from the media service
     parent_id = db.Column(db.String(255))  # Parent folder/collection ID
+    rating_key = db.Column(db.String(255), nullable=True)  # Plex ratingKey for direct API access
     
     # Basic metadata
     title = db.Column(db.String(500), nullable=False)
@@ -323,6 +324,7 @@ class MediaItem(db.Model):
     __table_args__ = (
         db.Index('idx_media_items_library_type', 'library_id', 'item_type'),
         db.Index('idx_media_items_external_id', 'external_id'),
+        db.Index('idx_media_items_rating_key', 'rating_key'),
         db.Index('idx_media_items_title', 'title'),
         db.Index('idx_media_items_year', 'year'),
         db.Index('idx_media_items_added_at', 'added_at'),

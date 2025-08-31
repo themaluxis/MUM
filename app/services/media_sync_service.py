@@ -240,10 +240,17 @@ class MediaSyncService:
                 except (ValueError, TypeError):
                     pass
             
+            # Extract rating_key for Plex items
+            rating_key = None
+            raw_data = item_data.get('raw_data', {})
+            if raw_data and isinstance(raw_data, dict):
+                rating_key = raw_data.get('ratingKey')
+            
             media_item = MediaItem(
                 library_id=library.id,
                 server_id=library.server_id,
                 external_id=str(item_data.get('id', '')),
+                rating_key=str(rating_key) if rating_key else None,
                 title=item_data.get('title', 'Unknown Title'),
                 sort_title=item_data.get('sort_title') or item_data.get('title', 'Unknown Title'),
                 item_type=item_data.get('type', 'unknown'),
@@ -270,6 +277,13 @@ class MediaSyncService:
         try:
             changes = []
             
+            # Extract rating_key for Plex items
+            new_rating_key = None
+            raw_data = item_data.get('raw_data', {})
+            if raw_data and isinstance(raw_data, dict):
+                new_rating_key = raw_data.get('ratingKey')
+            new_rating_key = str(new_rating_key) if new_rating_key else None
+            
             # Check if key fields have changed
             new_title = item_data.get('title', 'Unknown Title')
             new_summary = item_data.get('summary') or item_data.get('plot') or item_data.get('overview')
@@ -294,6 +308,10 @@ class MediaSyncService:
                 new_rating_str = f"{new_rating:.1f}" if new_rating else "None"
                 changes.append(f"Rating: {old_rating} → {new_rating_str}")
                 item.rating = new_rating
+            
+            if item.rating_key != new_rating_key:
+                changes.append(f"Rating Key: {item.rating_key} → {new_rating_key}")
+                item.rating_key = new_rating_key
             
             # Always update last_synced and extra_metadata
             item.last_synced = datetime.utcnow()
