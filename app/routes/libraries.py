@@ -607,7 +607,7 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 24, type=int)
         search_query = request.args.get('search', '').strip()
-        sort_by = request.args.get('sort_by', 'title_asc').strip()
+        sort_by = request.args.get('sort_by', 'season_episode_asc').strip()
         
         # Validate per_page parameter
         if per_page not in [12, 24, 48, 96]:
@@ -615,12 +615,13 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
             
         # Validate sort_by parameter
         valid_sorts = [
+            'season_episode_asc', 'season_episode_desc',
             'title_asc', 'title_desc', 'year_asc', 'year_desc', 
-            'added_at_asc', 'added_at_desc', 'rating_asc', 'rating_desc',
+            'added_at_asc', 'added_at_desc',
             'total_streams_asc', 'total_streams_desc'
         ]
         if sort_by not in valid_sorts:
-            sort_by = 'title_asc'
+            sort_by = 'season_episode_asc'
             
         episodes_content = get_show_episodes_by_item(server, library, media_item, page, per_page, search_query, sort_by)
     
@@ -746,7 +747,7 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                          episodes_content=episodes_content,
                          active_tab=tab,
                          days_filter=request.args.get('days', 30) if tab == 'activity' else None,
-                         current_sort_by=request.args.get('sort_by', 'title_asc') if tab == 'episodes' else None,
+                         current_sort_by=request.args.get('sort_by', 'season_episode_asc') if tab == 'episodes' else None,
                          format_duration=format_duration,
                          format_media_duration=format_media_duration)
 
@@ -1442,7 +1443,10 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
             
             # Apply sorting (database level for cached episodes)
             current_app.logger.debug(f"Applying sort_by: {sort_by} to cached episodes query")
-            if sort_by == 'title_desc':
+            if sort_by.startswith('season_episode'):
+                # For season/episode sorting, we'll sort manually after getting the data
+                query = query.order_by(MediaItem.sort_title.asc())  # Default order first
+            elif sort_by == 'title_desc':
                 query = query.order_by(MediaItem.sort_title.desc())
             elif sort_by == 'year_asc':
                 query = query.order_by(MediaItem.year.asc().nullsfirst(), MediaItem.sort_title.asc())
@@ -1455,7 +1459,7 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
             elif sort_by.startswith('total_streams'):
                 # For stream sorting, we'll sort manually after getting stream counts
                 query = query.order_by(MediaItem.sort_title.asc())  # Default order first
-            else:  # Default to title_asc
+            else:  # Default to season_episode_asc
                 query = query.order_by(MediaItem.sort_title.asc())
             
             # Get all episodes for stream count calculation
@@ -1476,9 +1480,17 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
                 episode_dict['stream_count'] = stream_count
                 episodes_data.append(episode_dict)
             
-            # Apply manual sorting for cached episodes (especially for stream counts)
+            # Apply manual sorting for cached episodes (especially for stream counts and season/episode)
             current_app.logger.debug(f"Applying manual sorting for cached episodes: {sort_by}")
-            if sort_by.startswith('total_streams'):
+            if sort_by.startswith('season_episode'):
+                reverse = sort_by.endswith('_desc')
+                def season_episode_sort_key(episode):
+                    season = episode.get('season_number', 0) or 0
+                    episode_num = episode.get('episode_number', 0) or 0
+                    return (season, episode_num)
+                episodes_data.sort(key=season_episode_sort_key, reverse=reverse)
+                current_app.logger.debug(f"Sorted cached episodes by season/episode, first episode: '{episodes_data[0].get('title')}' S{episodes_data[0].get('season_number', 0):02d}E{episodes_data[0].get('episode_number', 0):02d}")
+            elif sort_by.startswith('total_streams'):
                 reverse = sort_by.endswith('_desc')
                 episodes_data.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
                 current_app.logger.debug(f"Sorted cached episodes by streams, first episode: '{episodes_data[0].get('title')}' with {episodes_data[0].get('stream_count', 0)} streams")
@@ -1491,9 +1503,6 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
             elif sort_by.startswith('added_at') and not sort_by.endswith('_asc'):
                 reverse = sort_by.endswith('_desc')
                 episodes_data.sort(key=lambda x: x.get('added_at') or ('1900-01-01' if not reverse else '9999-12-31'), reverse=reverse)
-            elif sort_by.startswith('rating'):
-                reverse = sort_by.endswith('_desc')
-                episodes_data.sort(key=lambda x: x.get('rating') or (0 if not reverse else 10), reverse=reverse)
             
             # Apply manual pagination
             start_idx = (page - 1) * per_page
@@ -1670,12 +1679,19 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
         # Apply sorting if needed (some services might not support server-side sorting)
         # Note: This must happen AFTER stream counts are added above
         current_app.logger.debug(f"API fallback sorting: sort_by={sort_by}, episodes_data exists: {episodes_data is not None}")
-        if episodes_data and episodes_data.get('items') and sort_by != 'title_asc':
+        if episodes_data and episodes_data.get('items') and sort_by != 'season_episode_asc':
             items = episodes_data['items']
             reverse = sort_by.endswith('_desc')
             current_app.logger.debug(f"Applying API fallback sorting to {len(items)} episodes")
             
-            if sort_by.startswith('title'):
+            if sort_by.startswith('season_episode'):
+                def season_episode_sort_key(episode):
+                    season = episode.get('season_number', 0) or 0
+                    episode_num = episode.get('episode_number', 0) or 0
+                    return (season, episode_num)
+                items.sort(key=season_episode_sort_key, reverse=reverse)
+                current_app.logger.debug(f"Sorted API episodes by season/episode, first episode: '{items[0].get('title')}' S{items[0].get('season_number', 0):02d}E{items[0].get('episode_number', 0):02d}")
+            elif sort_by.startswith('title'):
                 items.sort(key=lambda x: x.get('title', '').lower(), reverse=reverse)
                 current_app.logger.debug(f"Sorted API episodes by title, first episode: '{items[0].get('title')}'")
             elif sort_by.startswith('year'):
@@ -1684,9 +1700,6 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
             elif sort_by.startswith('added_at'):
                 items.sort(key=lambda x: x.get('added_at', ''), reverse=reverse)
                 current_app.logger.debug(f"Sorted API episodes by added_at, first episode: '{items[0].get('title')}' ({items[0].get('added_at')})")
-            elif sort_by.startswith('rating'):
-                items.sort(key=lambda x: x.get('rating', 0) or 0, reverse=reverse)
-                current_app.logger.debug(f"Sorted API episodes by rating, first episode: '{items[0].get('title')}' ({items[0].get('rating')})")
             elif sort_by.startswith('total_streams'):
                 items.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
                 current_app.logger.debug(f"Sorted API episodes by streams, first episode: '{items[0].get('title')}' with {items[0].get('stream_count', 0)} streams")

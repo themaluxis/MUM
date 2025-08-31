@@ -49,14 +49,14 @@
             <div class="flex items-center gap-2">
                 <label for="episodes-sort-by" class="text-sm text-base-content/60 whitespace-nowrap">Sort by:</label>
                 <select id="episodes-sort-by" class="select select-bordered select-sm w-64">
-                    <option value="title_asc" {{ 'selected' if request.args.get('sort_by', 'title_asc') == 'title_asc' else '' }}>Title (A to Z)</option>
+                    <option value="season_episode_asc" {{ 'selected' if request.args.get('sort_by', 'season_episode_asc') == 'season_episode_asc' else '' }}>Season/Episode (S01E01)</option>
+                    <option value="season_episode_desc" {{ 'selected' if request.args.get('sort_by') == 'season_episode_desc' else '' }}>Season/Episode (Reverse)</option>
+                    <option value="title_asc" {{ 'selected' if request.args.get('sort_by') == 'title_asc' else '' }}>Title (A to Z)</option>
                     <option value="title_desc" {{ 'selected' if request.args.get('sort_by') == 'title_desc' else '' }}>Title (Z to A)</option>
                     <option value="year_desc" {{ 'selected' if request.args.get('sort_by') == 'year_desc' else '' }}>Year (Newest First)</option>
                     <option value="year_asc" {{ 'selected' if request.args.get('sort_by') == 'year_asc' else '' }}>Year (Oldest First)</option>
                     <option value="added_at_desc" {{ 'selected' if request.args.get('sort_by') == 'added_at_desc' else '' }}>Date Added (Newest First)</option>
                     <option value="added_at_asc" {{ 'selected' if request.args.get('sort_by') == 'added_at_asc' else '' }}>Date Added (Oldest First)</option>
-                    <option value="rating_desc" {{ 'selected' if request.args.get('sort_by') == 'rating_desc' else '' }}>Rating (Highest First)</option>
-                    <option value="rating_asc" {{ 'selected' if request.args.get('sort_by') == 'rating_asc' else '' }}>Rating (Lowest First)</option>
                     <option value="total_streams_desc" {{ 'selected' if request.args.get('sort_by') == 'total_streams_desc' else '' }}>Total Streams (Most Popular)</option>
                     <option value="total_streams_asc" {{ 'selected' if request.args.get('sort_by') == 'total_streams_asc' else '' }}>Total Streams (Least Popular)</option>
                 </select>
