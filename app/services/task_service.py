@@ -212,6 +212,16 @@ def monitor_media_sessions_task():
                         view_offset_ms = getattr(session, 'viewOffset', 0)
                         view_offset_s = int(view_offset_ms / 1000) if view_offset_ms else 0
                         
+                        # Extract external_media_item_id from Plex session
+                        external_media_item_id = None
+                        if hasattr(session, 'media') and session.media:
+                            # For movies and episodes, use the media ID from the media array
+                            first_media = session.media[0]
+                            if hasattr(first_media, 'id'):
+                                external_media_item_id = str(first_media.id)
+                        
+                        # For shows, external_media_item_id remains None (we use rating_key for shows)
+                        
                         # Extract library name from Plex session
                         library_name = getattr(session, 'librarySectionTitle', None)
                     else:
@@ -233,6 +243,9 @@ def monitor_media_sessions_task():
                         grandparent_title = now_playing.get('SeriesName', None)
                         parent_title = now_playing.get('SeasonName', None)
                         rating_key = str(now_playing.get('Id', None))
+                        
+                        # For Jellyfin, the Id is already the correct external_media_item_id
+                        external_media_item_id = rating_key
                         
                         # Position in ticks for Jellyfin
                         position_ticks = play_state.get('PositionTicks', 0)
@@ -285,6 +298,7 @@ def monitor_media_sessions_task():
                         server_id=current_server.id,
                         session_key=str(session_key),
                         rating_key=rating_key,
+                        external_media_item_id=external_media_item_id,
                         started_at=now_utc,
                         platform=platform,
                         product=product,

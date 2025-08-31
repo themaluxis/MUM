@@ -407,6 +407,57 @@ def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
         'date_range_days': days
     }
 
+def enhance_history_records_with_media_ids(history_records):
+    """Enhance history records with MediaItem database IDs for clickable links"""
+    from app.models_media_services import MediaItem, MediaLibrary
+    
+    for record in history_records:
+        # Initialize the fields we'll add
+        record.media_item_db_id = None
+        record.show_media_item_db_id = None
+        
+        if not record.server or not record.library_name:
+            continue
+            
+        # Find the library
+        library = MediaLibrary.query.filter_by(
+            server_id=record.server_id,
+            name=record.library_name
+        ).first()
+        
+        if not library:
+            continue
+        
+        # For movies and episodes with external_media_item_id
+        if record.external_media_item_id:
+            media_item = MediaItem.query.filter_by(
+                library_id=library.id,
+                external_id=record.external_media_item_id
+            ).first()
+            if media_item:
+                record.media_item_db_id = media_item.id
+        
+        # For TV shows (using rating_key when external_media_item_id is None)
+        if record.grandparent_title and not record.external_media_item_id:
+            # This is likely a show, use rating_key to find the show
+            show_item = MediaItem.query.filter_by(
+                library_id=library.id,
+                external_id=record.rating_key
+            ).first()
+            if show_item:
+                record.show_media_item_db_id = show_item.id
+        
+        # For episodes, also try to find the parent show using rating_key
+        if record.grandparent_title and record.external_media_item_id:
+            # This is an episode, try to find the parent show by title
+            show_item = MediaItem.query.filter_by(
+                library_id=library.id,
+                title=record.grandparent_title,
+                item_type='show'
+            ).first()
+            if show_item:
+                record.show_media_item_db_id = show_item.id
+
 def check_if_user_is_admin(user):
     """Check if a UserAppAccess user is an admin by looking up their access in UserMediaAccess"""
     if not isinstance(user, UserAppAccess):
@@ -1021,6 +1072,9 @@ def view_service_account(server_nickname, server_username):
                     .paginate(page=page, per_page=15, error_out=False)
                 current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for service user")
                 
+                # Enhance history records with MediaItem database IDs for clickable links
+                enhance_history_records_with_media_ids(stream_history_pagination.items)
+                
                 # Additional debugging - show sample records
                 if stream_history_pagination.items:
                     current_app.logger.info(f"DEBUG HISTORY: Sample records:")
@@ -1033,6 +1087,9 @@ def view_service_account(server_nickname, server_username):
                     .order_by(MediaStreamHistory.started_at.desc())\
                     .paginate(page=page, per_page=15, error_out=False)
                 current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for regular user")
+                
+                # Enhance history records with MediaItem database IDs for clickable links
+                enhance_history_records_with_media_ids(stream_history_pagination.items)
             
             # Additional debugging - check what's actually in the database
             total_records = MediaStreamHistory.query.count()

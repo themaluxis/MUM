@@ -394,6 +394,7 @@ class MediaStreamHistory(db.Model):
     grandparent_title = db.Column(db.String(255), nullable=True)
     parent_title = db.Column(db.String(255), nullable=True)
     library_name = db.Column(db.String(255), nullable=True)
+    external_media_item_id = db.Column(db.String(255), nullable=True)  # Media ID from service (media array for Plex, rating_key for shows)
     
     media_duration_seconds = db.Column(db.Integer, nullable=True)
     view_offset_at_end_seconds = db.Column(db.Integer, nullable=True)

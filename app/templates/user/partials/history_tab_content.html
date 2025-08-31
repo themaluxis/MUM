@@ -101,9 +101,61 @@
                             {% endif %}
                         </td>
                         <td data-col="media_title">
-                            <div class="font-bold">{{ entry.media_title or 'Unknown Title' }}</div>
-                            {% if entry.grandparent_title %}
-                                <div class="text-xs opacity-70">{{ entry.grandparent_title }}</div>
+                            {% if entry.media_item_db_id or entry.show_media_item_db_id %}
+                                <!-- Episode link (for TV shows) -->
+                                {% if entry.grandparent_title and entry.grandparent_title != entry.media_title %}
+                                    <div class="font-bold">
+                                        {% if entry.media_item_db_id %}
+                                            <a href="{{ url_for('libraries.episode_detail', 
+                                                server_nickname=entry.server.server_nickname, 
+                                                library_name=encode_url_component(entry.library_name), 
+                                                media_id=entry.show_media_item_db_id or entry.media_item_db_id,
+                                                tv_show_slug=generate_url_slug(entry.grandparent_title),
+                                                episode_slug=generate_url_slug(entry.media_title)) }}" 
+                                               class="text-primary hover:text-primary-focus hover:underline">
+                                                {{ entry.media_title or 'Unknown Title' }}
+                                            </a>
+                                        {% else %}
+                                            {{ entry.media_title or 'Unknown Title' }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-xs opacity-70">
+                                        {% if entry.show_media_item_db_id %}
+                                            <a href="{{ url_for('libraries.media_detail', 
+                                                server_nickname=entry.server.server_nickname, 
+                                                library_name=encode_url_component(entry.library_name), 
+                                                media_id=entry.show_media_item_db_id,
+                                                slug=generate_url_slug(entry.grandparent_title)) }}" 
+                                               class="text-base-content/70 hover:text-base-content hover:underline">
+                                                {{ entry.grandparent_title }}
+                                            </a>
+                                        {% else %}
+                                            {{ entry.grandparent_title }}
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <!-- Movie or other content link -->
+                                    <div class="font-bold">
+                                        {% if entry.media_item_db_id %}
+                                            <a href="{{ url_for('libraries.media_detail', 
+                                                server_nickname=entry.server.server_nickname, 
+                                                library_name=encode_url_component(entry.library_name), 
+                                                media_id=entry.media_item_db_id,
+                                                slug=generate_url_slug(entry.media_title)) }}" 
+                                               class="text-primary hover:text-primary-focus hover:underline">
+                                                {{ entry.media_title or 'Unknown Title' }}
+                                            </a>
+                                        {% else %}
+                                            {{ entry.media_title or 'Unknown Title' }}
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            {% else %}
+                                <!-- Fallback for entries without database IDs -->
+                                <div class="font-bold">{{ entry.media_title or 'Unknown Title' }}</div>
+                                {% if entry.grandparent_title %}
+                                    <div class="text-xs opacity-70">{{ entry.grandparent_title }}</div>
+                                {% endif %}
                             {% endif %}
                         </td>
                         <td data-col="player">
