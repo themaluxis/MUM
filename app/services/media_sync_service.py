@@ -240,7 +240,7 @@ class MediaSyncService:
                 except (ValueError, TypeError):
                     pass
             
-            # Extract rating_key for Plex items
+            # Extract rating_key for Plex items - every Plex item has a ratingKey
             rating_key = None
             raw_data = item_data.get('raw_data', {})
             if raw_data and isinstance(raw_data, dict):
@@ -277,11 +277,12 @@ class MediaSyncService:
         try:
             changes = []
             
-            # Extract rating_key for Plex items
+            # Extract rating_key for Plex items - every Plex item has a ratingKey
             new_rating_key = None
             raw_data = item_data.get('raw_data', {})
             if raw_data and isinstance(raw_data, dict):
                 new_rating_key = raw_data.get('ratingKey')
+            
             new_rating_key = str(new_rating_key) if new_rating_key else None
             
             # Check if key fields have changed

@@ -27,16 +27,19 @@ def upgrade():
     # This will extract ratingKey from the JSON and populate the new column
     connection = op.get_bind()
     
-    # For PostgreSQL
+    # For PostgreSQL and SQLite
     try:
+        # Populate from ratingKey in metadata - every Plex item has this
         connection.execute(sa.text("""
             UPDATE media_items 
             SET rating_key = extra_metadata->>'ratingKey'
             WHERE extra_metadata IS NOT NULL 
             AND extra_metadata->>'ratingKey' IS NOT NULL
+            AND extra_metadata->>'ratingKey' != ''
         """))
     except Exception:
-        # For SQLite (fallback - will need manual population)
+        # If JSON operations aren't supported, skip migration
+        # Users will need to re-sync their libraries
         pass
 
 

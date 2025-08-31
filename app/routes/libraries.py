@@ -431,7 +431,9 @@ def episode_detail(server_nickname, library_name, media_id, tv_show_slug, episod
     # Get episodes for the show to find the specific episode
     episode_details = None
     if hasattr(service, 'get_show_episodes'):
-        episodes_data = service.get_show_episodes(tv_show_item.external_id, page=1, per_page=1000)
+        # Use rating_key if available, otherwise fall back to external_id
+        show_id = tv_show_item.rating_key if tv_show_item.rating_key else tv_show_item.external_id
+        episodes_data = service.get_show_episodes(show_id, page=1, per_page=1000)
         if episodes_data and episodes_data.get('items'):
             for episode in episodes_data['items']:
                 if generate_url_slug(episode.get('title', '')) == episode_slug:
@@ -620,7 +622,7 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
         if sort_by not in valid_sorts:
             sort_by = 'title_asc'
             
-        episodes_content = get_show_episodes(server, library, content_name_for_lookup, page, per_page, search_query, sort_by)
+        episodes_content = get_show_episodes_by_item(server, library, media_item, page, per_page, search_query, sort_by)
     
     # Get streaming history for this specific content
     streaming_history = None
@@ -1393,8 +1395,8 @@ def get_media_details(server, library, content_name):
         current_app.logger.error(f"Error getting media details: {e}")
         return None
 
-def get_show_episodes(server, library, show_title, page=1, per_page=24, search_query='', sort_by='title_asc'):
-    """Get episodes for a specific TV show"""
+def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, search_query='', sort_by='title_asc'):
+    """Get episodes for a specific TV show using the media item object"""
     try:
         from app.services.media_service_factory import MediaServiceFactory
         
@@ -1412,9 +1414,9 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
                 'error': 'Could not create service instance'
             }
         
-        # Get show details first to find the show ID
-        show_details = get_media_details(server, library, show_title)
-        if not show_details:
+        # Use the media item's rating_key directly - no title-based lookup needed!
+        show_id = media_item.rating_key if media_item.rating_key else media_item.external_id
+        if not show_id:
             return {
                 'items': [],
                 'total': 0,
@@ -1423,16 +1425,16 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
                 'pages': 0,
                 'has_prev': False,
                 'has_next': False,
-                'error': 'Show not found'
+                'error': 'No show ID available'
             }
         
         # Get ALL episodes from the service first (for proper sorting)
         if hasattr(service, 'get_show_episodes'):
             # Get all episodes first, then we'll handle pagination after sorting
-            episodes_data = service.get_show_episodes(show_details['id'], page=1, per_page=1000, search_query=search_query)
+            episodes_data = service.get_show_episodes(show_id, page=1, per_page=1000, search_query=search_query)
         elif hasattr(service, 'get_library_content'):
             # Fallback: try to get episodes by searching for the show in the library
-            episodes_data = service.get_library_content(library.external_id, page=1, per_page=1000, parent_id=show_details['id'])
+            episodes_data = service.get_library_content(library.external_id, page=1, per_page=1000, parent_id=show_id)
         else:
             return {
                 'items': [],
@@ -1455,7 +1457,7 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
                     MediaStreamHistory.server_id == server.id,
                     MediaStreamHistory.library_name == library.name,
                     MediaStreamHistory.media_title == episode.get('title', ''),
-                    MediaStreamHistory.grandparent_title == show_title
+                    MediaStreamHistory.grandparent_title == media_item.title
                 ).count()
                 episode['stream_count'] = stream_count
         
@@ -1508,7 +1510,7 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
         return episodes_data
         
     except Exception as e:
-        current_app.logger.error(f"Error getting episodes for show '{show_title}': {e}")
+        current_app.logger.error(f"Error getting episodes for show '{media_item.title}': {e}")
         return {
             'items': [],
             'total': 0,
@@ -1588,11 +1590,11 @@ def get_media_api_output(server_nickname, library_name, media_id):
                 
                 # Use the dedicated rating_key column for direct API access
                 try:
-                    # Use rating_key column if available, otherwise fall back to external_id
-                    if media_item.rating_key:
-                        fetch_id = int(media_item.rating_key)
-                    else:
-                        fetch_id = int(media_item.external_id)
+                    # Use rating_key column - this should always be populated for Plex items
+                    if not media_item.rating_key:
+                        return {'error': 'No rating key available for this media item. Try re-syncing the library.'}, 404
+                    
+                    fetch_id = int(media_item.rating_key)
                     
                     plex_item = plex_server.fetchItem(fetch_id)
                     
@@ -1717,11 +1719,11 @@ def get_episode_api_output(server_nickname, library_name, media_id, tv_show_slug
                 
                 # Use the dedicated rating_key column for direct API access
                 try:
-                    # Use rating_key column if available, otherwise fall back to external_id
-                    if tv_show_item.rating_key:
-                        fetch_id = int(tv_show_item.rating_key)
-                    else:
-                        fetch_id = int(tv_show_item.external_id)
+                    # Use rating_key column - this should always be populated for Plex items
+                    if not tv_show_item.rating_key:
+                        return {'error': 'No rating key available for this TV show. Try re-syncing the library.'}, 404
+                    
+                    fetch_id = int(tv_show_item.rating_key)
                     
                     plex_show = plex_server.fetchItem(fetch_id)
                     
