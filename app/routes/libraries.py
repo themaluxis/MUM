@@ -1563,9 +1563,28 @@ def get_media_api_output(server_nickname, library_name, media_id):
                 if not plex_server:
                     return {'error': 'Could not connect to Plex server'}, 500
                 
-                # Get the item by rating key (external_id)
+                # Determine what ID to use for fetchItem based on external_id_type
                 try:
-                    plex_item = plex_server.fetchItem(int(media_item.external_id))
+                    external_id_type = None
+                    rating_key = None
+                    
+                    if media_item.extra_metadata:
+                        external_id_type = media_item.extra_metadata.get('external_id_type')
+                        rating_key = media_item.extra_metadata.get('ratingKey')
+                    
+                    # For movies with media_id, use ratingKey; for shows, external_id is already ratingKey
+                    if external_id_type == 'media_id' and rating_key:
+                        fetch_id = int(rating_key)
+                    elif external_id_type == 'ratingKey':
+                        fetch_id = int(media_item.external_id)
+                    else:
+                        # Fallback: try ratingKey from metadata, then external_id
+                        if rating_key:
+                            fetch_id = int(rating_key)
+                        else:
+                            fetch_id = int(media_item.external_id)
+                    
+                    plex_item = plex_server.fetchItem(fetch_id)
                     
                     # Convert PlexAPI object to dictionary with all attributes
                     def serialize_value(value):
@@ -1680,9 +1699,24 @@ def get_episode_api_output(server_nickname, library_name, media_id, tv_show_slug
                 if not plex_server:
                     return {'error': 'Could not connect to Plex server'}, 500
                 
-                # Get the show first
+                # Get the show first - for shows, external_id should be ratingKey
                 try:
-                    plex_show = plex_server.fetchItem(int(tv_show_item.external_id))
+                    external_id_type = None
+                    rating_key = None
+                    
+                    if tv_show_item.extra_metadata:
+                        external_id_type = tv_show_item.extra_metadata.get('external_id_type')
+                        rating_key = tv_show_item.extra_metadata.get('ratingKey')
+                    
+                    # For shows, external_id should be ratingKey, but fallback to metadata if needed
+                    if external_id_type == 'ratingKey':
+                        fetch_id = int(tv_show_item.external_id)
+                    elif rating_key:
+                        fetch_id = int(rating_key)
+                    else:
+                        fetch_id = int(tv_show_item.external_id)
+                    
+                    plex_show = plex_server.fetchItem(fetch_id)
                     
                     # Find the episode by title
                     episode_found = None

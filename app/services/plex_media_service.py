@@ -1152,13 +1152,35 @@ class PlexMediaService(BaseMediaService):
                     elif hasattr(item, 'audienceRating') and item.audienceRating:
                         rating = float(item.audienceRating)
                     
-                    # Get duration in milliseconds
+                    # Get duration in milliseconds and media ID
                     duration = None
-                    if hasattr(item, 'duration') and item.duration:
+                    media_id = None
+                    
+                    # Extract media ID from the media array (the real external ID)
+                    if hasattr(item, 'media') and item.media:
+                        # Use the first media item's ID as the primary external_id
+                        first_media = item.media[0]
+                        if hasattr(first_media, 'id'):
+                            media_id = str(first_media.id)
+                        # Get duration from media if available
+                        if hasattr(first_media, 'duration') and first_media.duration:
+                            duration = first_media.duration
+                    
+                    # Fallback to item duration if media duration not available
+                    if not duration and hasattr(item, 'duration') and item.duration:
                         duration = item.duration
                     
+                    # Use media ID for movies, ratingKey for shows and other content
+                    item_type = getattr(item, 'type', 'unknown').lower()
+                    if item_type == 'movie' and media_id:
+                        # For movies, use the media ID from the media array
+                        external_id = media_id
+                    else:
+                        # For shows, episodes, and other content, use ratingKey
+                        external_id = str(getattr(item, 'ratingKey', ''))
+                    
                     processed_item = {
-                        'id': getattr(item, 'ratingKey', ''),
+                        'id': external_id,
                         'title': getattr(item, 'title', 'Unknown Title'),
                         'year': year,
                         'edition': edition,
@@ -1174,6 +1196,8 @@ class PlexMediaService(BaseMediaService):
                         'contentRating': getattr(item, 'contentRating', ''),
                         'raw_data': {
                             'ratingKey': getattr(item, 'ratingKey', ''),
+                            'media_id': media_id,  # Will be None for shows, that's expected
+                            'external_id_type': 'media_id' if item_type == 'movie' and media_id else 'ratingKey',
                             'title': getattr(item, 'title', ''),
                             'type': getattr(item, 'type', ''),
                             'thumb': getattr(item, 'thumb', ''),
@@ -1326,8 +1350,18 @@ class PlexMediaService(BaseMediaService):
                     elif hasattr(episode, 'year') and episode.year:
                         year = str(episode.year)
                     
+                    # Extract media ID from episode's media array (same logic as movies)
+                    episode_media_id = None
+                    if hasattr(episode, 'media') and episode.media:
+                        first_media = episode.media[0]
+                        if hasattr(first_media, 'id'):
+                            episode_media_id = str(first_media.id)
+                    
+                    # Use media ID if available, otherwise use ratingKey
+                    episode_external_id = episode_media_id if episode_media_id else str(episode.ratingKey)
+                    
                     episode_data = {
-                        'id': episode.ratingKey,
+                        'id': episode_external_id,
                         'title': episode.title or 'Unknown Episode',
                         'summary': episode.summary or '',
                         'year': year,
@@ -1338,7 +1372,12 @@ class PlexMediaService(BaseMediaService):
                         'episode_number': episode.episodeNumber if hasattr(episode, 'episodeNumber') else None,
                         'air_date': episode.originallyAvailableAt if hasattr(episode, 'originallyAvailableAt') else None,
                         'added_at': episode.addedAt if hasattr(episode, 'addedAt') else None,
-                        'type': 'episode'
+                        'type': 'episode',
+                        'raw_data': {
+                            'ratingKey': episode.ratingKey,
+                            'media_id': episode_media_id,
+                            'external_id_type': 'media_id' if episode_media_id else 'ratingKey'
+                        }
                     }
                     formatted_episodes.append(episode_data)
                 except Exception as e:

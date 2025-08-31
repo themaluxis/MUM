@@ -264,10 +264,16 @@
                                     <span class="text-base-content/60">Service:</span>
                                     <span class="font-medium">{{ service_name }}</span>
                                 </div>
-                                {% if media_details.id %}
+                                {% if media_details.external_id %}
                                 <div class="flex justify-between">
-                                    <span class="text-base-content/60">External ID:</span>
-                                    <span class="font-medium font-mono text-sm">{{ media_details.id }}</span>
+                                    <span class="text-base-content/60">
+                                        {% if server.service_type.value.lower() == 'plex' and media_details.raw_data.external_id_type == 'ratingKey' %}
+                                            External ID (ratingKey):
+                                        {% else %}
+                                            External ID:
+                                        {% endif %}
+                                    </span>
+                                    <span class="font-medium font-mono text-sm">{{ media_details.external_id }}</span>
                                 </div>
                                 {% endif %}
                                 {% if media_details.added_at %}
