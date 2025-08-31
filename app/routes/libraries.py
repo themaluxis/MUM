@@ -1489,7 +1489,11 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
                     episode_num = episode.get('episode_number', 0) or 0
                     return (season, episode_num)
                 episodes_data.sort(key=season_episode_sort_key, reverse=reverse)
-                current_app.logger.debug(f"Sorted cached episodes by season/episode, first episode: '{episodes_data[0].get('title')}' S{episodes_data[0].get('season_number', 0):02d}E{episodes_data[0].get('episode_number', 0):02d}")
+                if episodes_data:
+                    first_ep = episodes_data[0]
+                    season_num = first_ep.get('season_number', 0) or 0
+                    episode_num = first_ep.get('episode_number', 0) or 0
+                    current_app.logger.debug(f"Sorted cached episodes by season/episode, first episode: '{first_ep.get('title')}' S{season_num:02d}E{episode_num:02d}")
             elif sort_by.startswith('total_streams'):
                 reverse = sort_by.endswith('_desc')
                 episodes_data.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
@@ -1690,7 +1694,11 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
                     episode_num = episode.get('episode_number', 0) or 0
                     return (season, episode_num)
                 items.sort(key=season_episode_sort_key, reverse=reverse)
-                current_app.logger.debug(f"Sorted API episodes by season/episode, first episode: '{items[0].get('title')}' S{items[0].get('season_number', 0):02d}E{items[0].get('episode_number', 0):02d}")
+                if items:
+                    first_ep = items[0]
+                    season_num = first_ep.get('season_number', 0) or 0
+                    episode_num = first_ep.get('episode_number', 0) or 0
+                    current_app.logger.debug(f"Sorted API episodes by season/episode, first episode: '{first_ep.get('title')}' S{season_num:02d}E{episode_num:02d}")
             elif sort_by.startswith('title'):
                 items.sort(key=lambda x: x.get('title', '').lower(), reverse=reverse)
                 current_app.logger.debug(f"Sorted API episodes by title, first episode: '{items[0].get('title')}'")
