@@ -173,7 +173,7 @@
                             {% if media_details.duration %}
                             <div class="flex items-center gap-1">
                                 <i class="fa-solid fa-clock"></i>
-                                <span>{{ (media_details.duration // 60)|int }}m</span>
+                                <span>{{ format_duration(media_details.duration // 1000) }}</span>
                             </div>
                             {% endif %}
                             {% if media_details.added_at %}
@@ -249,7 +249,7 @@
                                 {% if media_details.duration %}
                                 <div class="flex justify-between">
                                     <span class="text-base-content/60">Duration:</span>
-                                    <span class="font-medium">{{ (media_details.duration // 60)|int }} minutes</span>
+                                    <span class="font-medium">{{ format_duration(media_details.duration // 1000) }}</span>
                                 </div>
                                 {% endif %}
                                 <div class="flex justify-between">
