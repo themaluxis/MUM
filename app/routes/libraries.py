@@ -311,6 +311,7 @@ def get_library_raw_data(server_id, library_id):
                 if server.service_type.value.lower() == 'plex':
                     # Plex uses UUID exclusively
                     lib_uuid = lib.get('uuid')
+                    current_app.logger.debug(f"Comparing Plex library UUID '{lib_uuid}' with requested ID '{library_id}' for library '{lib.get('title', 'Unknown')}'")
                     if str(lib_uuid) == str(library_id):
                         target_library = lib
                         break
@@ -342,6 +343,16 @@ def get_library_raw_data(server_id, library_id):
                     break
         
         if not target_library:
+            # Debug: Log all available libraries for troubleshooting
+            if server.service_type.value.lower() == 'plex':
+                available_libs = []
+                for lib in libraries:
+                    available_libs.append({
+                        'title': lib.get('title', 'Unknown'),
+                        'uuid': lib.get('uuid'),
+                        'key': lib.get('key')
+                    })
+                current_app.logger.error(f"Library with ID '{library_id}' not found. Available Plex libraries: {available_libs}")
             return {'error': f'Library with ID {library_id} not found on server'}, 404
         
         return {
@@ -1520,6 +1531,10 @@ def get_media_api_output(server_nickname, library_name, media_id):
         server_nickname = urllib.parse.unquote(server_nickname)
         library_name = urllib.parse.unquote(library_name)
         
+        # Handle HTML entities in the URL (like &amp; -> &)
+        import html
+        library_name = html.unescape(library_name)
+        
         # Decode URL component back to original name for lookup
         library_name_for_lookup = decode_url_component(library_name)
         
@@ -1540,14 +1555,22 @@ def get_media_api_output(server_nickname, library_name, media_id):
                 break
         
         if not library:
+            current_app.logger.error(f"Library not found for name variations: {library_name_variations}")
             return {'error': 'Library not found'}, 404
+        
+        current_app.logger.debug(f"Found library: {library.name} (ID: {library.id})")
         
         # Get the media item from database
         from app.models_media_services import MediaItem
+        current_app.logger.debug(f"Looking for media item with ID: {media_id} in library ID: {library.id}")
         media_item = MediaItem.query.filter_by(
             id=media_id,
             library_id=library.id
-        ).first_or_404()
+        ).first()
+        
+        if not media_item:
+            current_app.logger.error(f"Media item with ID {media_id} not found in library {library.name} (ID: {library.id})")
+            return {'error': f'Media item with ID {media_id} not found'}, 404
         
         # Get the media service
         from app.services.media_service_factory import MediaServiceFactory
@@ -1653,6 +1676,12 @@ def get_episode_api_output(server_nickname, library_name, media_id, tv_show_slug
         library_name = urllib.parse.unquote(library_name)
         tv_show_slug = urllib.parse.unquote(tv_show_slug)
         episode_slug = urllib.parse.unquote(episode_slug)
+        
+        # Handle HTML entities in the URL (like &amp; -> &)
+        import html
+        library_name = html.unescape(library_name)
+        tv_show_slug = html.unescape(tv_show_slug)
+        episode_slug = html.unescape(episode_slug)
         
         # Decode URL component back to original name for lookup
         library_name_for_lookup = decode_url_component(library_name)
