@@ -347,11 +347,28 @@ class MediaItem(db.Model):
                 # Plex format: regular path that needs proxy construction
                 thumb_url = f"/api/media/{self.server.service_type.value}/images/proxy?path={self.thumb_path.lstrip('/')}"
         
+        # Extract season and episode numbers for episodes
+        season_number = None
+        episode_number = None
+        if self.item_type == 'episode' and self.extra_metadata:
+            # Try different possible field names for season/episode numbers
+            season_number = (self.extra_metadata.get('seasonNumber') or 
+                           self.extra_metadata.get('season_number') or 
+                           self.extra_metadata.get('season') or
+                           self.extra_metadata.get('parentIndex'))
+            
+            episode_number = (self.extra_metadata.get('episodeNumber') or 
+                            self.extra_metadata.get('episode_number') or 
+                            self.extra_metadata.get('episode') or
+                            self.extra_metadata.get('index'))
+
         return {
             'id': self.id,  # Use database ID for new URL structure
             'external_id': self.external_id,  # Keep external_id for backward compatibility
             'title': self.title,
             'year': self.year,
+            'season_number': season_number,  # Add season number for episodes
+            'episode_number': episode_number,  # Add episode number for episodes
             'edition': self.extra_metadata.get('edition') if self.extra_metadata else None,
             'thumb': thumb_url,
             'type': self.item_type,

@@ -87,6 +87,8 @@ class MediaSyncService:
             # Sync items to database
             sync_results = MediaSyncService._sync_items_to_db(library, all_items)
             
+            # Note: Episodes are synced on-demand when users visit show pages, not during library sync
+            
             # Update library last sync time
             library.last_scanned = datetime.utcnow()
             db.session.add(library)
@@ -250,6 +252,7 @@ class MediaSyncService:
                 library_id=library.id,
                 server_id=library.server_id,
                 external_id=str(item_data.get('id', '')),
+                parent_id=item_data.get('parent_id'),  # Add parent_id support for episodes
                 rating_key=str(rating_key) if rating_key else None,
                 title=item_data.get('title', 'Unknown Title'),
                 sort_title=item_data.get('sort_title') or item_data.get('title', 'Unknown Title'),
@@ -328,6 +331,291 @@ class MediaSyncService:
             return []
     
     @staticmethod
+    def _sync_episodes_for_shows(library: MediaLibrary, service) -> Dict[str, Any]:
+        """
+        Sync episodes for all TV shows in the library
+        
+        Args:
+            library: MediaLibrary instance
+            service: Media service instance
+            
+        Returns:
+            Dict with episode sync results
+        """
+        added_count = 0
+        updated_count = 0
+        removed_count = 0
+        errors = []
+        
+        try:
+            # Get all TV shows in this library
+            tv_shows = MediaItem.query.filter_by(
+                library_id=library.id,
+                item_type='show'
+            ).all()
+            
+            current_app.logger.info(f"Syncing episodes for {len(tv_shows)} TV shows in library {library.name}")
+            
+            for show in tv_shows:
+                try:
+                    # Use rating_key if available, otherwise external_id
+                    show_id = show.rating_key if show.rating_key else show.external_id
+                    if not show_id:
+                        current_app.logger.warning(f"No show ID available for show: {show.title}")
+                        continue
+                    
+                    current_app.logger.debug(f"Syncing episodes for show: {show.title} (ID: {show_id})")
+                    
+                    # Get episodes from service
+                    if hasattr(service, 'get_show_episodes'):
+                        episodes_data = service.get_show_episodes(show_id, page=1, per_page=1000)
+                        if episodes_data and episodes_data.get('items'):
+                            episodes = episodes_data['items']
+                            
+                            # Get existing episodes for this show - check both external_id and rating_key as parent_id
+                            existing_episodes_query = MediaItem.query.filter(
+                                MediaItem.library_id == library.id,
+                                MediaItem.item_type == 'episode',
+                                or_(
+                                    MediaItem.parent_id == show.external_id,
+                                    MediaItem.parent_id == show.rating_key
+                                )
+                            )
+                            existing_episodes = {ep.external_id: ep for ep in existing_episodes_query.all()}
+                            
+                            current_episode_ids = set()
+                            
+                            for episode_data in episodes:
+                                try:
+                                    episode_external_id = str(episode_data.get('id', ''))
+                                    if not episode_external_id:
+                                        continue
+                                    
+                                    current_episode_ids.add(episode_external_id)
+                                    
+                                    # Check if episode exists
+                                    existing_episode = existing_episodes.get(episode_external_id)
+                                    
+                                    if existing_episode:
+                                        # Update existing episode
+                                        changes = MediaSyncService._update_media_item(existing_episode, episode_data)
+                                        if changes:
+                                            updated_count += 1
+                                    else:
+                                        # Create new episode - use rating_key as parent_id if available, otherwise external_id
+                                        episode_data['parent_id'] = show.rating_key if show.rating_key else show.external_id
+                                        new_episode = MediaSyncService._create_media_item(library, episode_data)
+                                        if new_episode:
+                                            added_count += 1
+                                            
+                                except Exception as e:
+                                    error_msg = f"Error processing episode {episode_data.get('title', 'unknown')} for show {show.title}: {str(e)}"
+                                    current_app.logger.warning(error_msg)
+                                    errors.append(error_msg)
+                                    continue
+                            
+                            # Remove episodes that no longer exist
+                            episodes_to_remove = [ep for ep_id, ep in existing_episodes.items() 
+                                                if ep_id not in current_episode_ids]
+                            
+                            for episode in episodes_to_remove:
+                                db.session.delete(episode)
+                                removed_count += 1
+                                
+                        else:
+                            current_app.logger.debug(f"No episodes found for show: {show.title}")
+                    
+                except Exception as e:
+                    error_msg = f"Error syncing episodes for show {show.title}: {str(e)}"
+                    current_app.logger.error(error_msg)
+                    errors.append(error_msg)
+                    continue
+            
+            # Commit episode changes
+            try:
+                db.session.commit()
+                current_app.logger.info(f"Episode sync completed: {added_count} added, {updated_count} updated, {removed_count} removed")
+            except Exception as e:
+                current_app.logger.error(f"Error committing episode sync changes: {e}")
+                db.session.rollback()
+                raise
+            
+            return {
+                'added': added_count,
+                'updated': updated_count,
+                'removed': removed_count,
+                'errors': errors
+            }
+            
+        except Exception as e:
+            current_app.logger.error(f"Error syncing episodes for library {library.name}: {e}")
+            db.session.rollback()
+            return {
+                'added': 0,
+                'updated': 0,
+                'removed': 0,
+                'errors': [str(e)]
+            }
+    
+    @staticmethod
+    def sync_show_episodes(show_id: int) -> Dict[str, Any]:
+        """
+        Sync episodes for a single TV show on-demand
+        
+        Args:
+            show_id: Database ID of the show (MediaItem.id)
+            
+        Returns:
+            Dict with sync results
+        """
+        try:
+            # Get the show from database
+            show = MediaItem.query.get(show_id)
+            if not show or show.item_type != 'show':
+                return {'success': False, 'error': 'Show not found or not a TV show'}
+            
+            library = show.library
+            if not library:
+                return {'success': False, 'error': 'Library not found for show'}
+            
+            current_app.logger.info(f"Starting episode sync for show: {show.title}")
+            
+            # Create service instance
+            from app.services.media_service_factory import MediaServiceFactory
+            service = MediaServiceFactory.create_service_from_db(library.server)
+            if not service:
+                return {'success': False, 'error': 'Could not create service instance'}
+            
+            # Use rating_key if available, otherwise external_id
+            show_external_id = show.rating_key if show.rating_key else show.external_id
+            if not show_external_id:
+                return {'success': False, 'error': 'No show ID available'}
+            
+            added_count = 0
+            updated_count = 0
+            removed_count = 0
+            errors = []
+            
+            # Get episodes from service
+            if hasattr(service, 'get_show_episodes'):
+                episodes_data = service.get_show_episodes(show_external_id, page=1, per_page=1000)
+                if episodes_data and episodes_data.get('items'):
+                    episodes = episodes_data['items']
+                    
+                    # Get existing episodes for this show - check both external_id and rating_key as parent_id
+                    existing_episodes_query = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.item_type == 'episode',
+                        or_(
+                            MediaItem.parent_id == show.external_id,
+                            MediaItem.parent_id == show.rating_key
+                        )
+                    )
+                    existing_episodes = {ep.external_id: ep for ep in existing_episodes_query.all()}
+                    
+                    # Also check for episodes that might exist without proper parent_id (orphaned episodes)
+                    orphaned_episodes_query = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.item_type == 'episode',
+                        MediaItem.parent_id.is_(None)
+                    )
+                    orphaned_episodes = orphaned_episodes_query.all()
+                    
+                    current_app.logger.debug(f"Found {len(existing_episodes)} existing episodes with proper parent_id for show {show.title}")
+                    current_app.logger.debug(f"Found {len(orphaned_episodes)} orphaned episodes (no parent_id) in library")
+                    
+                    # Log some existing episodes for debugging
+                    if existing_episodes:
+                        sample_episodes = list(existing_episodes.values())[:3]
+                        for ep in sample_episodes:
+                            current_app.logger.debug(f"Existing episode: {ep.title} (external_id: {ep.external_id}, parent_id: {ep.parent_id})")
+                    
+                    # Add orphaned episodes to existing episodes dict to prevent duplicates
+                    for ep in orphaned_episodes:
+                        if ep.external_id not in existing_episodes:
+                            existing_episodes[ep.external_id] = ep
+                            current_app.logger.debug(f"Added orphaned episode to existing: {ep.title} (external_id: {ep.external_id})")
+                    
+                    current_app.logger.debug(f"Total episodes in existing_episodes dict after orphan check: {len(existing_episodes)}")
+                    
+                    current_episode_ids = set()
+                    
+                    for episode_data in episodes:
+                        try:
+                            episode_external_id = str(episode_data.get('id', ''))
+                            if not episode_external_id:
+                                continue
+                            
+                            current_episode_ids.add(episode_external_id)
+                            
+                            # Check if episode exists
+                            existing_episode = existing_episodes.get(episode_external_id)
+                            
+                            if existing_episode:
+                                # Update existing episode
+                                changes = MediaSyncService._update_media_item(existing_episode, episode_data)
+                                if changes:
+                                    updated_count += 1
+                            else:
+                                # Create new episode - use rating_key as parent_id if available, otherwise external_id
+                                parent_id_to_use = show.rating_key if show.rating_key else show.external_id
+                                episode_data['parent_id'] = parent_id_to_use
+                                current_app.logger.debug(f"Creating new episode: {episode_data.get('title')} with parent_id: {parent_id_to_use} for show: {show.title}")
+                                new_episode = MediaSyncService._create_media_item(library, episode_data)
+                                if new_episode:
+                                    added_count += 1
+                                    current_app.logger.debug(f"Successfully created episode: {new_episode.title} (external_id: {new_episode.external_id}, parent_id: {new_episode.parent_id})")
+                                else:
+                                    current_app.logger.error(f"Failed to create episode: {episode_data.get('title')}")
+                                    
+                        except Exception as e:
+                            error_msg = f"Error processing episode {episode_data.get('title', 'unknown')}: {str(e)}"
+                            current_app.logger.warning(error_msg)
+                            errors.append(error_msg)
+                            continue
+                    
+                    # Remove episodes that no longer exist
+                    episodes_to_remove = [ep for ep_id, ep in existing_episodes.items() 
+                                        if ep_id not in current_episode_ids]
+                    
+                    for episode in episodes_to_remove:
+                        db.session.delete(episode)
+                        removed_count += 1
+                        
+                else:
+                    current_app.logger.debug(f"No episodes found for show: {show.title}")
+            else:
+                return {'success': False, 'error': 'Service does not support episode retrieval'}
+            
+            # Update show's last synced time for episodes
+            show.last_synced = datetime.utcnow()
+            db.session.add(show)
+            
+            # Commit changes
+            try:
+                db.session.commit()
+                current_app.logger.info(f"Episode sync completed for {show.title}: {added_count} added, {updated_count} updated, {removed_count} removed")
+            except Exception as e:
+                current_app.logger.error(f"Error committing episode sync changes: {e}")
+                db.session.rollback()
+                raise
+            
+            return {
+                'success': True,
+                'show_title': show.title,
+                'added': added_count,
+                'updated': updated_count,
+                'removed': removed_count,
+                'total_episodes': added_count + len(existing_episodes) - removed_count,
+                'errors': errors
+            }
+            
+        except Exception as e:
+            current_app.logger.error(f"Error syncing episodes for show {show_id}: {e}")
+            db.session.rollback()
+            return {'success': False, 'error': str(e)}
+    
+    @staticmethod
     def get_cached_library_content(library_id: int, page: int = 1, per_page: int = 24, 
                                  search_query: str = '', sort_by: str = 'title_asc') -> Dict[str, Any]:
         """
@@ -344,8 +632,11 @@ class MediaSyncService:
             Dict with paginated results
         """
         try:
-            # Build query
-            query = MediaItem.query.filter_by(library_id=library_id)
+            # Build query - exclude episodes from library media view (episodes should only show in show pages)
+            query = MediaItem.query.filter(
+                MediaItem.library_id == library_id,
+                MediaItem.item_type != 'episode'
+            )
             
             # Apply search filter if provided
             if search_query:
@@ -431,11 +722,23 @@ class MediaSyncService:
                 item_dict['stream_count'] = stream_count
                 items_data.append(item_dict)
             
-            # Apply sorting after adding stream counts (overrides database sorting for stream counts)
+            # Apply manual sorting after adding stream counts (ensures consistent sorting)
             if sort_by.startswith('total_streams'):
                 reverse = sort_by.endswith('_desc')
                 items_data.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
-                current_app.logger.info(f"DEBUG: Sorted library by streams, first item: '{items_data[0].get('title')}' with {items_data[0].get('stream_count', 0)} streams")
+                current_app.logger.debug(f"Sorted library by streams, first item: '{items_data[0].get('title')}' with {items_data[0].get('stream_count', 0)} streams")
+            elif sort_by.startswith('title'):
+                reverse = sort_by.endswith('_desc')
+                items_data.sort(key=lambda x: x.get('title', '').lower(), reverse=reverse)
+            elif sort_by.startswith('year'):
+                reverse = sort_by.endswith('_desc')
+                items_data.sort(key=lambda x: x.get('year') or (0 if not reverse else 9999), reverse=reverse)
+            elif sort_by.startswith('added_at'):
+                reverse = sort_by.endswith('_desc')
+                items_data.sort(key=lambda x: x.get('added_at') or ('1900-01-01' if not reverse else '9999-12-31'), reverse=reverse)
+            elif sort_by.startswith('rating'):
+                reverse = sort_by.endswith('_desc')
+                items_data.sort(key=lambda x: x.get('rating') or (0 if not reverse else 10), reverse=reverse)
             
             # Apply manual pagination after sorting
             start_idx = (page - 1) * per_page

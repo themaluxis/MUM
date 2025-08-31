@@ -1357,8 +1357,8 @@ class PlexMediaService(BaseMediaService):
                         if hasattr(first_media, 'id'):
                             episode_media_id = str(first_media.id)
                     
-                    # Use media ID if available, otherwise use ratingKey
-                    episode_external_id = episode_media_id if episode_media_id else str(episode.ratingKey)
+                    # For episodes, always use ratingKey to ensure uniqueness (media_id can be the same for episodes of the same show)
+                    episode_external_id = str(episode.ratingKey)
                     
                     episode_data = {
                         'id': episode_external_id,
@@ -1376,7 +1376,11 @@ class PlexMediaService(BaseMediaService):
                         'raw_data': {
                             'ratingKey': episode.ratingKey,
                             'media_id': episode_media_id,
-                            'external_id_type': 'media_id' if episode_media_id else 'ratingKey'
+                            'external_id_type': 'ratingKey',  # Episodes always use ratingKey for uniqueness
+                            'seasonNumber': episode.seasonNumber if hasattr(episode, 'seasonNumber') else None,
+                            'episodeNumber': episode.episodeNumber if hasattr(episode, 'episodeNumber') else None,
+                            'season_number': episode.seasonNumber if hasattr(episode, 'seasonNumber') else None,
+                            'episode_number': episode.episodeNumber if hasattr(episode, 'episodeNumber') else None
                         }
                     }
                     formatted_episodes.append(episode_data)

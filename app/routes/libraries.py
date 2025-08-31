@@ -1398,54 +1398,260 @@ def get_media_details(server, library, content_name):
 def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, search_query='', sort_by='title_asc'):
     """Get episodes for a specific TV show using the media item object"""
     try:
-        from app.services.media_service_factory import MediaServiceFactory
+        from app.models_media_services import MediaStreamHistory, MediaItem
+        from sqlalchemy import or_
         
-        # Create service instance
-        service = MediaServiceFactory.create_service_from_db(server)
-        if not service:
+        # First try to get episodes from database (much faster!)
+        # Check multiple possible parent_id patterns for better compatibility
+        query = MediaItem.query.filter(
+            MediaItem.library_id == library.id,
+            MediaItem.item_type == 'episode',
+            or_(
+                MediaItem.parent_id == media_item.external_id,
+                MediaItem.parent_id == media_item.rating_key
+            )
+        )
+        
+        # Apply search filter if provided
+        if search_query:
+            search_term = f"%{search_query.lower()}%"
+            query = query.filter(
+                or_(
+                    MediaItem.title.ilike(search_term),
+                    MediaItem.summary.ilike(search_term)
+                )
+            )
+        
+        # Check if we have episodes in database
+        total_episodes = query.count()
+        
+        current_app.logger.debug(f"Found {total_episodes} cached episodes for show: {media_item.title} (external_id: {media_item.external_id}, rating_key: {media_item.rating_key})")
+        
+        if total_episodes > 0:
+            # We have episodes in database - use them!
+            current_app.logger.debug(f"Using cached episodes for show: {media_item.title} ({total_episodes} episodes)")
+            
+            # Check if episodes need syncing (older than 24 hours)
+            from datetime import datetime, timedelta
+            needs_sync = False
+            if media_item.last_synced:
+                sync_age = datetime.utcnow() - media_item.last_synced
+                needs_sync = sync_age > timedelta(hours=24)
+            else:
+                needs_sync = True
+            
+            # Apply sorting (database level for cached episodes)
+            current_app.logger.debug(f"Applying sort_by: {sort_by} to cached episodes query")
+            if sort_by == 'title_desc':
+                query = query.order_by(MediaItem.sort_title.desc())
+            elif sort_by == 'year_asc':
+                query = query.order_by(MediaItem.year.asc().nullsfirst(), MediaItem.sort_title.asc())
+            elif sort_by == 'year_desc':
+                query = query.order_by(MediaItem.year.desc().nullslast(), MediaItem.sort_title.asc())
+            elif sort_by == 'added_at_asc':
+                query = query.order_by(MediaItem.added_at.asc().nullsfirst(), MediaItem.sort_title.asc())
+            elif sort_by == 'added_at_desc':
+                query = query.order_by(MediaItem.added_at.desc().nullslast(), MediaItem.sort_title.asc())
+            elif sort_by.startswith('total_streams'):
+                # For stream sorting, we'll sort manually after getting stream counts
+                query = query.order_by(MediaItem.sort_title.asc())  # Default order first
+            else:  # Default to title_asc
+                query = query.order_by(MediaItem.sort_title.asc())
+            
+            # Get all episodes for stream count calculation
+            all_episodes = query.all()
+            
+            # Convert to dict format and add stream counts
+            episodes_data = []
+            for episode in all_episodes:
+                episode_dict = episode.to_dict()
+                
+                # Get stream count for this episode
+                stream_count = MediaStreamHistory.query.filter(
+                    MediaStreamHistory.server_id == server.id,
+                    MediaStreamHistory.library_name == library.name,
+                    MediaStreamHistory.media_title == episode.title,
+                    MediaStreamHistory.grandparent_title == media_item.title
+                ).count()
+                episode_dict['stream_count'] = stream_count
+                episodes_data.append(episode_dict)
+            
+            # Apply manual sorting for cached episodes (especially for stream counts)
+            current_app.logger.debug(f"Applying manual sorting for cached episodes: {sort_by}")
+            if sort_by.startswith('total_streams'):
+                reverse = sort_by.endswith('_desc')
+                episodes_data.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
+                current_app.logger.debug(f"Sorted cached episodes by streams, first episode: '{episodes_data[0].get('title')}' with {episodes_data[0].get('stream_count', 0)} streams")
+            elif sort_by.startswith('title') and sort_by != 'title_asc':  # title_asc is already handled by database
+                reverse = sort_by.endswith('_desc')
+                episodes_data.sort(key=lambda x: x.get('title', '').lower(), reverse=reverse)
+            elif sort_by.startswith('year') and sort_by != 'year_asc':
+                reverse = sort_by.endswith('_desc')
+                episodes_data.sort(key=lambda x: x.get('year') or (0 if not reverse else 9999), reverse=reverse)
+            elif sort_by.startswith('added_at') and not sort_by.endswith('_asc'):
+                reverse = sort_by.endswith('_desc')
+                episodes_data.sort(key=lambda x: x.get('added_at') or ('1900-01-01' if not reverse else '9999-12-31'), reverse=reverse)
+            elif sort_by.startswith('rating'):
+                reverse = sort_by.endswith('_desc')
+                episodes_data.sort(key=lambda x: x.get('rating') or (0 if not reverse else 10), reverse=reverse)
+            
+            # Apply manual pagination
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            paginated_episodes = episodes_data[start_idx:end_idx]
+            
+            # Calculate pagination info
+            total_pages = (total_episodes + per_page - 1) // per_page
+            
             return {
-                'items': [],
-                'total': 0,
+                'items': paginated_episodes,
+                'total': total_episodes,
                 'page': page,
                 'per_page': per_page,
-                'pages': 0,
-                'has_prev': False,
-                'has_next': False,
-                'error': 'Could not create service instance'
+                'pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages,
+                'needs_sync': needs_sync,
+                'last_synced': media_item.last_synced.isoformat() if media_item.last_synced else None,
+                'show_id': media_item.id
             }
         
-        # Use the media item's rating_key directly - no title-based lookup needed!
-        show_id = media_item.rating_key if media_item.rating_key else media_item.external_id
-        if not show_id:
-            return {
-                'items': [],
-                'total': 0,
-                'page': page,
-                'per_page': per_page,
-                'pages': 0,
-                'has_prev': False,
-                'has_next': False,
-                'error': 'No show ID available'
-            }
-        
-        # Get ALL episodes from the service first (for proper sorting)
-        if hasattr(service, 'get_show_episodes'):
-            # Get all episodes first, then we'll handle pagination after sorting
-            episodes_data = service.get_show_episodes(show_id, page=1, per_page=1000, search_query=search_query)
-        elif hasattr(service, 'get_library_content'):
-            # Fallback: try to get episodes by searching for the show in the library
-            episodes_data = service.get_library_content(library.external_id, page=1, per_page=1000, parent_id=show_id)
         else:
-            return {
-                'items': [],
-                'total': 0,
-                'page': page,
-                'per_page': per_page,
-                'pages': 0,
-                'has_prev': False,
-                'has_next': False,
-                'error': 'Service does not support episode retrieval'
-            }
+            # No episodes in database - trigger automatic sync first
+            current_app.logger.info(f"No cached episodes found for show: {media_item.title}, triggering automatic sync")
+            
+            # Trigger episode sync automatically
+            from app.services.media_sync_service import MediaSyncService
+            sync_result = MediaSyncService.sync_show_episodes(media_item.id)
+            
+            if sync_result['success']:
+                current_app.logger.info(f"Auto-sync completed for {media_item.title}: {sync_result['added']} episodes added")
+                
+                # Now try to get episodes from database again
+                query = MediaItem.query.filter_by(
+                    library_id=library.id,
+                    item_type='episode',
+                    parent_id=media_item.external_id
+                )
+                
+                # Apply search filter if provided
+                if search_query:
+                    search_term = f"%{search_query.lower()}%"
+                    query = query.filter(
+                        or_(
+                            MediaItem.title.ilike(search_term),
+                            MediaItem.summary.ilike(search_term)
+                        )
+                    )
+                
+                total_episodes = query.count()
+                
+                if total_episodes > 0:
+                    # Apply sorting
+                    if sort_by == 'title_desc':
+                        query = query.order_by(MediaItem.sort_title.desc())
+                    elif sort_by == 'year_asc':
+                        query = query.order_by(MediaItem.year.asc().nullsfirst(), MediaItem.sort_title.asc())
+                    elif sort_by == 'year_desc':
+                        query = query.order_by(MediaItem.year.desc().nullslast(), MediaItem.sort_title.asc())
+                    elif sort_by == 'added_at_asc':
+                        query = query.order_by(MediaItem.added_at.asc().nullsfirst(), MediaItem.sort_title.asc())
+                    elif sort_by == 'added_at_desc':
+                        query = query.order_by(MediaItem.added_at.desc().nullslast(), MediaItem.sort_title.asc())
+                    else:  # Default to title_asc
+                        query = query.order_by(MediaItem.sort_title.asc())
+                    
+                    # Get all episodes for stream count calculation
+                    all_episodes = query.all()
+                    
+                    # Convert to dict format and add stream counts
+                    episodes_data = []
+                    for episode in all_episodes:
+                        episode_dict = episode.to_dict()
+                        
+                        # Get stream count for this episode
+                        stream_count = MediaStreamHistory.query.filter(
+                            MediaStreamHistory.server_id == server.id,
+                            MediaStreamHistory.library_name == library.name,
+                            MediaStreamHistory.media_title == episode.title,
+                            MediaStreamHistory.grandparent_title == media_item.title
+                        ).count()
+                        episode_dict['stream_count'] = stream_count
+                        episodes_data.append(episode_dict)
+                    
+                    # Apply manual pagination
+                    start_idx = (page - 1) * per_page
+                    end_idx = start_idx + per_page
+                    paginated_episodes = episodes_data[start_idx:end_idx]
+                    
+                    # Calculate pagination info
+                    total_pages = (total_episodes + per_page - 1) // per_page
+                    
+                    return {
+                        'items': paginated_episodes,
+                        'total': total_episodes,
+                        'page': page,
+                        'per_page': per_page,
+                        'pages': total_pages,
+                        'has_prev': page > 1,
+                        'has_next': page < total_pages,
+                        'needs_sync': False,  # Just synced
+                        'last_synced': media_item.last_synced.isoformat() if media_item.last_synced else None,
+                        'show_id': media_item.id,
+                        'auto_synced': True  # Flag to indicate this was auto-synced
+                    }
+            
+            # If auto-sync failed, fall back to API call
+            current_app.logger.warning(f"Auto-sync failed for {media_item.title}, falling back to API: {sync_result.get('error', 'Unknown error')}")
+            
+            from app.services.media_service_factory import MediaServiceFactory
+            
+            # Create service instance
+            service = MediaServiceFactory.create_service_from_db(server)
+            if not service:
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': 'Could not create service instance'
+                }
+            
+            # Use the media item's rating_key directly
+            show_id = media_item.rating_key if media_item.rating_key else media_item.external_id
+            if not show_id:
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': 'No show ID available'
+                }
+            
+            # Get ALL episodes from the service first (for proper sorting)
+            if hasattr(service, 'get_show_episodes'):
+                # Get all episodes first, then we'll handle pagination after sorting
+                episodes_data = service.get_show_episodes(show_id, page=1, per_page=1000, search_query=search_query)
+            elif hasattr(service, 'get_library_content'):
+                # Fallback: try to get episodes by searching for the show in the library
+                episodes_data = service.get_library_content(library.external_id, page=1, per_page=1000, parent_id=show_id)
+            else:
+                return {
+                    'items': [],
+                    'total': 0,
+                    'page': page,
+                    'per_page': per_page,
+                    'pages': 0,
+                    'has_prev': False,
+                    'has_next': False,
+                    'error': 'Service does not support episode retrieval'
+                }
         
         # Add stream counts to episodes
         if episodes_data and episodes_data.get('items'):
@@ -1463,23 +1669,27 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
         
         # Apply sorting if needed (some services might not support server-side sorting)
         # Note: This must happen AFTER stream counts are added above
+        current_app.logger.debug(f"API fallback sorting: sort_by={sort_by}, episodes_data exists: {episodes_data is not None}")
         if episodes_data and episodes_data.get('items') and sort_by != 'title_asc':
             items = episodes_data['items']
             reverse = sort_by.endswith('_desc')
+            current_app.logger.debug(f"Applying API fallback sorting to {len(items)} episodes")
             
             if sort_by.startswith('title'):
                 items.sort(key=lambda x: x.get('title', '').lower(), reverse=reverse)
+                current_app.logger.debug(f"Sorted API episodes by title, first episode: '{items[0].get('title')}'")
             elif sort_by.startswith('year'):
                 items.sort(key=lambda x: x.get('year', 0) or 0, reverse=reverse)
+                current_app.logger.debug(f"Sorted API episodes by year, first episode: '{items[0].get('title')}' ({items[0].get('year')})")
             elif sort_by.startswith('added_at'):
                 items.sort(key=lambda x: x.get('added_at', ''), reverse=reverse)
+                current_app.logger.debug(f"Sorted API episodes by added_at, first episode: '{items[0].get('title')}' ({items[0].get('added_at')})")
             elif sort_by.startswith('rating'):
                 items.sort(key=lambda x: x.get('rating', 0) or 0, reverse=reverse)
+                current_app.logger.debug(f"Sorted API episodes by rating, first episode: '{items[0].get('title')}' ({items[0].get('rating')})")
             elif sort_by.startswith('total_streams'):
                 items.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
-                # Log just the first episode to confirm sorting worked
-                if items:
-                    current_app.logger.info(f"DEBUG: After sorting by streams, first episode: '{items[0].get('title')}' with {items[0].get('stream_count', 0)} streams")
+                current_app.logger.debug(f"Sorted API episodes by streams, first episode: '{items[0].get('title')}' with {items[0].get('stream_count', 0)} streams")
             
             episodes_data['items'] = items
         
@@ -1521,6 +1731,110 @@ def get_show_episodes_by_item(server, library, media_item, page=1, per_page=24, 
             'has_next': False,
             'error': str(e)
         }
+
+@bp.route('/api/sync-episodes/<int:show_id>', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('view_libraries')
+def sync_show_episodes_api(show_id):
+    """API endpoint to sync episodes for a specific show"""
+    try:
+        from app.services.media_sync_service import MediaSyncService
+        
+        # Trigger episode sync
+        result = MediaSyncService.sync_show_episodes(show_id)
+        
+        if result['success']:
+            return {
+                'success': True,
+                'message': f"Episodes synced for {result['show_title']}",
+                'added': result['added'],
+                'updated': result['updated'],
+                'removed': result['removed'],
+                'total_episodes': result['total_episodes']
+            }
+        else:
+            return {'success': False, 'error': result['error']}, 400
+            
+    except Exception as e:
+        current_app.logger.error(f"Error in episode sync API: {e}")
+        return {'success': False, 'error': str(e)}, 500
+
+@bp.route('/api/purge-episodes/<int:show_id>', methods=['DELETE'])
+@login_required
+@setup_required
+@permission_required('view_libraries')
+def purge_show_episodes_api(show_id):
+    """API endpoint to purge cached episodes for a specific show"""
+    try:
+        from app.models_media_services import MediaItem
+        from app.extensions import db
+        
+        # Get the show from database
+        show = MediaItem.query.get(show_id)
+        if not show or show.item_type != 'show':
+            return {'success': False, 'error': 'Show not found or not a TV show'}, 404
+        
+        current_app.logger.info(f"Purging cached episodes for show: {show.title}")
+        
+        # Find all episodes for this show (check both parent_id patterns for safety)
+        episodes_to_delete = MediaItem.query.filter(
+            MediaItem.library_id == show.library_id,
+            MediaItem.item_type == 'episode',
+            db.or_(
+                MediaItem.parent_id == show.external_id,  # Correct parent_id
+                MediaItem.parent_id.is_(None)  # Episodes with no parent_id (from incomplete syncs)
+            )
+        ).all()
+        
+        # Also find episodes by checking if their external_id matches any episode from this show's ratingKey
+        # This catches episodes that might have been synced with wrong parent_id
+        if show.rating_key:
+            # Get episodes from Plex to find their external_ids
+            from app.services.media_service_factory import MediaServiceFactory
+            service = MediaServiceFactory.create_service_from_db(show.library.server)
+            if service and hasattr(service, 'get_show_episodes'):
+                episodes_data = service.get_show_episodes(show.rating_key, page=1, per_page=1000)
+                if episodes_data and episodes_data.get('items'):
+                    episode_external_ids = [str(ep.get('id', '')) for ep in episodes_data['items']]
+                    
+                    # Find any episodes in database with these external_ids
+                    orphaned_episodes = MediaItem.query.filter(
+                        MediaItem.library_id == show.library_id,
+                        MediaItem.item_type == 'episode',
+                        MediaItem.external_id.in_(episode_external_ids)
+                    ).all()
+                    
+                    # Add to deletion list (avoid duplicates)
+                    for ep in orphaned_episodes:
+                        if ep not in episodes_to_delete:
+                            episodes_to_delete.append(ep)
+        
+        deleted_count = len(episodes_to_delete)
+        deleted_titles = [ep.title for ep in episodes_to_delete[:10]]  # First 10 for logging
+        
+        # Delete episodes
+        for episode in episodes_to_delete:
+            db.session.delete(episode)
+        
+        # Commit changes
+        db.session.commit()
+        
+        current_app.logger.info(f"Purged {deleted_count} episodes for show {show.title}")
+        if deleted_titles:
+            current_app.logger.debug(f"Deleted episodes include: {', '.join(deleted_titles)}")
+        
+        return {
+            'success': True,
+            'message': f"Purged {deleted_count} cached episodes for {show.title}",
+            'deleted_count': deleted_count,
+            'show_title': show.title
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in episode purge API: {e}")
+        db.session.rollback()
+        return {'success': False, 'error': str(e)}, 500
 
 @bp.route('/api/media-output/<server_nickname>/<library_name>/<int:media_id>')
 @login_required

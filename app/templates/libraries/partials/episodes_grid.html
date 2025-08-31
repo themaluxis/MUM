@@ -72,6 +72,31 @@
                     <option value="96" {{ 'selected' if episodes_content.per_page == 96 else '' }}>96</option>
                 </select>
             </div>
+            
+            <!-- Sync Button and Last Updated -->
+            <div class="flex items-center gap-2">
+                <button class="btn btn-primary btn-xs sync-episodes-btn"
+                        data-show-id="{{ episodes_content.show_id if episodes_content else '' }}"
+                        data-show-title="{{ media_details.title if media_details else '' }}"
+                        title="Sync episodes for {{ media_details.title if media_details else 'this show' }}">
+                    <i class="fa-solid fa-sync sm:mr-1"></i>
+                    <span class="sync-episodes-btn-text hidden sm:inline">Sync</span>
+                </button>
+                <button class="btn btn-error btn-xs purge-episodes-btn"
+                        data-show-id="{{ episodes_content.show_id if episodes_content else '' }}"
+                        data-show-title="{{ media_details.title if media_details else '' }}"
+                        title="Purge cached episodes for {{ media_details.title if media_details else 'this show' }}">
+                    <i class="fa-solid fa-trash sm:mr-1"></i>
+                    <span class="purge-episodes-btn-text hidden sm:inline">Purge</span>
+                </button>
+                <div class="text-xs text-base-content/50 hidden sm:block">
+                    {% if episodes_content and episodes_content.last_synced %}
+                        Last updated: {{ episodes_content.last_synced }}
+                    {% else %}
+                        Never synced
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 
@@ -299,6 +324,218 @@ document.addEventListener('DOMContentLoaded', function() {
         clearSearchBtn.addEventListener('click', function() {
             searchInput.value = '';
             updateEpisodesView();
+        });
+    }
+    
+    // Episode sync functionality
+    const syncBtn = document.querySelector('.sync-episodes-btn');
+    if (syncBtn) {
+        syncBtn.addEventListener('click', function() {
+            const showId = this.dataset.showId;
+            const showTitle = this.dataset.showTitle;
+            const btnText = this.querySelector('.sync-episodes-btn-text');
+            const btnIcon = this.querySelector('i');
+            
+            if (!showId) {
+                console.error('No show ID found for sync');
+                return;
+            }
+            
+            // Update button state
+            this.disabled = true;
+            btnIcon.classList.remove('fa-sync');
+            btnIcon.classList.add('fa-spinner', 'fa-spin');
+            if (btnText) btnText.textContent = 'Syncing...';
+            
+            // Make sync request
+            fetch(`/api/sync-episodes/${showId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    const message = `Episodes synced for ${showTitle}: ${data.added} added, ${data.updated} updated, ${data.removed} removed`;
+                    
+                    // Create and show toast notification
+                    const toast = document.createElement('div');
+                    toast.className = 'toast toast-top toast-end';
+                    toast.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="fa-solid fa-check-circle"></i>
+                            <span>${message}</span>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+                    
+                    // Auto-remove toast after 5 seconds
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 5000);
+                    
+                    // Refresh the episodes page
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    console.error('Sync failed:', data.error);
+                    
+                    // Show error toast
+                    const toast = document.createElement('div');
+                    toast.className = 'toast toast-top toast-end';
+                    toast.innerHTML = `
+                        <div class="alert alert-error">
+                            <i class="fa-solid fa-exclamation-circle"></i>
+                            <span>Sync failed: ${data.error}</span>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+                    
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 5000);
+                }
+            })
+            .catch(error => {
+                console.error('Sync request failed:', error);
+                
+                // Show error toast
+                const toast = document.createElement('div');
+                toast.className = 'toast toast-top toast-end';
+                toast.innerHTML = `
+                    <div class="alert alert-error">
+                        <i class="fa-solid fa-exclamation-circle"></i>
+                        <span>Sync request failed: ${error.message}</span>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 300);
+                }, 5000);
+            })
+            .finally(() => {
+                // Reset button state
+                this.disabled = false;
+                btnIcon.classList.remove('fa-spinner', 'fa-spin');
+                btnIcon.classList.add('fa-sync');
+                if (btnText) btnText.textContent = 'Sync';
+            });
+        });
+    }
+    
+    // Episode purge functionality
+    const purgeBtn = document.querySelector('.purge-episodes-btn');
+    if (purgeBtn) {
+        purgeBtn.addEventListener('click', function() {
+            const showId = this.dataset.showId;
+            const showTitle = this.dataset.showTitle;
+            const btnText = this.querySelector('.purge-episodes-btn-text');
+            const btnIcon = this.querySelector('i');
+            
+            if (!showId) {
+                console.error('No show ID found for purge');
+                return;
+            }
+            
+            // Show confirmation dialog
+            if (!confirm(`Are you sure you want to purge all cached episodes for "${showTitle}"?\n\nThis will delete all stored episode data and you'll need to sync again to reload them.`)) {
+                return;
+            }
+            
+            // Update button state
+            this.disabled = true;
+            btnIcon.classList.remove('fa-trash');
+            btnIcon.classList.add('fa-spinner', 'fa-spin');
+            if (btnText) btnText.textContent = 'Purging...';
+            
+            // Make purge request
+            fetch(`/api/purge-episodes/${showId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    const message = `${data.message}`;
+                    
+                    // Create and show toast notification
+                    const toast = document.createElement('div');
+                    toast.className = 'toast toast-top toast-end';
+                    toast.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="fa-solid fa-check-circle"></i>
+                            <span>${message}</span>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+                    
+                    // Auto-remove toast after 5 seconds
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 5000);
+                    
+                    // Refresh the episodes page
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    console.error('Purge failed:', data.error);
+                    
+                    // Show error toast
+                    const toast = document.createElement('div');
+                    toast.className = 'toast toast-top toast-end';
+                    toast.innerHTML = `
+                        <div class="alert alert-error">
+                            <i class="fa-solid fa-exclamation-circle"></i>
+                            <span>Purge failed: ${data.error}</span>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+                    
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 5000);
+                }
+            })
+            .catch(error => {
+                console.error('Purge request failed:', error);
+                
+                // Show error toast
+                const toast = document.createElement('div');
+                toast.className = 'toast toast-top toast-end';
+                toast.innerHTML = `
+                    <div class="alert alert-error">
+                        <i class="fa-solid fa-exclamation-circle"></i>
+                        <span>Purge request failed: ${error.message}</span>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 300);
+                }, 5000);
+            })
+            .finally(() => {
+                // Reset button state
+                this.disabled = false;
+                btnIcon.classList.remove('fa-spinner', 'fa-spin');
+                btnIcon.classList.add('fa-trash');
+                if (btnText) btnText.textContent = 'Purge';
+            });
         });
     }
 });
