@@ -383,12 +383,12 @@ class MediaSyncService:
             # Get total count
             total = query.count()
             
-            # Apply pagination
-            items = query.offset((page - 1) * per_page).limit(per_page).all()
+            # Get ALL items first (for proper sorting by stream counts)
+            all_items = query.all()
             
             # Convert to dict format and add stream counts
             items_data = []
-            for item in items:
+            for item in all_items:
                 item_dict = item.to_dict()
                 
                 # Get stream count for this item
@@ -412,11 +412,22 @@ class MediaSyncService:
                 item_dict['stream_count'] = stream_count
                 items_data.append(item_dict)
             
+            # Apply sorting after adding stream counts (overrides database sorting for stream counts)
+            if sort_by.startswith('total_streams'):
+                reverse = sort_by.endswith('_desc')
+                items_data.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
+                current_app.logger.info(f"DEBUG: Sorted library by streams, first item: '{items_data[0].get('title')}' with {items_data[0].get('stream_count', 0)} streams")
+            
+            # Apply manual pagination after sorting
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            paginated_items = items_data[start_idx:end_idx]
+            
             # Calculate pagination info
             total_pages = (total + per_page - 1) // per_page
             
             return {
-                'items': items_data,
+                'items': paginated_items,
                 'total': total,
                 'page': page,
                 'per_page': per_page,
