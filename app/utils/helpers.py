@@ -324,6 +324,32 @@ def format_duration(total_seconds):
         
     return " ".join(parts[:3]) # Show at most 3 parts (e.g., d, h, m)
 
+def format_media_duration(duration_value, service_type):
+    """Formats media duration based on the service type.
+    
+    Args:
+        duration_value: The raw duration value from the media service
+        service_type: The type of media service ('plex', 'jellyfin', etc.)
+    
+    Returns:
+        Formatted duration string like '2h 9m'
+    """
+    if not duration_value or duration_value <= 0:
+        return "0m"
+    
+    # Convert to seconds based on service type
+    if service_type.lower() == 'plex':
+        # Plex returns duration in milliseconds
+        total_seconds = duration_value // 1000
+    elif service_type.lower() == 'jellyfin':
+        # Jellyfin returns duration in .NET ticks (10,000,000 ticks = 1 second)
+        total_seconds = duration_value // 10000000
+    else:
+        # For other services, assume it's already in seconds
+        total_seconds = duration_value
+    
+    return format_duration(total_seconds)
+
 def format_json(data):
     """Format JSON data with proper indentation for display"""
     try:

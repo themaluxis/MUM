@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, current_app, request, make_response, json, flash, redirect, url_for, abort
 from flask_login import login_required, current_user
-from app.utils.helpers import setup_required, permission_required, encode_url_component, decode_url_component, decode_url_component_variations, generate_url_slug, format_duration
+from app.utils.helpers import setup_required, permission_required, encode_url_component, decode_url_component, decode_url_component_variations, generate_url_slug, format_duration, format_media_duration
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
 from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory, UserMediaAccess
@@ -734,7 +734,8 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                          active_tab=tab,
                          days_filter=request.args.get('days', 30) if tab == 'activity' else None,
                          current_sort_by=request.args.get('sort_by', 'title_asc') if tab == 'episodes' else None,
-                         format_duration=format_duration)
+                         format_duration=format_duration,
+                         format_media_duration=format_media_duration)
 
 @bp.route('/library/<server_nickname>/<library_name>')
 @login_required
