@@ -460,21 +460,65 @@ def episode_detail(server_nickname, library_name, media_id, tv_show_slug, episod
             if user_access:
                 entry.user_display_name = user_access.get_display_name()
                 entry.user_type = 'service'
+                entry.user_server_nickname = user_access.server.server_nickname if user_access.server else None
+                entry.user_external_username = user_access.external_username
+                
+                # Get avatar URL for Plex users
+                entry.user_avatar_url = None
+                if server.service_type.value.lower() == 'plex':
+                    # For Plex, check multiple possible locations for the thumb URL
+                    thumb_url = None
+                    
+                    # First try service_settings
+                    if user_access.service_settings and user_access.service_settings.get('thumb'):
+                        thumb_url = user_access.service_settings['thumb']
+                    # Then try raw_data from the user sync
+                    elif user_access.user_raw_data and user_access.user_raw_data.get('thumb'):
+                        thumb_url = user_access.user_raw_data['thumb']
+                    # Also check nested raw data structure
+                    elif (user_access.user_raw_data and 
+                          user_access.user_raw_data.get('plex_user_obj_attrs') and 
+                          user_access.user_raw_data['plex_user_obj_attrs'].get('thumb')):
+                        thumb_url = user_access.user_raw_data['plex_user_obj_attrs']['thumb']
+                    
+                    if thumb_url:
+                        # Check if it's already a full URL (plex.tv avatars) or needs proxy
+                        if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
+                            entry.user_avatar_url = thumb_url
+                        else:
+                            entry.user_avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                
+                elif server.service_type.value.lower() == 'jellyfin':
+                    # For Jellyfin, use the external_user_id to get avatar
+                    if user_access.external_user_id:
+                        entry.user_avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user_access.external_user_id}"
             else:
                 entry.user_display_name = 'Unknown User'
                 entry.user_type = 'unknown'
+                entry.user_avatar_url = None
+                entry.user_server_nickname = None
+                entry.user_external_username = None
         elif entry.user_app_access_uuid:
             from app.models import UserAppAccess
             user_app = UserAppAccess.query.filter_by(uuid=entry.user_app_access_uuid).first()
             if user_app:
                 entry.user_display_name = user_app.get_display_name()
                 entry.user_type = 'local'
+                entry.user_avatar_url = None  # Local users don't have service avatars
+                entry.user_server_nickname = None
+                entry.user_external_username = None
             else:
                 entry.user_display_name = 'Unknown User'
                 entry.user_type = 'unknown'
+                entry.user_avatar_url = None
+                entry.user_server_nickname = None
+                entry.user_external_username = None
         else:
             entry.user_display_name = 'Unknown User'
             entry.user_type = 'unknown'
+            entry.user_avatar_url = None
+            entry.user_server_nickname = None
+            entry.user_external_username = None
     
     streaming_history = activity_pagination
     

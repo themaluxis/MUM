@@ -320,115 +320,198 @@
                 {% elif active_tab == 'activity' %}
                     <!-- Activity Tab -->
                     <div class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-xl font-semibold">
-                                <i class="fa-solid fa-chart-line text-primary mr-2"></i>
-                                Recent Activity
-                            </h2>
+                        <!-- Filter Controls -->
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-primary"></i>
+                                Streaming Activity
+                            </h3>
                             
-                            <!-- Days Filter -->
-                            <div class="flex items-center gap-2">
-                                <label for="days-filter" class="text-sm text-base-content/60">Last:</label>
-                                <select id="days-filter" class="select select-bordered select-sm" onchange="updateDaysFilter()">
-                                    <option value="7" {{ 'selected' if days_filter == 7 else '' }}>7 days</option>
-                                    <option value="30" {{ 'selected' if days_filter == 30 else '' }}>30 days</option>
-                                    <option value="90" {{ 'selected' if days_filter == 90 else '' }}>90 days</option>
-                                    <option value="365" {{ 'selected' if days_filter == 365 else '' }}>1 year</option>
-                                </select>
+                            <!-- Time Filter Dropdown -->
+                            <div class="dropdown dropdown-end">
+                                <div tabindex="0" role="button" class="btn btn-sm btn-outline">
+                                    <i class="fa-solid fa-calendar mr-2"></i>
+                                    {% if days_filter == 7 %}Last 7 days
+                                    {% elif days_filter == 30 %}Last 30 days
+                                    {% elif days_filter == 90 %}Last 90 days
+                                    {% else %}Last 30 days{% endif %}
+                                    <i class="fa-solid fa-chevron-down ml-2"></i>
+                                </div>
+                                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
+                                    <li><a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', days=7) }}"
+                                           class="{% if days_filter == 7 %}active{% endif %}">Last 7 days</a></li>
+                                    <li><a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', days=30) }}"
+                                           class="{% if days_filter == 30 %}active{% endif %}">Last 30 days</a></li>
+                                    <li><a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', days=90) }}"
+                                           class="{% if days_filter == 90 %}active{% endif %}">Last 90 days</a></li>
+                                </ul>
                             </div>
                         </div>
 
+                        <!-- Activity List -->
                         {% if streaming_history and streaming_history.items %}
-                            <!-- Activity List -->
-                            <div class="space-y-3">
-                                {% for entry in streaming_history.items %}
-                                <div class="bg-base-100 rounded-lg p-4 flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <div class="avatar">
-                                            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
-                                                {% if entry.user_avatar_url %}
-                                                    <img src="{{ entry.user_avatar_url }}" 
-                                                         alt="{{ entry.user_display_name }}" 
-                                                         class="w-full h-full object-cover"
-                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                                    <!-- Fallback if avatar fails to load -->
-                                                    <div class="w-full h-full bg-primary text-primary-content rounded-full flex items-center justify-center" style="display: none;">
-                                                        <span class="text-sm">{{ entry.user_display_name[0].upper() if entry.user_display_name else 'U' }}</span>
+                            <div class="bg-base-200/50 rounded-lg border border-base-300 overflow-hidden">
+                                <div class="overflow-x-auto">
+                                    <table class="table table-zebra w-full">
+                                        <thead class="bg-base-300">
+                                            <tr>
+                                                <th class="text-left">User</th>
+                                                <th class="text-left">Started</th>
+                                                <th class="text-left">Duration</th>
+                                                <th class="text-left">Progress</th>
+                                                <th class="text-left">Device</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for activity in streaming_history.items %}
+                                            <tr class="hover:bg-base-200/50">
+                                                <td>
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="avatar">
+                                                            <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                                                                {% if activity.user_avatar_url %}
+                                                                    <img src="{{ activity.user_avatar_url }}" 
+                                                                         alt="{{ activity.user_display_name }}" 
+                                                                         class="w-full h-full object-cover"
+                                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                                    <!-- Fallback icon if avatar fails to load -->
+                                                                    <div class="w-full h-full flex items-center justify-center" style="display: none;">
+                                                                        {% if activity.user_type == 'service' %}
+                                                                            <i class="fa-solid fa-user text-primary text-xs"></i>
+                                                                        {% elif activity.user_type == 'local' %}
+                                                                            <i class="fa-solid fa-user-gear text-primary text-xs"></i>
+                                                                        {% else %}
+                                                                            <i class="fa-solid fa-user-question text-primary text-xs"></i>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                {% else %}
+                                                                    <!-- No avatar available, show icon -->
+                                                                    {% if activity.user_type == 'service' %}
+                                                                        <i class="fa-solid fa-user text-primary text-xs"></i>
+                                                                    {% elif activity.user_type == 'local' %}
+                                                                        <i class="fa-solid fa-user-gear text-primary text-xs"></i>
+                                                                    {% else %}
+                                                                        <i class="fa-solid fa-user-question text-primary text-xs"></i>
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="font-medium text-sm">
+                                                                {% if activity.user_server_nickname and activity.user_external_username %}
+                                                                    <a href="{{ url_for('user.view_service_account', server_nickname=activity.user_server_nickname, server_username=activity.user_external_username, back='users', back_view='cards') }}" class="text-primary hover:text-primary-focus" title="View user profile">
+                                                                        {{ activity.user_display_name }}
+                                                                    </a>
+                                                                {% else %}
+                                                                    {{ activity.user_display_name }}
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                {% else %}
-                                                    <!-- No avatar available, show initials -->
-                                                    <div class="w-full h-full bg-primary text-primary-content rounded-full flex items-center justify-center">
-                                                        <span class="text-sm">{{ entry.user_display_name[0].upper() if entry.user_display_name else 'U' }}</span>
+                                                </td>
+                                                <td>
+                                                    <div class="text-sm">
+                                                        <div>{{ activity.started_at.strftime('%b %d, %Y') }}</div>
+                                                        <div class="text-xs text-base-content/60">{{ activity.started_at.strftime('%I:%M %p') }}</div>
                                                     </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div class="font-medium">{{ entry.user_display_name or 'Unknown User' }}</div>
-                                            <div class="text-sm text-base-content/60">
-                                                {{ entry.started_at.strftime('%b %d, %Y at %I:%M %p') }}
-                                                {% if entry.duration_seconds %}
-                                                    • {{ (entry.duration_seconds // 60) }}m {{ (entry.duration_seconds % 60) }}s
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="text-sm">
+                                                        {% if activity.duration_seconds %}
+                                                            {% set hours = (activity.duration_seconds // 3600)|int %}
+                                                            {% set minutes = ((activity.duration_seconds % 3600) // 60)|int %}
+                                                            {% if hours > 0 %}
+                                                                {{ hours }}h {{ minutes }}m
+                                                            {% else %}
+                                                                {{ minutes }}m
+                                                            {% endif %}
+                                                        {% elif activity.view_offset_at_end_seconds %}
+                                                            {% set hours = (activity.view_offset_at_end_seconds // 3600)|int %}
+                                                            {% set minutes = ((activity.view_offset_at_end_seconds % 3600) // 60)|int %}
+                                                            {% if hours > 0 %}
+                                                                {{ hours }}h {{ minutes }}m
+                                                            {% else %}
+                                                                {{ minutes }}m
+                                                            {% endif %}
+                                                        {% else %}
+                                                            <span class="text-base-content/40">Unknown</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="text-sm">
+                                                        {% if activity.view_offset_at_end_seconds and activity.media_duration_seconds %}
+                                                            {% set progress_percent = ((activity.view_offset_at_end_seconds / activity.media_duration_seconds) * 100)|round(1) %}
+                                                            <div class="flex items-center gap-2">
+                                                                <div class="w-16 bg-base-300 rounded-full h-2">
+                                                                    <div class="bg-primary h-2 rounded-full" style="width: {{ progress_percent }}%"></div>
+                                                                </div>
+                                                                <span class="text-xs">{{ progress_percent }}%</span>
+                                                            </div>
+                                                        {% else %}
+                                                            <span class="text-base-content/40">Unknown</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="text-sm">
+                                                        {% if activity.device_name %}
+                                                            <div class="flex items-center gap-1">
+                                                                <i class="fa-solid fa-tv text-base-content/60 text-xs"></i>
+                                                                {{ activity.device_name }}
+                                                            </div>
+                                                        {% else %}
+                                                            <span class="text-base-content/40">Unknown</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                {% endfor %}
                             </div>
 
                             <!-- Pagination -->
                             {% if streaming_history.pages > 1 %}
-                            <div class="flex justify-center mt-6">
-                                <div class="join">
-                                    {% if streaming_history.has_prev %}
-                                        <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', page=streaming_history.page-1, days=days_filter) }}" 
-                                           class="join-item btn btn-sm">
-                                            <i class="fa-solid fa-chevron-left"></i>
-                                        </a>
-                                    {% endif %}
-                                    
-                                    {% set start_page = [1, streaming_history.page - 2] | max %}
-                                    {% set end_page = [streaming_history.pages, streaming_history.page + 2] | min %}
-                                    
-                                    {% if start_page > 1 %}
-                                        <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', page=1, days=days_filter) }}" 
-                                           class="join-item btn btn-sm">1</a>
-                                        {% if start_page > 2 %}
-                                            <button class="join-item btn btn-sm btn-disabled">...</button>
-                                        {% endif %}
-                                    {% endif %}
-                                    
-                                    {% for page_num in range(start_page, end_page + 1) %}
-                                        {% if page_num == streaming_history.page %}
-                                            <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
+                            <div class="flex items-center justify-center gap-2">
+                                <!-- Previous Page -->
+                                {% if streaming_history.has_prev %}
+                                    <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', days=days_filter, page=streaming_history.prev_num) }}"
+                                       class="btn btn-sm btn-outline">
+                                        <i class="fa-solid fa-chevron-left"></i>
+                                        Previous
+                                    </a>
+                                {% endif %}
+
+                                <!-- Page Numbers -->
+                                {% for page_num in streaming_history.iter_pages() %}
+                                    {% if page_num %}
+                                        {% if page_num != streaming_history.page %}
+                                            <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', days=days_filter, page=page_num) }}"
+                                               class="btn btn-sm btn-outline">{{ page_num }}</a>
                                         {% else %}
-                                            <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', page=page_num, days=days_filter) }}" 
-                                               class="join-item btn btn-sm">{{ page_num }}</a>
+                                            <span class="btn btn-sm btn-primary">{{ page_num }}</span>
                                         {% endif %}
-                                    {% endfor %}
-                                    
-                                    {% if end_page < streaming_history.pages %}
-                                        {% if end_page < streaming_history.pages - 1 %}
-                                            <button class="join-item btn btn-sm btn-disabled">...</button>
-                                        {% endif %}
-                                        <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', page=streaming_history.pages, days=days_filter) }}" 
-                                           class="join-item btn btn-sm">{{ streaming_history.pages }}</a>
+                                    {% else %}
+                                        <span class="btn btn-sm btn-disabled">…</span>
                                     {% endif %}
-                                    
-                                    {% if streaming_history.has_next %}
-                                        <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', page=streaming_history.page+1, days=days_filter) }}" 
-                                           class="join-item btn btn-sm">
-                                            <i class="fa-solid fa-chevron-right"></i>
-                                        </a>
-                                    {% endif %}
-                                </div>
+                                {% endfor %}
+
+                                <!-- Next Page -->
+                                {% if streaming_history.has_next %}
+                                    <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title), tab='activity', days=days_filter, page=streaming_history.next_num) }}"
+                                       class="btn btn-sm btn-outline">
+                                        Next
+                                        <i class="fa-solid fa-chevron-right"></i>
+                                    </a>
+                                {% endif %}
                             </div>
                             {% endif %}
 
                         {% else %}
                             <!-- No Activity -->
-                            <div class="text-center py-12">
+                            <div class="bg-base-200/50 rounded-lg p-12 text-center border border-base-300">
                                 <div class="w-16 h-16 rounded-full bg-base-300 flex items-center justify-center mx-auto mb-4">
                                     <i class="fa-solid fa-chart-line text-2xl text-base-content/40"></i>
                                 </div>
