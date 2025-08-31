@@ -294,6 +294,14 @@
                                     {% endif %}
                                 </div>
                                 {% endif %}
+                                
+                                <!-- View Output Button -->
+                                <div class="pt-3 border-t border-base-300">
+                                    <button onclick="showEpisodeApiOutputModal()" class="btn btn-sm btn-outline btn-primary w-full">
+                                        <i class="fa-solid fa-code mr-2"></i>
+                                        View API Output
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -438,6 +446,53 @@
     </div>
 </div>
 
+<!-- Episode API Output Modal -->
+<dialog id="episodeApiOutputModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-5xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
+                    <i class="fa-solid fa-code text-secondary text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Raw API Data</h3>
+                    <p class="text-sm text-base-content/60">Complete API response for "{{ episode_details.title }}"</p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <div class="flex gap-2 mb-4">
+                <button onclick="copyEpisodeApiOutput()" class="btn btn-sm btn-outline">
+                    <i class="fa-solid fa-copy mr-2"></i>
+                    Copy to Clipboard
+                </button>
+                <button onclick="downloadEpisodeApiOutput()" class="btn btn-sm btn-outline">
+                    <i class="fa-solid fa-download mr-2"></i>
+                    Download JSON
+                </button>
+            </div>
+            
+            <div class="bg-base-300 rounded-lg p-4 max-h-96 overflow-auto">
+                <pre id="episodeApiOutputContent" class="text-sm whitespace-pre-wrap break-words font-mono">
+                    <div class="flex items-center justify-center py-8">
+                        <span class="loading loading-spinner loading-md mr-2"></span>
+                        Loading API output...
+                    </div>
+                </pre>
+            </div>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 <script>
 function updateDaysFilter() {
     const daysSelect = document.getElementById('days-filter');
@@ -446,5 +501,80 @@ function updateDaysFilter() {
     currentUrl.searchParams.set('page', '1'); // Reset to first page
     window.location.href = currentUrl.toString();
 }
+
+// Episode API Output Modal Functions
+function showEpisodeApiOutputModal() {
+    const modal = document.getElementById('episodeApiOutputModal');
+    const content = document.getElementById('episodeApiOutputContent');
+    
+    // Show modal
+    modal.showModal();
+    
+    // Reset content to loading state
+    content.innerHTML = `
+        <div class="flex items-center justify-center py-8">
+            <span class="loading loading-spinner loading-md mr-2"></span>
+            Loading API output...
+        </div>
+    `;
+    
+    // Fetch API output for the episode
+    fetch(`{{ url_for('libraries.get_episode_api_output', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=tv_show_item.id, tv_show_slug=generate_url_slug(tv_show_item.title), episode_slug=generate_url_slug(episode_details.title)) }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                content.innerHTML = `<div class="text-error">Error: ${data.error}</div>`;
+            } else {
+                content.textContent = JSON.stringify(data, null, 2);
+            }
+        })
+        .catch(error => {
+            content.innerHTML = `<div class="text-error">Error loading API output: ${error.message}</div>`;
+        });
+}
+
+function closeEpisodeApiOutputModal() {
+    const modal = document.getElementById('episodeApiOutputModal');
+    modal.close();
+}
+
+function copyEpisodeApiOutput() {
+    const content = document.getElementById('episodeApiOutputContent');
+    navigator.clipboard.writeText(content.textContent).then(() => {
+        // Show temporary success message
+        const copyBtn = event.target.closest('button');
+        const originalBtnText = copyBtn.innerHTML;
+        
+        copyBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i>Copied!';
+        copyBtn.classList.add('btn-success');
+        
+        setTimeout(() => {
+            copyBtn.innerHTML = originalBtnText;
+            copyBtn.classList.remove('btn-success');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+}
+
+function downloadEpisodeApiOutput() {
+    const content = document.getElementById('episodeApiOutputContent').textContent;
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `{{ episode_details.title|replace(' ', '_') }}_api_output.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Close modal when clicking outside
+document.getElementById('episodeApiOutputModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeEpisodeApiOutputModal();
+    }
+});
 </script>
 {% endblock %}

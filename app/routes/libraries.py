@@ -1463,6 +1463,250 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
             'error': str(e)
         }
 
+@bp.route('/api/media-output/<server_nickname>/<library_name>/<int:media_id>')
+@login_required
+@setup_required
+@permission_required('view_libraries')
+def get_media_api_output(server_nickname, library_name, media_id):
+    """Get raw API output for a specific media item"""
+    try:
+        # URL decode the parameters
+        server_nickname = urllib.parse.unquote(server_nickname)
+        library_name = urllib.parse.unquote(library_name)
+        
+        # Decode URL component back to original name for lookup
+        library_name_for_lookup = decode_url_component(library_name)
+        
+        # Find the server by nickname
+        server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
+        
+        # Find the library by name and server
+        library = None
+        library_name_variations = decode_url_component_variations(library_name)
+        
+        for variation in library_name_variations:
+            library = MediaLibrary.query.filter_by(
+                server_id=server.id,
+                name=variation
+            ).first()
+            if library:
+                library_name_for_lookup = variation
+                break
+        
+        if not library:
+            return {'error': 'Library not found'}, 404
+        
+        # Get the media item from database
+        from app.models_media_services import MediaItem
+        media_item = MediaItem.query.filter_by(
+            id=media_id,
+            library_id=library.id
+        ).first_or_404()
+        
+        # Get the media service
+        from app.services.media_service_factory import MediaServiceFactory
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service:
+            return {'error': 'Could not connect to media service'}, 500
+        
+        # Get the raw media details from the service
+        try:
+            # For Plex, get the raw item data directly
+            if server.service_type.value.lower() == 'plex':
+                plex_server = service._get_server_instance()
+                if not plex_server:
+                    return {'error': 'Could not connect to Plex server'}, 500
+                
+                # Get the item by rating key (external_id)
+                try:
+                    plex_item = plex_server.fetchItem(int(media_item.external_id))
+                    
+                    # Convert PlexAPI object to dictionary with all attributes
+                    def serialize_value(value):
+                        """Recursively serialize complex objects to JSON-safe format"""
+                        if value is None:
+                            return None
+                        elif isinstance(value, (str, int, float, bool)):
+                            return value
+                        elif isinstance(value, (list, tuple)):
+                            return [serialize_value(item) for item in value]
+                        elif isinstance(value, dict):
+                            return {k: serialize_value(v) for k, v in value.items()}
+                        elif hasattr(value, '__dict__'):
+                            # For objects with __dict__, try to serialize their attributes
+                            try:
+                                result = {}
+                                for k, v in value.__dict__.items():
+                                    if not k.startswith('_'):
+                                        result[k] = serialize_value(v)
+                                return result
+                            except:
+                                return str(value)
+                        else:
+                            return str(value)
+                    
+                    raw_output = {}
+                    for attr in dir(plex_item):
+                        if not attr.startswith('_') and not callable(getattr(plex_item, attr)):
+                            try:
+                                value = getattr(plex_item, attr)
+                                raw_output[attr] = serialize_value(value)
+                            except Exception as e:
+                                raw_output[attr] = f"<Error accessing {attr}: {str(e)}>"
+                    
+                    return raw_output
+                    
+                except Exception as e:
+                    return {'error': f'Failed to fetch item from Plex: {str(e)}'}, 500
+            
+            else:
+                # For other services, try to get library content and find the item
+                library_content = service.get_library_content(library.external_id, page=1, per_page=1000)
+                if library_content and library_content.get('items'):
+                    for item in library_content['items']:
+                        if str(item.get('id')) == str(media_item.external_id):
+                            return item
+                
+                return {'error': 'Media item not found in service response'}, 404
+                
+        except Exception as e:
+            return {'error': f'Error fetching media details: {str(e)}'}, 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Error getting media API output: {e}")
+        return {'error': str(e)}, 500
+
+@bp.route('/api/episode-output/<server_nickname>/<library_name>/<int:media_id>/<tv_show_slug>/<episode_slug>')
+@login_required
+@setup_required
+@permission_required('view_libraries')
+def get_episode_api_output(server_nickname, library_name, media_id, tv_show_slug, episode_slug):
+    """Get raw API output for a specific episode"""
+    try:
+        # URL decode the parameters
+        server_nickname = urllib.parse.unquote(server_nickname)
+        library_name = urllib.parse.unquote(library_name)
+        tv_show_slug = urllib.parse.unquote(tv_show_slug)
+        episode_slug = urllib.parse.unquote(episode_slug)
+        
+        # Decode URL component back to original name for lookup
+        library_name_for_lookup = decode_url_component(library_name)
+        tv_show_name = decode_url_component(tv_show_slug)
+        episode_name = decode_url_component(episode_slug)
+        
+        # Find the server by nickname
+        server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
+        
+        # Find the library by name and server
+        library = None
+        library_name_variations = decode_url_component_variations(library_name)
+        
+        for variation in library_name_variations:
+            library = MediaLibrary.query.filter_by(
+                server_id=server.id,
+                name=variation
+            ).first()
+            if library:
+                library_name_for_lookup = variation
+                break
+        
+        if not library:
+            return {'error': 'Library not found'}, 404
+        
+        # Get the TV show item from database
+        from app.models_media_services import MediaItem
+        tv_show_item = MediaItem.query.filter_by(
+            id=media_id,
+            library_id=library.id
+        ).first_or_404()
+        
+        # Get the media service
+        from app.services.media_service_factory import MediaServiceFactory
+        service = MediaServiceFactory.create_service_from_db(server)
+        if not service:
+            return {'error': 'Could not connect to media service'}, 500
+        
+        # Get the episode details from the service
+        try:
+            # For Plex, get the raw episode data directly
+            if server.service_type.value.lower() == 'plex':
+                plex_server = service._get_server_instance()
+                if not plex_server:
+                    return {'error': 'Could not connect to Plex server'}, 500
+                
+                # Get the show first
+                try:
+                    plex_show = plex_server.fetchItem(int(tv_show_item.external_id))
+                    
+                    # Find the episode by title
+                    episode_found = None
+                    for season in plex_show.seasons():
+                        for episode in season.episodes():
+                            if generate_url_slug(episode.title) == episode_slug:
+                                episode_found = episode
+                                break
+                        if episode_found:
+                            break
+                    
+                    if not episode_found:
+                        return {'error': f'Episode "{episode_name}" not found'}, 404
+                    
+                    # Convert PlexAPI episode object to dictionary with all attributes
+                    def serialize_value(value):
+                        """Recursively serialize complex objects to JSON-safe format"""
+                        if value is None:
+                            return None
+                        elif isinstance(value, (str, int, float, bool)):
+                            return value
+                        elif isinstance(value, (list, tuple)):
+                            return [serialize_value(item) for item in value]
+                        elif isinstance(value, dict):
+                            return {k: serialize_value(v) for k, v in value.items()}
+                        elif hasattr(value, '__dict__'):
+                            # For objects with __dict__, try to serialize their attributes
+                            try:
+                                result = {}
+                                for k, v in value.__dict__.items():
+                                    if not k.startswith('_'):
+                                        result[k] = serialize_value(v)
+                                return result
+                            except:
+                                return str(value)
+                        else:
+                            return str(value)
+                    
+                    raw_output = {}
+                    for attr in dir(episode_found):
+                        if not attr.startswith('_') and not callable(getattr(episode_found, attr)):
+                            try:
+                                value = getattr(episode_found, attr)
+                                raw_output[attr] = serialize_value(value)
+                            except Exception as e:
+                                raw_output[attr] = f"<Error accessing {attr}: {str(e)}>"
+                    
+                    return raw_output
+                    
+                except Exception as e:
+                    return {'error': f'Failed to fetch episode from Plex: {str(e)}'}, 500
+            
+            else:
+                # For other services, try to get episodes and find the specific one
+                if hasattr(service, 'get_show_episodes'):
+                    episodes_data = service.get_show_episodes(tv_show_item.external_id, page=1, per_page=1000)
+                    if episodes_data and episodes_data.get('items'):
+                        for episode in episodes_data['items']:
+                            if generate_url_slug(episode.get('title', '')) == episode_slug:
+                                return episode
+                
+                return {'error': 'Episode not found in service response'}, 404
+                
+        except Exception as e:
+            return {'error': f'Error fetching episode details: {str(e)}'}, 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Error getting episode API output: {e}")
+        return {'error': str(e)}, 500
+
 
 def get_library_media_content(library, page=1, per_page=24, search_query='', sort_by='title_asc'):
     """Get media content from the library using cached data or live API"""
