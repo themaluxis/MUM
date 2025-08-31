@@ -170,7 +170,15 @@
                             {% if episode_details.duration %}
                             <div class="flex items-center gap-1">
                                 <i class="fa-solid fa-clock"></i>
-                                <span>{{ (episode_details.duration // 60)|int }}m</span>
+                                {# Plex returns duration in milliseconds, convert to minutes #}
+                                {% set total_minutes = (episode_details.duration / 60000)|int %}
+                                {% set hours = (total_minutes // 60)|int %}
+                                {% set minutes = (total_minutes % 60)|int %}
+                                {% if hours > 0 %}
+                                    <span>{{ hours }}h {{ minutes }}m</span>
+                                {% else %}
+                                    <span>{{ minutes }}m</span>
+                                {% endif %}
                             </div>
                             {% endif %}
                             {% if episode_details.air_date %}
@@ -245,7 +253,17 @@
                                 {% if episode_details.duration %}
                                 <div class="flex justify-between">
                                     <span class="text-base-content/60">Duration:</span>
-                                    <span class="font-medium">{{ (episode_details.duration // 60)|int }} minutes</span>
+                                    <span class="font-medium">
+                                        {# Plex returns duration in milliseconds, convert to minutes #}
+                                        {% set total_minutes = (episode_details.duration / 60000)|int %}
+                                        {% set hours = (total_minutes // 60)|int %}
+                                        {% set minutes = (total_minutes % 60)|int %}
+                                        {% if hours > 0 %}
+                                            {{ hours }} hour{{ 's' if hours != 1 else '' }} {{ minutes }} minute{{ 's' if minutes != 1 else '' }}
+                                        {% else %}
+                                            {{ minutes }} minute{{ 's' if minutes != 1 else '' }}
+                                        {% endif %}
+                                    </span>
                                 </div>
                                 {% endif %}
                                 <div class="flex justify-between">
