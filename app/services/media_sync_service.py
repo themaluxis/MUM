@@ -393,10 +393,21 @@ class MediaSyncService:
                 
                 # Get stream count for this item
                 from app.models_media_services import MediaStreamHistory
-                stream_count = MediaStreamHistory.query.filter(
-                    MediaStreamHistory.server_id == item.server_id,
-                    MediaStreamHistory.media_title == item.title
-                ).count()
+                
+                # For TV shows, count all episodes (grandparent_title = show title)
+                # For movies and other content, count direct matches (media_title = content title)
+                if item.item_type and item.item_type.lower() in ['show', 'series']:
+                    # For TV shows, count all episodes of the show
+                    stream_count = MediaStreamHistory.query.filter(
+                        MediaStreamHistory.server_id == item.server_id,
+                        MediaStreamHistory.grandparent_title == item.title
+                    ).count()
+                else:
+                    # For movies and other content, count direct matches
+                    stream_count = MediaStreamHistory.query.filter(
+                        MediaStreamHistory.server_id == item.server_id,
+                        MediaStreamHistory.media_title == item.title
+                    ).count()
                 
                 item_dict['stream_count'] = stream_count
                 items_data.append(item_dict)

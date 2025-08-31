@@ -703,7 +703,7 @@ def encode_url_component(text):
     # Debug logging
     try:
         from flask import current_app
-        current_app.logger.info(f"DEBUG encode_url_component: '{text}' -> '{encoded}'")
+        #current_app.logger.info(f"DEBUG encode_url_component: '{text}' -> '{encoded}'")
     except:
         pass  # Ignore if not in Flask context
     

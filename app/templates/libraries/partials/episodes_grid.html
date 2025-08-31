@@ -77,6 +77,7 @@
 
     {% if episodes_content and episodes_content.get('items') %}
         <!-- Episodes Grid -->
+        
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
             {% for episode in episodes_content.get('items', []) %}
             <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, tv_show_slug=generate_url_slug(media_details.title), episode_slug=generate_url_slug(episode.title)) }}" class="group cursor-pointer block">

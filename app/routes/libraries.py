@@ -1369,12 +1369,13 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
                 'error': 'Show not found'
             }
         
-        # Get episodes from the service
+        # Get ALL episodes from the service first (for proper sorting)
         if hasattr(service, 'get_show_episodes'):
-            episodes_data = service.get_show_episodes(show_details['id'], page=page, per_page=per_page, search_query=search_query)
+            # Get all episodes first, then we'll handle pagination after sorting
+            episodes_data = service.get_show_episodes(show_details['id'], page=1, per_page=1000, search_query=search_query)
         elif hasattr(service, 'get_library_content'):
             # Fallback: try to get episodes by searching for the show in the library
-            episodes_data = service.get_library_content(library.external_id, page=page, per_page=per_page, parent_id=show_details['id'])
+            episodes_data = service.get_library_content(library.external_id, page=1, per_page=1000, parent_id=show_details['id'])
         else:
             return {
                 'items': [],
@@ -1390,6 +1391,7 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
         # Add stream counts to episodes
         if episodes_data and episodes_data.get('items'):
             from app.models_media_services import MediaStreamHistory
+            
             for episode in episodes_data['items']:
                 # Filter by both episode title AND show title to avoid conflicts with episodes from other shows
                 stream_count = MediaStreamHistory.query.filter(
@@ -1399,12 +1401,9 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
                     MediaStreamHistory.grandparent_title == show_title
                 ).count()
                 episode['stream_count'] = stream_count
-                
-                # Debug logging
-                if stream_count > 0:
-                    current_app.logger.info(f"DEBUG: Episode '{episode.get('title')}' has {stream_count} streams")
         
         # Apply sorting if needed (some services might not support server-side sorting)
+        # Note: This must happen AFTER stream counts are added above
         if episodes_data and episodes_data.get('items') and sort_by != 'title_asc':
             items = episodes_data['items']
             reverse = sort_by.endswith('_desc')
@@ -1419,8 +1418,35 @@ def get_show_episodes(server, library, show_title, page=1, per_page=24, search_q
                 items.sort(key=lambda x: x.get('rating', 0) or 0, reverse=reverse)
             elif sort_by.startswith('total_streams'):
                 items.sort(key=lambda x: x.get('stream_count', 0), reverse=reverse)
+                # Log just the first episode to confirm sorting worked
+                if items:
+                    current_app.logger.info(f"DEBUG: After sorting by streams, first episode: '{items[0].get('title')}' with {items[0].get('stream_count', 0)} streams")
             
             episodes_data['items'] = items
+        
+        # Apply manual pagination after sorting (since we got all episodes)
+        if episodes_data and episodes_data.get('items'):
+            all_items = episodes_data['items']
+            total_items = len(all_items)
+            
+            # Calculate pagination
+            total_pages = (total_items + per_page - 1) // per_page
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            paginated_items = all_items[start_idx:end_idx]
+            
+            # Update episodes_data with paginated results
+            episodes_data.update({
+                'items': paginated_items,
+                'total': total_items,
+                'page': page,
+                'per_page': per_page,
+                'pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages
+            })
+            
+            current_app.logger.info(f"DEBUG: Manual pagination - showing {len(paginated_items)} episodes (page {page}/{total_pages})")
         
         return episodes_data
         
