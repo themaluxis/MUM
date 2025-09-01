@@ -311,14 +311,7 @@
 
                 {% elif active_tab == 'episodes' and library.library_type and library.library_type.lower() in ['show', 'tv', 'series', 'tvshows'] %}
                     <!-- Episodes Tab -->
-                    {% if episodes_content %}
-                        {% include 'libraries/partials/episodes_grid.html' %}
-                    {% else %}
-                        <div class="text-center py-8">
-                            <p class="text-lg">No episodes data available.</p>
-                            <p class="text-sm text-base-content/60 mt-2">Episodes information could not be loaded.</p>
-                        </div>
-                    {% endif %}
+                    {% include 'libraries/partials/episodes_grid.html' %}
                 
                 {% elif active_tab == 'activity' %}
                     <!-- Activity Tab -->

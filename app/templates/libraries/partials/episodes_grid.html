@@ -1,5 +1,20 @@
 <!-- Episodes Grid Template - Similar to library_media_grid.html but for TV show episodes -->
-<div class="space-y-6">
+<div class="space-y-6" id="episodes-container">
+    {% if not episodes_cached %}
+    <!-- Syncing Indicator -->
+    <div id="sync-indicator" 
+         hx-post="/api/sync-episodes/{{ media_item.id }}"
+         hx-target="#episodes-container"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        
+        <div class="flex flex-col items-center justify-center py-16">
+            <div class="loading loading-spinner loading-lg text-primary"></div>
+            <p class="mt-4 text-lg font-medium text-base-content">Syncing episodes...</p>
+            <p class="text-sm text-base-content/60 mt-2">This may take a moment for shows with many episodes</p>
+        </div>
+    </div>
+    {% else %}
     <!-- Episodes Grid Header -->
     <div class="flex flex-col gap-4">
         <!-- Title and Stats Row -->
@@ -48,17 +63,23 @@
             <!-- Sort By Dropdown -->
             <div class="flex items-center gap-2">
                 <label for="episodes-sort-by" class="text-sm text-base-content/60 whitespace-nowrap">Sort by:</label>
-                <select id="episodes-sort-by" class="select select-bordered select-sm w-64">
-                    <option value="season_episode_asc" {{ 'selected' if request.args.get('sort_by', 'season_episode_asc') == 'season_episode_asc' else '' }}>Season/Episode (S01E01)</option>
-                    <option value="season_episode_desc" {{ 'selected' if request.args.get('sort_by') == 'season_episode_desc' else '' }}>Season/Episode (Reverse)</option>
-                    <option value="title_asc" {{ 'selected' if request.args.get('sort_by') == 'title_asc' else '' }}>Title (A to Z)</option>
-                    <option value="title_desc" {{ 'selected' if request.args.get('sort_by') == 'title_desc' else '' }}>Title (Z to A)</option>
-                    <option value="year_desc" {{ 'selected' if request.args.get('sort_by') == 'year_desc' else '' }}>Year (Newest First)</option>
-                    <option value="year_asc" {{ 'selected' if request.args.get('sort_by') == 'year_asc' else '' }}>Year (Oldest First)</option>
-                    <option value="added_at_desc" {{ 'selected' if request.args.get('sort_by') == 'added_at_desc' else '' }}>Date Added (Newest First)</option>
-                    <option value="added_at_asc" {{ 'selected' if request.args.get('sort_by') == 'added_at_asc' else '' }}>Date Added (Oldest First)</option>
-                    <option value="total_streams_desc" {{ 'selected' if request.args.get('sort_by') == 'total_streams_desc' else '' }}>Total Streams (Most Popular)</option>
-                    <option value="total_streams_asc" {{ 'selected' if request.args.get('sort_by') == 'total_streams_asc' else '' }}>Total Streams (Least Popular)</option>
+                <select id="episodes-sort-by" 
+                        class="select select-bordered select-sm w-64"
+                        hx-get="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes') }}"
+                        hx-target="#episodes-container"
+                        hx-trigger="change"
+                        hx-include="[name='page'], [name='per_page'], [name='search']"
+                        name="sort_by">
+                    <option value="season_episode_asc" {{ 'selected' if current_sort_by == 'season_episode_asc' else '' }}>Season/Episode (S01E01)</option>
+                    <option value="season_episode_desc" {{ 'selected' if current_sort_by == 'season_episode_desc' else '' }}>Season/Episode (Reverse)</option>
+                    <option value="title_asc" {{ 'selected' if current_sort_by == 'title_asc' else '' }}>Title (A to Z)</option>
+                    <option value="title_desc" {{ 'selected' if current_sort_by == 'title_desc' else '' }}>Title (Z to A)</option>
+                    <option value="year_desc" {{ 'selected' if current_sort_by == 'year_desc' else '' }}>Year (Newest First)</option>
+                    <option value="year_asc" {{ 'selected' if current_sort_by == 'year_asc' else '' }}>Year (Oldest First)</option>
+                    <option value="added_at_desc" {{ 'selected' if current_sort_by == 'added_at_desc' else '' }}>Date Added (Newest First)</option>
+                    <option value="added_at_asc" {{ 'selected' if current_sort_by == 'added_at_asc' else '' }}>Date Added (Oldest First)</option>
+                    <option value="total_streams_desc" {{ 'selected' if current_sort_by == 'total_streams_desc' else '' }}>Total Streams (Most Popular)</option>
+                    <option value="total_streams_asc" {{ 'selected' if current_sort_by == 'total_streams_asc' else '' }}>Total Streams (Least Popular)</option>
                 </select>
             </div>
             
@@ -182,7 +203,7 @@
         <div class="flex justify-center mt-8">
             <div class="join">
                 {% if episodes_content.has_prev %}
-                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.page-1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.page-1, sort_by=current_sort_by, search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">
                         <i class="fa-solid fa-chevron-left"></i>
                     </a>
@@ -192,7 +213,7 @@
                 {% set end_page = [episodes_content.pages, episodes_content.page + 2] | min %}
                 
                 {% if start_page > 1 %}
-                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=1, sort_by=current_sort_by, search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">1</a>
                     {% if start_page > 2 %}
                         <button class="join-item btn btn-sm btn-disabled">...</button>
@@ -203,7 +224,7 @@
                     {% if page_num == episodes_content.page %}
                         <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
                     {% else %}
-                        <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=page_num, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                        <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=page_num, sort_by=current_sort_by, search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                            class="join-item btn btn-sm">{{ page_num }}</a>
                     {% endif %}
                 {% endfor %}
@@ -212,12 +233,12 @@
                     {% if end_page < episodes_content.pages - 1 %}
                         <button class="join-item btn btn-sm btn-disabled">...</button>
                     {% endif %}
-                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.pages, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.pages, sort_by=current_sort_by, search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">{{ episodes_content.pages }}</a>
                 {% endif %}
                 
                 {% if episodes_content.has_next %}
-                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.page+1, sort_by=request.args.get('sort_by', 'title_asc'), search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
+                    <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='episodes', page=episodes_content.page+1, sort_by=current_sort_by, search=request.args.get('search', ''), per_page=request.args.get('per_page', 24)) }}" 
                        class="join-item btn btn-sm">
                         <i class="fa-solid fa-chevron-right"></i>
                     </a>
@@ -540,3 +561,5 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+    {% endif %}
+</div>

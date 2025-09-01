@@ -603,6 +603,7 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
     
     # Get episodes for TV shows
     episodes_content = None
+    episodes_cached = False
     if tab == 'episodes' and library.library_type and library.library_type.lower() in ['show', 'tv', 'series', 'tvshows']:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 24, type=int)
@@ -622,8 +623,24 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
         ]
         if sort_by not in valid_sorts:
             sort_by = 'season_episode_asc'
-            
-        episodes_content = get_show_episodes_by_item(server, library, media_item, page, per_page, search_query, sort_by)
+        
+        # Check if we have cached episodes
+        from app.models_media_services import MediaItem
+        from sqlalchemy import or_
+        cached_episodes_count = MediaItem.query.filter(
+            MediaItem.library_id == library.id,
+            MediaItem.item_type == 'episode',
+            or_(
+                MediaItem.parent_id == media_item.external_id,
+                MediaItem.parent_id == media_item.rating_key
+            )
+        ).count()
+        
+        episodes_cached = cached_episodes_count > 0
+        
+        # Only get episodes if we have cached data
+        if episodes_cached:
+            episodes_content = get_show_episodes_by_item(server, library, media_item, page, per_page, search_query, sort_by)
     
     # Get streaming history for this specific content
     streaming_history = None
@@ -729,13 +746,23 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
         streaming_history = activity_pagination
     
     # Handle HTMX requests for tab content
-    if request.headers.get('HX-Request') and tab == 'activity':
-        return render_template('libraries/partials/media_activity_tab.html',
-                             media_details=media_details,
-                             library=library,
-                             server=server,
-                             streaming_history=streaming_history,
-                             days_filter=request.args.get('days', 30))
+    if request.headers.get('HX-Request'):
+        if tab == 'activity':
+            return render_template('libraries/partials/media_activity_tab.html',
+                                 media_details=media_details,
+                                 library=library,
+                                 server=server,
+                                 streaming_history=streaming_history,
+                                 days_filter=request.args.get('days', 30))
+        elif tab == 'episodes':
+            return render_template('libraries/partials/episodes_grid.html',
+                                 episodes_content=episodes_content,
+                                 episodes_cached=episodes_cached,
+                                 media_details=media_details,
+                                 media_item=media_item,
+                                 library=library,
+                                 server=server,
+                                 current_sort_by=request.args.get('sort_by', 'season_episode_asc'))
     
     return render_template('libraries/media_detail.html',
                          title=f"Media: {media_item.title}",
@@ -745,6 +772,7 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                          server=server,
                          streaming_history=streaming_history,
                          episodes_content=episodes_content,
+                         episodes_cached=episodes_cached,
                          active_tab=tab,
                          days_filter=request.args.get('days', 30) if tab == 'activity' else None,
                          current_sort_by=request.args.get('sort_by', 'season_episode_asc') if tab == 'episodes' else None,
@@ -1761,25 +1789,55 @@ def sync_show_episodes_api(show_id):
     """API endpoint to sync episodes for a specific show"""
     try:
         from app.services.media_sync_service import MediaSyncService
+        from app.models_media_services import MediaItem
+        
+        current_app.logger.info(f"Starting episode sync for show ID: {show_id}")
+        
+        # Get the show from database
+        show = MediaItem.query.get(show_id)
+        if not show or show.item_type != 'show':
+            current_app.logger.error(f"Show not found or not a TV show: ID {show_id}")
+            return f'<div class="alert alert-error"><span>Show not found or not a TV show</span></div>', 404
+        
+        current_app.logger.info(f"Found show: {show.title} (external_id: {show.external_id}, rating_key: {show.rating_key})")
+        
+        library = show.library
+        server = library.server
         
         # Trigger episode sync
+        current_app.logger.info(f"Triggering sync for show: {show.title}")
         result = MediaSyncService.sync_show_episodes(show_id)
         
+        current_app.logger.info(f"Sync result: {result}")
+        
         if result['success']:
-            return {
-                'success': True,
-                'message': f"Episodes synced for {result['show_title']}",
-                'added': result['added'],
-                'updated': result['updated'],
-                'removed': result['removed'],
-                'total_episodes': result['total_episodes']
-            }
+            # Get the synced episodes with default sorting
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 24, type=int)
+            search_query = request.args.get('search', '').strip()
+            sort_by = request.args.get('sort_by', 'season_episode_asc').strip()
+            
+            current_app.logger.info(f"Getting episodes after sync: page={page}, per_page={per_page}, sort_by={sort_by}")
+            episodes_content = get_show_episodes_by_item(server, library, show, page, per_page, search_query, sort_by)
+            
+            current_app.logger.info(f"Episodes content after sync: {episodes_content.get('total', 0) if episodes_content else 'None'} total episodes")
+            
+            # Return the episodes grid HTML
+            return render_template('libraries/partials/episodes_grid.html',
+                                 episodes_content=episodes_content,
+                                 episodes_cached=True,  # After sync, episodes are cached
+                                 media_details=show.to_dict(),
+                                 media_item=show,
+                                 library=library,
+                                 server=server,
+                                 current_sort_by=sort_by)
         else:
-            return {'success': False, 'error': result['error']}, 400
+            current_app.logger.error(f"Sync failed for show {show.title}: {result.get('error', 'Unknown error')}")
+            return f'<div class="alert alert-error"><span>Sync failed: {result["error"]}</span></div>', 400
             
     except Exception as e:
-        current_app.logger.error(f"Error in episode sync API: {e}")
-        return {'success': False, 'error': str(e)}, 500
+        current_app.logger.error(f"Error in episode sync API for show {show_id}: {e}", exc_info=True)
+        return f'<div class="alert alert-error"><span>Sync failed: {str(e)}</span></div>', 500
 
 @bp.route('/api/purge-episodes/<int:show_id>', methods=['DELETE'])
 @login_required
