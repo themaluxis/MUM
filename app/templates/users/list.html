@@ -742,6 +742,86 @@
                         </div>
                     </div>
 
+                    <!-- Show Email Section -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-envelope text-blue-500 text-sm"></i>
+                                        <h5 class="font-medium text-base-content">Show Email Section</h5>
+                                    </div>
+                                    <input type="checkbox" id="show_email_section_toggle" class="toggle toggle-primary" checked />
+                                </div>
+                                <p class="text-sm text-base-content/60">Display email information on user cards</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Show Added Section -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-calendar-plus text-green-500 text-sm"></i>
+                                        <h5 class="font-medium text-base-content">Show Added Section</h5>
+                                    </div>
+                                    <input type="checkbox" id="show_added_section_toggle" class="toggle toggle-success" checked />
+                                </div>
+                                <p class="text-sm text-base-content/60">Display when the user was added to the system</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Show Streamed Section -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-play text-purple-500 text-sm"></i>
+                                        <h5 class="font-medium text-base-content">Show Streamed Section</h5>
+                                    </div>
+                                    <input type="checkbox" id="show_streamed_section_toggle" class="toggle toggle-secondary" checked />
+                                </div>
+                                <p class="text-sm text-base-content/60">Display streaming activity and statistics</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Show Libraries Section -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-folder text-orange-500 text-sm"></i>
+                                        <h5 class="font-medium text-base-content">Show Libraries Section</h5>
+                                    </div>
+                                    <input type="checkbox" id="show_libraries_section_toggle" class="toggle toggle-warning" checked />
+                                </div>
+                                <p class="text-sm text-base-content/60">Display library access and permissions</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Show Roles Section -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-user-tag text-red-500 text-sm"></i>
+                                        <h5 class="font-medium text-base-content">Show Roles Section</h5>
+                                    </div>
+                                    <input type="checkbox" id="show_roles_section_toggle" class="toggle toggle-error" checked />
+                                </div>
+                                <p class="text-sm text-base-content/60">Display user roles and permissions</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Preferred View -->
                     <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
                         <div class="flex items-center justify-between">
@@ -851,16 +931,57 @@
     // User Display Settings Logic
     const userSettingsModal = document.getElementById('user_settings_modal');
     const showUserNotesToggle = document.getElementById('show_user_notes_toggle');
+    const showEmailSectionToggle = document.getElementById('show_email_section_toggle');
+    const showAddedSectionToggle = document.getElementById('show_added_section_toggle');
+    const showStreamedSectionToggle = document.getElementById('show_streamed_section_toggle');
+    const showLibrariesSectionToggle = document.getElementById('show_libraries_section_toggle');
+    const showRolesSectionToggle = document.getElementById('show_roles_section_toggle');
     const preferredViewSelect = document.getElementById('preferred_view_select');
     const saveSettingsBtn = document.getElementById('save_user_settings_btn');
     const openSettingsBtn = document.querySelector('button[onclick="user_settings_modal.showModal()"]');
 
-    // This function applies the "Show Notes" preference to the user cards on the page.
-    function applyShowNotesPreference() {
+    // This function applies all display preferences to the user cards on the page.
+    function applyDisplayPreferences() {
+        // Show Notes preference
         const showNotes = localStorage.getItem('showUserNotes') === 'true';
         document.querySelectorAll('.user-notes-container').forEach(container => {
             container.style.display = showNotes ? '' : 'none';
         });
+
+        // Show Email Section preference
+        const showEmail = localStorage.getItem('showEmailSection') !== 'false';
+        document.querySelectorAll('.user-email-section').forEach(section => {
+            section.style.display = showEmail ? '' : 'none';
+        });
+
+        // Show Added Section preference
+        const showAdded = localStorage.getItem('showAddedSection') !== 'false';
+        document.querySelectorAll('.user-added-section').forEach(section => {
+            section.style.display = showAdded ? '' : 'none';
+        });
+
+        // Show Streamed Section preference
+        const showStreamed = localStorage.getItem('showStreamedSection') !== 'false';
+        document.querySelectorAll('.user-streamed-section').forEach(section => {
+            section.style.display = showStreamed ? '' : 'none';
+        });
+
+        // Show Libraries Section preference
+        const showLibraries = localStorage.getItem('showLibrariesSection') !== 'false';
+        document.querySelectorAll('.user-libraries-section').forEach(section => {
+            section.style.display = showLibraries ? '' : 'none';
+        });
+
+        // Show Roles Section preference
+        const showRoles = localStorage.getItem('showRolesSection') !== 'false';
+        document.querySelectorAll('.user-roles-section').forEach(section => {
+            section.style.display = showRoles ? '' : 'none';
+        });
+    }
+
+    // Legacy function for backward compatibility
+    function applyShowNotesPreference() {
+        applyDisplayPreferences();
     }
 
     // This function is called when the modal is opened. It sets the
@@ -868,6 +989,21 @@
     function loadSettingsIntoModal() {
         const showNotes = localStorage.getItem('showUserNotes') === 'true';
         showUserNotesToggle.checked = showNotes;
+
+        const showEmail = localStorage.getItem('showEmailSection') !== 'false';
+        showEmailSectionToggle.checked = showEmail;
+
+        const showAdded = localStorage.getItem('showAddedSection') !== 'false';
+        showAddedSectionToggle.checked = showAdded;
+
+        const showStreamed = localStorage.getItem('showStreamedSection') !== 'false';
+        showStreamedSectionToggle.checked = showStreamed;
+
+        const showLibraries = localStorage.getItem('showLibrariesSection') !== 'false';
+        showLibrariesSectionToggle.checked = showLibraries;
+
+        const showRoles = localStorage.getItem('showRolesSection') !== 'false';
+        showRolesSectionToggle.checked = showRoles;
 
         const autoSync = localStorage.getItem('autoSyncUsers') === 'true';
         document.getElementById('auto_sync_users_toggle').checked = autoSync;
@@ -885,16 +1021,26 @@
     saveSettingsBtn.addEventListener('click', function() {
         // 1. Get the chosen values from the modal inputs.
         const showNotes = showUserNotesToggle.checked;
+        const showEmail = showEmailSectionToggle.checked;
+        const showAdded = showAddedSectionToggle.checked;
+        const showStreamed = showStreamedSectionToggle.checked;
+        const showLibraries = showLibrariesSectionToggle.checked;
+        const showRoles = showRolesSectionToggle.checked;
         const autoSync = document.getElementById('auto_sync_users_toggle').checked;
         const preferredView = preferredViewSelect.value;
 
         // 2. Save them to localStorage for immediate UI updates.
         localStorage.setItem('showUserNotes', showNotes);
+        localStorage.setItem('showEmailSection', showEmail);
+        localStorage.setItem('showAddedSection', showAdded);
+        localStorage.setItem('showStreamedSection', showStreamed);
+        localStorage.setItem('showLibrariesSection', showLibraries);
+        localStorage.setItem('showRolesSection', showRoles);
         localStorage.setItem('autoSyncUsers', autoSync);
         localStorage.setItem('userListView', preferredView);
 
-        // 3. Visually apply the notes preference right away.
-        applyShowNotesPreference();
+        // 3. Visually apply all display preferences right away.
+        applyDisplayPreferences();
 
         // 4. Send the preferred view to the backend to save in the database.
         htmx.ajax('POST', '/users/save_view_preference', {
@@ -919,11 +1065,11 @@
         });
     });
 
-    // On initial page load, apply the "Show Notes" preference.
-    document.addEventListener('DOMContentLoaded', applyShowNotesPreference);
+    // On initial page load, apply all display preferences.
+    document.addEventListener('DOMContentLoaded', applyDisplayPreferences);
     
-    // After any HTMX content swap, re-apply the "Show Notes" preference.
-    htmx.on('htmx:afterSwap', applyShowNotesPreference);
+    // After any HTMX content swap, re-apply all display preferences.
+    htmx.on('htmx:afterSwap', applyDisplayPreferences);
 </script>
 <script>
     const TABLE_COLUMNS = {

@@ -33,11 +33,17 @@
         
         <div class="text-xs space-y-1 mb-3">
             {# For UserAppAccess, show the primary email #}
-            <p class="text-xs text-base-content/70 truncate" title="{{ user.email or 'No E-mail address' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.email or 'No E-mail address' }}</p>
-            <div class="tooltip tooltip-top" data-tip="The date {{ user.get_display_name() }} was added to MUM">
-                <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}</p>
+            <div class="user-email-section">
+                <p class="text-xs text-base-content/70 truncate" title="{{ user.email or 'No E-mail address' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.email or 'No E-mail address' }}</p>
             </div>
-            <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
+            <div class="user-added-section">
+                <div class="tooltip tooltip-top" data-tip="The date {{ user.get_display_name() }} was added to MUM">
+                    <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}</p>
+                </div>
+            </div>
+            <div class="user-streamed-section">
+                <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
+            </div>
             {% if user.access_expires_at %}
                 <p class="text-warning">
                     <i class="fa-solid fa-hourglass-end fa-fw mr-1"></i> 
@@ -52,7 +58,7 @@
             <p class="text-xs text-base-content/70 mb-3">{{ user.notes or 'No notes for this user.' }}</p>
         </div>
 
-        <div class="mb-3">
+        <div class="user-libraries-section mb-3">
             <p class="text-xs font-semibold mb-2">Service Accounts (<span class="font-normal">{{ user.media_accesses|length }}</span>):</p>
             {% if user.media_accesses %}
                 <div class="flex flex-wrap gap-1">

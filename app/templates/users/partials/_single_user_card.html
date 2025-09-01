@@ -237,11 +237,17 @@
         
         <div class="text-xs space-y-1 mb-3">
             {# For UserAppAccess, show the primary email #}
-            <p class="text-xs text-base-content/70 truncate" title="{{ user.email or 'No E-mail address' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.email or 'No E-mail address' }}</p>
-            <div class="tooltip tooltip-top" data-tip="The date {{ user.get_display_name() }} was added to MUM">
-                <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}</p>
+            <div class="user-email-section">
+                <p class="text-xs text-base-content/70 truncate" title="{{ user.email or 'No E-mail address' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.email or 'No E-mail address' }}</p>
             </div>
-            <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
+            <div class="user-added-section">
+                <div class="tooltip tooltip-top" data-tip="The date {{ user.get_display_name() }} was added to MUM">
+                    <p><i class="fa-solid fa-calendar-plus fa-fw mr-1 text-info"></i> Added: {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}</p>
+                </div>
+            </div>
+            <div class="user-streamed-section">
+                <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
+            </div>
             {% if user.service_join_date or user.plex_join_date %}
             <div class="tooltip tooltip-top" data-tip="Full join date: {{ (user.service_join_date or user.plex_join_date) | format_datetime_user }} - When {{ user.get_display_name() }} joined the service">
                 <p><i class="fa-solid fa-server fa-fw mr-1 text-info"></i> Service Join Date: {{ (user.service_join_date or user.plex_join_date) | format_datetime_user(include_time=False) }}</p>
@@ -261,7 +267,7 @@
             <p class="text-xs text-base-content/70 mb-3">{{ user.notes or 'No notes for this user.' }}</p>
         </div>
 
-        <div class="mb-3">
+        <div class="user-libraries-section mb-3">
             <p class="text-xs font-semibold mb-2">Libraries (<span class="font-normal">{{ user_sorted_libraries.get(user.uuid, [])|length }}</span>):</p>
             {% if user_sorted_libraries.get(user.uuid) %}
                 <div class="flex flex-wrap gap-1">
@@ -281,51 +287,53 @@
         </div>
 
         <!-- User Roles Section -->
-        {% set has_roles = user.is_home_user or user.shares_back or user.discord_user_id or user.is_purge_whitelisted %}
-        {% if has_roles %}
-        <div class="mb-3">
-            <div class="text-xs font-medium mb-1">Roles:</div>
-            <div class="flex flex-wrap gap-1">
-                {% if user.is_home_user %}
-                    <span class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20 gap-1" title="Plex Home User">
-                        <i class="fa-solid fa-home w-3 h-3"></i>
-                        Home User
-                    </span>
-                {% endif %}
-                {% if user.shares_back %}
-                    <span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-400/10 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/20 gap-1" title="Shares Libraries Back">
-                        <i class="fa-solid fa-server w-3 h-3"></i>
-                        Shares Back
-                    </span>
-                {% endif %}
-                {% if user.discord_user_id %}
-                    <span class="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-400/10 px-2 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-400 ring-1 ring-inset ring-indigo-600/20 dark:ring-indigo-500/20 gap-1" title="Discord: {{ user.discord_username or 'Linked' }}">
-                        <i class="fa-brands fa-discord w-3 h-3"></i>
-                        Discord Linked
-                    </span>
-                {% endif %}
-                {% if user.is_purge_whitelisted %}
-                    <span class="inline-flex items-center rounded-md bg-amber-50 dark:bg-amber-400/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400 ring-1 ring-inset ring-amber-600/20 dark:ring-amber-500/20 gap-1" title="This user is immune to inactivity purges">
-                        <i class="fa-solid fa-shield-halved w-3 h-3"></i>
-                        Purge Protected
-                    </span>
-                {% endif %}
+        <div class="user-roles-section">
+            {% set has_roles = user.is_home_user or user.shares_back or user.discord_user_id or user.is_purge_whitelisted %}
+            {% if has_roles %}
+            <div class="mb-3">
+                <div class="text-xs font-medium mb-1">Roles:</div>
+                <div class="flex flex-wrap gap-1">
+                    {% if user.is_home_user %}
+                        <span class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20 gap-1" title="Plex Home User">
+                            <i class="fa-solid fa-home w-3 h-3"></i>
+                            Home User
+                        </span>
+                    {% endif %}
+                    {% if user.shares_back %}
+                        <span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-400/10 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/20 gap-1" title="Shares Libraries Back">
+                            <i class="fa-solid fa-server w-3 h-3"></i>
+                            Shares Back
+                        </span>
+                    {% endif %}
+                    {% if user.discord_user_id %}
+                        <span class="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-400/10 px-2 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-400 ring-1 ring-inset ring-indigo-600/20 dark:ring-indigo-500/20 gap-1" title="Discord: {{ user.discord_username or 'Linked' }}">
+                            <i class="fa-brands fa-discord w-3 h-3"></i>
+                            Discord Linked
+                        </span>
+                    {% endif %}
+                    {% if user.is_purge_whitelisted %}
+                        <span class="inline-flex items-center rounded-md bg-amber-50 dark:bg-amber-400/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400 ring-1 ring-inset ring-amber-600/20 dark:ring-amber-500/20 gap-1" title="This user is immune to inactivity purges">
+                            <i class="fa-solid fa-shield-halved w-3 h-3"></i>
+                            Purge Protected
+                        </span>
+                    {% endif %}
+                </div>
             </div>
+            {% endif %}
+            
+            <!-- Admin and Role Badges -->
+            {% if user.plex_uuid and user.plex_uuid in admins_by_uuid %}
+            <div class="flex flex-wrap gap-1 mb-3">
+                <div class="badge badge-error badge-outline badge-sm" title="This user is an administrator"><i class="fa-solid fa-user-shield"></i>Admin</div>
+                {% set admin = admins_by_uuid[user.plex_uuid] %}
+                {% for role in admin.roles %}
+                <span class="badge badge-sm" style="background-color: {{ role.color or '#808080' }}; border-color: {{ role.color or '#808080' }}; color: {{ get_text_color_for_bg(role.color) }};" title="Role: {{ role.name }}">
+                    {% if role.icon %}<i class="{{ role.icon }}"></i>{% endif %}{{ role.name }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
-        
-        <!-- Admin and Role Badges -->
-        {% if user.plex_uuid and user.plex_uuid in admins_by_uuid %}
-        <div class="flex flex-wrap gap-1 mb-3">
-            <div class="badge badge-error badge-outline badge-sm" title="This user is an administrator"><i class="fa-solid fa-user-shield"></i>Admin</div>
-            {% set admin = admins_by_uuid[user.plex_uuid] %}
-            {% for role in admin.roles %}
-            <span class="badge badge-sm" style="background-color: {{ role.color or '#808080' }}; border-color: {{ role.color or '#808080' }}; color: {{ get_text_color_for_bg(role.color) }};" title="Role: {{ role.name }}">
-                {% if role.icon %}<i class="{{ role.icon }}"></i>{% endif %}{{ role.name }}
-            </span>
-            {% endfor %}
-        </div>
-        {% endif %}
         
         <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90">
             <button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" 
