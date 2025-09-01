@@ -1,5 +1,5 @@
 <!-- Admin Streaming Activity Chart -->
-<div class="card bg-base-100 shadow-xl">
+<div class="card bg-base-200 shadow-xl">
     <div class="card-body">
         <!-- Chart Header -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
@@ -37,15 +37,15 @@
 
         <!-- Chart Stats -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <div class="stat bg-base-200 rounded-lg p-4">
+            <div class="stat bg-base-100 rounded-lg p-4">
                 <div class="stat-title text-xs">Total Streams</div>
                 <div class="stat-value text-lg">{{ chart_data.total_streams }}</div>
             </div>
-            <div class="stat bg-base-200 rounded-lg p-4">
+            <div class="stat bg-base-100 rounded-lg p-4">
                 <div class="stat-title text-xs">Total Duration</div>
                 <div class="stat-value text-lg">{{ chart_data.total_duration }}</div>
             </div>
-            <div class="stat bg-base-200 rounded-lg p-4">
+            <div class="stat bg-base-100 rounded-lg p-4">
                 <div class="stat-title text-xs">Most Active Service</div>
                 <div class="stat-value text-lg">{{ chart_data.most_active_service }}</div>
             </div>
@@ -57,7 +57,7 @@
             <h3 class="text-sm font-semibold mb-3">Services</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {% for service in chart_data.services %}
-                <div class="flex items-center gap-3 p-2 bg-base-200 rounded-lg">
+                <div class="flex items-center gap-3 p-2 bg-base-100 rounded-lg">
                     <div class="w-4 h-4 rounded" style="background-color: {{ service.color }}"></div>
                     <div class="flex-1 min-w-0">
                         <div class="text-sm font-medium">{{ service.name }}</div>

@@ -114,7 +114,7 @@ class Owner(db.Model, UserMixin):
     
     def set_password(self, password):
         """Set password hash for owner account"""
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
     
     def check_password(self, password):
         """Check password for owner account"""
@@ -266,7 +266,7 @@ class UserAppAccess(db.Model, UserMixin):
     
     def set_password(self, password):
         """Set password hash for user app access account"""
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
     
     def check_password(self, password):
         """Check password for user app access account"""

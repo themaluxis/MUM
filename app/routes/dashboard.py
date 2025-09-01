@@ -11,6 +11,169 @@ from app.services.media_service_manager import MediaServiceManager
 
 bp = Blueprint('dashboard', __name__)
 
+def _generate_top_users_data(days=7, limit=5):
+    """Generate top users data for admin dashboard"""
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    from sqlalchemy import func
+    
+    # Calculate date range
+    end_date = datetime.now(timezone.utc)
+    if days == -1:  # All time
+        earliest_stream = MediaStreamHistory.query.order_by(MediaStreamHistory.started_at.asc()).first()
+        if earliest_stream:
+            start_date = earliest_stream.started_at
+        else:
+            start_date = end_date - timedelta(days=7)  # Fallback to 7 days
+    else:
+        start_date = end_date - timedelta(days=days-1)
+    
+    # Query to get top users by total watch time
+    user_stats = db.session.query(
+        MediaStreamHistory.user_app_access_uuid,
+        MediaStreamHistory.user_media_access_uuid,
+        func.count(MediaStreamHistory.id).label('stream_count'),
+        func.sum(
+            func.coalesce(
+                MediaStreamHistory.duration_seconds,
+                MediaStreamHistory.view_offset_at_end_seconds,
+                60  # Default 1 minute for streams without duration
+            )
+        ).label('total_seconds')
+    ).filter(
+        MediaStreamHistory.started_at >= start_date,
+        MediaStreamHistory.started_at <= end_date
+    ).group_by(
+        MediaStreamHistory.user_app_access_uuid,
+        MediaStreamHistory.user_media_access_uuid
+    ).order_by(
+        func.sum(
+            func.coalesce(
+                MediaStreamHistory.duration_seconds,
+                MediaStreamHistory.view_offset_at_end_seconds,
+                60
+            )
+        ).desc()
+    ).limit(limit).all()
+    
+    top_users = []
+    for stat in user_stats:
+        user_display_name = "Unknown User"
+        user_avatar = None
+        service_info = []
+        
+        # Get user info - could be from UserAppAccess (linked) or UserMediaAccess (standalone)
+        if stat.user_app_access_uuid:
+            user_app_access = UserAppAccess.query.filter_by(uuid=stat.user_app_access_uuid).first()
+            if user_app_access:
+                user_display_name = user_app_access.get_display_name()
+                # Get all services this user has access to
+                for media_access in user_app_access.media_accesses:
+                    if media_access.server:
+                        service_info.append({
+                            'type': media_access.server.service_type.value,
+                            'name': media_access.server.server_nickname
+                        })
+        elif stat.user_media_access_uuid:
+            user_media_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
+            if user_media_access:
+                user_display_name = user_media_access.get_display_name()
+                user_avatar = user_media_access.get_avatar_url()
+                if user_media_access.server:
+                    service_info.append({
+                        'type': user_media_access.server.service_type.value,
+                        'name': user_media_access.server.server_nickname
+                    })
+        
+        # Remove duplicates from service_info
+        unique_services = []
+        seen_services = set()
+        for service in service_info:
+            service_key = f"{service['type']}_{service['name']}"
+            if service_key not in seen_services:
+                unique_services.append(service)
+                seen_services.add(service_key)
+        
+        # Get category breakdown for this user
+        category_query = db.session.query(
+            MediaStreamHistory.media_type,
+            func.sum(
+                func.coalesce(
+                    MediaStreamHistory.duration_seconds,
+                    MediaStreamHistory.view_offset_at_end_seconds,
+                    60
+                )
+            ).label('category_seconds')
+        ).filter(
+            MediaStreamHistory.started_at >= start_date,
+            MediaStreamHistory.started_at <= end_date
+        )
+        
+        # Add user filter based on which UUID is present
+        if stat.user_app_access_uuid:
+            category_query = category_query.filter(MediaStreamHistory.user_app_access_uuid == stat.user_app_access_uuid)
+        elif stat.user_media_access_uuid:
+            category_query = category_query.filter(MediaStreamHistory.user_media_access_uuid == stat.user_media_access_uuid)
+        
+        category_stats = category_query.group_by(MediaStreamHistory.media_type).all()
+        
+        # Map media types to categories
+        categories = {'tv': 0, 'movies': 0, 'music': 0, 'photos': 0}
+        for category_stat in category_stats:
+            media_type = (category_stat.media_type or '').lower()
+            seconds = int(category_stat.category_seconds or 0)
+            
+            if media_type in ['show', 'episode', 'tv', 'series']:
+                categories['tv'] += seconds
+            elif media_type in ['movie', 'film']:
+                categories['movies'] += seconds
+            elif media_type in ['track', 'music', 'audio', 'song']:
+                categories['music'] += seconds
+            elif media_type in ['photo', 'image', 'picture']:
+                categories['photos'] += seconds
+            else:
+                # Default unknown types to TV
+                categories['tv'] += seconds
+        
+        # Format category durations
+        formatted_categories = {}
+        for cat, seconds in categories.items():
+            if seconds > 0:
+                formatted_categories[cat] = format_duration(seconds)
+            else:
+                formatted_categories[cat] = '0 min'
+        
+        total_seconds = int(stat.total_seconds or 0)
+        
+        # Get primary service type for CSS class
+        primary_service_type = 'gray'  # Default fallback
+        if unique_services:
+            primary_service_type = unique_services[0]['type']
+        
+        # Get primary server info for linking
+        primary_server_nickname = None
+        primary_server_username = None
+        if stat.user_media_access_uuid:
+            user_media_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
+            if user_media_access and user_media_access.server:
+                primary_server_nickname = user_media_access.server.server_nickname
+                primary_server_username = user_media_access.external_username
+        
+        top_users.append({
+            'display_name': user_display_name,
+            'avatar_url': user_avatar,
+            'stream_count': stat.stream_count,
+            'total_duration': format_duration(total_seconds),
+            'total_seconds': total_seconds,
+            'services': unique_services[:3],  # Show max 3 services to avoid clutter
+            'categories': formatted_categories,
+            'primary_service_type': primary_service_type,
+            'server_nickname': primary_server_nickname,
+            'server_username': primary_server_username
+        })
+    
+    return top_users
+
 def _generate_admin_streaming_chart_data(days=7):
     """Generate streaming chart data for admin dashboard - stacked by service within each day"""
     from datetime import datetime, timezone, timedelta
@@ -226,6 +389,11 @@ def index():
     chart_data = _generate_admin_streaming_chart_data(days)
     current_app.logger.debug(f"Dashboard: Chart data generated for {days} days")
 
+    # Generate top users data
+    current_app.logger.debug("Dashboard: Generating top users data")
+    top_users_data = _generate_top_users_data(days, limit=5)
+    current_app.logger.debug(f"Dashboard: Top users data generated with {len(top_users_data)} users")
+
     current_app.logger.info("Dashboard: Rendering template with data")
     current_app.logger.debug(f"Dashboard: Template data - users: {total_users}, invites: {active_invites_count}, streams: {active_streams_count}, servers: {server_count}, activities: {len(recent_activities)}")
     
@@ -238,6 +406,7 @@ def index():
                            recent_activities=recent_activities,
                            recent_activities_count=recent_activities_count,
                            chart_data=chart_data,
+                           top_users_data=top_users_data,
                            selected_days=days)
     
     current_app.logger.info("=== ADMIN DASHBOARD ROUTE COMPLETE ===")

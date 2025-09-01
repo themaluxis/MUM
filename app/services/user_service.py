@@ -1310,7 +1310,7 @@ def merge_service_users_into_local_account(user_uuids: list, username: str, pass
         # Create the new local user account
         new_local_user = UserAppAccess(
             username=username,
-            password_hash=generate_password_hash(password),
+            password_hash=generate_password_hash(password, method='pbkdf2:sha256'),
             email=None,  # Will be set from first service user if available
             is_active=True,
             created_at=datetime.utcnow(),
