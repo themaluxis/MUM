@@ -1786,7 +1786,7 @@ function renderUserList(users) {
                 <!-- Status badges -->
                 <div class="flex flex-wrap gap-1 mt-2">
                     ${user.is_home_user ? '<div class="badge badge-primary badge-sm" title="Plex Home User"><i class="fa-solid fa-home"></i>Home</div>' : ''}
-                    ${user.shares_back ? '<div class="badge badge-secondary badge-sm" title="Shares Libraries Back"><i class="fa-solid fa-server"></i>Shares Back</div>' : ''}
+                    ${user.shares_back ? '<div class="badge badge-secondary badge-sm" title="Shares Libraries Back"><i class="fa-solid fa-share"></i>Shares Back</div>' : ''}
                     ${user.discord_user_id ? '<div class="badge badge-info badge-sm" title="Discord: ' + (user.discord_username || 'Linked') + '"><i class="fa-brands fa-discord"></i>Linked</div>' : ''}
                     ${user.is_purge_whitelisted ? '<div class="badge badge-accent badge-sm" title="This user is immune to inactivity purges."><i class="fa-solid fa-shield-halved"></i>Purge Whitelisted</div>' : ''}
                     ${user.is_admin ? '<div class="badge badge-error badge-outline badge-sm" title="This user is an administrator"><i class="fa-solid fa-user-shield"></i>Admin</div>' : ''}
