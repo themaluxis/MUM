@@ -15,7 +15,7 @@
 </div>
 {% else %}
 <!-- Episodes Grid Header -->
-<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-4 mb-6">
     <!-- Title and Stats Row -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h3 class="text-lg font-semibold flex items-center">
@@ -110,8 +110,8 @@
                 <span class="purge-episodes-btn-text hidden sm:inline">Purge</span>
             </button>
             <div class="text-xs text-base-content/50 hidden sm:block">
-                {% if episodes_content and episodes_content.last_synced %}
-                    Last updated: {{ episodes_content.last_synced }}
+                {% if media_item and media_item.last_synced %}
+                    Last updated: {{ format_datetime_with_user_timezone(media_item.last_synced, '%m/%d %I:%M %p') }}
                 {% else %}
                     Never synced
                 {% endif %}

@@ -7141,6 +7141,16 @@
       }
     }
   }
+  .hover\:bg-audiobookshelf\/90 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, oklch(62.8% 0.16 263.78) 90%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-audiobookshelf) 90%, transparent);
+        }
+      }
+    }
+  }
   .hover\:bg-base-100 {
     &:hover {
       @media (hover: hover) {
@@ -7202,6 +7212,16 @@
       }
     }
   }
+  .hover\:bg-emby\/90 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, oklch(73.4% 0.19 150.17) 90%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-emby) 90%, transparent);
+        }
+      }
+    }
+  }
   .hover\:bg-error\/10 {
     &:hover {
       @media (hover: hover) {
@@ -7243,6 +7263,46 @@
       }
     }
   }
+  .hover\:bg-jellyfin\/90 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, oklch(0.63 0.27 304.24) 90%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-jellyfin) 90%, transparent);
+        }
+      }
+    }
+  }
+  .hover\:bg-kavita\/90 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, oklch(0.74 0.13 163.11) 90%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-kavita) 90%, transparent);
+        }
+      }
+    }
+  }
+  .hover\:bg-komga\/90 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, oklch(64.9% 0.22 29.4) 90%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-komga) 90%, transparent);
+        }
+      }
+    }
+  }
+  .hover\:bg-plex\/90 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, oklch(74.22% 0.18 80.28) 90%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-plex) 90%, transparent);
+        }
+      }
+    }
+  }
   .hover\:bg-primary\/10 {
     &:hover {
       @media (hover: hover) {
@@ -7277,6 +7337,16 @@
     &:hover {
       @media (hover: hover) {
         background-color: var(--color-purple-100);
+      }
+    }
+  }
+  .hover\:bg-romm\/90 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, oklch(62.28% 0.16 282.4) 90%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-romm) 90%, transparent);
+        }
       }
     }
   }
