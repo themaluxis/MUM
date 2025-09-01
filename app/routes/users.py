@@ -1071,46 +1071,22 @@ def mass_edit_libraries_form():
                 'current_library_ids': set(access.allowed_library_ids or [])
             }
         
-        services_data[service_type_key]['servers'][server.id]['users'].append(user)
+        # Create display name for this user on this server
+        display_name = f"{access.external_username} ({server.server_nickname})"
+        services_data[service_type_key]['servers'][server.id]['users'].append(display_name)
+        
         # Intersect library IDs for users on the same server
         current_ids = services_data[service_type_key]['servers'][server.id]['current_library_ids']
         current_ids.intersection_update(access.allowed_library_ids or [])
 
-    # Build user objects list for the template
-    users_list = []
-    current_app.logger.info(f"DEBUG: Building users list from {len(access_records)} access records")
-    for access, user, server in access_records:
-        # Safety check - ensure access and server are not None
-        if access is None:
-            current_app.logger.error("DEBUG: access is None, skipping")
-            continue
-        if server is None:
-            current_app.logger.error("DEBUG: server is None, skipping")
-            continue
-            
-        # Just use the display name string directly
-        display_name = f"{access.external_username} ({server.server_nickname})"
-        
-        current_app.logger.info(f"DEBUG: Adding user: {display_name}")
-        current_app.logger.info(f"DEBUG: User string type: {type(display_name)}")
-        
-        users_list.append(display_name)
-    
-    current_app.logger.info(f"DEBUG: Final users_list length: {len(users_list)}")
-    current_app.logger.info(f"DEBUG: First user type: {type(users_list[0]) if users_list else 'No users'}")
-    
-    # Create a data structure that matches what the template expects
-    user_data = {
-        'users': users_list
-    }
-    
-    current_app.logger.info(f"DEBUG: user_data object: {user_data}")
-    current_app.logger.info(f"DEBUG: user_data['users'] length: {len(user_data['users'])}")
-    current_app.logger.info(f"DEBUG: Calling render_template with services_data and user_data")
+    current_app.logger.info(f"DEBUG: Built services_data with {len(services_data)} service types")
+    for service_key, service_info in services_data.items():
+        current_app.logger.info(f"DEBUG: Service {service_key} has {len(service_info['servers'])} servers")
+        for server_id, server_data in service_info['servers'].items():
+            current_app.logger.info(f"DEBUG: Server {server_id} ({server_data['server_name']}) has {len(server_data['users'])} users: {server_data['users']}")
     
     return render_template('users/partials/_mass_edit_libraries.html', 
-                           services_data=services_data, 
-                           user_data=user_data)
+                           services_data=services_data)
 
 @bp.route('/mass_edit', methods=['POST'])
 @login_required
