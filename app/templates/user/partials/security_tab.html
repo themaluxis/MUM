@@ -26,7 +26,7 @@
                         </span>
                     </div>
                 </div>
-                {% if user.password_hash and user.used_invite_id %}
+                {% if user.password_hash %}
                 <div class="bg-base-200 rounded-lg p-4">
                     <div class="flex items-center justify-between">
                         <div>
@@ -51,12 +51,12 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <h5 class="font-medium text-sm">Reset Password</h5>
-                            <p class="text-xs text-gray-600">Password reset is only available for local accounts created through invites</p>
+                            <p class="text-xs text-gray-600">Password reset is only available for local accounts with passwords</p>
                         </div>
                         <button 
                             class="btn btn-outline btn-disabled btn-sm"
                             disabled
-                            title="Password reset not available for this account type"
+                            title="Password reset not available - no password set"
                         >
                             <i class="fa-solid fa-key mr-1"></i>
                             Not Available

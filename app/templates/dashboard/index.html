@@ -60,6 +60,13 @@
     <!-- Modals -->
     {% include 'components/modals/all_servers_status_modal.html' with context %}
 
+    <!-- Streaming Activity Chart -->
+    {% if chart_data %}
+    <div class="mb-8">
+        {% include 'dashboard/partials/admin_streaming_chart.html' %}
+    </div>
+    {% endif %}
+
     <!-- Recent Activity -->
     <h2 class="text-2xl font-semibold mb-4 mt-10">Recent Activity</h2>
     <div class="bg-base-200 shadow-lg rounded-lg p-2 sm:p-6">
@@ -128,6 +135,8 @@
 
 {% block scripts %}
 {{ super() }}
+<!-- Chart.js for the streaming history chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Function to open the all servers modal and trigger HTMX load
 function openAllServersModal() {

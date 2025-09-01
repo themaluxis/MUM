@@ -1295,9 +1295,9 @@ def reset_password(username=None, server_nickname=None, server_username=None):
     else:
         abort(400)
     
-    # Only allow reset for local accounts created through invites (have password_hash and used_invite_id)
-    if not user.password_hash or not user.used_invite_id:
-        flash('Password reset is only available for local user accounts created through invites.', 'danger')
+    # Only allow reset for local accounts that have a password (regardless of how they were created)
+    if not user.password_hash:
+        flash('Password reset is only available for local user accounts with passwords.', 'danger')
         # Need to determine the correct route based on user type and server info
         # For now, redirect to users list since we can't easily determine the username route
         return redirect(url_for('users.list'))

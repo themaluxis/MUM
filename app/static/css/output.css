@@ -3928,6 +3928,9 @@
   .h-72 {
     height: calc(var(--spacing) * 72);
   }
+  .h-80 {
+    height: calc(var(--spacing) * 80);
+  }
   .h-\[unset\] {
     height: unset;
   }
