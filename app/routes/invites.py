@@ -1345,7 +1345,40 @@ def invite_landing_page(): # Renamed from placeholder
     if current_user.is_authenticated: 
         return redirect(url_for('dashboard.index'))
     # If not authenticated and no specific invite, perhaps redirect to admin login or a generic info page
-    return redirect(url_for('auth.app_login')) 
+    return redirect(url_for('auth.app_login'))
+
+@bp.route('/invite/', methods=['GET', 'POST'])
+@setup_required
+def invite_code_entry():
+    """Landing page where users can enter their invite code"""
+    from flask_wtf import FlaskForm
+    from wtforms import StringField, SubmitField
+    from wtforms.validators import DataRequired, Length
+    from app.services import invite_service
+    
+    class InviteCodeForm(FlaskForm):
+        invite_code = StringField('Invite Code', 
+                                validators=[DataRequired(), Length(min=1, max=100)],
+                                render_kw={"placeholder": "Enter your invite code", "class": "input input-bordered w-full"})
+        submit = SubmitField('Access Invite', render_kw={"class": "btn btn-primary w-full"})
+    
+    form = InviteCodeForm()
+    error_message = None
+    
+    if form.validate_on_submit():
+        invite_code = form.invite_code.data.strip()
+        
+        # Validate the invite code before redirecting
+        invite, error_message_from_validation = invite_service.validate_invite_usability(invite_code)
+        
+        if error_message_from_validation or not invite:
+            # Invalid invite - show error message and stay on the page
+            error_message = error_message_from_validation or "Invalid invite code. Please check your code and try again."
+        else:
+            # Valid invite - redirect to the invite process
+            return redirect(url_for('invites.process_invite_form', invite_path_or_token=invite_code))
+    
+    return render_template('invites/invite_code_entry.html', form=form, error_message=error_message) 
 
 @bp.route('/manage/edit/<int:invite_id>', methods=['GET'])
 @login_required
