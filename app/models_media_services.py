@@ -352,15 +352,24 @@ class MediaItem(db.Model):
         episode_number = None
         if self.item_type == 'episode' and self.extra_metadata:
             # Try different possible field names for season/episode numbers
-            season_number = (self.extra_metadata.get('seasonNumber') or 
-                           self.extra_metadata.get('season_number') or 
-                           self.extra_metadata.get('season') or
-                           self.extra_metadata.get('parentIndex'))
+            # Use 'is not None' to handle season 0 (specials) correctly
+            if self.extra_metadata.get('seasonNumber') is not None:
+                season_number = self.extra_metadata.get('seasonNumber')
+            elif self.extra_metadata.get('season_number') is not None:
+                season_number = self.extra_metadata.get('season_number')
+            elif self.extra_metadata.get('season') is not None:
+                season_number = self.extra_metadata.get('season')
+            elif self.extra_metadata.get('parentIndex') is not None:
+                season_number = self.extra_metadata.get('parentIndex')
             
-            episode_number = (self.extra_metadata.get('episodeNumber') or 
-                            self.extra_metadata.get('episode_number') or 
-                            self.extra_metadata.get('episode') or
-                            self.extra_metadata.get('index'))
+            if self.extra_metadata.get('episodeNumber') is not None:
+                episode_number = self.extra_metadata.get('episodeNumber')
+            elif self.extra_metadata.get('episode_number') is not None:
+                episode_number = self.extra_metadata.get('episode_number')
+            elif self.extra_metadata.get('episode') is not None:
+                episode_number = self.extra_metadata.get('episode')
+            elif self.extra_metadata.get('index') is not None:
+                episode_number = self.extra_metadata.get('index')
 
         return {
             'id': self.id,  # Use database ID for new URL structure

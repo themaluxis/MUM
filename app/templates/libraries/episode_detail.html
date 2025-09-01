@@ -144,7 +144,7 @@
                             </span>
                             
                             <!-- Season/Episode Badge -->
-                            {% if episode_details.season_number and episode_details.episode_number %}
+                            {% if episode_details.season_number is not none and episode_details.episode_number is not none %}
                             <span class="inline-flex items-center rounded-md bg-orange-50 dark:bg-orange-400/10 px-2 py-1 text-xs font-medium text-orange-700 dark:text-orange-400 ring-1 ring-inset ring-orange-600/20 dark:ring-orange-500/20 gap-1">
                                 <i class="fa-solid fa-list-ol w-3 h-3"></i>
                                 S{{ "%02d"|format(episode_details.season_number) }}E{{ "%02d"|format(episode_details.episode_number) }}
@@ -238,7 +238,7 @@
                                     <span class="text-base-content/60">Title:</span>
                                     <span class="font-medium">{{ episode_details.title }}</span>
                                 </div>
-                                {% if episode_details.season_number and episode_details.episode_number %}
+                                {% if episode_details.season_number is not none and episode_details.episode_number is not none %}
                                 <div class="flex justify-between">
                                     <span class="text-base-content/60">Episode:</span>
                                     <span class="font-medium">Season {{ episode_details.season_number }}, Episode {{ episode_details.episode_number }}</span>

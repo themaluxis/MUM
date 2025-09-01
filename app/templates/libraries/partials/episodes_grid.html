@@ -160,7 +160,7 @@
                     <h4 class="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors" title="{{ episode.title }}">
                         {{ episode.title }}
                     </h4>
-                    {% if episode.season_number and episode.episode_number %}
+                    {% if episode.season_number is not none and episode.episode_number is not none %}
                     <p class="text-xs text-base-content/60 mt-1">
                         S{{ "%02d"|format(episode.season_number) }}E{{ "%02d"|format(episode.episode_number) }}
                         {% if episode.year %}
