@@ -48,7 +48,19 @@
                         <i class="fa-solid fa-envelope w-4 h-4 text-blue-500 mt-0.5"></i>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium text-base-content/70">Email</p>
-                            <p class="text-sm text-base-content truncate">{{ user.plex_email or user.primary_email or 'N/A' }}</p>
+                            <p class="text-sm text-base-content truncate">
+                                {% if user._access_record is defined and user._access_record.external_email %}
+                                    {{ user._access_record.external_email }}
+                                {% elif user.plex_email is defined and user.plex_email %}
+                                    {{ user.plex_email }}
+                                {% elif user.primary_email is defined and user.primary_email %}
+                                    {{ user.primary_email }}
+                                {% elif user.email is defined and user.email %}
+                                    {{ user.email }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </p>
                         </div>
                     </div>
                     
@@ -56,7 +68,15 @@
                         <i class="fa-solid fa-id-card w-4 h-4 text-green-500 mt-0.5"></i>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium text-base-content/70">{{ service_name }} User ID</p>
-                            <p class="text-sm text-base-content font-mono">{{ user.plex_user_id or 'N/A' }}</p>
+                            <p class="text-sm text-base-content font-mono">
+                                {% if user._access_record is defined and user._access_record.external_user_id %}
+                                    {{ user._access_record.external_user_id }}
+                                {% elif user.plex_user_id is defined and user.plex_user_id %}
+                                    {{ user.plex_user_id }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </p>
                         </div>
                     </div>
                     
