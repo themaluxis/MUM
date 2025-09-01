@@ -36,13 +36,13 @@
 
                         {% if already_authenticated_plex_user %}
                             <!-- Plex Account Linked -->
-                            <div class="bg-[#e5a00d]/10 border border-[#e5a00d]/20 rounded-lg p-4">
+                            <div class="bg-plex-50 border border-plex-500/20 rounded-lg p-4">
                                 <div class="flex items-start gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-[#e5a00d]/20 flex items-center justify-center flex-shrink-0">
-                                        <i class="fa-brands fa-plex text-[#e5a00d] text-sm"></i>
+                                    <div class="w-8 h-8 rounded-full bg-plex-500/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-brands fa-plex text-plex text-sm"></i>
                                     </div>
                                     <div>
-                                        <h3 class="font-medium text-[#e5a00d] mb-1">Plex Account Linked</h3>
+                                        <h3 class="font-medium text-plex mb-1">Plex Account Linked</h3>
                                         <p class="text-sm text-base-content/80">
                                             Welcome back, <strong class="text-base-content">{{ already_authenticated_plex_user.username }}</strong>!
                                         </p>
@@ -130,7 +130,7 @@
                             {# Plex Login Button #}
                             {% if not already_authenticated_plex_user %}
                                 <button name="auth_method" value="plex" type="submit" 
-                                        class="btn bg-[#e5a00d] hover:bg-[#c4880b] border-[#e5a00d] hover:border-[#c4880b] text-black w-full h-12 text-base font-medium">
+                                        class="btn bg-plex hover:bg-plex-600 border-plex hover:border-plex-600 text-black w-full h-12 text-base font-medium">
                                     <i class="fa-solid fa-right-to-bracket mr-2"></i>
                                     Sign In with Plex
                                 </button>

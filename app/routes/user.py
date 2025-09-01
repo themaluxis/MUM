@@ -79,13 +79,13 @@ def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
     
     # Service color mapping
     service_colors = {
-        'plex': '#e5a00d',
-        'jellyfin': '#00a4dc', 
-        'emby': '#52b54b',
-        'kavita': '#f39c12',
-        'audiobookshelf': '#8b5cf6',
-        'komga': '#ef4444',
-        'romm': '#10b981'
+        'plex': 'var(--color-plex)',
+        'jellyfin': 'var(--color-jellyfin)', 
+        'emby': 'var(--color-emby)',
+        'kavita': 'var(--color-kavita)',
+        'audiobookshelf': 'var(--color-audiobookshelf)',
+        'komga': 'var(--color-komga)',
+        'romm': 'var(--color-romm)'
     }
     
     # Determine grouping strategy based on days parameter

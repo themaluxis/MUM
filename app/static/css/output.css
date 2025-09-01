@@ -4739,6 +4739,9 @@
       border-color: color-mix(in oklab, var(--color-orange-500) 20%, transparent);
     }
   }
+  .border-plex {
+    border-color: var(--color-plex);
+  }
   .border-plex-500 {
     border-color: var(--color-plex-500);
   }
@@ -5202,6 +5205,12 @@
     background-color: color-mix(in srgb, oklch(74.22% 0.18 80.28) 10%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-plex-500) 10%, transparent);
+    }
+  }
+  .bg-plex-500\/20 {
+    background-color: color-mix(in srgb, oklch(74.22% 0.18 80.28) 20%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-plex-500) 20%, transparent);
     }
   }
   .bg-primary {
@@ -7099,6 +7108,13 @@
       }
     }
   }
+  .hover\:border-plex-600 {
+    &:hover {
+      @media (hover: hover) {
+        border-color: var(--color-plex-600);
+      }
+    }
+  }
   .hover\:bg-\[\#00a4dc\]\/10 {
     &:hover {
       @media (hover: hover) {
@@ -7290,6 +7306,13 @@
         @supports (color: color-mix(in lab, red, red)) {
           background-color: color-mix(in oklab, var(--color-komga) 90%, transparent);
         }
+      }
+    }
+  }
+  .hover\:bg-plex-600 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-plex-600);
       }
     }
   }

@@ -2,8 +2,8 @@
 <div class="step-section bg-base-200/30 border border-base-300 rounded-lg p-6" id="plex-step">
     <!-- Step Header -->
     <div class="flex items-center gap-3 mb-6">
-        <div class="w-10 h-10 rounded-full bg-[#e5a00d]/20 flex items-center justify-center flex-shrink-0">
-            <i class="fa-solid fa-right-to-bracket text-[#e5a00d] text-lg"></i>
+        <div class="w-10 h-10 rounded-full bg-plex-500/20 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-right-to-bracket text-plex text-lg"></i>
         </div>
         <div>
             <h2 class="text-xl font-semibold text-base-content mb-1">Plex Authentication</h2>
@@ -121,7 +121,7 @@
         <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
             {{ form.hidden_tag() }}
             <button name="auth_method" value="plex" type="submit" 
-                    class="btn bg-[#e5a00d] hover:bg-[#c4880b] border-[#e5a00d] hover:border-[#c4880b] text-black w-full h-12 text-base font-medium">
+                    class="btn bg-plex hover:bg-plex-600 border-plex hover:border-plex-600 text-black w-full h-12 text-base font-medium">
                 <i class="fa-solid fa-right-to-bracket mr-2"></i>
                 Sign In with Plex
             </button>

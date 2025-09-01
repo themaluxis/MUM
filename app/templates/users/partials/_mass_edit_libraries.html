@@ -9,6 +9,8 @@
                         <svg class="w-6 h-6 inline-block text-plex mr-2" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="transparent" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
                     {% elif service_key.lower() == 'jellyfin' %}
                         <i class="fa-solid fa-cube text-jellyfin mr-2"></i>
+                    {% elif service_key.lower() == 'kavita' %}
+                        <i class="fa-solid fa-book text-kavita mr-2"></i>
                     {% endif %}
                     {{ service_info.service_name }}
                 </summary>
