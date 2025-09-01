@@ -81,8 +81,14 @@
                     <div class="flex items-start gap-3">
                         <i class="fa-solid fa-clock w-4 h-4 text-indigo-500 mt-0.5"></i>
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-base-content/70">Last Synced</p>
-                            <p class="text-sm text-base-content">{{ user.last_synced_with_plex | time_ago if user.last_synced_with_plex else 'Never' }}</p>
+                            <p class="text-sm font-medium text-base-content/70">Last Streamed</p>
+                            <p class="text-sm text-base-content">
+                                {% if user.last_streamed_at %}
+                                    <span title="{{ user.last_streamed_at | format_datetime_user }}">{{ user.last_streamed_at | time_ago }}</span>
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </p>
                         </div>
                     </div>
                 </div>

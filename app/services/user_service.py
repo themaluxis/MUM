@@ -1112,47 +1112,59 @@ def get_bulk_last_known_ips(user_uuids: list) -> dict:
     """
     Efficiently gets the most recent IP address for a list of user UUIDs.
     Returns a dictionary mapping user_uuid to the last known IP address.
+    Supports both UserAppAccess and UserMediaAccess users.
     """
     if not user_uuids:
         return {}
 
-    # Convert UUIDs to actual user IDs
+    # Separate UUIDs by user type
     from app.utils.helpers import get_user_by_uuid
-    uuid_to_db_id = {}
-    actual_user_ids = []
+    app_access_uuids = []
+    media_access_uuids = []
     
     for user_uuid in user_uuids:
         try:
             user_obj, user_type = get_user_by_uuid(str(user_uuid))
             if user_obj and user_type == "user_app_access":
-                uuid_to_db_id[str(user_uuid)] = user_obj.id
-                actual_user_ids.append(user_obj.id)
+                app_access_uuids.append(str(user_uuid))
+            elif user_obj and user_type == "user_media_access":
+                media_access_uuids.append(str(user_uuid))
         except Exception:
             continue  # Skip invalid UUIDs
     
-    if not actual_user_ids:
-        return {}
-
-    # Use a subquery to rank history entries by date for each user
-    subquery = db.session.query(
-        MediaStreamHistory.user_app_access_id,
-        MediaStreamHistory.ip_address,
-        func.row_number().over(
-            partition_by=MediaStreamHistory.user_app_access_id,
-            order_by=MediaStreamHistory.started_at.desc()
-        ).label('rn')
-    ).filter(MediaStreamHistory.user_app_access_id.in_(actual_user_ids)).filter(MediaStreamHistory.ip_address.isnot(None)).subquery()
-
-    # Select only the most recent entry (rank = 1) for each user
-    results = db.session.query(subquery.c.user_app_access_id, subquery.c.ip_address).filter(subquery.c.rn == 1).all()
-
-    # Map back to UUIDs
     uuid_to_ip = {}
-    for user_uuid, db_id in uuid_to_db_id.items():
-        for result_db_id, ip_address in results:
-            if result_db_id == db_id:
-                uuid_to_ip[user_uuid] = ip_address
-                break
+    
+    # Handle UserAppAccess users
+    if app_access_uuids:
+        subquery_app = db.session.query(
+            MediaStreamHistory.user_app_access_uuid,
+            MediaStreamHistory.ip_address,
+            func.row_number().over(
+                partition_by=MediaStreamHistory.user_app_access_uuid,
+                order_by=MediaStreamHistory.started_at.desc()
+            ).label('rn')
+        ).filter(MediaStreamHistory.user_app_access_uuid.in_(app_access_uuids)).filter(MediaStreamHistory.ip_address.isnot(None)).subquery()
+
+        results_app = db.session.query(subquery_app.c.user_app_access_uuid, subquery_app.c.ip_address).filter(subquery_app.c.rn == 1).all()
+        
+        for result_uuid, ip_address in results_app:
+            uuid_to_ip[result_uuid] = ip_address
+    
+    # Handle UserMediaAccess users
+    if media_access_uuids:
+        subquery_media = db.session.query(
+            MediaStreamHistory.user_media_access_uuid,
+            MediaStreamHistory.ip_address,
+            func.row_number().over(
+                partition_by=MediaStreamHistory.user_media_access_uuid,
+                order_by=MediaStreamHistory.started_at.desc()
+            ).label('rn')
+        ).filter(MediaStreamHistory.user_media_access_uuid.in_(media_access_uuids)).filter(MediaStreamHistory.ip_address.isnot(None)).subquery()
+
+        results_media = db.session.query(subquery_media.c.user_media_access_uuid, subquery_media.c.ip_address).filter(subquery_media.c.rn == 1).all()
+        
+        for result_uuid, ip_address in results_media:
+            uuid_to_ip[result_uuid] = ip_address
     
     return uuid_to_ip
 

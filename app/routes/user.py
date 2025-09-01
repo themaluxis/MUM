@@ -1002,10 +1002,15 @@ def view_service_account(server_nickname, server_username):
     user.total_duration = stream_stats.get('global', {}).get('all_time_duration_seconds', 0)
     user.last_known_ip = last_ip if last_ip else 'N/A'
     
+    # Populate last_streamed_at field for the profile display
+    current_app.logger.info(f"DEBUG LAST_STREAMED: Populating last_streamed_at for user {user.uuid}")
+    last_stream = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
+    user.last_streamed_at = last_stream.started_at if last_stream else None
+    current_app.logger.info(f"DEBUG LAST_STREAMED: Set user.last_streamed_at = {user.last_streamed_at}")
+    
     current_app.logger.info(f"DEBUG STATS: Final stats - plays: {user.total_plays}, duration: {user.total_duration}, IP: {user.last_known_ip}")
     
     # Additional debugging - check what's actually in the database for this user
-    from app.models_media_services import MediaStreamHistory
     db_records = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).count()
     current_app.logger.info(f"DEBUG STATS: Direct DB check - MediaStreamHistory records for user_media_access_uuid={user.uuid}: {db_records}")
     
@@ -1437,7 +1442,13 @@ def view_app_user(username):
         else:
             user_app_access.total_duration = duration_value or 0
             
-        user_app_access.last_known_ip = last_ip_map.get(prefixed_user_id, 'N/A')
+        user_app_access.last_known_ip = last_ip_map.get(str(user_uuid), 'N/A')
+        
+        # Populate last_streamed_at field for the profile display
+        current_app.logger.info(f"DEBUG LAST_STREAMED: Populating last_streamed_at for app user {user_app_access.uuid}")
+        last_stream = MediaStreamHistory.query.filter_by(user_app_access_uuid=user_app_access.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
+        user_app_access.last_streamed_at = last_stream.started_at if last_stream else None
+        current_app.logger.info(f"DEBUG LAST_STREAMED: Set user_app_access.last_streamed_at = {user_app_access.last_streamed_at}")
     except Exception as e:
         current_app.logger.error(f"Error getting stream stats for local user {user_app_access.id}: {e}")
         # Provide empty stats as fallback
