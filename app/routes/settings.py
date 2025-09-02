@@ -7,7 +7,7 @@ from flask_login import login_required, current_user, logout_user
 import secrets
 from app.models import UserAppAccess, Invite, HistoryLog, Setting, EventType, SettingValueType, Owner, Role, UserPreferences 
 from app.forms import (
-    GeneralSettingsForm, DiscordConfigForm, SetPasswordForm, ChangePasswordForm, TimezonePreferenceForm
+    GeneralSettingsForm, DiscordConfigForm, SetPasswordForm, ChangePasswordForm, TimezonePreferenceForm, AdvancedSettingsForm
 )
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
@@ -334,7 +334,7 @@ def discord():
                            discord_admin_user_info=discord_admin_user_info,
                            initial_discord_enabled_state=initial_oauth_enabled_for_admin_link_section)
 
-@bp.route('/advanced', methods=['GET'])
+@bp.route('/advanced', methods=['GET', 'POST'])
 @login_required
 @setup_required
 @permission_required('manage_advanced_settings')
@@ -344,8 +344,39 @@ def advanced():
     if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_advanced_settings'):
         flash('You do not have permission to access the advanced settings page.', 'danger')
         return redirect(url_for('user.index'))
+    
+    form = AdvancedSettingsForm()
+    
+    if form.validate_on_submit():
+        # Handle CSRF token timeout setting
+        csrf_timeout_minutes = form.csrf_token_timeout_minutes.data
+        if csrf_timeout_minutes is None:
+            csrf_timeout_minutes = 50  # Default fallback
+        
+        if csrf_timeout_minutes == 0:
+            # Set to None to disable expiration
+            Setting.set('WTF_CSRF_TIME_LIMIT', None, SettingValueType.STRING, "CSRF Token Timeout")
+            current_app.config['WTF_CSRF_TIME_LIMIT'] = None
+        else:
+            # Convert minutes to seconds for Flask-WTF
+            csrf_timeout_seconds = csrf_timeout_minutes * 60
+            Setting.set('WTF_CSRF_TIME_LIMIT', csrf_timeout_seconds, SettingValueType.INTEGER, "CSRF Token Timeout")
+            current_app.config['WTF_CSRF_TIME_LIMIT'] = csrf_timeout_seconds
+        
+        log_event(EventType.SETTING_CHANGE, "Advanced settings updated.", admin_id=current_user.id)
+        flash('Advanced settings saved successfully.', 'success')
+        return redirect(url_for('settings.advanced'))
+    
+    elif request.method == 'GET':
+        # Load CSRF timeout setting - convert seconds back to minutes for display
+        csrf_timeout_seconds = Setting.get('WTF_CSRF_TIME_LIMIT')
+        if csrf_timeout_seconds is None:
+            form.csrf_token_timeout_minutes.data = 0  # 0 means disabled
+        else:
+            form.csrf_token_timeout_minutes.data = int(csrf_timeout_seconds) // 60 if csrf_timeout_seconds else 50
+    
     all_db_settings = Setting.query.order_by(Setting.key).all()
-    return render_template('settings/index.html', title="Advanced Settings", active_tab='advanced', all_db_settings=all_db_settings)
+    return render_template('settings/index.html', title="Advanced Settings", active_tab='advanced', all_db_settings=all_db_settings, form=form)
 
 @bp.route('/regenerate_secret_key', methods=['POST'])
 @login_required

@@ -27,6 +27,63 @@
 </div>
 
 <div class="space-y-8">
+    <!-- Security Settings Section -->
+    <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
+        <div class="flex items-center gap-3 mb-6">
+            <div class="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-shield-halved text-warning text-sm"></i>
+            </div>
+            <div>
+                <h2 class="text-lg font-semibold text-base-content mb-1">Security Settings</h2>
+                <p class="text-sm text-base-content/70">Configure security-related timeouts and protections</p>
+            </div>
+        </div>
+        
+        <form method="POST" action="{{ url_for('settings.advanced') }}">
+            {{ form.hidden_tag() }}
+            
+            <div class="space-y-6">
+                <!-- CSRF Token Timeout -->
+                <div class="space-y-3">
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-clock-rotate-left text-warning text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ form.csrf_token_timeout_minutes.label.text }}</h5>
+                        </div>
+                        {{ form.csrf_token_timeout_minutes(class="input input-bordered w-full " + ("input-error" if form.csrf_token_timeout_minutes.errors else ""), id="csrf_token_timeout") }}
+                        {% if form.csrf_token_timeout_minutes.errors %}
+                            <p class="text-error text-xs mt-2">{{ form.csrf_token_timeout_minutes.errors[0] }}</p>
+                        {% else %}
+                            <p class="text-xs text-base-content/60 mt-2" id="csrf-timeout-description">{{ form.csrf_token_timeout_minutes.description }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Security Info Card -->
+                    <div class="bg-warning/10 border border-warning/20 rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-6 h-6 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <i class="fa-solid fa-shield-exclamation text-warning text-xs"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-medium text-warning mb-1">Security Notice</h4>
+                                <p class="text-sm text-base-content/80">
+                                    CSRF tokens protect against malicious attacks. Setting to 0 disables expiration but reduces security. 
+                                    Shorter timeouts (15-30 minutes) are more secure but may inconvenience users with long forms. 
+                                    Longer timeouts (60+ minutes) are more user-friendly but less secure.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Save Button -->
+                <div class="flex justify-end pt-4 border-t border-base-300">
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </div>
+        </form>
+    </div>
+
     <!-- Danger Zone Section -->
     <div class="bg-base-200/30 border border-base-300 rounded-lg p-6">
         <div class="flex items-center gap-3 mb-6">
@@ -290,3 +347,36 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // CSRF timeout field dynamic feedback
+    const csrfTimeoutInput = document.getElementById('csrf_token_timeout');
+    const csrfTimeoutDescription = document.getElementById('csrf-timeout-description');
+    
+    if (csrfTimeoutInput && csrfTimeoutDescription) {
+        function updateCSRFDescription() {
+            const minutes = parseInt(csrfTimeoutInput.value) || 0;
+            if (minutes === 0) {
+                csrfTimeoutDescription.textContent = 'CSRF token expiration is DISABLED. This reduces security but tokens never expire.';
+                csrfTimeoutDescription.className = 'text-xs text-warning mt-2';
+            } else if (minutes < 15) {
+                csrfTimeoutDescription.textContent = `Very secure but may inconvenience users. Tokens expire after ${minutes} minute${minutes !== 1 ? 's' : ''}.`;
+                csrfTimeoutDescription.className = 'text-xs text-success mt-2';
+            } else if (minutes <= 60) {
+                csrfTimeoutDescription.textContent = `Good balance of security and usability. Tokens expire after ${minutes} minutes.`;
+                csrfTimeoutDescription.className = 'text-xs text-base-content/60 mt-2';
+            } else {
+                csrfTimeoutDescription.textContent = `More user-friendly but less secure. Tokens expire after ${minutes} minutes.`;
+                csrfTimeoutDescription.className = 'text-xs text-info mt-2';
+            }
+        }
+        
+        // Initial description update
+        updateCSRFDescription();
+        
+        // Listen for CSRF timeout changes
+        csrfTimeoutInput.addEventListener('input', updateCSRFDescription);
+    }
+});
+</script>

@@ -487,6 +487,21 @@ class UserAccountsSettingsForm(FlaskForm):
     )
     submit = SubmitField('Save User Account Settings')
 
+class AdvancedSettingsForm(FlaskForm):
+    csrf_token_timeout_minutes = IntegerField(
+        'CSRF Token Timeout (minutes)',
+        validators=[Optional(), NumberRange(min=0, max=1440)],
+        default=50,
+        description='How long security tokens remain valid before expiring. Set to 0 to disable expiration (not recommended for security). Default is 50 minutes.'
+    )
+    submit = SubmitField('Save Advanced Settings')
+    
+    def validate_csrf_token_timeout_minutes(self, field):
+        if field.data is None:
+            raise ValidationError('CSRF Token Timeout is required.')
+        if not isinstance(field.data, int) or field.data < 0 or field.data > 1440:
+            raise ValidationError('CSRF Token Timeout must be between 0 and 1440 minutes.')
+
 class UserAccountCreationForm(FlaskForm):
     username = StringField(
         'Username',
