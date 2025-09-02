@@ -68,6 +68,11 @@ def initialize_settings_from_db(app_instance):
                 pass
 
 def register_error_handlers(app):
+    @app.errorhandler(400)
+    def bad_request_page(error): 
+        # Check if this is a CSRF error
+        error_description = str(error.description) if hasattr(error, 'description') else ""
+        return render_template("errors/400.html", error_description=error_description), 400
     @app.errorhandler(403)
     def forbidden_page(error): return render_template("errors/403.html"), 403
     @app.errorhandler(404)

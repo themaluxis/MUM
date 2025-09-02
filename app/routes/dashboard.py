@@ -175,7 +175,7 @@ def _generate_top_users_data(days=7, limit=5):
     return top_users
 
 def _generate_admin_streaming_chart_data(days=7):
-    """Generate streaming chart data for admin dashboard - stacked by service within each day"""
+    """Generate streaming chart data for admin dashboard - stacked by service within each period"""
     from datetime import datetime, timezone, timedelta
     from collections import defaultdict
     
@@ -217,14 +217,27 @@ def _generate_admin_streaming_chart_data(days=7):
         'romm': '#8b5cf6'
     }
     
-    # Group data by date and service (stacked within same day)
-    grouped_data = defaultdict(lambda: defaultdict(float))  # [date][service] = minutes
+    # Determine grouping strategy based on days
+    group_by_week = days in [30, 90]
+    
+    # Group data by period and service
+    grouped_data = defaultdict(lambda: defaultdict(float))  # [period_key][service] = minutes
     service_totals = defaultdict(float)  # Total watch time per service
     service_counts = defaultdict(int)  # Stream counts per service
     total_duration_seconds = 0
     
     for entry in streaming_history:
         entry_date = entry.started_at.date()
+        
+        # Determine period key based on grouping strategy
+        if group_by_week:
+            # Group by week - find the Monday of the week containing this date
+            days_since_monday = entry_date.weekday()
+            week_start = entry_date - timedelta(days=days_since_monday)
+            period_key = week_start.isoformat()
+        else:
+            # Group by day
+            period_key = entry_date.isoformat()
         
         # Get service type from the server
         service_type = 'unknown'
@@ -245,7 +258,7 @@ def _generate_admin_streaming_chart_data(days=7):
             duration_minutes = 1  # 1 minute minimum to show activity
         
         # Add to grouped data
-        grouped_data[entry_date.isoformat()][service_type] += duration_minutes
+        grouped_data[period_key][service_type] += duration_minutes
         service_totals[service_type] += duration_minutes
         service_counts[service_type] += 1
     
@@ -254,19 +267,45 @@ def _generate_admin_streaming_chart_data(days=7):
     start_date_only = start_date.date() if hasattr(start_date, 'date') else start_date
     end_date_only = end_date.date() if hasattr(end_date, 'date') else end_date
     
-    current_date = start_date_only
-    while current_date <= end_date_only:
-        day_key = current_date.isoformat()
-        day_label = current_date.strftime('%b %d')
+    if group_by_week:
+        # Generate week periods
+        # Start from the Monday of the week containing start_date
+        days_since_monday = start_date_only.weekday()
+        current_week_start = start_date_only - timedelta(days=days_since_monday)
         
-        period_data = {'date': day_key, 'label': day_label}
-        
-        # Add service watch times for this day (in minutes)
-        for service_type in service_totals.keys():
-            period_data[service_type] = round(grouped_data[day_key].get(service_type, 0), 1)
-        
-        chart_data_list.append(period_data)
-        current_date += timedelta(days=1)
+        while current_week_start <= end_date_only:
+            week_end = current_week_start + timedelta(days=6)
+            period_key = current_week_start.isoformat()
+            
+            # Create label for the week
+            if current_week_start.month == week_end.month:
+                week_label = f"{current_week_start.strftime('%b %d')}-{week_end.strftime('%d')}"
+            else:
+                week_label = f"{current_week_start.strftime('%b %d')}-{week_end.strftime('%b %d')}"
+            
+            period_data = {'date': period_key, 'label': week_label}
+            
+            # Add service watch times for this week (in minutes)
+            for service_type in service_totals.keys():
+                period_data[service_type] = round(grouped_data[period_key].get(service_type, 0), 1)
+            
+            chart_data_list.append(period_data)
+            current_week_start += timedelta(days=7)
+    else:
+        # Generate daily periods
+        current_date = start_date_only
+        while current_date <= end_date_only:
+            day_key = current_date.isoformat()
+            day_label = current_date.strftime('%b %d')
+            
+            period_data = {'date': day_key, 'label': day_label}
+            
+            # Add service watch times for this day (in minutes)
+            for service_type in service_totals.keys():
+                period_data[service_type] = round(grouped_data[day_key].get(service_type, 0), 1)
+            
+            chart_data_list.append(period_data)
+            current_date += timedelta(days=1)
     
     # Prepare service information for legend
     services = []
