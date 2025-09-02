@@ -853,6 +853,136 @@ def sync_all_users():
         }
         return make_response(modal_html, 200, headers)
 
+@bp.route('/delete-local/<uuid:user_uuid>/accounts', methods=['GET'])
+@login_required
+@setup_required
+@permission_required('delete_user')
+def get_linked_accounts_list(user_uuid):
+    """Get the linked accounts list for the deletion modal"""
+    # Get user by uuid
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_uuid))
+    
+    if not user_obj or user_type != "user_app_access":
+        return '<div class="text-center p-4 text-error">Local user not found.</div>'
+    
+    user = UserAppAccess.query.get(user_obj.id)
+    if not user:
+        return '<div class="text-center p-4 text-error">Local user not found.</div>'
+    
+    # Get linked service accounts
+    from app.models_media_services import UserMediaAccess
+    linked_accounts = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
+    
+    if not linked_accounts:
+        return '<div class="text-center p-4 text-base-content/60">No linked service accounts found.</div>'
+    
+    # Render the accounts list
+    html = '<div class="space-y-2 max-h-32 overflow-y-auto">'
+    for access in linked_accounts:
+        service_type = access.server.service_type.value
+        
+        # Service badge HTML
+        if service_type == 'plex':
+            badge = '''<span class="inline-flex items-center rounded-md bg-plex-50 dark:bg-plex-400/10 px-2 py-1 text-xs font-medium text-plex-700 dark:text-plex-400 ring-1 ring-inset ring-plex-600/20 dark:ring-plex-500/20 gap-1">
+                <svg class="w-3 h-3" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
+                Plex
+            </span>'''
+        elif service_type == 'jellyfin':
+            badge = '''<span class="inline-flex items-center rounded-md bg-jellyfin-50 dark:bg-jellyfin-400/10 px-2 py-1 text-xs font-medium text-jellyfin-700 dark:text-jellyfin-400 ring-1 ring-inset ring-jellyfin-600/20 dark:ring-jellyfin-500/20 gap-1">
+                <i class="fa-solid fa-cube w-3 h-3"></i>
+                Jellyfin
+            </span>'''
+        elif service_type == 'emby':
+            badge = '''<span class="inline-flex items-center rounded-md bg-emby-50 dark:bg-emby-400/10 px-2 py-1 text-xs font-medium text-emby-700 dark:text-emby-400 ring-1 ring-inset ring-emby-600/20 dark:ring-emby-500/20 gap-1">
+                <i class="fa-solid fa-play-circle w-3 h-3"></i>
+                Emby
+            </span>'''
+        else:
+            badge = f'''<span class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1">
+                <i class="fa-solid fa-server w-3 h-3"></i>
+                {service_type.title()}
+            </span>'''
+        
+        html += f'''
+        <div class="flex items-center gap-3 p-3 bg-base-100 rounded-lg border border-base-300/50">
+            {badge}
+            <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm text-base-content truncate">{access.external_username or "Unknown"}</div>
+                <div class="text-xs text-base-content/60">{access.server.server_nickname}</div>
+            </div>
+        </div>
+        '''
+    
+    html += '</div>'
+    return html
+
+@bp.route('/delete-local/<uuid:user_uuid>', methods=['DELETE'])
+@login_required
+@setup_required
+@permission_required('delete_user')
+def delete_local_user(user_uuid):
+    """Delete a local user with options for handling linked accounts"""
+    import json
+    
+    # Get user by uuid
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_uuid))
+    
+    if not user_obj or user_type != "user_app_access":
+        return make_response("Local user not found", 404)
+    
+    user = UserAppAccess.query.get(user_obj.id)
+    if not user:
+        return make_response("Local user not found", 404)
+    
+    # Get deletion type from request
+    try:
+        data = request.get_json()
+        deletion_type = data.get('deletion_type', 'unlink_only')
+    except:
+        deletion_type = 'unlink_only'  # Default to safer option
+    
+    username = user.username
+    
+    try:
+        # Get linked service accounts before deletion
+        from app.models_media_services import UserMediaAccess
+        linked_accounts = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
+        linked_count = len(linked_accounts)
+        
+        if deletion_type == 'delete_all':
+            # Delete from all services AND delete local user
+            current_app.logger.info(f"Deleting local user '{username}' and all {linked_count} linked service accounts")
+            UnifiedUserService.delete_user_completely(user.id, admin_id=current_user.id)
+            message = f"Local user '{username}' and all {linked_count} linked service accounts have been deleted."
+        else:
+            # Unlink only - convert service accounts to standalone
+            current_app.logger.info(f"Deleting local user '{username}' and converting {linked_count} service accounts to standalone")
+            
+            # Unlink all service accounts (convert to standalone)
+            for access in linked_accounts:
+                access.user_app_access_id = None
+                current_app.logger.debug(f"Unlinked service account: {access.external_username} on {access.server.server_nickname}")
+            
+            # Delete the local user
+            db.session.delete(user)
+            db.session.commit()
+            
+            # Log the event
+            log_event(EventType.MUM_USER_DELETED_FROM_MUM, 
+                     f"Local user '{username}' deleted. {linked_count} service accounts converted to standalone users.",
+                     admin_id=current_user.id)
+            
+            message = f"Local user '{username}' deleted. {linked_count} service accounts converted to standalone users."
+        
+        return make_response(message, 200)
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting local user '{username}': {e}", exc_info=True)
+        return make_response(f"Error deleting user: {str(e)}", 500)
+
 @bp.route('/delete/<uuid:user_uuid>', methods=['DELETE'])
 @login_required
 @setup_required

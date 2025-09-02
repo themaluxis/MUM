@@ -194,15 +194,10 @@
             {% if current_user.has_permission('delete_user') %}
             <button 
                 class="btn btn-xs btn-ghost text-error hover:bg-error/10" 
-                title="Delete Local User"
-                hx-confirm="Are you sure you want to delete local user '{{ user.username }}' and all linked service accounts? This action cannot be undone."
-                hx-delete="{{ url_for('users.delete_app_user', username=user.username) }}"
-                hx-target="closest .card" 
-                hx-swap="outerHTML swap:0.5s"
-                hx-indicator="this"
+                title="Delete Local User (with options)"
+                onclick="showDeleteLocalUserModal('{{ user.uuid }}', '{{ user.username }}', {{ user.media_accesses|length }})"
             >
-                <i class="fa-solid fa-trash-can htmx-indicator-hide"></i>
-                <span class="htmx-indicator loading loading-spinner loading-xs"></span>
+                <i class="fa-solid fa-trash-can"></i>
             </button>
             {% endif %}
         </div>

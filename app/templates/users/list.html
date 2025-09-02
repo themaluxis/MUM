@@ -1934,6 +1934,255 @@ function linkSelectedUsers() {
         linkButton.innerHTML = originalContent;
     });
 }
+
+// Function to show the delete local user modal
+function showDeleteLocalUserModal(userUuid, username, linkedAccountsCount) {
+    // Set the user data in the modal
+    document.getElementById('delete_user_uuid').value = userUuid;
+    document.getElementById('delete_user_display_name').textContent = username;
+    document.getElementById('delete_linked_accounts_count').textContent = linkedAccountsCount;
+    document.getElementById('delete_linked_accounts_plural').textContent = linkedAccountsCount !== 1 ? 's' : '';
+    document.getElementById('delete_confirmation_username').textContent = username;
+    
+    // Reset form state
+    document.querySelector('input[name="deletion_type"][value="unlink_only"]').checked = true;
+    document.getElementById('confirm_deletion').checked = false;
+    document.getElementById('confirm_delete_btn').disabled = true;
+    
+    // Show/hide linked accounts section
+    const linkedAccountsSection = document.getElementById('linked_accounts_section');
+    if (linkedAccountsCount > 0) {
+        linkedAccountsSection.style.display = 'block';
+        // Load linked accounts via HTMX
+        htmx.ajax('GET', `/users/delete-local/${userUuid}/accounts`, {
+            target: '#linked_accounts_list',
+            swap: 'innerHTML'
+        });
+    } else {
+        linkedAccountsSection.style.display = 'none';
+    }
+    
+    // Show the modal
+    delete_local_user_modal.showModal();
+}
+
+// Enable/disable delete button based on confirmation checkbox
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmCheckbox = document.getElementById('confirm_deletion');
+    const deleteBtn = document.getElementById('confirm_delete_btn');
+    
+    if (confirmCheckbox && deleteBtn) {
+        confirmCheckbox.addEventListener('change', function() {
+            deleteBtn.disabled = !this.checked;
+        });
+    }
+});
+
+// Execute the local user deletion
+function executeLocalUserDeletion() {
+    const userUuid = document.getElementById('delete_user_uuid').value;
+    const username = document.getElementById('delete_user_display_name').textContent;
+    const deletionType = document.querySelector('input[name="deletion_type"]:checked').value;
+    const confirmed = document.getElementById('confirm_deletion').checked;
+    
+    if (!confirmed) {
+        alert('Please confirm the deletion by checking the checkbox.');
+        return;
+    }
+    
+    // Show loading state
+    const deleteBtn = document.getElementById('confirm_delete_btn');
+    const originalText = deleteBtn.innerHTML;
+    deleteBtn.innerHTML = '<span class="loading loading-spinner loading-sm mr-2"></span>Deleting...';
+    deleteBtn.disabled = true;
+    
+    // Make the deletion request
+    fetch(`/users/delete-local/${userUuid}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            deletion_type: deletionType
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            // Close modal and refresh user list
+            delete_local_user_modal.close();
+            
+            // Trigger HTMX refresh of user list
+            htmx.trigger(document.body, 'refreshUserList');
+            
+            // Show success toast
+            const message = deletionType === 'unlink_only' 
+                ? `Local user '${username}' deleted. Service accounts converted to standalone users.`
+                : `Local user '${username}' and all linked service accounts deleted.`;
+            
+            showToast(message, 'success');
+        } else {
+            // Handle error
+            response.text().then(errorText => {
+                alert(`Error deleting user: ${errorText}`);
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert(`Error deleting user: ${error.message}`);
+    })
+    .finally(() => {
+        // Restore button state
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.disabled = false;
+    });
+}
 </script>
+
+<!-- Delete Local User Modal -->
+<dialog id="delete_local_user_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-2xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center">
+                    <i class="fa-solid fa-trash text-error text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Delete Local User</h3>
+                    <p class="text-sm text-base-content/60">
+                        <span id="delete_user_display_name">User</span> • 
+                        <span id="delete_linked_accounts_count">0</span> linked service account<span id="delete_linked_accounts_plural">s</span>
+                    </p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <input type="hidden" id="delete_user_uuid" value="">
+            
+            <!-- Warning Section -->
+            <div class="space-y-4 mb-6">
+                <h4 class="font-medium text-base-content text-lg mb-3">
+                    <i class="fa-solid fa-exclamation-triangle text-warning text-sm mr-2"></i>
+                    Choose Deletion Method
+                </h4>
+                
+                <div class="bg-warning/10 border border-warning/20 rounded-lg p-4">
+                    <p class="text-sm text-base-content/80 leading-relaxed">
+                        This local user account has linked service accounts. Choose how you want to handle the deletion:
+                    </p>
+                </div>
+            </div>
+
+            <!-- Linked Accounts Section -->
+            <div id="linked_accounts_section" class="space-y-4 mb-6">
+                <h4 class="font-medium text-base-content text-lg mb-3">
+                    <i class="fa-solid fa-link text-primary text-sm mr-2"></i>
+                    Linked Service Accounts
+                </h4>
+                
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30">
+                    <div id="linked_accounts_list">
+                        <!-- Accounts will be loaded here via HTMX -->
+                        <div class="text-center p-4">
+                            <span class="loading loading-spinner loading-sm"></span>
+                            <p class="text-sm text-base-content/60 mt-2">Loading linked accounts...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deletion Options Section -->
+            <div class="space-y-4 mb-6">
+                <h4 class="font-medium text-base-content text-lg mb-3">
+                    <i class="fa-solid fa-cog text-primary text-sm mr-2"></i>
+                    Deletion Options
+                </h4>
+                
+                <!-- Option 1: Unlink Only -->
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                    <label class="cursor-pointer flex items-start gap-3">
+                        <input type="radio" name="deletion_type" value="unlink_only" class="radio radio-primary mt-1" checked>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-unlink text-primary text-sm"></i>
+                                <h5 class="font-medium text-base-content">Unlink and Keep Service Accounts</h5>
+                            </div>
+                            <p class="text-sm text-base-content/70 mb-2">
+                                Delete the local user account but keep all service accounts as standalone users. 
+                                The service accounts will remain active on their respective servers.
+                            </p>
+                            <div class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-success/10 text-success text-xs">
+                                <i class="fa-solid fa-check"></i>
+                                Recommended - Preserves user access to media servers
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Option 2: Delete Everything -->
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30 hover:border-base-300/60 transition-colors">
+                    <label class="cursor-pointer flex items-start gap-3">
+                        <input type="radio" name="deletion_type" value="delete_all" class="radio radio-error mt-1">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-trash text-error text-sm"></i>
+                                <h5 class="font-medium text-base-content">Delete Local User and All Service Accounts</h5>
+                            </div>
+                            <p class="text-sm text-base-content/70 mb-2">
+                                Delete the local user account AND remove all linked service accounts from their media servers. 
+                                This will completely revoke the user's access.
+                            </p>
+                            <div class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-error/10 text-error text-xs">
+                                <i class="fa-solid fa-exclamation-triangle"></i>
+                                Destructive - User will lose all media server access
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Confirmation Section -->
+            <div class="space-y-4">
+                <h4 class="font-medium text-base-content text-lg mb-3">
+                    <i class="fa-solid fa-check-circle text-error text-sm mr-2"></i>
+                    Confirmation Required
+                </h4>
+                
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300/30">
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" id="confirm_deletion" class="checkbox checkbox-error mt-1" required>
+                        <div class="text-sm text-base-content/80">
+                            I understand the consequences of this action and want to proceed with deleting the local user account 
+                            <strong id="delete_confirmation_username">User</strong>.
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 p-6 border-t border-base-300">
+            <button type="button" class="btn btn-ghost" onclick="delete_local_user_modal.close()">
+                <i class="fa-solid fa-times mr-2"></i>
+                Cancel
+            </button>
+            
+            <button type="button" class="btn btn-error" id="confirm_delete_btn" disabled onclick="executeLocalUserDeletion()">
+                <i class="fa-solid fa-trash mr-2"></i>
+                Delete User
+            </button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 {% endblock %}

@@ -6853,6 +6853,12 @@
       --input-color: var(--color-error);
     }
   }
+  .radio-error {
+    --input-color: var(--color-error);
+  }
+  .radio-primary {
+    --input-color: var(--color-primary);
+  }
   .ring-inset {
     --tw-ring-inset: inset;
   }
