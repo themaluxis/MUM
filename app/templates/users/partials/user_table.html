@@ -200,14 +200,7 @@
                                         {% set user_servers = user_server_names.get(user.uuid, []) %}
                                         {% if user_servers %}
                                             {% set server_name = user_servers[0] %}
-                                            {% if user.plex_username %}
-                                                {% set username = user.plex_username %}
-                                            {% elif '@' in user.primary_username %}
-                                                {% set username = user.primary_username.split('@')[0] %}
-                                            {% else %}
-                                                {% set username = user.primary_username %}
-                                            {% endif %}
-                                            <a href="{{ url_for('user.view_app_user', username=user.username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="App User Profile" class="link link-hover">
+                                            <a href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=user.username, back='users', back_view='table') }}" title="Service User Profile" class="link link-hover">
                                                 <div class="font-bold truncate max-w-[150px] sm:max-w-xs {{ username_class }}" title="{{ user.get_display_name() }}">{{ user.get_display_name() }}</div>
                                             </a>
                                         {% else %}
@@ -303,7 +296,10 @@
                     {{ user.plex_join_date | format_datetime_user if user.plex_join_date else 'N/A' }}
                 </td>
                 <td data-col="last_known_ip" class="text-sm font-mono">
-                    {{ user.last_known_ip }}
+                    <div class="flex items-center gap-1">
+                        <i class="fa-solid fa-globe fa-fw text-info text-xs"></i>
+                        <span>{{ user.last_known_ip if user.last_known_ip != 'N/A' else 'No IP recorded' }}</span>
+                    </div>
                 </td>
                 <td data-col="total_plays" class="text-sm">
                     {{ user.total_plays }}
@@ -388,9 +384,10 @@
                         </span>
                     {% endif %}
                 </td>
-                <td data-col="last_streamed" class="text-sm" title="{{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}">
-                    <div title="{{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never streamed' }}">
-                        {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}
+                <td data-col="last_streamed" class="text-sm" title="{{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never streamed' }}">
+                    <div class="flex items-center gap-1">
+                        <i class="fa-solid fa-play fa-fw text-info text-xs"></i>
+                        <span>{{ user.last_streamed_at | time_ago if user.last_streamed_at else 'Never streamed' }}</span>
                     </div>
                     {% if user.access_expires_at %}
                         <div class="text-xs text-warning mt-0.5" title="Access expires on {{ user.access_expires_at | format_datetime_user }}">

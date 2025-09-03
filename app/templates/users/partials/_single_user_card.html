@@ -246,7 +246,7 @@
                 </div>
             </div>
             <div class="user-streamed-section">
-                <p><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never' }}</p>
+                <p title="{{ user.last_streamed_at | format_datetime_user if user.last_streamed_at else 'Never streamed' }}"><i class="fa-solid fa-clock fa-fw mr-1 {{ 'text-success' if user.last_streamed_at else 'text-warning' }}"></i> Streamed: {{ user.last_streamed_at | time_ago if user.last_streamed_at else 'Never' }}</p>
             </div>
             {% if user.service_join_date or user.plex_join_date %}
             <div class="tooltip tooltip-top" data-tip="Full join date: {{ (user.service_join_date or user.plex_join_date) | format_datetime_user }} - When {{ user.get_display_name() }} joined the service">
