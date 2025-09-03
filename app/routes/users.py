@@ -251,6 +251,9 @@ def list_users():
                     self._is_standalone = True  # Flag to identify standalone users
                     self._access_record = access  # Store the original access record
                     
+                    # Add service join date for table display
+                    self.plex_join_date = access.service_join_date or access.created_at
+                    
                     # Add the missing status fields for badge display
                     self.is_home_user = access.is_home_user
                     self.shares_back = access.shares_back
@@ -343,6 +346,14 @@ def list_users():
         # Process avatar URL for local users using their linked media access accounts
         app_user.avatar_url = _get_local_user_avatar_url(app_user)
         # UUID is already available on the user object
+        
+        # Set plex_join_date for local users - use the earliest service join date or created_at
+        earliest_join_date = app_user.created_at
+        for media_access in app_user.media_accesses:
+            if media_access.service_join_date and (not earliest_join_date or media_access.service_join_date < earliest_join_date):
+                earliest_join_date = media_access.service_join_date
+        app_user.plex_join_date = earliest_join_date
+        
         all_users.append(app_user)
         current_app.logger.info(f"DEBUG: Local user {app_user.username} (UUID: {app_user.uuid}) added to list")
     
@@ -433,24 +444,20 @@ def list_users():
     admin_accounts = [owner] if owner else []
     admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts}
     
-    # Get user IDs for additional data - extract actual IDs from prefixed format
-    user_ids_on_page = []  # Actual UserMediaAccess IDs for service users
-    app_user_ids_on_page = []  # Actual UserAppAccess IDs for local users
+    # Get user UUIDs for additional data - both local and service users
+    all_user_uuids = []
     
     for user in users_on_page:
         if hasattr(user, '_user_type'):
-            # Use actual database IDs directly since we're working with real user objects
-            if user._user_type == 'service':
-                user_ids_on_page.append(user.id)
-            elif user._user_type == 'local':
-                app_user_ids_on_page.append(user.id)
+            # Use UUIDs for both local and service users
+            all_user_uuids.append(user.uuid)
 
-    # Fetch additional data for service users only (using actual IDs)
+    # Fetch additional data for all users (using UUIDs)
     stream_stats = {}
     last_ips = {}
-    if user_ids_on_page:
-        stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
-        last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
+    if all_user_uuids:
+        stream_stats = user_service.get_bulk_user_stream_stats(all_user_uuids)
+        last_ips = user_service.get_bulk_last_known_ips(all_user_uuids)
 
     # Get last known IPs from streaming history for all users
     all_user_uuids = []
@@ -483,21 +490,16 @@ def list_users():
 
     # Attach the additional data directly to each user object
     for user in users_on_page:
-        if hasattr(user, '_user_type') and user._user_type == 'service':
-            # Use actual database ID directly
-            stats = stream_stats.get(user.id, {})
+        if hasattr(user, '_user_type'):
+            # Use UUID to get stats for both local and service users
+            stats = stream_stats.get(user.uuid, {})
             user.total_plays = stats.get('play_count', 0)
             user.total_duration = stats.get('total_duration', 0)
-            # Use IP from streaming history first, then fall back to service-specific IP
-            user.last_known_ip = last_known_ips_from_streams.get(user.uuid) or last_ips.get(user.id, 'N/A')
-        else:
-            # Local users don't have stream stats from the service-specific logic above
-            user.total_plays = 0
-            user.total_duration = 0
-            # Get IP from streaming history
-            user.last_known_ip = last_known_ips_from_streams.get(user.uuid, 'N/A')
-            # Initialize last_streamed_at for local users - will be set below if streaming history exists
-            user.last_streamed_at = None
+            # Use IP from streaming history first, then fall back to bulk IP lookup
+            user.last_known_ip = last_known_ips_from_streams.get(user.uuid) or last_ips.get(user.uuid, 'N/A')
+            # Initialize last_streamed_at - will be set below if streaming history exists
+            if not hasattr(user, 'last_streamed_at'):
+                user.last_streamed_at = None
     
     # Get library access info for each user, organized by server to prevent ID collisions
     user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
@@ -1566,14 +1568,18 @@ def mass_edit_users():
     # Extract users from pagination results (handling complex queries that return tuples)
     users_on_page = [item[0] if isinstance(item, tuple) else item for item in users_pagination.items]
     
-    # Extract user IDs from pagination results
-    user_ids_on_page = [user.id for user in users_pagination.items]
+    # Extract user UUIDs from pagination results for stats lookup
+    user_uuids_on_page = [user.uuid for user in users_pagination.items if hasattr(user, 'uuid')]
     
     # Get library access info for each user, organized by server to prevent ID collisions
     user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
     user_sorted_libraries = {}
     from app.models_media_services import UserMediaAccess
-    access_records = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id.in_(user_ids_on_page)).all()
+    
+    # Get actual user IDs for UserAppAccess users only (for library access lookup)
+    local_user_ids = [user.id for user in users_pagination.items if hasattr(user, '_user_type') and user._user_type == 'local']
+    
+    access_records = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id.in_(local_user_ids)).all()
     for access in access_records:
         if access.user_app_access_id not in user_library_access_by_server:
             user_library_access_by_server[access.user_app_access_id] = {}
@@ -1638,17 +1644,17 @@ def mass_edit_users():
     admin_accounts = [owner] if owner else []
     admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts if admin.plex_uuid}
     
-    # Get stream stats and other data
-    user_ids_on_page = [user.id for user in users_on_page]
-    stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
-    last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
+    # Get stream stats and other data using UUIDs
+    stream_stats = user_service.get_bulk_user_stream_stats(user_uuids_on_page)
+    last_ips = user_service.get_bulk_last_known_ips(user_uuids_on_page)
     
     # Attach the additional data directly to each user object
-    for user in users_on_page:
-        stats = stream_stats.get(user.id, {})
-        user.total_plays = stats.get('play_count', 0)
-        user.total_duration = stats.get('total_duration', 0)
-        user.last_known_ip = last_ips.get(user.id, 'N/A')
+    for user in users_pagination.items:
+        if hasattr(user, 'uuid'):
+            stats = stream_stats.get(user.uuid, {})
+            user.total_plays = stats.get('play_count', 0)
+            user.total_duration = stats.get('total_duration', 0)
+            user.last_known_ip = last_ips.get(user.uuid, 'N/A')
     
     # Build user_service_types for template context
     user_service_types = {}  # Track which services each user belongs to

@@ -1069,70 +1069,90 @@ def get_bulk_user_stream_stats(user_ids: list[int]) -> dict:
     """
     Efficiently gets total plays and duration for a list of user IDs.
     Returns a dictionary mapping user_id to its stats.
+    Handles both local users (UserAppAccess) and service users (UserMediaAccess).
     """
     if not user_ids:
         return {}
 
-    # Convert user IDs to UUIDs for the query
+    # Convert user IDs to UUIDs for the query, separating by user type
     from app.utils.helpers import get_user_by_uuid
-    user_uuids = []
-    for user_id in user_ids:
-        try:
-            user_obj, user_type = get_user_by_uuid(str(user_id))
-            if user_obj and user_type == "user_app_access":
-                user_uuids.append(user_obj.uuid)
-        except Exception:
-            continue
-    
-    if not user_uuids:
-        return {}
-    
-    results = db.session.query(
-        MediaStreamHistory.user_app_access_uuid,
-        func.count(MediaStreamHistory.id).label('total_plays'),
-        func.sum(MediaStreamHistory.duration_seconds).label('total_duration')
-    ).filter(MediaStreamHistory.user_app_access_uuid.in_(user_uuids)).group_by(MediaStreamHistory.user_app_access_uuid).all()
-
-    # Create a mapping from UUID back to original user ID
+    app_access_uuids = []
+    media_access_uuids = []
     uuid_to_user_id = {}
+    
     for user_id in user_ids:
         try:
             user_obj, user_type = get_user_by_uuid(str(user_id))
             if user_obj and user_type == "user_app_access":
+                app_access_uuids.append(user_obj.uuid)
+                uuid_to_user_id[user_obj.uuid] = user_id
+            elif user_obj and user_type == "user_media_access":
+                media_access_uuids.append(user_obj.uuid)
                 uuid_to_user_id[user_obj.uuid] = user_id
         except Exception:
             continue
     
-    return {
-        uuid_to_user_id.get(user_uuid, user_uuid): {'play_count': plays, 'total_duration': duration or 0}
-        for user_uuid, plays, duration in results
-    }
+    if not app_access_uuids and not media_access_uuids:
+        return {}
+    
+    stats_results = {}
+    
+    # Query for local users (UserAppAccess)
+    if app_access_uuids:
+        app_results = db.session.query(
+            MediaStreamHistory.user_app_access_uuid,
+            func.count(MediaStreamHistory.id).label('total_plays'),
+            func.sum(MediaStreamHistory.duration_seconds).label('total_duration')
+        ).filter(MediaStreamHistory.user_app_access_uuid.in_(app_access_uuids)).group_by(MediaStreamHistory.user_app_access_uuid).all()
+        
+        for user_uuid, plays, duration in app_results:
+            user_id = uuid_to_user_id.get(user_uuid)
+            if user_id:
+                stats_results[user_id] = {'play_count': plays, 'total_duration': duration or 0}
+    
+    # Query for service users (UserMediaAccess)
+    if media_access_uuids:
+        media_results = db.session.query(
+            MediaStreamHistory.user_media_access_uuid,
+            func.count(MediaStreamHistory.id).label('total_plays'),
+            func.sum(MediaStreamHistory.duration_seconds).label('total_duration')
+        ).filter(MediaStreamHistory.user_media_access_uuid.in_(media_access_uuids)).group_by(MediaStreamHistory.user_media_access_uuid).all()
+        
+        for user_uuid, plays, duration in media_results:
+            user_id = uuid_to_user_id.get(user_uuid)
+            if user_id:
+                stats_results[user_id] = {'play_count': plays, 'total_duration': duration or 0}
+    
+    return stats_results
 
-def get_bulk_last_known_ips(user_uuids: list) -> dict:
+def get_bulk_last_known_ips(user_ids: list) -> dict:
     """
-    Efficiently gets the most recent IP address for a list of user UUIDs.
-    Returns a dictionary mapping user_uuid to the last known IP address.
+    Efficiently gets the most recent IP address for a list of user IDs.
+    Returns a dictionary mapping user_id to the last known IP address.
     Supports both UserAppAccess and UserMediaAccess users.
     """
-    if not user_uuids:
+    if not user_ids:
         return {}
 
-    # Separate UUIDs by user type
+    # Convert user IDs to UUIDs for the query, separating by user type
     from app.utils.helpers import get_user_by_uuid
     app_access_uuids = []
     media_access_uuids = []
+    uuid_to_user_id = {}
     
-    for user_uuid in user_uuids:
+    for user_id in user_ids:
         try:
-            user_obj, user_type = get_user_by_uuid(str(user_uuid))
+            user_obj, user_type = get_user_by_uuid(str(user_id))
             if user_obj and user_type == "user_app_access":
-                app_access_uuids.append(str(user_uuid))
+                app_access_uuids.append(user_obj.uuid)
+                uuid_to_user_id[user_obj.uuid] = user_id
             elif user_obj and user_type == "user_media_access":
-                media_access_uuids.append(str(user_uuid))
+                media_access_uuids.append(user_obj.uuid)
+                uuid_to_user_id[user_obj.uuid] = user_id
         except Exception:
-            continue  # Skip invalid UUIDs
+            continue  # Skip invalid IDs
     
-    uuid_to_ip = {}
+    user_id_to_ip = {}
     
     # Handle UserAppAccess users
     if app_access_uuids:
@@ -1148,7 +1168,9 @@ def get_bulk_last_known_ips(user_uuids: list) -> dict:
         results_app = db.session.query(subquery_app.c.user_app_access_uuid, subquery_app.c.ip_address).filter(subquery_app.c.rn == 1).all()
         
         for result_uuid, ip_address in results_app:
-            uuid_to_ip[result_uuid] = ip_address
+            user_id = uuid_to_user_id.get(result_uuid)
+            if user_id:
+                user_id_to_ip[user_id] = ip_address
     
     # Handle UserMediaAccess users
     if media_access_uuids:
@@ -1164,9 +1186,11 @@ def get_bulk_last_known_ips(user_uuids: list) -> dict:
         results_media = db.session.query(subquery_media.c.user_media_access_uuid, subquery_media.c.ip_address).filter(subquery_media.c.rn == 1).all()
         
         for result_uuid, ip_address in results_media:
-            uuid_to_ip[result_uuid] = ip_address
+            user_id = uuid_to_user_id.get(result_uuid)
+            if user_id:
+                user_id_to_ip[user_id] = ip_address
     
-    return uuid_to_ip
+    return user_id_to_ip
 
 def mass_extend_access(user_uuids: list, days_to_extend: int, admin_id: int = None):
     """Mass extend access for service users (UserMediaAccess)"""
