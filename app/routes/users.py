@@ -650,52 +650,60 @@ def list_users():
         {"id": "service", "name": "Service Users Only"}
     ]
 
-    # Get last played content for each user - extract actual IDs for local users only
+    # Get last played content for each user - both local and service users
     user_last_played = {}
-    local_user_ids_on_page = []
+    all_user_uuids_for_last_played = []
     
-    # Extract actual UserAppAccess IDs for local users (MediaStreamHistory only tracks local users)
+    # Extract UUIDs for all users (both local and service)
     for user in users_pagination.items:
-        if hasattr(user, '_user_type') and user._user_type == 'local':
-            # Use actual database ID directly for local users
-            local_user_ids_on_page.append(user.id)
+        if hasattr(user, '_user_type'):
+            all_user_uuids_for_last_played.append(user.uuid)
     
-    if local_user_ids_on_page:
-        # Get the most recent stream for each local user from MediaStreamHistory table
-        # Need to get UUIDs for the local users first
-        local_user_uuids = []
-        for user in users_on_page:
-            if hasattr(user, '_user_type') and user._user_type == 'local':
-                local_user_uuids.append(user.uuid)
+    if all_user_uuids_for_last_played:
+        from sqlalchemy import desc
+        # Get the most recent stream for each user from MediaStreamHistory table
+        last_streams = db.session.query(MediaStreamHistory).filter(
+            or_(
+                MediaStreamHistory.user_app_access_uuid.in_(all_user_uuids_for_last_played),
+                MediaStreamHistory.user_media_access_uuid.in_(all_user_uuids_for_last_played)
+            )
+        ).order_by(MediaStreamHistory.started_at.desc()).all()
         
-        if local_user_uuids:
-            from sqlalchemy import desc
-            last_streams = db.session.query(MediaStreamHistory).filter(
-                MediaStreamHistory.user_app_access_uuid.in_(local_user_uuids)
-            ).order_by(MediaStreamHistory.user_app_access_uuid, desc(MediaStreamHistory.started_at)).all()
-            
-            # Group by user_app_access_uuid and take the first (most recent) for each user
-            seen_users = set()
-            for stream in last_streams:
-                if stream.user_app_access_uuid not in seen_users:
-                    # Find the user by UUID
-                    user_for_stream = next((u for u in users_on_page if hasattr(u, '_user_type') and u._user_type == 'local' and u.uuid == stream.user_app_access_uuid), None)
-                    if user_for_stream:
-                        user_last_played[user_for_stream.uuid] = {
-                        'media_title': stream.media_title,
+        # Group by user UUID and take the first (most recent) for each user
+        seen_users = set()
+        for stream in last_streams:
+            user_uuid = stream.user_app_access_uuid or stream.user_media_access_uuid
+            if user_uuid and user_uuid not in seen_users:
+                # Find the user by UUID
+                user_for_stream = next((u for u in users_on_page if hasattr(u, '_user_type') and u.uuid == user_uuid), None)
+                if user_for_stream:
+                    # Build display title based on media type
+                    display_title = stream.media_title or 'Unknown Title'
+                    
+                    # For TV shows, combine show name and episode title
+                    if stream.media_type == 'episode' and stream.grandparent_title:
+                        if stream.parent_title:  # Season info
+                            display_title = f"{stream.grandparent_title} - {stream.media_title}"
+                        else:
+                            display_title = f"{stream.grandparent_title} - {stream.media_title}"
+                    elif stream.media_type == 'track' and stream.grandparent_title:  # Music
+                        display_title = f"{stream.grandparent_title} - {stream.media_title}"
+                    
+                    user_last_played[user_for_stream.uuid] = {
+                        'media_title': display_title,
+                        'original_media_title': stream.media_title,
                         'media_type': stream.media_type,
-                    'grandparent_title': stream.grandparent_title,
-                    'parent_title': stream.parent_title,
-                    'started_at': stream.started_at,
-                    'rating_key': stream.rating_key,
-                    'server_id': stream.server_id if hasattr(stream, 'server_id') else None
-                }
+                        'grandparent_title': stream.grandparent_title,
+                        'parent_title': stream.parent_title,
+                        'started_at': stream.started_at,
+                        'rating_key': stream.rating_key,
+                        'server_id': stream.server_id if hasattr(stream, 'server_id') else None
+                    }
                 
                     # Also set last_streamed_at on the user object for table display
-                    # When sorting by last_streamed, users_on_page contains all users, not just paginated ones
                     user_for_stream.last_streamed_at = stream.started_at
                 
-                seen_users.add(stream.user_app_access_uuid)
+                seen_users.add(user_uuid)
 
     # Handle last_streamed sorting after streaming data is populated
     if 'last_streamed' in sort_by_param:

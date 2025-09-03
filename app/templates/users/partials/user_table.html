@@ -417,7 +417,6 @@
                         {% else %}
                         <span>{{ last_played.media_title or 'Unknown Title' }}</span>
                         {% endif %}
-                        <div class="text-xs opacity-60">{{ last_played.started_at | format_datetime_user if last_played.started_at else 'N/A' }}</div>
                     {% else %}
                         Never
                     {% endif %}
