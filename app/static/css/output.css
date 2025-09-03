@@ -7111,6 +7111,13 @@
       }
     }
   }
+  .hover\:bg-audiobookshelf-100 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-audiobookshelf-100);
+      }
+    }
+  }
   .hover\:bg-base-100 {
     &:hover {
       @media (hover: hover) {
@@ -7172,6 +7179,13 @@
       }
     }
   }
+  .hover\:bg-emby-100 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-emby-100);
+      }
+    }
+  }
   .hover\:bg-error\/10 {
     &:hover {
       @media (hover: hover) {
@@ -7210,6 +7224,34 @@
         @supports (color: color-mix(in lab, red, red)) {
           background-color: color-mix(in oklab, var(--color-info) 10%, transparent);
         }
+      }
+    }
+  }
+  .hover\:bg-jellyfin-100 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-jellyfin-100);
+      }
+    }
+  }
+  .hover\:bg-kavita-100 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-kavita-100);
+      }
+    }
+  }
+  .hover\:bg-komga-100 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-komga-100);
+      }
+    }
+  }
+  .hover\:bg-plex-100 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-plex-100);
       }
     }
   }
@@ -7254,6 +7296,13 @@
     &:hover {
       @media (hover: hover) {
         background-color: var(--color-purple-100);
+      }
+    }
+  }
+  .hover\:bg-romm-100 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-romm-100);
       }
     }
   }
@@ -8407,6 +8456,30 @@
       }
     }
   }
+  .dark\:hover\:bg-audiobookshelf-400\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in srgb, oklch(68% 0.14 263.78) 20%, transparent);
+          @supports (color: color-mix(in lab, red, red)) {
+            background-color: color-mix(in oklab, var(--color-audiobookshelf-400) 20%, transparent);
+          }
+        }
+      }
+    }
+  }
+  .dark\:hover\:bg-emby-400\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in srgb, oklch(75% 0.16 150.17) 20%, transparent);
+          @supports (color: color-mix(in lab, red, red)) {
+            background-color: color-mix(in oklab, var(--color-emby-400) 20%, transparent);
+          }
+        }
+      }
+    }
+  }
   .dark\:hover\:bg-gray-400\/20 {
     &:where([data-theme=dark], [data-theme=dark] *) {
       &:hover {
@@ -8443,6 +8516,54 @@
       }
     }
   }
+  .dark\:hover\:bg-jellyfin-400\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in srgb, oklch(68% 0.22 304.24) 20%, transparent);
+          @supports (color: color-mix(in lab, red, red)) {
+            background-color: color-mix(in oklab, var(--color-jellyfin-400) 20%, transparent);
+          }
+        }
+      }
+    }
+  }
+  .dark\:hover\:bg-kavita-400\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in srgb, oklch(77% 0.10 163.11) 20%, transparent);
+          @supports (color: color-mix(in lab, red, red)) {
+            background-color: color-mix(in oklab, var(--color-kavita-400) 20%, transparent);
+          }
+        }
+      }
+    }
+  }
+  .dark\:hover\:bg-komga-400\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in srgb, oklch(71% 0.18 29.4) 20%, transparent);
+          @supports (color: color-mix(in lab, red, red)) {
+            background-color: color-mix(in oklab, var(--color-komga-400) 20%, transparent);
+          }
+        }
+      }
+    }
+  }
+  .dark\:hover\:bg-plex-400\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in srgb, oklch(78% 0.15 80.28) 20%, transparent);
+          @supports (color: color-mix(in lab, red, red)) {
+            background-color: color-mix(in oklab, var(--color-plex-400) 20%, transparent);
+          }
+        }
+      }
+    }
+  }
   .dark\:hover\:bg-purple-400\/20 {
     &:where([data-theme=dark], [data-theme=dark] *) {
       &:hover {
@@ -8450,6 +8571,18 @@
           background-color: color-mix(in srgb, oklch(71.4% 0.203 305.504) 20%, transparent);
           @supports (color: color-mix(in lab, red, red)) {
             background-color: color-mix(in oklab, var(--color-purple-400) 20%, transparent);
+          }
+        }
+      }
+    }
+  }
+  .dark\:hover\:bg-romm-400\/20 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in srgb, oklch(68% 0.14 282.4) 20%, transparent);
+          @supports (color: color-mix(in lab, red, red)) {
+            background-color: color-mix(in oklab, var(--color-romm-400) 20%, transparent);
           }
         }
       }
