@@ -32,7 +32,7 @@
                 {% do query_params.update({'sort_by': next_sort_duration}) %}
                 <th data-col="total_duration"><a href="{{ url_for('users.list_users', **query_params) }}" hx-get="{{ url_for('users.list_users', **query_params) }}" hx-target="#user-list-container" hx-swap="innerHTML" hx-push-url="true" class="link link-hover">Total Duration {% if sort_column == 'total_duration' %}<i class="fa-solid fa-sort-{{ 'down' if sort_direction == 'desc' else 'up' }} ml-1"></i>{% endif %}</a></th>
                 
-                <th data-col="status">Status</th>
+                <th data-col="roles">Roles</th>
                 
                 <th data-col="libraries">Libraries</th>
                 
@@ -293,7 +293,7 @@
                     </div>
                 </td>
                 <td data-col="plex_join_date" class="text-sm">
-                    {{ user.plex_join_date | format_datetime_user if user.plex_join_date else 'N/A' }}
+                    {{ user.plex_join_date.strftime('%b %d, %Y') if user.plex_join_date else 'N/A' }}
                 </td>
                 <td data-col="last_known_ip" class="text-sm font-mono">
                     <div class="flex items-center gap-1">
@@ -307,7 +307,7 @@
                 <td data-col="total_duration" class="text-sm">
                     {{ user.total_duration | format_duration }}
                 </td>
-                <td data-col="status">
+                <td data-col="roles">
                     {% if user.is_home_user %}<span class="badge badge-primary badge-sm whitespace-nowrap" title="Plex Home User"><i class="fa-solid fa-home"></i>Home</span>{% endif %}
                     {% if user.shares_back %}<span class="badge badge-secondary badge-sm mt-1 whitespace-nowrap" title="Shares Libraries Back"><i class="fa-solid fa-share"></i>Shares Back</span>{% endif %}
                     {% if user.discord_user_id %}<span class="badge badge-info badge-sm mt-1 whitespace-nowrap" title="Discord: {{ user.discord_username or 'Linked' }}"><i class="fa-brands fa-discord"></i>Discord</span>{% endif %}
@@ -396,7 +396,7 @@
                     {% endif %}
                 </td>
                 <td data-col="mum_added_date" class="text-sm" title="{{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}">
-                    {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}
+                    {{ user.created_at.strftime('%b %d, %Y') if user.created_at else 'N/A' }}
                 </td>
                 <td data-col="last_played" class="text-sm">
                     {% set last_played = user_last_played.get(user.uuid) %}
@@ -426,21 +426,14 @@
                         {% if current_user.has_permission('view_user') %}
                             {% if user._user_type is defined and user._user_type == 'local' %}
                                 <!-- Local user profile link -->
-                                <a href="{{ url_for('user.view_app_user', username=user.username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="App User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-user"></i></a>
+                                <a href="{{ url_for('user.view_app_user', username=user.username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-user"></i></a>
                             {% else %}
                                 <!-- Service user profile link -->
                                 {% if user._user_type is defined and user._user_type == 'service' %}
                                     {% set user_servers = user_server_names.get(user.uuid, []) %}
                                     {% if user_servers %}
                                         {% set server_name = user_servers[0] %}
-                                        {% if user.plex_username %}
-                                            {% set username = user.plex_username %}
-                                        {% elif '@' in user.primary_username %}
-                                            {% set username = user.primary_username.split('@')[0] %}
-                                        {% else %}
-                                            {% set username = user.primary_username %}
-                                        {% endif %}
-                                        <a href="{{ url_for('user.view_app_user', username=user.username, view='table', page=users.page, per_page=current_per_page, back='users', back_view='table') }}" title="App User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-user"></i></a>
+                                        <a href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=user.username, back='users', back_view='table') }}" title="Service User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10"><i class="fa-solid fa-user"></i></a>
                                     {% else %}
                                         <span title="No server info available" class="btn btn-xs btn-ghost text-gray-500"><i class="fa-solid fa-eye-slash"></i></span>
                                     {% endif %}
