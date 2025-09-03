@@ -452,6 +452,35 @@ def list_users():
         stream_stats = user_service.get_bulk_user_stream_stats(user_ids_on_page)
         last_ips = user_service.get_bulk_last_known_ips(user_ids_on_page)
 
+    # Get last known IPs from streaming history for all users
+    all_user_uuids = []
+    for user in users_on_page:
+        if hasattr(user, '_user_type'):
+            if user._user_type == 'local':
+                all_user_uuids.append(user.uuid)
+            elif user._user_type == 'service':
+                all_user_uuids.append(user.uuid)
+    
+    # Get most recent IP addresses from MediaStreamHistory for all users
+    last_known_ips_from_streams = {}
+    if all_user_uuids:
+        from sqlalchemy import desc
+        # Query for the most recent stream for each user to get their last known IP
+        recent_streams = db.session.query(MediaStreamHistory).filter(
+            or_(
+                MediaStreamHistory.user_app_access_uuid.in_(all_user_uuids),
+                MediaStreamHistory.user_media_access_uuid.in_(all_user_uuids)
+            )
+        ).order_by(MediaStreamHistory.started_at.desc()).all()
+        
+        # Group by user and take the most recent IP for each
+        seen_users = set()
+        for stream in recent_streams:
+            user_uuid = stream.user_app_access_uuid or stream.user_media_access_uuid
+            if user_uuid and user_uuid not in seen_users and stream.ip_address:
+                last_known_ips_from_streams[user_uuid] = stream.ip_address
+                seen_users.add(user_uuid)
+
     # Attach the additional data directly to each user object
     for user in users_on_page:
         if hasattr(user, '_user_type') and user._user_type == 'service':
@@ -459,12 +488,14 @@ def list_users():
             stats = stream_stats.get(user.id, {})
             user.total_plays = stats.get('play_count', 0)
             user.total_duration = stats.get('total_duration', 0)
-            user.last_known_ip = last_ips.get(user.id, 'N/A')
+            # Use IP from streaming history first, then fall back to service-specific IP
+            user.last_known_ip = last_known_ips_from_streams.get(user.uuid) or last_ips.get(user.id, 'N/A')
         else:
             # Local users don't have stream stats from the service-specific logic above
             user.total_plays = 0
             user.total_duration = 0
-            user.last_known_ip = 'N/A'
+            # Get IP from streaming history
+            user.last_known_ip = last_known_ips_from_streams.get(user.uuid, 'N/A')
             # Initialize last_streamed_at for local users - will be set below if streaming history exists
             user.last_streamed_at = None
     

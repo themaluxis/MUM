@@ -399,7 +399,7 @@
                     {{ user.created_at | format_datetime_user if user.created_at else 'N/A' }}
                 </td>
                 <td data-col="last_played" class="text-sm">
-                    {% set last_played = user_last_played.get(user.id) %}
+                    {% set last_played = user_last_played.get(user.uuid) %}
                     {% if last_played %}
                         {% if last_played.rating_key %}
                         <div class="relative group">
