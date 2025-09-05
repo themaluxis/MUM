@@ -3,20 +3,37 @@
 {% block title %}Select Services - {{ g.app_name }}{% endblock %}
 
 {% block setup_content %}
-<div class="card bg-base-100 shadow-xl max-w-4xl mx-auto">
+<div class="card bg-base-100 shadow-xl max-w-6xl mx-auto">
     <div class="card-body">
-        <h2 class="card-title text-2xl mb-6">
-            <i class="fas fa-puzzle-piece mr-3"></i>
-            Select Media Services
-        </h2>
-        
-        <div class="mb-6">
-            <p class="text-gray-600">
-                Choose which media services you want to use with MUM. You can enable additional services later from the settings panel.
-            </p>
+        <!-- Clean Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-puzzle-piece text-primary text-xl"></i>
+                </div>
+                <div class="flex-1">
+                    <h1 class="text-2xl font-bold text-base-content mb-1">Select Media Services</h1>
+                    <p class="text-base-content/70 text-sm">Choose which media services you want to use with MUM. You can enable additional services later from the settings panel.</p>
+                </div>
+            </div>
         </div>
 
-        <!-- Service Descriptions -->
+        <!-- Plugin Overview Card -->
+        <div class="bg-info/10 border border-info/20 rounded-lg p-4 mb-6">
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-info text-info text-xs"></i>
+                </div>
+                <div>
+                    <h4 class="font-medium text-info mb-1">Service Setup</h4>
+                    <p class="text-sm text-base-content/80">
+                        Select and configure media service plugins to connect to your servers. Each plugin supports different features and authentication methods.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service Information Dropdown -->
         <div class="collapse collapse-arrow bg-base-200 mb-6">
             <input type="checkbox" /> 
             <div class="collapse-title text-lg font-medium">
@@ -47,55 +64,82 @@
             </div>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-2 mb-8">
-            {% for plugin in plugins %}
-            <div class="card bg-base-200 hover:bg-base-300 transition-colors">
-                <div class="card-body p-4">
-                    <div class="flex items-start">
-                        <div class="flex-1">
-                            <div class="flex items-center mb-1">
-                                <h3 class="font-semibold text-lg mr-3">{{ plugin.name }}</h3>
-                                {% if plugin.servers_count > 0 %}
-                                    <span class="badge badge-success badge-sm">Configured</span>
-                                {% else %}
-                                    <span class="badge badge-ghost badge-sm">Not Configured</span>
-                                {% endif %}
+        <!-- Available Services Section -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Available Services</h2>
+            <div class="grid gap-4 md:grid-cols-2">
+                {% for plugin in plugins %}
+                <div class="bg-base-100 border border-base-300 rounded-lg p-6 hover:border-base-300/60 transition-colors flex flex-col h-full">
+                    <!-- Plugin Header -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                <i class="fa-solid fa-puzzle-piece text-primary text-lg"></i>
                             </div>
-                            <p class="text-sm text-gray-600 mt-1">{{ plugin.description }}</p>
-                            
-                            {% if plugin.supported_features %}
-                            <div class="mt-3">
-                                <div class="text-xs text-gray-500 mb-1">Features:</div>
+                            <div>
+                                <h3 class="font-semibold text-base-content">{{ plugin.name }}</h3>
+                                <span class="text-xs text-base-content/60">v{{ plugin.version }}</span>
+                            </div>
+                        </div>
+                        {% if plugin.servers_count > 0 %}
+                            <span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-400/10 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/20 gap-1">
+                                <i class="fa-solid fa-check-circle"></i>
+                                Configured
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center rounded-md bg-gray-50 dark:bg-gray-400/10 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-400 ring-1 ring-inset ring-gray-600/20 dark:ring-gray-500/20 gap-1">
+                                <i class="fa-solid fa-circle"></i>
+                                Not Configured
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Plugin Description -->
+                    <p class="text-sm text-base-content/80 mb-4 leading-relaxed">{{ plugin.description }}</p>
+                    
+                    <!-- Plugin Details -->
+                    <div class="space-y-3 mb-4 flex-1">
+                        <!-- Server Count -->
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-server text-base-content/60 text-sm w-4"></i>
+                            <span class="text-sm text-base-content/80">
+                                {% if plugin.servers_count > 0 %}
+                                    {{ plugin.servers_count }} server{{ 's' if plugin.servers_count != 1 else '' }} configured
+                                {% else %}
+                                    No servers configured
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        {% if plugin.supported_features %}
+                        <!-- Features -->
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-star text-base-content/60 text-sm w-4 mt-0.5"></i>
+                            <div class="flex-1">
                                 <div class="flex flex-wrap gap-1">
-                                    {% for feature in plugin.supported_features[:4] %}
-                                    <span class="badge badge-outline badge-xs">
-                                        {{ feature.replace('_', ' ').title() }}
-                                    </span>
+                                    {% for feature in plugin.supported_features[:3] %}
+                                        <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">{{ feature.replace('_', ' ').title() }}</span>
                                     {% endfor %}
-                                    {% if plugin.supported_features|length > 4 %}
-                                    <span class="badge badge-outline badge-xs">
-                                        +{{ plugin.supported_features|length - 4 }} more
-                                    </span>
+                                    {% if plugin.supported_features|length > 3 %}
+                                        <span class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20">+{{ plugin.supported_features|length - 3 }} more</span>
                                     {% endif %}
                                 </div>
                             </div>
-                            {% endif %}
-                            
-                            <div class="mt-2 text-xs text-gray-500">
-                                <i class="fas fa-code-branch mr-1"></i>
-                                Version {{ plugin.version }}
-                            </div>
                         </div>
+                        {% endif %}
                     </div>
-                    <div class="card-actions justify-end mt-4">
+
+                    <!-- Action Buttons -->
+                    <div class="flex items-center justify-end pt-4 border-t border-base-300 mt-auto">
                         <a href="{{ url_for('media_servers.setup_list_servers', plugin_id=plugin.plugin_id) }}" 
-                           class="btn btn-primary btn-sm">
+                           class="btn btn-primary btn-sm gap-1">
+                            <i class="fa-solid fa-cog"></i>
                             Configure
                         </a>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
 
         <!-- Action Buttons -->
@@ -112,6 +156,5 @@
         </div>
     </div>
 </div>
-
 
 {% endblock %}
