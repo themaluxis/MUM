@@ -3,11 +3,43 @@
 {% block title %}Add Media Server - {{ g.app_name }} Setup{% endblock %}
 
 {% block setup_content %}
-<div class="card bg-base-100 shadow-xl">
+<div class="card bg-base-100 shadow-xl max-w-4xl mx-auto">
     <div class="card-body">
-        <h2 class="card-title text-2xl mb-4">
-            Configure {{ form.service_type.data.title() }} Server
-        </h2>
+        <!-- Navigation -->
+        <div class="flex items-center mb-8">
+            <a href="{{ url_for('setup.plugins') }}" class="btn btn-ghost btn-sm">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Back to Services
+            </a>
+        </div>
+
+        <!-- Clean Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-plus text-success text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-base-content mb-1">Add New Server</h1>
+                    <p class="text-base-content/70 text-sm">Configure a new {{ form.service_type.data.title() }} server for media management</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Description Card -->
+        <div class="bg-info/10 border border-info/20 rounded-lg p-4 mb-6">
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-info text-info text-xs"></i>
+                </div>
+                <div>
+                    <h4 class="font-medium text-info mb-1">Server Setup</h4>
+                    <p class="text-sm text-base-content/80">
+                        Enter your {{ form.service_type.data.title() }} server connection details. Test the connection before adding to ensure proper configuration.
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <form method="POST" action="{{ url_for('media_servers.add_server_setup', plugin_id=form.service_type.data) }}">
             {{ form.hidden_tag() }}
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -16,57 +48,140 @@
             <input type="hidden" name="service_type" value="{{ form.service_type.data }}">
             {% endif %}
 
-            <div class="form-control w-full mb-4">
-                {{ form.name.label(class="label") }}
-                {{ form.name(class="input input-bordered w-full") }}
-                {% if form.name.errors %}
-                    <div class="label"><span class="label-text-alt text-error">{{ form.name.errors[0] }}</span></div>
-                {% endif %}
-            </div>
-
-            <div class="form-control w-full mb-4">
-                {{ form.url.label(class="label") }}
-                {{ form.url(class="input input-bordered w-full", placeholder="http://192.168.1.10:8096") }}
-                {% if form.url.errors %}
-                    <div class="label"><span class="label-text-alt text-error">{{ form.url.errors[0] }}</span></div>
-                {% endif %}
-            </div>
-
-            <div id="apiKeyField" class="form-control w-full mb-4">
-                {{ form.api_key.label(class="label") }}
-                <span class="label-text-alt text-xs mb-1" id="apiKeyHelp">Required for this service.</span>
-                {{ form.api_key(class="input input-bordered w-full") }}
-                {% if form.api_key.errors %}
-                    <div class="label"><span class="label-text-alt text-error">{{ form.api_key.errors[0] }}</span></div>
-                {% endif %}
-            </div>
-
-            <div id="credentialsFields" class="hidden">
-                <div class="form-control w-full mb-4">
-                    {{ form.username.label(class="label") }}
-                    {{ form.username(class="input input-bordered w-full") }}
+            <!-- Basic Settings Section -->
+            <div class="space-y-4 mb-6">
+                <h4 class="font-medium text-base-content text-lg mb-3">
+                    <i class="fa-solid fa-cog text-primary text-sm mr-2"></i>
+                    Basic Settings
+                </h4>
+                
+                <!-- Server Name -->
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-tag text-primary text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ form.name.label.text }}</h5>
+                            <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
+                        </div>
+                    </div>
+                    {{ form.name(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.name.errors else "")) }}
+                    {% if form.name.errors %}
+                        <span class="text-error text-xs mt-1 block">{{ form.name.errors[0] }}</span>
+                    {% else %}
+                        <span class="text-base-content/60 text-xs mt-1 block">A friendly name for this server</span>
+                    {% endif %}
                 </div>
-                <div class="form-control w-full mb-4">
-                    {{ form.password.label(class="label") }}
-                    {{ form.password(class="input input-bordered w-full") }}
+
+                <!-- Server URL -->
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-link text-secondary text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ form.url.label.text }}</h5>
+                            <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
+                        </div>
+                    </div>
+                    {{ form.url(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.url.errors else ""), placeholder="https://your-server.com:32400") }}
+                    {% if form.url.errors %}
+                        <span class="text-error text-xs mt-1 block">{{ form.url.errors[0] }}</span>
+                    {% else %}
+                        <span class="text-base-content/60 text-xs mt-1 block">Full URL including protocol (http:// or https://)</span>
+                    {% endif %}
                 </div>
             </div>
 
-            <div class="form-control mb-6">
-                <label class="label cursor-pointer justify-start">
-                    {{ form.is_active(class="checkbox checkbox-primary mr-3") }}
-                    <span class="label-text">{{ form.is_active.label.text }}</span>
-                </label>
+            <!-- Authentication Section -->
+            <div class="space-y-4 mb-6" id="apiKeyField">
+                <h4 class="font-medium text-base-content text-lg mb-3">
+                    <i class="fa-solid fa-key text-warning text-sm mr-2"></i>
+                    Authentication
+                </h4>
+                
+                <!-- API Key -->
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-shield-halved text-warning text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ form.api_key.label.text }}</h5>
+                            <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20" id="apiKeyRequiredBadge">Required</span>
+                        </div>
+                    </div>
+                    {{ form.api_key(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.api_key.errors else "")) }}
+                    {% if form.api_key.errors %}
+                        <span class="text-error text-xs mt-1 block">{{ form.api_key.errors[0] }}</span>
+                    {% else %}
+                        <span class="text-base-content/60 text-xs mt-1 block" id="apiKeyHelp">API key for server authentication</span>
+                    {% endif %}
+                </div>
             </div>
 
-            <div class="card-actions justify-between items-center mt-6">
-                <a href="{{ url_for('setup.plugins') }}" class="btn btn-ghost">
-                    <i class="fas fa-arrow-left mr-2"></i>Back to Services
+            <!-- Credentials Section (for services that need username/password) -->
+            <div id="credentialsFields" class="space-y-4 mb-6 hidden">
+                <h4 class="font-medium text-base-content text-lg mb-3">
+                    <i class="fa-solid fa-key text-warning text-sm mr-2"></i>
+                    Authentication
+                </h4>
+                
+                <!-- Username -->
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-user text-warning text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ form.username.label.text }}</h5>
+                            <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
+                        </div>
+                    </div>
+                    {{ form.username(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                </div>
+
+                <!-- Password -->
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-lock text-warning text-sm"></i>
+                            <h5 class="font-medium text-base-content">{{ form.password.label.text }}</h5>
+                            <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
+                        </div>
+                    </div>
+                    {{ form.password(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                </div>
+            </div>
+
+            <!-- Server Status Section -->
+            <div class="space-y-4 mb-6">
+                <h4 class="font-medium text-base-content text-lg mb-3">
+                    <i class="fa-solid fa-toggle-on text-success text-sm mr-2"></i>
+                    Server Status
+                </h4>
+                
+                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-power-off text-success text-sm"></i>
+                            <div>
+                                <h5 class="font-medium text-base-content">{{ form.is_active.label.text }}</h5>
+                                <span class="text-base-content/60 text-xs">Enable this server after adding</span>
+                            </div>
+                        </div>
+                        {{ form.is_active(class="toggle toggle-success", checked=true) }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end gap-3 pt-6 border-t border-base-300">
+                <a href="{{ url_for('setup.plugins') }}" class="btn btn-ghost h-12">
+                    <i class="fa-solid fa-times mr-2"></i>
+                    Cancel
                 </a>
-                <div class="flex gap-2">
-                    <button type="button" id="test-connection-btn" class="btn btn-outline">Test Connection</button>
-                    {{ form.submit(class="btn btn-primary", id="submit-btn", disabled=true) }}
-                </div>
+                <button type="button" id="test-connection-btn" class="btn btn-outline h-12">
+                    <i class="fa-solid fa-wifi mr-2"></i>
+                    Test Connection
+                </button>
+                <button type="submit" id="submit-btn" class="btn btn-primary h-12 gap-2" disabled>
+                    <i class="fa-solid fa-plus"></i>
+                    Add Server
+                </button>
             </div>
         </form>
     </div>
@@ -76,9 +191,7 @@
 {% block scripts %}
 {{ super() }}
 <script>
-// Connection test validation
 let connectionTested = false;
-let connectionSuccessful = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     function updateFormFields() {
@@ -86,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const apiKeyField = document.getElementById('apiKeyField');
         const credentialsFields = document.getElementById('credentialsFields');
         const apiKeyHelp = document.getElementById('apiKeyHelp');
+        const apiKeyRequiredBadge = document.getElementById('apiKeyRequiredBadge');
         const apiKeyInput = document.getElementById('api_key');
         
         const apiKeyServices = ['plex', 'emby', 'jellyfin', 'kavita', 'audiobookshelf', 'komga'];
@@ -95,6 +209,9 @@ document.addEventListener('DOMContentLoaded', function() {
             apiKeyField.classList.remove('hidden');
             credentialsFields.classList.add('hidden');
             apiKeyInput.required = true;
+            if (apiKeyHelp) {
+                apiKeyHelp.textContent = `API key required for ${serviceType.charAt(0).toUpperCase() + serviceType.slice(1)} authentication`;
+            }
         } else if (credentialServices.includes(serviceType)) {
             apiKeyField.classList.add('hidden');
             credentialsFields.classList.remove('hidden');
@@ -102,101 +219,103 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function testConnection(event) {
-        const form = document.querySelector('form');
-        const formData = new FormData(form);
-        const btn = event.target;
-        const originalText = btn.innerHTML;
+    function testConnection() {
+        const testBtn = document.getElementById('test-connection-btn');
+        const addBtn = document.getElementById('submit-btn');
+        const originalText = testBtn.innerHTML;
         
-        btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Testing...';
-        btn.disabled = true;
-        
-        const serverConfig = {
-            name: formData.get('name'),
-            service_type: formData.get('service_type'),
-            url: formData.get('url'),
-            api_key: formData.get('api_key'),
-            username: formData.get('username'),
-            password: formData.get('password')
+        // Get form data as JSON
+        const formData = {
+            name: document.querySelector('input[name="name"]').value,
+            url: document.querySelector('input[name="url"]').value,
+            api_key: document.querySelector('input[name="api_key"]').value,
+            username: document.querySelector('input[name="username"]') ? document.querySelector('input[name="username"]').value : '',
+            password: document.querySelector('input[name="password"]') ? document.querySelector('input[name="password"]').value : '',
+            service_type: '{{ form.service_type.data }}'
         };
+        
+        // Update button state
+        testBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';
+        testBtn.disabled = true;
         
         fetch("{{ url_for('plugin_management.test_connection', plugin_id=form.service_type.data) }}", {
             method: 'POST',
+            body: JSON.stringify(formData),
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': formData.get('csrf_token')
-            },
-            body: JSON.stringify(serverConfig)
+                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+            }
         })
         .then(response => response.json())
         .then(data => {
-            connectionTested = true;
             if (data.success) {
-                connectionSuccessful = true;
-                htmx.trigger('body', 'showToastEvent', { message: 'Connection successful: ' + data.message, category: 'success' });
-                // Enable submit button
-                const submitBtn = document.getElementById('submit-btn');
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('btn-disabled');
+                testBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i>Connection Successful';
+                testBtn.className = 'btn btn-success h-12';
+                addBtn.disabled = false;
+                connectionTested = true;
+                if (typeof htmx !== 'undefined') {
+                    htmx.trigger('body', 'showToastEvent', { message: 'Connection test successful!', category: 'success' });
+                }
             } else {
-                connectionSuccessful = false;
-                htmx.trigger('body', 'showToastEvent', { message: 'Connection failed: ' + data.message, category: 'danger' });
-                // Keep submit button disabled
-                const submitBtn = document.getElementById('submit-btn');
-                submitBtn.disabled = true;
-                submitBtn.classList.add('btn-disabled');
+                testBtn.innerHTML = '<i class="fa-solid fa-times mr-2"></i>Connection Failed';
+                testBtn.className = 'btn btn-error h-12';
+                addBtn.disabled = true;
+                connectionTested = false;
+                if (typeof htmx !== 'undefined') {
+                    htmx.trigger('body', 'showToastEvent', { message: 'Connection test failed: ' + data.message, category: 'error' });
+                }
             }
         })
         .catch(error => {
-            connectionTested = true;
-            connectionSuccessful = false;
-            htmx.trigger('body', 'showToastEvent', { message: 'Error: ' + error.message, category: 'danger' });
-            // Keep submit button disabled
-            const submitBtn = document.getElementById('submit-btn');
-            submitBtn.disabled = true;
-            submitBtn.classList.add('btn-disabled');
+            testBtn.innerHTML = '<i class="fa-solid fa-times mr-2"></i>Test Failed';
+            testBtn.className = 'btn btn-error h-12';
+            addBtn.disabled = true;
+            connectionTested = false;
+            if (typeof htmx !== 'undefined') {
+                htmx.trigger('body', 'showToastEvent', { message: 'Error testing connection: ' + error.message, category: 'error' });
+            }
         })
         .finally(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+            testBtn.disabled = false;
+            
+            // Reset button after 3 seconds if successful
+            if (connectionTested) {
+                setTimeout(() => {
+                    testBtn.innerHTML = '<i class="fa-solid fa-wifi mr-2"></i>Test Connection';
+                    testBtn.className = 'btn btn-outline h-12';
+                }, 3000);
+            }
         });
     }
 
-    // Form submission validation
-    function validateForm(event) {
-        if (!connectionTested || !connectionSuccessful) {
-            event.preventDefault();
-            htmx.trigger('body', 'showToastEvent', { 
-                message: 'Please test the connection successfully before saving the server.', 
-                category: 'warning' 
-            });
+    // Prevent form submission if connection not tested
+    document.querySelector('form').addEventListener('submit', function(e) {
+        if (!connectionTested) {
+            e.preventDefault();
+            if (typeof htmx !== 'undefined') {
+                htmx.trigger('body', 'showToastEvent', { message: 'Please test the connection successfully before adding the server.', category: 'error' });
+            }
             return false;
-        }
-        return true;
-    }
-
-    // Reset connection status when form fields change
-    function resetConnectionStatus() {
-        connectionTested = false;
-        connectionSuccessful = false;
-        const submitBtn = document.getElementById('submit-btn');
-        submitBtn.disabled = true;
-        submitBtn.classList.add('btn-disabled');
-    }
-
-    // Add event listeners to form fields to reset connection status
-    const formFields = ['name', 'url', 'api_key', 'username', 'password'];
-    formFields.forEach(fieldName => {
-        const field = document.querySelector(`[name="${fieldName}"]`);
-        if (field) {
-            field.addEventListener('input', resetConnectionStatus);
-            field.addEventListener('change', resetConnectionStatus);
         }
     });
 
+    // Reset connection test status when form fields change
+    document.querySelectorAll('input[name="url"], input[name="api_key"], input[name="username"], input[name="password"]').forEach(input => {
+        input.addEventListener('input', function() {
+            if (connectionTested) {
+                connectionTested = false;
+                const testBtn = document.getElementById('test-connection-btn');
+                const addBtn = document.getElementById('submit-btn');
+                testBtn.innerHTML = '<i class="fa-solid fa-wifi mr-2"></i>Test Connection';
+                testBtn.className = 'btn btn-outline h-12';
+                addBtn.disabled = true;
+            }
+        });
+    });
+
+    // Initialize form fields and add event listener
     updateFormFields();
     document.getElementById('test-connection-btn').addEventListener('click', testConnection);
-    document.querySelector('form').addEventListener('submit', validateForm);
 });
 </script>
 {% endblock %}
