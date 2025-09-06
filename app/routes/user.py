@@ -739,7 +739,8 @@ def view_service_account(server_nickname, server_username):
             libraries_changed = (original_library_ids != new_library_ids_from_form)
 
             # Update user fields directly (not library-related)
-            user.notes = form.notes.data
+            # For service users, save notes to the access record
+            access.notes = form.notes.data
             user.is_discord_bot_whitelisted = form.is_discord_bot_whitelisted.data
             user.is_purge_whitelisted = form.is_purge_whitelisted.data
             user.allow_4k_transcode = form.allow_4k_transcode.data
@@ -804,8 +805,11 @@ def view_service_account(server_nickname, server_username):
             db.session.commit()
             
             if request.headers.get('HX-Request'):
-                # Re-fetch user data to ensure the form is populated with the freshest data after save
-                user = UserAppAccess.query.get_or_404(user.id)
+                # Re-fetch access data to ensure the form is populated with the freshest data after save
+                # Note: user is a MockServiceUser, so user.id is actually access.id (UserMediaAccess)
+                updated_access = UserMediaAccess.query.get_or_404(user.id)
+                # Recreate the mock user with updated data
+                user = MockServiceUser(updated_access)
                 form_after_save = UserEditForm(obj=user)
                 
                 # Re-populate the dynamic choices and data for the re-rendered form
@@ -813,9 +817,8 @@ def view_service_account(server_nickname, server_username):
                 
                 # Get current library IDs from UserMediaAccess records for the re-rendered form
                 current_library_ids_after_save = []
-                updated_user_access_records = UserMediaAccess.query.filter_by(service_account_id=user.id).all()
-                for access in updated_user_access_records:
-                    current_library_ids_after_save.extend(access.allowed_library_ids or [])
+                # For service users, we only have one access record (the one we just updated)
+                current_library_ids_after_save.extend(updated_access.allowed_library_ids or [])
                 
                 # Handle special case for Jellyfin users with '*' (all libraries access)
                 if current_library_ids_after_save == ['*']:
@@ -839,7 +842,8 @@ def view_service_account(server_nickname, server_username):
                 # We need the same context that the main user list uses for a card
                 
                 # Get all user access records for proper library display
-                all_user_access_records = UserMediaAccess.query.filter_by(service_account_id=user.id).all()
+                # For service users, we only have one access record
+                all_user_access_records = [updated_access]
                 user_sorted_libraries = {}
                 user_service_types = {}
                 user_server_names = {}
