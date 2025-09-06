@@ -15,16 +15,17 @@ class KomgaMediaService(BaseMediaService):
     
     def _get_headers(self):
         """Get headers for Komga API requests"""
-        if self.username and self.password:
-            # Komga uses basic auth
+        if self.api_key:
+            # Komga uses X-API-Key header for API key authentication
+            return {
+                'X-API-Key': self.api_key,
+                'Content-Type': 'application/json'
+            }
+        elif self.username and self.password:
+            # Komga also supports basic auth as fallback
             credentials = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
             return {
                 'Authorization': f'Basic {credentials}',
-                'Content-Type': 'application/json'
-            }
-        elif self.api_key:
-            return {
-                'Authorization': f'Bearer {self.api_key}',
                 'Content-Type': 'application/json'
             }
         else:
@@ -32,7 +33,13 @@ class KomgaMediaService(BaseMediaService):
     
     def _make_request(self, endpoint: str, method: str = 'GET', data: Dict = None):
         """Make API request to Komga server"""
-        url = f"{self.url.rstrip('/')}/api/v1/{endpoint.lstrip('/')}"
+        # Use v2 API for user-related endpoints, v1 for everything else
+        if endpoint.startswith('users'):
+            api_version = 'v2'
+        else:
+            api_version = 'v1'
+        
+        url = f"{self.url.rstrip('/')}/api/{api_version}/{endpoint.lstrip('/')}"
         headers = self._get_headers()
         
         try:
@@ -58,7 +65,7 @@ class KomgaMediaService(BaseMediaService):
         """Test connection to Komga server"""
         try:
             # Try to get server info
-            self._make_request('users/me')
+            self._make_request('users')
             return True, "Connected to Komga successfully"
         except Exception as e:
             return False, f"Connection failed: {str(e)}"
@@ -81,8 +88,11 @@ class KomgaMediaService(BaseMediaService):
             libraries_response = self.get_libraries_raw()
             result = []
             
+            # Komga API returns a list directly, not wrapped in a 'content' object
+            libraries_list = libraries_response if isinstance(libraries_response, list) else libraries_response.get('content', [])
+            
             # Process the raw data for internal use
-            for lib in libraries_response.get('content', []):
+            for lib in libraries_list:
                 result.append({
                     'id': lib.get('id', ''),
                     'name': lib.get('name', 'Unknown'),
@@ -103,7 +113,10 @@ class KomgaMediaService(BaseMediaService):
             users = self._make_request('users')
             result = []
             
-            for user in users.get('content', []):
+            # Komga API returns a list directly, not wrapped in a 'content' object
+            users_list = users if isinstance(users, list) else users.get('content', [])
+            
+            for user in users_list:
                 user_id = user.get('id')
                 if not user_id:
                     continue
@@ -111,7 +124,9 @@ class KomgaMediaService(BaseMediaService):
                 # Get user's library access
                 try:
                     shared_libs = self._make_request(f'users/{user_id}/shared-libraries')
-                    library_ids = [lib.get('id') for lib in shared_libs.get('content', [])]
+                    # Handle both list and object responses for shared libraries
+                    shared_libs_list = shared_libs if isinstance(shared_libs, list) else shared_libs.get('content', [])
+                    library_ids = [lib.get('id') for lib in shared_libs_list]
                 except:
                     library_ids = []
                 
@@ -205,7 +220,7 @@ class KomgaMediaService(BaseMediaService):
         """Get Komga server information"""
         try:
             # Komga doesn't have a specific version endpoint, so we'll use user info
-            self._make_request('users/me')
+            self._make_request('users')
             return {
                 'name': self.name,
                 'url': self.url,

@@ -215,13 +215,13 @@ def check_komga(url: str, api_key: str) -> Tuple[bool, str]:
         # Clean up URL
         url = url.rstrip('/')
         
-        # Komga uses X-API-Key header authentication (like your friend's code)
+        # Komga uses X-API-Key header authentication
         headers = {
             "X-API-Key": api_key,
             "Accept": "application/json"
         }
         
-        # Test with libraries endpoint (like your friend's code)
+        # Test with libraries endpoint
         response = requests.get(
             f"{url}/api/v1/libraries",
             headers=headers,

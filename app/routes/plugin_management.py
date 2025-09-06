@@ -148,9 +148,10 @@ def edit_server(plugin_id, server_id):
     
     form = MediaServerForm(server_id=server.id, obj=server)
     form.service_type.data = server.service_type.value
+    form.name.data = server.server_nickname  # Manually set the name field
     
     # Remove username/password fields for services that only use API tokens
-    if plugin_id in ['plex', 'emby', 'jellyfin', 'kavita']:
+    if plugin_id in ['plex', 'emby', 'jellyfin', 'kavita', 'komga']:
         delattr(form, 'username')
         delattr(form, 'password')
     
@@ -160,9 +161,13 @@ def edit_server(plugin_id, server_id):
             server.server_nickname = form.name.data
             server.url = form.url.data.rstrip('/')
             server.api_key = form.api_key.data
-            server.username = form.username.data
-            if form.password.data:  # Only update password if provided
+            
+            # Only update username/password for services that use them
+            if hasattr(form, 'username'):
+                server.username = form.username.data
+            if hasattr(form, 'password') and form.password.data:  # Only update password if provided
                 server.password = form.password.data
+                
             server.is_active = form.is_active.data
             
             db.session.commit()
@@ -394,13 +399,13 @@ def test_existing_server_connection(plugin_id, server_id):
         # Prepare credentials based on service type
         credentials = {}
         
-        if plugin_id in ['jellyfin', 'emby', 'plex', 'audiobookshelf', 'kavita']:
+        if plugin_id in ['jellyfin', 'emby', 'plex', 'audiobookshelf', 'kavita', 'komga']:
             # Token-based authentication
             if not server.api_key:
                 return jsonify({'success': False, 'message': f'API token not configured for this {plugin_id.title()} server'})
             credentials['token'] = server.api_key
                 
-        elif plugin_id in ['komga', 'romm']:
+        elif plugin_id in ['romm']:
             # Username/password authentication
             if not server.username or not server.password:
                 return jsonify({'success': False, 'message': f'Username and password not configured for this {plugin_id.title()} server'})
