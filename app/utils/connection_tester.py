@@ -209,37 +209,46 @@ def check_kavita(url: str, api_key: str) -> Tuple[bool, str]:
         return False, f"Unexpected error testing Kavita connection: {str(e)}"
 
 
-def check_komga(url: str, username: str, password: str) -> Tuple[bool, str]:
+def check_komga(url: str, api_key: str) -> Tuple[bool, str]:
     """Test connection to Komga server."""
     try:
         # Clean up URL
         url = url.rstrip('/')
         
-        # Test basic connectivity with authentication
+        # Komga uses X-API-Key header authentication (like your friend's code)
+        headers = {
+            "X-API-Key": api_key,
+            "Accept": "application/json"
+        }
+        
+        # Test with libraries endpoint (like your friend's code)
         response = requests.get(
-            f"{url}/api/v1/users/me",
-            auth=(username, password),
+            f"{url}/api/v1/libraries",
+            headers=headers,
             timeout=get_api_timeout_with_fallback(10)
         )
         response.raise_for_status()
         
-        user_info = response.json()
-        user_email = user_info.get('email', username)
+        libraries = response.json()
+        library_count = len(libraries) if isinstance(libraries, list) else 0
         
-        # Get server info
-        server_response = requests.get(
-            f"{url}/api/v1/actuator/info",
-            auth=(username, password),
-            timeout=get_api_timeout_with_fallback(10)
-        )
-        
-        if server_response.status_code == 200:
-            server_info = server_response.json()
-            version = server_info.get('build', {}).get('version', 'Unknown')
-        else:
+        # Try to get server info for version
+        try:
+            server_response = requests.get(
+                f"{url}/api/v1/actuator/info",
+                headers=headers,
+                timeout=get_api_timeout_with_fallback(10)
+            )
+            
+            if server_response.status_code == 200:
+                server_info = server_response.json()
+                version = server_info.get('build', {}).get('version', 'Unknown')
+            else:
+                version = 'Unknown'
+        except:
             version = 'Unknown'
         
-        return True, f"Successfully connected to Komga server (v{version}) as user '{user_email}'"
+        return True, f"Successfully connected to Komga server (v{version}). Found {library_count} libraries."
         
     except requests.exceptions.RequestException as e:
         return handle_connection_error(e, "Komga")
@@ -332,11 +341,10 @@ def test_server_connection(service_type: str, url: str, **credentials) -> Tuple[
             return check_kavita(url, api_key)
             
         elif service_type == 'komga':
-            username = credentials.get('username')
-            password = credentials.get('password')
-            if not username or not password:
-                return False, "Username and password are required for Komga"
-            return check_komga(url, username, password)
+            api_key = credentials.get('token') or credentials.get('api_key')
+            if not api_key:
+                return False, "API token is required for Komga"
+            return check_komga(url, api_key)
             
         elif service_type == 'romm':
             username = credentials.get('username')

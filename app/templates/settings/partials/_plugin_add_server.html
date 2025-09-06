@@ -87,7 +87,7 @@
             Authentication
         </h4>
         
-        {% if plugin.plugin_id in ['komga', 'romm'] %}
+        {% if plugin.plugin_id in ['romm'] %}
         <!-- Username -->
         <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
             <div class="flex items-center justify-between mb-2">
@@ -128,7 +128,7 @@
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-shield-halved text-warning text-sm"></i>
                     <h5 class="font-medium text-base-content">{{ form.api_key.label.text }}</h5>
-                    {% if plugin.plugin_id in ['jellyfin', 'emby', 'kavita', 'audiobookshelf'] %}
+                    {% if plugin.plugin_id in ['jellyfin', 'emby', 'kavita', 'audiobookshelf', 'komga'] %}
                         <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
                     {% else %}
                         <span class="inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-400/10 px-2 py-1 text-xs font-medium text-yellow-700 dark:text-yellow-400 ring-1 ring-inset ring-yellow-600/20 dark:ring-yellow-500/20">Optional</span>
@@ -139,7 +139,7 @@
             {% if form.api_key.errors %}
                 <span class="text-error text-xs mt-1 block">{{ form.api_key.errors[0] }}</span>
             {% else %}
-                {% if plugin.plugin_id in ['jellyfin', 'emby', 'kavita', 'audiobookshelf'] %}
+                {% if plugin.plugin_id in ['jellyfin', 'emby', 'kavita', 'audiobookshelf', 'komga'] %}
                     <span class="text-base-content/60 text-xs mt-1 block">API key required for {{ plugin.name }} authentication</span>
                 {% else %}
                     <span class="text-base-content/60 text-xs mt-1 block">API key for server authentication (optional for some services)</span>
@@ -204,7 +204,7 @@ function testConnection() {
     };
     
     // Add authentication fields based on plugin type
-    {% if plugin.plugin_id in ['komga', 'romm'] %}
+    {% if plugin.plugin_id in ['romm'] %}
     formData.username = document.querySelector('input[name="username"]').value;
     formData.password = document.querySelector('input[name="password"]').value;
     {% else %}
@@ -270,7 +270,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
 });
 
 // Reset connection test status when form fields change
-{% if plugin.plugin_id in ['komga', 'romm'] %}
+{% if plugin.plugin_id in ['romm'] %}
 document.querySelectorAll('input[name="url"], input[name="username"], input[name="password"]').forEach(input => {
 {% else %}
 document.querySelectorAll('input[name="url"], input[name="api_key"]').forEach(input => {

@@ -338,12 +338,18 @@ def test_connection(plugin_id):
                 return jsonify({'success': False, 'message': f'API token is required for {plugin_id.title()}'})
             credentials['token'] = api_key
                 
-        elif plugin_id in ['komga', 'romm']:
+        elif plugin_id in ['romm']:
             # Username/password authentication
             if not username or not password:
                 return jsonify({'success': False, 'message': f'Username and password are required for {plugin_id.title()}'})
             credentials['username'] = username
             credentials['password'] = password
+            
+        elif plugin_id in ['komga']:
+            # API token authentication
+            if not api_key:
+                return jsonify({'success': False, 'message': f'API token is required for {plugin_id.title()}'})
+            credentials['token'] = api_key
         
         else:
             return jsonify({'success': False, 'message': f'Unsupported service type: {plugin_id}'})
