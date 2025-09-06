@@ -131,12 +131,24 @@ def create_app(config_name=None):
     with app.app_context():
         initialize_settings_from_db(app)
         
-        # Initialize plugin system
+        # Initialize plugin system only if plugins table exists
         try:
             from app.services.plugin_manager import plugin_manager
-            plugin_manager.initialize_core_plugins()
-            plugin_manager.load_all_enabled_plugins()
-            current_app.logger.info("Plugin system initialized successfully.")
+            from app.models_plugins import Plugin
+            
+            # Check if plugins table exists before initializing
+            engine_conn = None
+            try:
+                engine_conn = db.engine.connect()
+                if db.engine.dialect.has_table(engine_conn, Plugin.__tablename__):
+                    plugin_manager.initialize_core_plugins()
+                    plugin_manager.load_all_enabled_plugins()
+                    current_app.logger.info("Plugin system initialized successfully.")
+                else:
+                    current_app.logger.warning("Plugins table not found during initialization. Plugin system will be initialized after migrations.")
+            finally:
+                if engine_conn:
+                    engine_conn.close()
         except Exception as e:
             current_app.logger.error(f"Error initializing plugin system: {e}", exc_info=True)
 
@@ -287,6 +299,26 @@ def create_app(config_name=None):
         g.app_name = current_app.config.get('APP_NAME', 'Multimedia User Manager')
         g.plex_url = None; g.app_base_url = None
         g.discord_oauth_enabled_for_invite = False; g.setup_complete = False 
+
+        # Initialize plugin system if not already done and tables exist
+        try:
+            from app.services.plugin_manager import plugin_manager
+            from app.models_plugins import Plugin
+            
+            if not hasattr(plugin_manager, '_initialized'):
+                engine_conn = None
+                try:
+                    engine_conn = db.engine.connect()
+                    if db.engine.dialect.has_table(engine_conn, Plugin.__tablename__):
+                        plugin_manager.initialize_core_plugins()
+                        plugin_manager.load_all_enabled_plugins()
+                        plugin_manager._initialized = True
+                        current_app.logger.info("Plugin system initialized successfully after migrations.")
+                finally:
+                    if engine_conn:
+                        engine_conn.close()
+        except Exception as e:
+            current_app.logger.debug(f"Plugin system initialization check: {e}")
 
         # Debug endpoint tracking removed for cleaner logs
 

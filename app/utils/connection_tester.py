@@ -4,6 +4,7 @@ Provides functions to test connectivity and authentication for various media ser
 """
 
 import requests
+import base64
 from typing import Tuple
 from flask import current_app
 from app.utils.timeout_helper import get_api_timeout_with_fallback
@@ -252,32 +253,32 @@ def check_romm(url: str, username: str, password: str) -> Tuple[bool, str]:
         # Clean up URL
         url = url.rstrip('/')
         
-        # First, get authentication token
-        auth_response = requests.post(
-            f"{url}/api/token",
-            data={"username": username, "password": password},
-            timeout=get_api_timeout_with_fallback(10)
-        )
-        auth_response.raise_for_status()
+        # RomM uses Basic auth with base64 encoded username:password
+        auth_string = f"{username}:{password}"
+        encoded_auth = base64.b64encode(auth_string.encode()).decode()
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Basic {encoded_auth}"
+        }
         
-        auth_data = auth_response.json()
-        token = auth_data.get('access_token')
-        
-        if not token:
-            return False, "Failed to authenticate with RomM server"
-        
-        # Test authenticated request
+        # Test authenticated request - use platforms endpoint
         response = requests.get(
-            f"{url}/api/users/me",
-            headers={"Authorization": f"Bearer {token}"},
+            f"{url}/api/platforms",
+            headers=headers,
             timeout=get_api_timeout_with_fallback(10)
         )
-        response.raise_for_status()
         
-        user_info = response.json()
-        user_username = user_info.get('username', username)
+        # Check status code explicitly
+        if response.status_code != 200:
+            return False, f"RomM returned status code {response.status_code}. Response: {response.text[:100]}"
         
-        return True, f"Successfully connected to RomM server as user '{user_username}'"
+        # Basic sanity check – ensure response is JSON list
+        platforms = response.json()
+        if not isinstance(platforms, list):
+            return False, "Unexpected RomM response format - expected JSON list"
+        
+        platform_count = len(platforms)
+        return True, f"Successfully connected to RomM server. Found {platform_count} platforms."
         
     except requests.exceptions.RequestException as e:
         return handle_connection_error(e, "RomM")

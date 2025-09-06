@@ -71,7 +71,7 @@ class PluginManager:
             'romm': {
                 'name': 'RomM',
                 'module_path': 'app.services.romm_media_service',
-                'service_class': 'RomMMediaService',
+                'service_class': 'RommMediaService',
                 'description': 'RomM retro gaming server integration',
                 'supported_features': ['user_management', 'library_access', 'downloads']
             }

@@ -5,6 +5,7 @@ Provides integration with RomM (Rom Manager) servers for retro gaming content ma
 
 import requests
 import json
+import base64
 from typing import List, Dict, Any, Optional, Tuple
 from flask import current_app
 from app.services.base_media_service import BaseMediaService
@@ -22,62 +23,57 @@ class RommMediaService(BaseMediaService):
         super().__init__(server_config)
         self.session = requests.Session()
         self.session.timeout = 30
-        self._token = None
+        # RomM uses username/password authentication
+        self.username = server_config.get('username')
+        self.password = server_config.get('password')
         
-    def _authenticate(self) -> bool:
-        """Authenticate with RomM server and get access token"""
+    def _setup_auth_headers(self) -> bool:
+        """Setup authentication headers for RomM API requests"""
         try:
             if not self.username or not self.password:
                 self.log_error("Username and password are required for RomM authentication")
                 return False
+            
+            # RomM uses Basic auth with base64 encoded username:password
+            auth_string = f"{self.username}:{self.password}"
+            encoded_auth = base64.b64encode(auth_string.encode()).decode()
+            self.session.headers.update({
+                'Authorization': f'Basic {encoded_auth}',
+                'Accept': 'application/json'
+            })
+            self.log_info("Successfully setup RomM authentication headers")
+            return True
                 
-            auth_url = f"{self.url.rstrip('/')}/api/token"
-            
-            response = self.session.post(
-                auth_url,
-                data={
-                    "username": self.username,
-                    "password": self.password
-                },
-                timeout=10
-            )
-            response.raise_for_status()
-            
-            auth_data = response.json()
-            self._token = auth_data.get('access_token')
-            
-            if self._token:
-                self.session.headers.update({
-                    'Authorization': f'Bearer {self._token}'
-                })
-                self.log_info("Successfully authenticated with RomM server")
-                return True
-            else:
-                self.log_error("No access token received from RomM server")
-                return False
-                
-        except requests.exceptions.RequestException as e:
-            self.log_error(f"Authentication failed: {e}")
-            return False
         except Exception as e:
-            self.log_error(f"Unexpected error during authentication: {e}")
+            self.log_error(f"Error setting up authentication: {e}")
             return False
+    
+    def _get_auth_header(self, username: str = None, password: str = None) -> str:
+        """Get Basic auth header for operations"""
+        user = username or self.username
+        pwd = password or self.password
+        if not user or not pwd:
+            return ""
+        # RomM uses username:password format for authentication
+        auth_string = f"{user}:{pwd}"
+        encoded = base64.b64encode(auth_string.encode()).decode()
+        return f"Basic {encoded}"
     
     def test_connection(self) -> Tuple[bool, str]:
         """Test connection to RomM server"""
         try:
-            # First authenticate
-            if not self._authenticate():
-                return False, "Authentication failed. Check username and password."
+            # Setup authentication headers
+            if not self._setup_auth_headers():
+                return False, "Authentication failed. Check API key."
             
-            # Test authenticated request
-            response = self.session.get(f"{self.url.rstrip('/')}/api/users/me")
+            # Test authenticated request - use platforms endpoint as it's more reliable
+            response = self.session.get(f"{self.url.rstrip('/')}/api/platforms")
             response.raise_for_status()
             
-            user_info = response.json()
-            username = user_info.get('username', self.username)
+            platforms = response.json()
+            platform_count = len(platforms) if isinstance(platforms, list) else 0
             
-            return True, f"Successfully connected to RomM server as user '{username}'"
+            return True, f"Successfully connected to RomM server. Found {platform_count} platforms."
             
         except requests.exceptions.ConnectTimeout:
             return False, "Connection to RomM timed out. Check if the server is running and accessible."
@@ -85,9 +81,9 @@ class RommMediaService(BaseMediaService):
             return False, "Could not connect to RomM. Check the URL and network connectivity."
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
-                return False, "Authentication failed. Check username and password."
+                return False, "Authentication failed. Check API key."
             elif e.response.status_code == 403:
-                return False, "Access denied. User may not have sufficient permissions."
+                return False, "Access denied. API key may not have sufficient permissions."
             else:
                 return False, f"RomM returned an error: {e.response.status_code} - {e.response.reason}"
         except requests.exceptions.Timeout:
@@ -98,8 +94,8 @@ class RommMediaService(BaseMediaService):
     def get_libraries_raw(self) -> List[Dict[str, Any]]:
         """Get raw, unmodified platform data from RomM API"""
         try:
-            if not self._authenticate():
-                self.log_error("Failed to authenticate for raw library retrieval")
+            if not self._setup_auth_headers():
+                self.log_error("Failed to setup authentication for raw library retrieval")
                 return []
             
             response = self.session.get(f"{self.url.rstrip('/')}/api/platforms")
@@ -138,11 +134,48 @@ class RommMediaService(BaseMediaService):
             self.log_error(f"Error retrieving platforms: {e}")
             return []
     
+    def scan_libraries(self, url: str = None, username: str = None, password: str = None) -> Dict[str, str]:
+        """Scan available platforms on this RomM server.
+        
+        Args:
+            url: Optional server URL override
+            username: Optional username override
+            password: Optional password override
+            
+        Returns:
+            dict: Platform name -> platform ID mapping
+        """
+        try:
+            if url and username and password:
+                # Use provided credentials for scanning
+                auth_header = self._get_auth_header(username, password)
+                headers = {"Authorization": auth_header, "Accept": "application/json"}
+                response = requests.get(
+                    f"{url.rstrip('/')}/api/platforms", 
+                    headers=headers, 
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+            else:
+                # Use saved credentials
+                if not self._setup_auth_headers():
+                    self.log_error("Failed to setup authentication for library scan")
+                    return {}
+                response = self.session.get(f"{self.url.rstrip('/')}/api/platforms")
+                response.raise_for_status()
+                data = response.json()
+            
+            return {p.get("name", p["id"]): p["id"] for p in data}
+        except Exception as e:
+            self.log_error(f"RomM: failed to scan platforms – {e}")
+            return {}
+    
     def get_users(self) -> List[Dict[str, Any]]:
         """Get all users from RomM"""
         try:
-            if not self._authenticate():
-                self.log_error("Failed to authenticate for user retrieval")
+            if not self._setup_auth_headers():
+                self.log_error("Failed to setup authentication for user retrieval")
                 return []
             
             response = self.session.get(f"{self.url.rstrip('/')}/api/users")
@@ -172,8 +205,8 @@ class RommMediaService(BaseMediaService):
     def create_user(self, username: str, email: str, password: str = None, **kwargs) -> Dict[str, Any]:
         """Create a new user in RomM"""
         try:
-            if not self._authenticate():
-                self.log_error("Failed to authenticate for user creation")
+            if not self._setup_auth_headers():
+                self.log_error("Failed to setup authentication for user creation")
                 return {}
             
             user_data = {
@@ -210,8 +243,8 @@ class RommMediaService(BaseMediaService):
     def update_user_access(self, user_id: str, library_ids: List[str] = None, **kwargs) -> bool:
         """Update user's platform access in RomM"""
         try:
-            if not self._authenticate():
-                self.log_error("Failed to authenticate for user access update")
+            if not self._setup_auth_headers():
+                self.log_error("Failed to setup authentication for user access update")
                 return False
             
             # RomM doesn't have granular library access control like other services
@@ -243,8 +276,8 @@ class RommMediaService(BaseMediaService):
     def delete_user(self, user_id: str) -> bool:
         """Delete/remove user from RomM"""
         try:
-            if not self._authenticate():
-                self.log_error("Failed to authenticate for user deletion")
+            if not self._setup_auth_headers():
+                self.log_error("Failed to setup authentication for user deletion")
                 return False
             
             response = self.session.delete(f"{self.url.rstrip('/')}/api/users/{user_id}")
@@ -272,8 +305,8 @@ class RommMediaService(BaseMediaService):
     def get_active_sessions(self) -> List[Dict[str, Any]]:
         """Get currently active gaming sessions from RomM"""
         try:
-            if not self._authenticate():
-                self.log_error("Failed to authenticate for session retrieval")
+            if not self._setup_auth_headers():
+                self.log_error("Failed to setup authentication for session retrieval")
                 return []
             
             # RomM doesn't have traditional "streaming sessions" like media servers
@@ -343,7 +376,7 @@ class RommMediaService(BaseMediaService):
     def get_server_info(self) -> Dict[str, Any]:
         """Get RomM server information"""
         try:
-            if not self._authenticate():
+            if not self._setup_auth_headers():
                 return {
                     'name': self.name,
                     'url': self.url,

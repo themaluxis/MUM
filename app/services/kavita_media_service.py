@@ -263,7 +263,6 @@ class KavitaMediaService(BaseMediaService):
     def get_users(self) -> List[Dict[str, Any]]:
         """Get all Kavita users"""
         try:
-            # Use the correct endpoint that your friend's code uses
             users = self._make_request('Users')
             result = []
             
