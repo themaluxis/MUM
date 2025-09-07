@@ -1,0 +1,184 @@
+<!-- Issues Content Only - for HTMX responses -->
+{% if issues and issues|length > 0 %}
+    <!-- Issues Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-4">
+            <h3 class="text-xl font-semibold text-base-content">
+                <i class="fa-solid fa-book mr-2 text-primary"></i>
+                Issues
+            </h3>
+            <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">
+                {{ issues|length }} issue{{ 's' if issues|length != 1 else '' }}
+            </span>
+        </div>
+        
+        <!-- Sort Options -->
+        <div class="flex items-center gap-2">
+            <label class="text-sm font-medium text-base-content/70">Sort by:</label>
+            <select class="select select-bordered select-sm" 
+                    hx-get="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='issues') }}"
+                    hx-target="#issues-content"
+                    hx-swap="innerHTML"
+                    hx-include="[name='sort_by']"
+                    name="sort_by">
+                <option value="number_asc" {{ 'selected' if sort_by == 'number_asc' else '' }}>Issue Number (Ascending)</option>
+                <option value="number_desc" {{ 'selected' if sort_by == 'number_desc' else '' }}>Issue Number (Descending)</option>
+                <option value="title_asc" {{ 'selected' if sort_by == 'title_asc' else '' }}>Title (A-Z)</option>
+                <option value="title_desc" {{ 'selected' if sort_by == 'title_desc' else '' }}>Title (Z-A)</option>
+                <option value="date_asc" {{ 'selected' if sort_by == 'date_asc' else '' }}>Release Date (Oldest)</option>
+                <option value="date_desc" {{ 'selected' if sort_by == 'date_desc' else '' }}>Release Date (Newest)</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Issues Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+        {% for issue in issues %}
+        <div class="group relative bg-base-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105">
+            <!-- Issue Cover -->
+            <div class="aspect-[2/3] relative overflow-hidden bg-base-300">
+                {% if issue.thumb %}
+                    <img src="{{ issue.thumb }}"
+                         alt="{{ issue.title }}"
+                         class="w-full h-full object-cover"
+                         loading="lazy"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <!-- Fallback when image fails to load -->
+                    <div class="absolute inset-0 bg-base-300 flex items-center justify-center" style="display: none;">
+                        <div class="text-center text-base-content/50">
+                            <i class="fa-solid fa-book text-4xl mb-2"></i>
+                            <p class="text-xs">No Cover</p>
+                        </div>
+                    </div>
+                {% else %}
+                    <!-- No image placeholder -->
+                    <div class="w-full h-full bg-base-300 flex items-center justify-center">
+                        <div class="text-center text-base-content/50">
+                            <i class="fa-solid fa-book text-4xl mb-2"></i>
+                            <p class="text-xs">No Cover</p>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- Issue Number Badge -->
+                {% if issue.number %}
+                <div class="absolute top-2 left-2">
+                    <span class="inline-flex items-center rounded-md bg-primary/90 px-2 py-1 text-xs font-medium text-primary-content">
+                        #{{ issue.number }}
+                    </span>
+                </div>
+                {% endif %}
+                
+                <!-- Read Status Badge -->
+                {% if issue.read_progress %}
+                <div class="absolute top-2 right-2">
+                    {% if issue.read_progress.completed %}
+                    <span class="inline-flex items-center rounded-md bg-success/90 px-2 py-1 text-xs font-medium text-success-content">
+                        <i class="fa-solid fa-check mr-1"></i>Read
+                    </span>
+                    {% elif issue.read_progress.page > 0 %}
+                    <span class="inline-flex items-center rounded-md bg-warning/90 px-2 py-1 text-xs font-medium text-warning-content">
+                        {{ issue.read_progress.page }}/{{ issue.pages_count or '?' }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Issue Info -->
+            <div class="p-3">
+                <h4 class="font-medium text-sm text-base-content line-clamp-2 mb-1" title="{{ issue.title }}">
+                    {{ issue.title }}
+                </h4>
+                
+                {% if issue.release_date %}
+                <p class="text-xs text-base-content/60 mb-1">
+                    {{ issue.release_date | format_date }}
+                </p>
+                {% endif %}
+                
+                {% if issue.pages_count %}
+                <p class="text-xs text-base-content/50">
+                    {{ issue.pages_count }} page{{ 's' if issue.pages_count != 1 else '' }}
+                </p>
+                {% endif %}
+            </div>
+            
+            <!-- Hover Actions -->
+            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                <div class="flex gap-2">
+                    <!-- Read Button -->
+                    <button class="btn btn-primary btn-sm" title="Read Issue">
+                        <i class="fa-solid fa-book-open"></i>
+                    </button>
+                    
+                    <!-- Info Button -->
+                    <button class="btn btn-ghost btn-sm text-white" 
+                            onclick="showIssueInfo('{{ issue.id }}')" 
+                            title="Issue Info">
+                        <i class="fa-solid fa-info"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination and pagination.total_pages > 1 %}
+    <div class="flex items-center justify-center mt-8">
+        <div class="join">
+            {% if pagination.has_prev %}
+            <button class="join-item btn btn-sm"
+                    hx-get="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='issues', page=pagination.page-1) }}"
+                    hx-target="#issues-content"
+                    hx-swap="innerHTML">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            {% endif %}
+            
+            <span class="join-item btn btn-sm btn-disabled">
+                Page {{ pagination.page }} of {{ pagination.total_pages }}
+            </span>
+            
+            {% if pagination.has_next %}
+            <button class="join-item btn btn-sm"
+                    hx-get="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='issues', page=pagination.page+1) }}"
+                    hx-target="#issues-content"
+                    hx-swap="innerHTML">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+{% else %}
+    <!-- No Issues Found -->
+    <div class="text-center py-12">
+        <div class="w-16 h-16 rounded-full bg-base-200 flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-book text-base-content/30 text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-medium text-base-content mb-2">No Issues Found</h3>
+        <p class="text-sm text-base-content/60 mb-4">
+            This series doesn't have any issues available, or they haven't been synced yet.
+        </p>
+        <button class="btn btn-primary btn-sm" 
+                onclick="syncSeriesIssues('{{ media_item.id }}')">
+            <i class="fa-solid fa-sync mr-2"></i>
+            Sync Issues
+        </button>
+    </div>
+{% endif %}
+
+<script>
+function showIssueInfo(issueId) {
+    // TODO: Implement issue info modal
+    console.log('Show info for issue:', issueId);
+}
+
+function syncSeriesIssues(seriesId) {
+    // TODO: Implement series issues sync
+    console.log('Sync issues for series:', seriesId);
+}
+</script>

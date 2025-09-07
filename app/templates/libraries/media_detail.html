@@ -205,6 +205,12 @@
                         <i class="fa-solid fa-list mr-2"></i>Episodes
                     </a>
                     {% endif %}
+                    {% if library.library_type and library.library_type.lower() in ['comic', 'comics'] and server.service_type.value == 'komga' %}
+                    <a role="tab" href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='issues') }}"
+                       class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'issues' else '' }}">
+                        <i class="fa-solid fa-book mr-2"></i>Issues
+                    </a>
+                    {% endif %}
                     <a role="tab" href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='activity') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'activity' else '' }}">
                         <i class="fa-solid fa-chart-line mr-2"></i>Activity
@@ -313,6 +319,10 @@
                     <!-- Episodes Tab -->
                     {% include 'libraries/partials/episodes_grid.html' %}
                 
+                {% elif active_tab == 'issues' and library.library_type and library.library_type.lower() in ['comic', 'comics'] and server.service_type.value == 'komga' %}
+                    <!-- Issues Tab -->
+                    {% include 'libraries/partials/issues_grid.html' %}
+                
                 {% elif active_tab == 'activity' %}
                     <!-- Activity Tab -->
                     {% include 'libraries/partials/media_activity_tab.html' %}
@@ -346,6 +356,41 @@
 
         <!-- Content -->
         <div class="p-6">
+            <!-- API Endpoint Info -->
+            <div class="bg-info/10 border border-info/20 rounded-lg p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-link text-info text-xs"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="font-medium text-info mb-1">API Endpoint Used</h4>
+                        <div class="space-y-2">
+                            {% if server.service_type.value == 'komga' %}
+                            <div class="bg-base-100 rounded border p-2">
+                                <span class="text-xs font-mono text-base-content/80">GET {{ server.url.rstrip('/') }}/api/v2/series/{{ media_details.raw_data.id if media_details.raw_data and media_details.raw_data.id else media_item.external_id }}</span>
+                            </div>
+                            {% elif server.service_type.value == 'plex' %}
+                            <div class="bg-base-100 rounded border p-2">
+                                <span class="text-xs font-mono text-base-content/80">GET {{ server.url.rstrip('/') }}/library/metadata/{{ media_details.raw_data.ratingKey if media_details.raw_data and media_details.raw_data.ratingKey else media_item.external_id }}</span>
+                            </div>
+                            {% elif server.service_type.value == 'jellyfin' %}
+                            <div class="bg-base-100 rounded border p-2">
+                                <span class="text-xs font-mono text-base-content/80">GET {{ server.url.rstrip('/') }}/Items/{{ media_details.raw_data.Id if media_details.raw_data and media_details.raw_data.Id else media_item.external_id }}</span>
+                            </div>
+                            {% else %}
+                            <div class="bg-base-100 rounded border p-2">
+                                <span class="text-xs font-mono text-base-content/80">{{ server.service_type.value.title() }} API endpoint for item {{ media_item.external_id }}</span>
+                            </div>
+                            {% endif %}
+                            <p class="text-xs text-base-content/60">
+                                <i class="fa-solid fa-info-circle mr-1"></i>
+                                This endpoint was used to fetch the raw data shown below.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="flex gap-2 mb-4">
                 <button onclick="copyApiOutput()" class="btn btn-sm btn-outline">
                     <i class="fa-solid fa-copy mr-2"></i>

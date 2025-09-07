@@ -5208,6 +5208,12 @@
       background-color: color-mix(in oklab, var(--color-primary) 80%, transparent);
     }
   }
+  .bg-primary\/90 {
+    background-color: var(--color-primary);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-primary) 90%, transparent);
+    }
+  }
   .bg-purple-50 {
     background-color: var(--color-purple-50);
   }
@@ -5283,6 +5289,12 @@
       background-color: color-mix(in oklab, var(--color-success) 20%, transparent);
     }
   }
+  .bg-success\/90 {
+    background-color: var(--color-success);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-success) 90%, transparent);
+    }
+  }
   .bg-teal-400 {
     background-color: var(--color-teal-400);
   }
@@ -5299,6 +5311,12 @@
     background-color: var(--color-warning);
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-warning) 20%, transparent);
+    }
+  }
+  .bg-warning\/90 {
+    background-color: var(--color-warning);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-warning) 90%, transparent);
     }
   }
   .bg-white {
@@ -6409,6 +6427,9 @@
   .text-success {
     color: var(--color-success);
   }
+  .text-success-content {
+    color: var(--color-success-content);
+  }
   .text-success\/80 {
     color: var(--color-success);
     @supports (color: color-mix(in lab, red, red)) {
@@ -7058,6 +7079,16 @@
     &:last-child {
       border-bottom-style: var(--tw-border-style);
       border-bottom-width: 0px;
+    }
+  }
+  .hover\:scale-105 {
+    &:hover {
+      @media (hover: hover) {
+        --tw-scale-x: 105%;
+        --tw-scale-y: 105%;
+        --tw-scale-z: 105%;
+        scale: var(--tw-scale-x) var(--tw-scale-y);
+      }
     }
   }
   .hover\:border-\[\#00a4dc\] {
@@ -7807,6 +7838,11 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
+  .lg\:grid-cols-5 {
+    @media (width >= 64rem) {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
   .lg\:grid-cols-6 {
     @media (width >= 64rem) {
       grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -7863,6 +7899,11 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
+  .xl\:grid-cols-6 {
+    @media (width >= 80rem) {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
   .xl\:grid-cols-8 {
     @media (width >= 80rem) {
       grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -7872,6 +7913,11 @@
     @media (width >= 80rem) {
       font-size: var(--text-7xl);
       line-height: var(--tw-leading, var(--text-7xl--line-height));
+    }
+  }
+  .\32 xl\:grid-cols-8 {
+    @media (width >= 96rem) {
+      grid-template-columns: repeat(8, minmax(0, 1fr));
     }
   }
   .dark\:border-blue-500\/20 {
