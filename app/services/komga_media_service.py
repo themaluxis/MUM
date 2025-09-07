@@ -266,3 +266,81 @@ class KomgaMediaService(BaseMediaService):
         except Exception as e:
             self.log_error(f"Error checking username '{username}': {e}")
             return False
+
+    def get_library_content(self, library_key: str, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
+        """Get series/books for a specific library"""
+        try:
+            # Calculate offset for pagination
+            offset = (page - 1) * per_page
+            
+            # Build the API URL for getting series in a library
+            url = f"{self.url.rstrip('/')}/api/v1/series"
+            params = {
+                'library_id': library_key,  # This is the external_id (library ID)
+                'page': page - 1,  # Komga uses 0-based pagination
+                'size': per_page,
+                'sort': 'metadata.titleSort,asc'
+            }
+            
+            self.log_info(f"Fetching series for library {library_key}, page {page}")
+            response = self._make_request(f'series?library_id={library_key}&page={page-1}&size={per_page}&sort=metadata.titleSort,asc')
+            
+            # Extract series from response
+            series_list = response if isinstance(response, list) else response.get('content', [])
+            total_count = response.get('totalElements', len(series_list)) if isinstance(response, dict) else len(series_list)
+            
+            # Process series into the expected format
+            items = []
+            for series in series_list:
+                # Extract metadata
+                metadata = series.get('metadata', {})
+                
+                # Construct thumbnail URL using image proxy
+                thumb_url = None
+                series_id = series.get('id')
+                if series_id:
+                    # Use the image proxy to handle authentication
+                    thumb_url = f"/api/media/komga/images/proxy?series_id={series_id}&server_id={self.server_id}"
+                
+                items.append({
+                    'id': str(series.get('id', '')),
+                    'external_id': str(series.get('id', '')),
+                    'title': metadata.get('title', series.get('name', 'Unknown Series')),
+                    'year': metadata.get('releaseYear'),
+                    'summary': metadata.get('summary', ''),
+                    'type': 'series',  # Komga content is series/books
+                    'book_count': series.get('booksCount', 0),
+                    'books_ready_count': series.get('booksReadyCount', 0),
+                    'books_in_progress_count': series.get('booksInProgressCount', 0),
+                    'books_unread_count': series.get('booksUnreadCount', 0),
+                    'publisher': metadata.get('publisher', ''),
+                    'status': metadata.get('status', ''),
+                    'thumb': thumb_url,  # Use proxy URL for series thumbnail
+                    'added_at': series.get('createdDate', ''),
+                    'updated_at': series.get('lastModifiedDate', ''),
+                    'raw_data': series  # Store full series data
+                })
+            
+            # Calculate pagination info
+            total_pages = (total_count + per_page - 1) // per_page
+            has_next = page < total_pages
+            has_prev = page > 1
+            
+            self.log_info(f"Retrieved {len(items)} series for library {library_key} (page {page}/{total_pages})")
+            
+            return {
+                'success': True,
+                'items': items,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': total_count,
+                    'total_pages': total_pages,
+                    'has_next': has_next,
+                    'has_prev': has_prev
+                }
+            }
+            
+        except Exception as e:
+            self.log_error(f"Error getting library content for library {library_key}: {e}")
+            return {'success': False, 'error': str(e)}

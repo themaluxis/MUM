@@ -980,6 +980,63 @@ def romm_image_proxy():
         current_app.logger.error(f"API romm_image_proxy: Unexpected error for path {image_path}: {e}", exc_info=True)
         return "Error fetching image", 500
 
+@bp.route('/media/komga/images/proxy')
+@login_required
+def komga_image_proxy():
+    """Proxy images from Komga servers with authentication"""
+    series_id = request.args.get('series_id')
+    server_id = request.args.get('server_id')
+    
+    if not series_id:
+        current_app.logger.warning("API komga_image_proxy: 'series_id' parameter is missing.")
+        return "Missing series_id parameter", 400
+    
+    if not server_id:
+        current_app.logger.warning("API komga_image_proxy: 'server_id' parameter is missing.")
+        return "Missing server_id parameter", 400
+    
+    try:
+        # Get the specific Komga server
+        from app.models_media_services import MediaServer, ServiceType
+        komga_server = MediaServer.query.filter_by(id=server_id, service_type=ServiceType.KOMGA).first()
+        
+        if not komga_server:
+            current_app.logger.error("API komga_image_proxy: Komga server not found.")
+            return "Komga server not found", 404
+        
+        # Create Komga service instance
+        from app.services.media_service_factory import MediaServiceFactory
+        komga_service = MediaServiceFactory.create_service_from_db(komga_server)
+        
+        if not komga_service:
+            current_app.logger.error("API komga_image_proxy: Could not get Komga instance to proxy image.")
+            return "Could not connect to Komga", 500
+        
+        # Construct thumbnail URL
+        thumbnail_url = f"{komga_server.url.rstrip('/')}/api/v1/series/{series_id}/thumbnail"
+        
+        # Get headers with authentication
+        headers = komga_service._get_headers()
+        
+        # Fetch image with authentication
+        import requests
+        response = requests.get(thumbnail_url, headers=headers)
+        response.raise_for_status()
+        
+        # Return image with proper content type
+        content_type = response.headers.get('content-type', 'image/jpeg')
+        return Response(response.content, content_type=content_type)
+        
+    except requests.exceptions.HTTPError as e_http:
+        current_app.logger.error(f"API komga_image_proxy: HTTPError ({e_http.response.status_code}) fetching from Komga: {e_http} for series {series_id}")
+        return "Error fetching image from Komga", e_http.response.status_code
+    except requests.exceptions.RequestException as e_req:
+        current_app.logger.error(f"API komga_image_proxy: RequestException fetching from Komga: {e_req} for series {series_id}")
+        return "Error connecting to Komga", 500
+    except Exception as e:
+        current_app.logger.error(f"API komga_image_proxy: Unexpected error for series {series_id}: {e}", exc_info=True)
+        return "Error fetching image", 500
+
 @bp.route('/media/jellyfin/users/avatar')
 @login_required
 def jellyfin_user_avatar_proxy():
