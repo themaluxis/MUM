@@ -125,17 +125,35 @@ class MediaServiceManager:
                     })
                     current_app.logger.debug(f"Added new library: {lib_data['name']}")
             
+            # Handle library removals - delete libraries that are no longer in the API response
+            api_external_ids = {lib_data['external_id'] for lib_data in libraries_data}
+            removed_count = 0
+            removed_libraries = []
+            
+            for external_id, lib in existing_libs.items():
+                if external_id not in api_external_ids:
+                    current_app.logger.info(f"Removing library '{lib.name}' (ID: {external_id}) - no longer exists on server")
+                    removed_libraries.append({
+                        'name': lib.name,
+                        'server_name': server.server_nickname,
+                        'external_id': external_id
+                    })
+                    db.session.delete(lib)
+                    removed_count += 1
+            
             server.last_sync_at = datetime.utcnow()
             db.session.commit()
-            current_app.logger.info(f"Library sync completed: {added_count} added, {updated_count} updated")
+            current_app.logger.info(f"Library sync completed: {added_count} added, {updated_count} updated, {removed_count} removed")
             
             return {
                 'success': True,
                 'message': f'Synced {len(libraries_data)} libraries',
                 'added': added_count,
                 'updated': updated_count,
+                'removed': removed_count,
                 'added_libraries': added_libraries,
-                'updated_libraries': updated_libraries
+                'updated_libraries': updated_libraries,
+                'removed_libraries': removed_libraries
             }
             
         except Exception as e:
