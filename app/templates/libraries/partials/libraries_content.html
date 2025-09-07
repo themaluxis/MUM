@@ -162,9 +162,18 @@
                     </table>
                 </div>
                 {% elif server_data.needs_sync %}
-                <div class="alert alert-warning">
-                    <i class="fa-solid fa-exclamation-triangle"></i>
-                    <span>No library data available. Click "Sync Libraries" to fetch from this server.</span>
+                <div class="bg-warning/10 border border-warning/20 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-exclamation-triangle text-warning text-xs"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-warning mb-1">Library Sync Required</h4>
+                            <p class="text-sm text-base-content/80">
+                                No library data available. Click "Sync Libraries" to fetch from this server.
+                            </p>
+                        </div>
+                    </div>
                 </div>
                 {% elif not server_data.online %}
                 <div class="alert alert-error">
