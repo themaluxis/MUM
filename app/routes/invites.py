@@ -1388,9 +1388,19 @@ def get_edit_invite_form(invite_id):
     form = InviteEditForm(obj=invite)
 
     # Populate form with existing data
-    if invite.expires_at and invite.expires_at > datetime.now(timezone.utc):
-        days_left = (invite.expires_at - datetime.now(timezone.utc)).days + 1
-        form.expires_in_days.data = days_left if days_left > 0 else 0
+    if invite.expires_at:
+        now = datetime.now(timezone.utc)
+        expires = invite.expires_at
+        
+        # If expires_at is naive, assume it's UTC
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        
+        if expires > now:
+            days_left = (expires - now).days + 1
+            form.expires_in_days.data = days_left if days_left > 0 else 0
+        else:
+            form.expires_in_days.data = 0
     else:
         form.expires_in_days.data = 0
     
