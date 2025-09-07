@@ -73,6 +73,43 @@ def list_invites():
     available_libraries = {}
     form.libraries.choices = []
     
+    # Build comprehensive library data for invite cards display
+    # This will help map library IDs to names and service types in the template
+    libraries_by_server = {}
+    all_libraries_lookup = {}
+    
+    for server in all_servers:
+        try:
+            from app.models_media_services import MediaLibrary
+            # Load libraries from database for each server
+            db_libraries = MediaLibrary.query.filter_by(server_id=server.id).all()
+            server_libraries = {}
+            
+            for lib in db_libraries:
+                lib_data = {
+                    'id': lib.id,
+                    'external_id': lib.external_id,
+                    'name': lib.name,
+                    'server_id': server.id,
+                    'server_name': server.server_nickname,
+                    'service_type': server.service_type.value
+                }
+                server_libraries[lib.external_id] = lib_data
+                # Also store in global lookup for easy access
+                all_libraries_lookup[lib.external_id] = lib_data
+                
+                # For Kavita, also store with prefixed format since it uses that
+                if server.service_type.name.upper() == 'KAVITA':
+                    prefixed_id = f"[{server.service_type.name.upper()}]-{server.server_nickname}-{lib.external_id}"
+                    all_libraries_lookup[prefixed_id] = lib_data
+            
+            libraries_by_server[server.id] = server_libraries
+            current_app.logger.debug(f"Loaded {len(server_libraries)} libraries for server {server.server_nickname}")
+            
+        except Exception as e:
+            current_app.logger.error(f"Failed to load libraries for server {server.server_nickname}: {e}")
+            libraries_by_server[server.id] = {}
+    
     # Discord settings
     discord_oauth_enabled = Setting.get_bool('DISCORD_OAUTH_ENABLED', False)
     bot_is_enabled = Setting.get_bool('DISCORD_BOT_ENABLED', False)
@@ -87,6 +124,8 @@ def list_invites():
                                invites=invites_pagination,
                                all_servers=all_servers,
                                available_libraries=available_libraries,
+                               libraries_by_server=libraries_by_server,
+                               all_libraries_lookup=all_libraries_lookup,
                                current_view=view_mode,
                                current_per_page=items_per_page)
 
@@ -105,7 +144,9 @@ def list_invites():
                            form=form, 
                            all_servers=all_servers,
                            grouped_servers=grouped_servers,
-                           available_libraries=available_libraries, 
+                           available_libraries=available_libraries,
+                           libraries_by_server=libraries_by_server,
+                           all_libraries_lookup=all_libraries_lookup,
                            current_per_page=items_per_page,
                            discord_oauth_enabled=discord_oauth_enabled,
                            global_force_sso=global_force_sso,
