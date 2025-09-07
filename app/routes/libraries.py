@@ -666,7 +666,7 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                 series_id = media_item.external_id
                 current_app.logger.info(f"Fetching issues for series {series_id} from Komga")
                 
-                issues_data = service.get_series_books(series_id, page=page, per_page=per_page)
+                issues_data = service.get_series_books(series_id, page=page, per_page=per_page, sort_by=sort_by)
                 if issues_data.get('success'):
                     issues_content = {
                         'issues': issues_data.get('items', []),
@@ -804,6 +804,15 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                                  library=library,
                                  server=server,
                                  current_sort_by=request.args.get('sort_by', 'season_episode_asc'))
+        elif tab == 'issues':
+            return render_template('libraries/partials/issues_content.html',
+                                 issues=issues_content.get('issues', []) if issues_content else [],
+                                 issues_pagination=issues_content.get('pagination', {}) if issues_content else {},
+                                 issues_sort_by=issues_content.get('sort_by', 'number_asc') if issues_content else 'number_asc',
+                                 media_details=media_details,
+                                 media_item=media_item,
+                                 library=library,
+                                 server=server)
     
     return render_template('libraries/media_detail.html',
                          title=f"Media: {media_item.title}",

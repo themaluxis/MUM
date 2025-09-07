@@ -345,15 +345,27 @@ class KomgaMediaService(BaseMediaService):
             self.log_error(f"Error getting library content for library {library_key}: {e}")
             return {'success': False, 'error': str(e)}
 
-    def get_series_books(self, series_id: str, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
+    def get_series_books(self, series_id: str, page: int = 1, per_page: int = 50, sort_by: str = 'number_asc') -> Dict[str, Any]:
         """Get books/issues for a specific series"""
         try:
             # Calculate offset for pagination
             offset = (page - 1) * per_page
             
+            # Map sort_by to Komga API sort parameters
+            sort_mapping = {
+                'number_asc': 'metadata.numberSort,asc',
+                'number_desc': 'metadata.numberSort,desc',
+                'title_asc': 'metadata.titleSort,asc',
+                'title_desc': 'metadata.titleSort,desc',
+                'date_asc': 'metadata.releaseDate,asc',
+                'date_desc': 'metadata.releaseDate,desc'
+            }
+            
+            komga_sort = sort_mapping.get(sort_by, 'metadata.numberSort,asc')
+            
             # Build the API URL for getting books in a series
-            self.log_info(f"Fetching books for series {series_id}, page {page}")
-            response = self._make_request(f'series/{series_id}/books?page={page-1}&size={per_page}&sort=metadata.numberSort,asc')
+            self.log_info(f"Fetching books for series {series_id}, page {page}, sort: {sort_by} ({komga_sort})")
+            response = self._make_request(f'series/{series_id}/books?page={page-1}&size={per_page}&sort={komga_sort}')
             
             # Extract books from response
             books_list = response if isinstance(response, list) else response.get('content', [])

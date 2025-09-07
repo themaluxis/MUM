@@ -1,33 +1,105 @@
 <!-- Issues Content Only - for HTMX responses -->
 {% if issues and issues|length > 0 %}
-    <!-- Issues Header -->
-    <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-4">
-            <h3 class="text-xl font-semibold text-base-content">
-                <i class="fa-solid fa-book mr-2 text-primary"></i>
+    <!-- Issues Grid Header -->
+    <div class="flex flex-col gap-4 mb-6">
+        <!-- Title and Stats Row -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h3 class="text-lg font-semibold flex items-center">
+                <i class="fa-solid fa-book text-primary mr-2"></i>
                 Issues
+                {% if issues_pagination and issues_pagination.total %}
+                    <span class="text-sm text-base-content/60 ml-2">({{ issues_pagination.total }} issues)</span>
+                {% endif %}
             </h3>
-            <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">
-                {{ issues|length }} issue{{ 's' if issues|length != 1 else '' }}
-            </span>
+            
+            <!-- Results Info -->
+            <div class="text-sm text-base-content/60">
+                {% if issues_pagination and issues_pagination.total %}
+                    Showing {{ ((issues_pagination.page - 1) * issues_pagination.per_page) + 1 }}-{{ 
+                        [issues_pagination.page * issues_pagination.per_page, issues_pagination.total] | min 
+                    }} of {{ issues_pagination.total }}
+                {% endif %}
+            </div>
         </div>
         
-        <!-- Sort Options -->
-        <div class="flex items-center gap-2">
-            <label class="text-sm font-medium text-base-content/70">Sort by:</label>
-            <select class="select select-bordered select-sm" 
-                    hx-get="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='issues') }}"
-                    hx-target="#issues-content"
-                    hx-swap="innerHTML"
-                    hx-include="[name='sort_by']"
-                    name="sort_by">
-                <option value="number_asc" {{ 'selected' if sort_by == 'number_asc' else '' }}>Issue Number (Ascending)</option>
-                <option value="number_desc" {{ 'selected' if sort_by == 'number_desc' else '' }}>Issue Number (Descending)</option>
-                <option value="title_asc" {{ 'selected' if sort_by == 'title_asc' else '' }}>Title (A-Z)</option>
-                <option value="title_desc" {{ 'selected' if sort_by == 'title_desc' else '' }}>Title (Z-A)</option>
-                <option value="date_asc" {{ 'selected' if sort_by == 'date_asc' else '' }}>Release Date (Oldest)</option>
-                <option value="date_desc" {{ 'selected' if sort_by == 'date_desc' else '' }}>Release Date (Newest)</option>
-            </select>
+        <!-- Search and Controls Row -->
+        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <!-- Search Box -->
+            <div class="flex-1 max-w-md">
+                <div class="relative">
+                    <input type="text" 
+                           id="issues-search" 
+                           name="search"
+                           placeholder="Search issues..." 
+                           class="input input-bordered w-full pl-10 pr-4"
+                           value="{{ request.args.get('search', '') }}">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-search text-base-content/40"></i>
+                    </div>
+                    {% if request.args.get('search') %}
+                    <button type="button" 
+                            id="clear-issues-search"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-base-content/60 hover:text-base-content">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Sort By Dropdown -->
+            <div class="flex items-center gap-2">
+                <label for="issues-sort-by" class="text-sm text-base-content/60 whitespace-nowrap">Sort by:</label>
+                <select id="issues-sort-by" 
+                        class="select select-bordered select-sm w-64"
+                        hx-get="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title), tab='issues') }}"
+                        hx-target="#issues-content"
+                        hx-trigger="change"
+                        hx-include="[name='search'], [name='per_page']"
+                        name="sort_by">
+                    <option value="number_asc" {{ 'selected' if issues_sort_by == 'number_asc' else '' }}>Issue Number (Ascending)</option>
+                    <option value="number_desc" {{ 'selected' if issues_sort_by == 'number_desc' else '' }}>Issue Number (Descending)</option>
+                    <option value="title_asc" {{ 'selected' if issues_sort_by == 'title_asc' else '' }}>Title (A-Z)</option>
+                    <option value="title_desc" {{ 'selected' if issues_sort_by == 'title_desc' else '' }}>Title (Z-A)</option>
+                    <option value="date_asc" {{ 'selected' if issues_sort_by == 'date_asc' else '' }}>Release Date (Oldest)</option>
+                    <option value="date_desc" {{ 'selected' if issues_sort_by == 'date_desc' else '' }}>Release Date (Newest)</option>
+                </select>
+            </div>
+            
+            <!-- Items Per Page Dropdown -->
+            <div class="flex items-center gap-2">
+                <label for="issues-per-page" class="text-sm text-base-content/60 whitespace-nowrap">Items per page:</label>
+                <select id="issues-per-page" name="per_page" class="select select-bordered select-sm w-20">
+                    <option value="12" {{ 'selected' if issues_pagination.per_page == 12 else '' }}>12</option>
+                    <option value="24" {{ 'selected' if issues_pagination.per_page == 24 else '' }}>24</option>
+                    <option value="48" {{ 'selected' if issues_pagination.per_page == 48 else '' }}>48</option>
+                    <option value="96" {{ 'selected' if issues_pagination.per_page == 96 else '' }}>96</option>
+                </select>
+            </div>
+            
+            <!-- Sync Button and Last Updated -->
+            <div class="flex items-center gap-2">
+                <button class="btn btn-primary btn-xs sync-issues-btn"
+                        data-series-id="{{ media_item.external_id if media_item else '' }}"
+                        data-series-title="{{ media_details.title if media_details else '' }}"
+                        title="Sync issues for {{ media_details.title if media_details else 'this series' }}">
+                    <i class="fa-solid fa-sync sm:mr-1"></i>
+                    <span class="sync-issues-btn-text hidden sm:inline">Sync</span>
+                </button>
+                <button class="btn btn-error btn-xs purge-issues-btn"
+                        data-series-id="{{ media_item.external_id if media_item else '' }}"
+                        data-series-title="{{ media_details.title if media_details else '' }}"
+                        title="Purge cached issues for {{ media_details.title if media_details else 'this series' }}">
+                    <i class="fa-solid fa-trash sm:mr-1"></i>
+                    <span class="purge-issues-btn-text hidden sm:inline">Purge</span>
+                </button>
+                <div class="text-xs text-base-content/50 hidden sm:block">
+                    {% if media_item and media_item.last_synced %}
+                        Last updated: {{ format_datetime_with_user_timezone(media_item.last_synced, '%m/%d %I:%M %p') }}
+                    {% else %}
+                        Never synced
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 
@@ -155,13 +227,165 @@
 {% endif %}
 
 <script>
+// Search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('issues-search');
+    const clearSearchBtn = document.getElementById('clear-issues-search');
+    const perPageSelect = document.getElementById('issues-per-page');
+    
+    if (searchInput) {
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                performIssuesSearch();
+            }, 500);
+        });
+    }
+    
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            performIssuesSearch();
+        });
+    }
+    
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', function() {
+            performIssuesSearch();
+        });
+    }
+});
+
+function performIssuesSearch() {
+    const searchInput = document.getElementById('issues-search');
+    const sortSelect = document.getElementById('issues-sort-by');
+    const perPageSelect = document.getElementById('issues-per-page');
+    
+    const params = new URLSearchParams();
+    params.set('tab', 'issues');
+    params.set('page', '1'); // Reset to first page on search
+    
+    if (searchInput && searchInput.value.trim()) {
+        params.set('search', searchInput.value.trim());
+    }
+    
+    if (sortSelect && sortSelect.value) {
+        params.set('sort_by', sortSelect.value);
+    }
+    
+    if (perPageSelect && perPageSelect.value) {
+        params.set('per_page', perPageSelect.value);
+    }
+    
+    // Construct the URL
+    const baseUrl = "{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=media_item.id, slug=generate_url_slug(media_details.title)) }}";
+    const fullUrl = baseUrl + '?' + params.toString();
+    
+    // Use HTMX to update the content
+    htmx.ajax('GET', fullUrl, {
+        target: '#issues-content',
+        swap: 'innerHTML'
+    });
+}
+
+// Sync Issues functionality
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.sync-issues-btn')) {
+        const btn = e.target.closest('.sync-issues-btn');
+        const seriesId = btn.dataset.seriesId;
+        const seriesTitle = btn.dataset.seriesTitle;
+        
+        if (!seriesId) {
+            showToast('Error: Series ID not found', 'error');
+            return;
+        }
+        
+        // Disable button and show loading
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Syncing...';
+        btn.disabled = true;
+        
+        // Make sync request
+        fetch(`/api/sync-series-issues/${seriesId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`Issues synced successfully for ${seriesTitle}`, 'success');
+                // Refresh the issues content
+                performIssuesSearch();
+            } else {
+                showToast(`Sync failed: ${data.message || 'Unknown error'}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Sync error:', error);
+            showToast('Sync failed: Network error', 'error');
+        })
+        .finally(() => {
+            // Restore button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    }
+    
+    if (e.target.closest('.purge-issues-btn')) {
+        const btn = e.target.closest('.purge-issues-btn');
+        const seriesId = btn.dataset.seriesId;
+        const seriesTitle = btn.dataset.seriesTitle;
+        
+        if (!seriesId) {
+            showToast('Error: Series ID not found', 'error');
+            return;
+        }
+        
+        if (!confirm(`Are you sure you want to purge all cached issues for "${seriesTitle}"? This will remove all issue data from the database.`)) {
+            return;
+        }
+        
+        // Disable button and show loading
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Purging...';
+        btn.disabled = true;
+        
+        // Make purge request
+        fetch(`/api/purge-series-issues/${seriesId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`Issues purged successfully for ${seriesTitle}`, 'success');
+                // Refresh the issues content
+                performIssuesSearch();
+            } else {
+                showToast(`Purge failed: ${data.message || 'Unknown error'}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Purge error:', error);
+            showToast('Purge failed: Network error', 'error');
+        })
+        .finally(() => {
+            // Restore button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    }
+});
+
 function showIssueInfo(issueId) {
     // TODO: Implement issue info modal
     console.log('Show info for issue:', issueId);
-}
-
-function syncSeriesIssues(seriesId) {
-    // TODO: Implement series issues sync
-    console.log('Sync issues for series:', seriesId);
 }
 </script>
