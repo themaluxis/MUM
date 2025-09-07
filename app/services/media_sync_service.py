@@ -222,6 +222,9 @@ class MediaSyncService:
                 elif thumb_url.startswith('/'):
                     # Direct path
                     thumb_path = thumb_url
+                elif thumb_url.startswith('http'):
+                    # Full URL (like RomM) - store as-is
+                    thumb_path = thumb_url
             
             # Parse duration (handle different formats)
             duration = item_data.get('duration')

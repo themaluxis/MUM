@@ -343,6 +343,9 @@ class MediaItem(db.Model):
             if self.thumb_path.startswith('/api/'):
                 # Already a proxy URL (Jellyfin or other services)
                 thumb_url = self.thumb_path
+            elif self.thumb_path.startswith('http'):
+                # Full URL (like RomM) - use as-is
+                thumb_url = self.thumb_path
             else:
                 # Plex format: regular path that needs proxy construction
                 thumb_url = f"/api/media/{self.server.service_type.value}/images/proxy?path={self.thumb_path.lstrip('/')}"

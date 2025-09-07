@@ -922,6 +922,64 @@ def jellyfin_image_proxy():
         current_app.logger.error(f"API jellyfin_image_proxy: Unexpected error for item {item_id}: {e}", exc_info=True)
         return "Error fetching image", 500
 
+@bp.route('/media/romm/images/proxy')
+@login_required
+def romm_image_proxy():
+    """Proxy images from RomM servers with authentication"""
+    image_path = request.args.get('path')
+    server_id = request.args.get('server_id')
+    
+    if not image_path:
+        current_app.logger.warning("API romm_image_proxy: 'path' parameter is missing.")
+        return "Missing path parameter", 400
+    
+    if not server_id:
+        current_app.logger.warning("API romm_image_proxy: 'server_id' parameter is missing.")
+        return "Missing server_id parameter", 400
+    
+    try:
+        # Get the specific RomM server
+        from app.models_media_services import MediaServer, ServiceType
+        romm_server = MediaServer.query.filter_by(id=server_id, service_type=ServiceType.ROMM).first()
+        
+        if not romm_server:
+            current_app.logger.error("API romm_image_proxy: RomM server not found.")
+            return "RomM server not found", 404
+        
+        # Create RomM service instance
+        from app.services.media_service_factory import MediaServiceFactory
+        romm_service = MediaServiceFactory.create_service_from_db(romm_server)
+        
+        if not romm_service:
+            current_app.logger.error("API romm_image_proxy: Could not get RomM instance to proxy image.")
+            return "Could not connect to RomM", 500
+        
+        # Setup authentication and make request
+        if not romm_service._setup_auth_headers():
+            current_app.logger.error("API romm_image_proxy: Failed to setup authentication.")
+            return "Authentication failed", 500
+        
+        # Construct full image URL
+        full_image_url = f"{romm_server.url.rstrip('/')}{image_path}"
+        
+        # Fetch image with authentication
+        response = romm_service.session.get(full_image_url)
+        response.raise_for_status()
+        
+        # Return image with proper content type
+        content_type = response.headers.get('content-type', 'image/jpeg')
+        return Response(response.content, content_type=content_type)
+        
+    except requests.exceptions.HTTPError as e_http:
+        current_app.logger.error(f"API romm_image_proxy: HTTPError ({e_http.response.status_code}) fetching from RomM: {e_http} for path {image_path}")
+        return "Error fetching image from RomM", e_http.response.status_code
+    except requests.exceptions.RequestException as e_req:
+        current_app.logger.error(f"API romm_image_proxy: RequestException fetching from RomM: {e_req} for path {image_path}")
+        return "Error connecting to RomM", 500
+    except Exception as e:
+        current_app.logger.error(f"API romm_image_proxy: Unexpected error for path {image_path}: {e}", exc_info=True)
+        return "Error fetching image", 500
+
 @bp.route('/media/jellyfin/users/avatar')
 @login_required
 def jellyfin_user_avatar_proxy():

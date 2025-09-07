@@ -434,6 +434,100 @@ class RommMediaService(BaseMediaService):
         
         return feature in romm_features
     
+    def get_library_content(self, library_key: str, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
+        """Get ROMs for a specific platform (library)"""
+        try:
+            if not self._setup_auth_headers():
+                self.log_error("Failed to setup authentication for library content retrieval")
+                return {'success': False, 'error': 'Authentication failed'}
+            
+            # Calculate offset for pagination
+            offset = (page - 1) * per_page
+            
+            # Build the API URL with the exact parameters you specified
+            url = f"{self.url.rstrip('/')}/api/roms"
+            params = {
+                'with_char_index': 'true',
+                'platform_id': library_key,  # This is the external_id (platform ID)
+                'group_by_meta_id': 'false',
+                'order_by': 'name',
+                'order_dir': 'asc',
+                'limit': per_page,
+                'offset': offset
+            }
+            
+            self.log_info(f"Fetching ROMs for platform {library_key}, page {page}")
+            response = self.session.get(url, params=params)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract ROMs from response - RomM uses 'items' array
+            roms = data.get('items', []) if isinstance(data, dict) else data
+            total_count = data.get('total_count', len(roms)) if isinstance(data, dict) else len(roms)
+            
+            # Process ROMs into the expected format
+            items = []
+            for rom in roms:
+                # Extract year from metadatum if available
+                year = None
+                if rom.get('metadatum') and rom.get('metadatum', {}).get('first_release_date'):
+                    try:
+                        # Parse year from first_release_date
+                        release_date = rom['metadatum']['first_release_date']
+                        if isinstance(release_date, str) and len(release_date) >= 4:
+                            year = int(release_date[:4])
+                    except (ValueError, TypeError):
+                        year = None
+                
+                # Construct thumbnail URL using image proxy to handle HTTPS/HTTP mixed content
+                thumb_url = None
+                if rom.get('path_cover_large'):
+                    # Use the image proxy to handle mixed content issues (HTTPS page loading HTTP images)
+                    thumb_url = f"/api/media/romm/images/proxy?path={rom['path_cover_large']}&server_id={self.server_id}"
+                    self.log_info(f"Generated proxy cover URL for ROM '{rom.get('name')}': {thumb_url}")
+                
+                items.append({
+                    'id': str(rom.get('id', '')),
+                    'external_id': str(rom.get('id', '')),
+                    'title': rom.get('name', 'Unknown ROM'),
+                    'year': year,
+                    'summary': rom.get('summary', ''),
+                    'type': 'rom',
+                    'file_size': rom.get('fs_size_bytes', 0),  # RomM uses 'fs_size_bytes'
+                    'file_path': rom.get('fs_path', ''),  # RomM uses 'fs_path'
+                    'file_name': rom.get('fs_name', ''),  # Add file name
+                    'platform': rom.get('platform_display_name', ''),  # RomM uses 'platform_display_name'
+                    'genres': rom.get('metadatum', {}).get('genres', []) if rom.get('metadatum') else [],
+                    'thumb': thumb_url,  # Construct full URL for cover image
+                    'added_at': rom.get('created_at', ''),
+                    'raw_data': rom  # Store full ROM data
+                })
+            
+            # Calculate pagination info
+            total_pages = (total_count + per_page - 1) // per_page
+            has_next = page < total_pages
+            has_prev = page > 1
+            
+            self.log_info(f"Retrieved {len(items)} ROMs for platform {library_key} (page {page}/{total_pages})")
+            
+            return {
+                'success': True,
+                'items': items,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': total_count,
+                    'total_pages': total_pages,
+                    'has_next': has_next,
+                    'has_prev': has_prev
+                }
+            }
+            
+        except Exception as e:
+            self.log_error(f"Error getting library content for platform {library_key}: {e}")
+            return {'success': False, 'error': str(e)}
+
     def get_geoip_info(self, ip_address: str) -> Dict[str, Any]:
         """Get GeoIP information for a given IP address"""
         # Use the base class implementation
