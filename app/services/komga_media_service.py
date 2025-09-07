@@ -344,3 +344,73 @@ class KomgaMediaService(BaseMediaService):
         except Exception as e:
             self.log_error(f"Error getting library content for library {library_key}: {e}")
             return {'success': False, 'error': str(e)}
+
+    def get_series_books(self, series_id: str, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
+        """Get books/issues for a specific series"""
+        try:
+            # Calculate offset for pagination
+            offset = (page - 1) * per_page
+            
+            # Build the API URL for getting books in a series
+            self.log_info(f"Fetching books for series {series_id}, page {page}")
+            response = self._make_request(f'series/{series_id}/books?page={page-1}&size={per_page}&sort=metadata.numberSort,asc')
+            
+            # Extract books from response
+            books_list = response if isinstance(response, list) else response.get('content', [])
+            total_count = response.get('totalElements', len(books_list)) if isinstance(response, dict) else len(books_list)
+            
+            # Process books into the expected format
+            items = []
+            for book in books_list:
+                # Extract metadata
+                metadata = book.get('metadata', {})
+                
+                # Construct thumbnail URL using image proxy for book covers
+                thumb_url = None
+                book_id = book.get('id')
+                if book_id:
+                    # Use the image proxy to handle authentication for book thumbnails
+                    thumb_url = f"/api/media/komga/images/proxy?book_id={book_id}&server_id={self.server_id}"
+                
+                items.append({
+                    'id': str(book.get('id', '')),
+                    'external_id': str(book.get('id', '')),
+                    'title': metadata.get('title', book.get('name', 'Unknown Issue')),
+                    'number': metadata.get('number'),
+                    'summary': metadata.get('summary', ''),
+                    'type': 'book',  # Komga books are individual issues
+                    'pages_count': book.get('pagesCount', 0),
+                    'file_size': book.get('sizeBytes', 0),
+                    'media_status': book.get('media', {}).get('status', ''),
+                    'release_date': metadata.get('releaseDate'),
+                    'isbn': metadata.get('isbn'),
+                    'thumb': thumb_url,  # Use proxy URL for book thumbnail
+                    'created_date': book.get('createdDate', ''),
+                    'last_modified_date': book.get('lastModifiedDate', ''),
+                    'file_hash': book.get('fileHash', ''),
+                    'raw_data': book  # Store full book data
+                })
+            
+            # Calculate pagination info
+            total_pages = (total_count + per_page - 1) // per_page
+            has_next = page < total_pages
+            has_prev = page > 1
+            
+            self.log_info(f"Retrieved {len(items)} books for series {series_id} (page {page}/{total_pages})")
+            
+            return {
+                'success': True,
+                'items': items,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': total_count,
+                    'total_pages': total_pages,
+                    'has_next': has_next,
+                    'has_prev': has_prev
+                }
+            }
+            
+        except Exception as e:
+            self.log_error(f"Error getting books for series {series_id}: {e}")
+            return {'success': False, 'error': str(e)}

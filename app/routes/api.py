@@ -985,11 +985,12 @@ def romm_image_proxy():
 def komga_image_proxy():
     """Proxy images from Komga servers with authentication"""
     series_id = request.args.get('series_id')
+    book_id = request.args.get('book_id')
     server_id = request.args.get('server_id')
     
-    if not series_id:
-        current_app.logger.warning("API komga_image_proxy: 'series_id' parameter is missing.")
-        return "Missing series_id parameter", 400
+    if not series_id and not book_id:
+        current_app.logger.warning("API komga_image_proxy: Either 'series_id' or 'book_id' parameter is required.")
+        return "Missing series_id or book_id parameter", 400
     
     if not server_id:
         current_app.logger.warning("API komga_image_proxy: 'server_id' parameter is missing.")
@@ -1012,8 +1013,11 @@ def komga_image_proxy():
             current_app.logger.error("API komga_image_proxy: Could not get Komga instance to proxy image.")
             return "Could not connect to Komga", 500
         
-        # Construct thumbnail URL
-        thumbnail_url = f"{komga_server.url.rstrip('/')}/api/v1/series/{series_id}/thumbnail"
+        # Construct thumbnail URL based on type
+        if series_id:
+            thumbnail_url = f"{komga_server.url.rstrip('/')}/api/v1/series/{series_id}/thumbnail"
+        else:  # book_id
+            thumbnail_url = f"{komga_server.url.rstrip('/')}/api/v1/books/{book_id}/thumbnail"
         
         # Get headers with authentication
         headers = komga_service._get_headers()
@@ -1028,13 +1032,16 @@ def komga_image_proxy():
         return Response(response.content, content_type=content_type)
         
     except requests.exceptions.HTTPError as e_http:
-        current_app.logger.error(f"API komga_image_proxy: HTTPError ({e_http.response.status_code}) fetching from Komga: {e_http} for series {series_id}")
+        item_id = series_id or book_id
+        current_app.logger.error(f"API komga_image_proxy: HTTPError ({e_http.response.status_code}) fetching from Komga: {e_http} for item {item_id}")
         return "Error fetching image from Komga", e_http.response.status_code
     except requests.exceptions.RequestException as e_req:
-        current_app.logger.error(f"API komga_image_proxy: RequestException fetching from Komga: {e_req} for series {series_id}")
+        item_id = series_id or book_id
+        current_app.logger.error(f"API komga_image_proxy: RequestException fetching from Komga: {e_req} for item {item_id}")
         return "Error connecting to Komga", 500
     except Exception as e:
-        current_app.logger.error(f"API komga_image_proxy: Unexpected error for series {series_id}: {e}", exc_info=True)
+        item_id = series_id or book_id
+        current_app.logger.error(f"API komga_image_proxy: Unexpected error for item {item_id}: {e}", exc_info=True)
         return "Error fetching image", 500
 
 @bp.route('/media/jellyfin/users/avatar')

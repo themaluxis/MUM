@@ -642,6 +642,47 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
         if episodes_cached:
             episodes_content = get_show_episodes_by_item(server, library, media_item, page, per_page, search_query, sort_by)
     
+    # Get issues for comic series (Komga)
+    issues_content = None
+    if tab == 'issues' and library.library_type and library.library_type.lower() in ['comic', 'comics'] and server.service_type.value == 'komga':
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 24, type=int)
+        sort_by = request.args.get('sort_by', 'number_asc').strip()
+        
+        # Validate per_page parameter
+        if per_page not in [12, 24, 48, 96]:
+            per_page = 24
+            
+        # Validate sort_by parameter
+        valid_sorts = ['number_asc', 'number_desc', 'title_asc', 'title_desc', 'date_asc', 'date_desc']
+        if sort_by not in valid_sorts:
+            sort_by = 'number_asc'
+        
+        try:
+            # Create service instance to get series books
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service and hasattr(service, 'get_series_books'):
+                # Use the external_id (series ID) to get books
+                series_id = media_item.external_id
+                current_app.logger.info(f"Fetching issues for series {series_id} from Komga")
+                
+                issues_data = service.get_series_books(series_id, page=page, per_page=per_page)
+                if issues_data.get('success'):
+                    issues_content = {
+                        'issues': issues_data.get('items', []),
+                        'pagination': issues_data.get('pagination', {}),
+                        'sort_by': sort_by
+                    }
+                else:
+                    current_app.logger.error(f"Failed to fetch issues: {issues_data.get('error', 'Unknown error')}")
+                    issues_content = {'issues': [], 'pagination': {}, 'sort_by': sort_by, 'error': issues_data.get('error')}
+            else:
+                current_app.logger.error("Komga service does not support get_series_books method")
+                issues_content = {'issues': [], 'pagination': {}, 'sort_by': sort_by, 'error': 'Service does not support book retrieval'}
+        except Exception as e:
+            current_app.logger.error(f"Error fetching issues for series {media_item.external_id}: {e}")
+            issues_content = {'issues': [], 'pagination': {}, 'sort_by': sort_by, 'error': str(e)}
+    
     # Get streaming history for this specific content
     streaming_history = None
     if tab == 'activity':
@@ -776,6 +817,9 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                          active_tab=tab,
                          days_filter=request.args.get('days', 30) if tab == 'activity' else None,
                          current_sort_by=request.args.get('sort_by', 'season_episode_asc') if tab == 'episodes' else None,
+                         issues=issues_content.get('issues', []) if issues_content else [],
+                         issues_pagination=issues_content.get('pagination', {}) if issues_content else {},
+                         issues_sort_by=issues_content.get('sort_by', 'number_asc') if issues_content else 'number_asc',
                          format_duration=format_duration,
                          format_media_duration=format_media_duration)
 

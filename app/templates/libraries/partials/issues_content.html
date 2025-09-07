@@ -32,11 +32,11 @@
     </div>
 
     <!-- Issues Grid -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
         {% for issue in issues %}
-        <div class="group relative bg-base-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105">
-            <!-- Issue Cover -->
-            <div class="aspect-[2/3] relative overflow-hidden bg-base-300">
+        <div class="group cursor-pointer block">
+            <!-- Issue Cover Container -->
+            <div class="relative aspect-[2/3] bg-base-200 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                 {% if issue.thumb %}
                     <img src="{{ issue.thumb }}"
                          alt="{{ issue.title }}"
@@ -44,81 +44,64 @@
                          loading="lazy"
                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                     <!-- Fallback when image fails to load -->
-                    <div class="absolute inset-0 bg-base-300 flex items-center justify-center" style="display: none;">
-                        <div class="text-center text-base-content/50">
-                            <i class="fa-solid fa-book text-4xl mb-2"></i>
-                            <p class="text-xs">No Cover</p>
-                        </div>
+                    <div class="absolute inset-0 bg-base-300 flex items-center justify-center text-base-content/40" style="display: none;">
+                        <i class="fa-solid fa-book text-4xl"></i>
                     </div>
                 {% else %}
                     <!-- No image placeholder -->
-                    <div class="w-full h-full bg-base-300 flex items-center justify-center">
-                        <div class="text-center text-base-content/50">
-                            <i class="fa-solid fa-book text-4xl mb-2"></i>
-                            <p class="text-xs">No Cover</p>
-                        </div>
+                    <div class="absolute inset-0 bg-base-300 flex items-center justify-center text-base-content/40">
+                        <i class="fa-solid fa-book text-4xl"></i>
                     </div>
                 {% endif %}
                 
+                <!-- Hover Overlay -->
+                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                    <div class="text-center text-white p-2">
+                        <i class="fa-solid fa-book-open text-2xl mb-2"></i>
+                        <div class="text-xs">Read Issue</div>
+                    </div>
+                </div>
+                
                 <!-- Issue Number Badge -->
                 {% if issue.number %}
-                <div class="absolute top-2 left-2">
-                    <span class="inline-flex items-center rounded-md bg-primary/90 px-2 py-1 text-xs font-medium text-primary-content">
-                        #{{ issue.number }}
-                    </span>
+                <div class="absolute top-2 left-2 bg-primary/80 text-white text-xs px-2 py-1 rounded-full capitalize">
+                    #{{ issue.number }}
                 </div>
                 {% endif %}
                 
-                <!-- Read Status Badge -->
-                {% if issue.read_progress %}
-                <div class="absolute top-2 right-2">
-                    {% if issue.read_progress.completed %}
-                    <span class="inline-flex items-center rounded-md bg-success/90 px-2 py-1 text-xs font-medium text-success-content">
-                        <i class="fa-solid fa-check mr-1"></i>Read
-                    </span>
-                    {% elif issue.read_progress.page > 0 %}
-                    <span class="inline-flex items-center rounded-md bg-warning/90 px-2 py-1 text-xs font-medium text-warning-content">
-                        {{ issue.read_progress.page }}/{{ issue.pages_count or '?' }}
-                    </span>
-                    {% endif %}
+                <!-- Pages Count Badge (if available) -->
+                {% if issue.pages_count %}
+                <div class="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                    <i class="fa-solid fa-file-lines text-blue-400 mr-1"></i>
+                    {{ issue.pages_count }}
+                </div>
+                {% endif %}
+                
+                <!-- Read Status Badge (bottom-left) -->
+                {% if issue.read_progress and issue.read_progress.completed %}
+                <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full flex items-center">
+                    <i class="fa-solid fa-check text-green-400 mr-1"></i>
+                    Read
+                </div>
+                {% elif issue.read_progress and issue.read_progress.page > 0 %}
+                <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full flex items-center">
+                    <i class="fa-solid fa-bookmark text-yellow-400 mr-1"></i>
+                    {{ issue.read_progress.page }}/{{ issue.pages_count or '?' }}
                 </div>
                 {% endif %}
             </div>
             
-            <!-- Issue Info -->
-            <div class="p-3">
-                <h4 class="font-medium text-sm text-base-content line-clamp-2 mb-1" title="{{ issue.title }}">
+            <!-- Issue Title and Details -->
+            <div class="mt-2 text-center">
+                <h4 class="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors" title="{{ issue.title }}">
                     {{ issue.title }}
                 </h4>
                 
                 {% if issue.release_date %}
-                <p class="text-xs text-base-content/60 mb-1">
-                    {{ issue.release_date | format_date }}
+                <p class="text-xs text-base-content/60 mt-1">
+                    {{ issue.release_date }}
                 </p>
                 {% endif %}
-                
-                {% if issue.pages_count %}
-                <p class="text-xs text-base-content/50">
-                    {{ issue.pages_count }} page{{ 's' if issue.pages_count != 1 else '' }}
-                </p>
-                {% endif %}
-            </div>
-            
-            <!-- Hover Actions -->
-            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                <div class="flex gap-2">
-                    <!-- Read Button -->
-                    <button class="btn btn-primary btn-sm" title="Read Issue">
-                        <i class="fa-solid fa-book-open"></i>
-                    </button>
-                    
-                    <!-- Info Button -->
-                    <button class="btn btn-ghost btn-sm text-white" 
-                            onclick="showIssueInfo('{{ issue.id }}')" 
-                            title="Issue Info">
-                        <i class="fa-solid fa-info"></i>
-                    </button>
-                </div>
             </div>
         </div>
         {% endfor %}
