@@ -341,7 +341,19 @@ class Invite(db.Model):
                               backref=db.backref('invites', lazy=True))
     def __repr__(self): return f'<Invite {self.custom_path or self.token}>'
     @property
-    def is_expired(self): return self.expires_at and utcnow() > self.expires_at
+    def is_expired(self): 
+        if not self.expires_at:
+            return False
+        # Ensure both datetimes are timezone-aware for comparison
+        from datetime import timezone
+        now = utcnow()
+        expires = self.expires_at
+        
+        # If expires_at is naive, assume it's UTC
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        
+        return now > expires
     @property
     def has_reached_max_uses(self): return self.max_uses is not None and self.current_uses >= self.max_uses
     @property
