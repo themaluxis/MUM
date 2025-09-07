@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Tuple
 from flask import current_app
 from app.models_media_services import ServiceType
+import requests
 
 class BaseMediaService(ABC):
     """Abstract base class for all media service implementations"""

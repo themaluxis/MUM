@@ -121,9 +121,11 @@ class RommMediaService(BaseMediaService):
             for platform in platforms:
                 libraries.append({
                     'id': str(platform.get('id', '')),
-                    'name': platform.get('name', 'Unknown Platform'),
+                    'name': platform.get('display_name', 'Unknown Platform'),  # RomM uses 'display_name' field
+                    'type': 'rom',  # RomM is specifically for ROMs
                     'slug': platform.get('slug', ''),
                     'rom_count': platform.get('rom_count', 0),
+                    'item_count': platform.get('rom_count', 0),  # Use rom_count as item_count for consistency
                     'external_id': str(platform.get('id', ''))  # Add external_id for compatibility
                 })
             
