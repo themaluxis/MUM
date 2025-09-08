@@ -46,9 +46,30 @@ class AudiobookShelfMediaService(BaseMediaService):
     def test_connection(self) -> Tuple[bool, str]:
         """Test connection to AudiobookShelf server"""
         try:
-            info = self._make_request('status')
-            version = info.get('serverVersion', 'Unknown')
-            return True, f"Connected to AudiobookShelf (v{version})"
+            # Test authentication with /api/me endpoint
+            user_info = self._make_request('me')
+            username = user_info.get('username', 'Unknown')
+            
+            # Get server version - try different endpoints
+            version = 'Unknown'
+            try:
+                # Try /api/status first
+                status_info = self._make_request('status')
+                version = status_info.get('serverVersion', status_info.get('version', 'Unknown'))
+            except Exception as e:
+                self.log_info(f"Status endpoint failed: {e}, trying alternatives")
+                try:
+                    # Try /api/ping
+                    ping_info = self._make_request('ping')
+                    version = ping_info.get('serverVersion', ping_info.get('version', 'Unknown'))
+                except Exception as e2:
+                    self.log_info(f"Ping endpoint also failed: {e2}")
+                    # Don't fail the whole test if we can't get version info
+            
+            if version != 'Unknown':
+                return True, f"Connected to AudiobookShelf (v{version}) as user '{username}'"
+            else:
+                return True, f"Connected to AudiobookShelf as user '{username}'"
         except Exception as e:
             return False, f"Connection failed: {str(e)}"
     
@@ -219,13 +240,32 @@ class AudiobookShelfMediaService(BaseMediaService):
     def get_server_info(self) -> Dict[str, Any]:
         """Get AudiobookShelf server information"""
         try:
-            info = self._make_request('status')
+            # Try to get server info, with fallback for missing endpoints
+            version = 'Unknown'
+            online = True
+            
+            try:
+                info = self._make_request('status')
+                version = info.get('serverVersion', info.get('version', 'Unknown'))
+            except Exception as e:
+                self.log_info(f"Status endpoint failed in get_server_info: {e}, trying alternatives")
+                try:
+                    ping_info = self._make_request('ping')
+                    version = ping_info.get('serverVersion', ping_info.get('version', 'Unknown'))
+                except Exception as e2:
+                    self.log_info(f"Ping endpoint also failed in get_server_info: {e2}")
+                    # Still mark as online if we can reach the server at all
+                    try:
+                        self._make_request('me')  # Test basic connectivity
+                    except:
+                        online = False
+            
             return {
                 'name': self.name,
                 'url': self.url,
                 'service_type': self.service_type.value,
-                'online': True,
-                'version': info.get('serverVersion', 'Unknown')
+                'online': online,
+                'version': version
             }
         except:
             return {

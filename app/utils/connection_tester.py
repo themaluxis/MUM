@@ -111,27 +111,66 @@ def check_audiobookshelf(url: str, token: str) -> Tuple[bool, str]:
         # Clean up URL
         url = url.rstrip('/')
         
+        # Debug logging
+        from flask import current_app
+        current_app.logger.debug(f"AudioBookshelf connection test - URL: {url}")
+        current_app.logger.debug(f"AudioBookshelf connection test - Token length: {len(token) if token else 0}")
+        current_app.logger.debug(f"AudioBookshelf connection test - Token preview: {token[:20]}..." if token and len(token) > 20 else f"Token: {token}")
+        
         # Test basic connectivity
+        headers = {"Authorization": f"Bearer {token}"}
+        current_app.logger.debug(f"AudioBookshelf connection test - Headers: {headers}")
+        
         response = requests.get(
             f"{url}/api/me",
-            headers={"Authorization": f"Bearer {token}"},
+            headers=headers,
             timeout=get_api_timeout_with_fallback(10)
         )
+        
+        current_app.logger.debug(f"AudioBookshelf connection test - Response status: {response.status_code}")
+        current_app.logger.debug(f"AudioBookshelf connection test - Response headers: {dict(response.headers)}")
+        
+        if response.status_code == 401:
+            current_app.logger.debug(f"AudioBookshelf connection test - 401 response body: {response.text}")
+            return False, f"Authentication failed. Please check your API token. Server response: {response.text[:100]}"
+        
         response.raise_for_status()
         
         user_info = response.json()
         username = user_info.get('username', 'Unknown')
         
-        # Get server info
-        server_response = requests.get(
-            f"{url}/api/status",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=get_api_timeout_with_fallback(10)
-        )
-        server_response.raise_for_status()
-        
-        server_info = server_response.json()
-        version = server_info.get('version', 'Unknown')
+        # Get server info - try different endpoints
+        version = 'Unknown'
+        try:
+            # Try /api/status first
+            server_response = requests.get(
+                f"{url}/api/status",
+                headers=headers,
+                timeout=get_api_timeout_with_fallback(10)
+            )
+            current_app.logger.debug(f"AudioBookshelf /api/status response: {server_response.status_code}")
+            
+            if server_response.status_code == 200:
+                server_info = server_response.json()
+                version = server_info.get('serverVersion', server_info.get('version', 'Unknown'))
+            else:
+                current_app.logger.debug(f"AudioBookshelf /api/status failed with {server_response.status_code}, trying alternatives")
+                
+                # Try /api/ping or other endpoints
+                ping_response = requests.get(
+                    f"{url}/api/ping",
+                    headers=headers,
+                    timeout=get_api_timeout_with_fallback(10)
+                )
+                current_app.logger.debug(f"AudioBookshelf /api/ping response: {ping_response.status_code}")
+                
+                if ping_response.status_code == 200:
+                    ping_info = ping_response.json()
+                    version = ping_info.get('serverVersion', ping_info.get('version', 'Unknown'))
+                    
+        except Exception as e:
+            current_app.logger.debug(f"AudioBookshelf server info request failed: {e}")
+            # Don't fail the whole test if we can't get version info
         
         return True, f"Successfully connected to AudioBookshelf server (v{version}) as user '{username}'"
         
