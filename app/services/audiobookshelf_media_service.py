@@ -107,12 +107,27 @@ class AudiobookShelfMediaService(BaseMediaService):
             
             # Process the raw data for internal use
             for lib in libraries_list:
+                lib_id = lib.get('id', '')
+                
+                # Get actual item count using /api/libraries/{id}/items?limit=0
+                item_count = 0
+                try:
+                    if lib_id:
+                        items_response = self._make_request(f'libraries/{lib_id}/items?limit=0')
+                        self.log_info(f"AudioBookshelf items API response for '{lib.get('name')}': {items_response}")
+                        item_count = items_response.get('total', 0)
+                        self.log_info(f"AudioBookshelf library '{lib.get('name')}' has {item_count} items")
+                except Exception as e:
+                    self.log_info(f"Could not get item count for library '{lib.get('name')}': {e}")
+                    # Fallback to stats if available
+                    item_count = lib.get('stats', {}).get('totalItems', 0)
+                
                 result.append({
-                    'id': lib.get('id', ''),
+                    'id': lib_id,
                     'name': lib.get('name', 'Unknown'),
                     'type': lib.get('mediaType', 'book').lower(),
-                    'item_count': lib.get('stats', {}).get('totalItems', 0),
-                    'external_id': lib.get('id', '')
+                    'item_count': item_count,
+                    'external_id': lib_id
                 })
             
             self.log_info(f"Processed {len(result)} libraries from AudiobookShelf")

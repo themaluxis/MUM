@@ -302,7 +302,19 @@ def get_library_raw_data(server_id, library_id):
         # Get raw libraries data (unmodified API response)
         if hasattr(service, 'get_libraries_raw'):
             # Use raw data method if available (shows true API response)
-            libraries = service.get_libraries_raw()
+            libraries_response = service.get_libraries_raw()
+            
+            # Handle different response formats
+            if isinstance(libraries_response, dict) and 'libraries' in libraries_response:
+                # AudioBookshelf format: {"libraries": [...]}
+                libraries = libraries_response['libraries']
+            elif isinstance(libraries_response, list):
+                # Direct array format
+                libraries = libraries_response
+            else:
+                # Fallback
+                libraries = libraries_response
+            
             # For raw data, we need to match against the actual API field names
             target_library = None
             for lib in libraries:

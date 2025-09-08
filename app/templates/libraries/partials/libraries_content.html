@@ -29,7 +29,7 @@
                                     {{ lib.type }}
                                 </span>
                             </td>
-                            <td>{{ lib.item_count if lib.item_count else 'N/A' }}</td>
+                            <td>{{ lib.item_count if lib.item_count is not none else 'N/A' }}</td>
                             <td>
                                 <button class="btn btn-xs btn-outline btn-ghost" 
                                         data-library-name="{{ lib.name }}"
@@ -144,7 +144,7 @@
                                         {{ lib.type or 'Unknown' }}
                                     </span>
                                 </td>
-                                <td>{{ lib.item_count if lib.item_count else 'N/A' }}</td>
+                                <td>{{ lib.item_count if lib.item_count is not none else 'N/A' }}</td>
                                 <td>
                                     <button class="btn btn-xs btn-outline btn-ghost" 
                                             data-library-name="{{ lib.name }}"
