@@ -194,7 +194,8 @@ class RommMediaService(BaseMediaService):
                     'enabled': user.get('enabled', True),
                     'role': user.get('role', 'viewer'),
                     'created_at': user.get('created_at', ''),
-                    'last_active_at': user.get('last_active_at', '')
+                    'last_active_at': user.get('last_active_at', ''),
+                    'raw_data': user  # Store complete raw user data for debugging
                 })
             
             self.log_info(f"Retrieved {len(users)} users from RomM")
