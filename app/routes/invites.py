@@ -591,6 +591,9 @@ def process_invite_form(invite_path_or_token):
     media_service_manager = MediaServiceManager()
     all_servers = media_service_manager.get_all_servers(active_only=True)
     
+    # Check if there are Plex servers in the invite (needed early for validation)
+    has_plex_servers = any(server.service_type.name.upper() == 'PLEX' for server in invite.servers)
+    
     # Get library information for each server in the invite
     servers_with_libraries = {}
     if invite and invite.servers:
@@ -842,8 +845,7 @@ def process_invite_form(invite_path_or_token):
     # - Multiple servers are available in this invite
     has_multiple_servers_available = len(invite.servers) > 1
     
-    # Check if there are Plex servers in the invite
-    has_plex_servers = any(server.service_type.name.upper() == 'PLEX' for server in invite.servers)
+    # has_plex_servers already defined earlier for validation
     
     # Get cross-server preferences from session
     cross_server_prefs = session.get(f'invite_{invite.id}_cross_server_prefs', {})
