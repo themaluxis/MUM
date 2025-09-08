@@ -185,6 +185,13 @@
                                         <i class="fa-solid fa-headphones w-3 h-3 mr-1"></i>
                                         {{ user_servers[0] }}
                                     </span>
+                                    {# Check if AudioBookshelf user is owner (type: "root") #}
+                                    {% if user._access_record and user._access_record.user_raw_data and user._access_record.user_raw_data.get('type') == 'root' %}
+                                        <span class="inline-flex items-center rounded-md bg-amber-50 dark:bg-amber-400/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400 ring-1 ring-inset ring-amber-600/20 dark:ring-amber-500/20 gap-1 mt-1" title="AudioBookshelf Server Owner">
+                                            <i class="fa-solid fa-crown w-3 h-3 mr-1"></i>
+                                            Owner
+                                        </span>
+                                    {% endif %}
                                 {% elif primary_service.value == 'komga' %}
                                     <span class="inline-flex items-center rounded-md bg-komga-50 dark:bg-komga-400/10 px-2 py-1 text-xs font-medium text-komga-700 dark:text-komga-400 ring-1 ring-inset ring-komga-600/20 dark:ring-komga-500/20 gap-1 mt-1">
                                         <i class="fa-solid fa-book-open w-3 h-3 mr-1"></i>
