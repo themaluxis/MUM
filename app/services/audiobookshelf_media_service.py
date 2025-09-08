@@ -124,10 +124,19 @@ class AudiobookShelfMediaService(BaseMediaService):
     def get_users(self) -> List[Dict[str, Any]]:
         """Get all AudiobookShelf users"""
         try:
-            users = self._make_request('users')
+            users_response = self._make_request('users')
             result = []
             
-            for user in users.get('users', []):
+            # Handle different response formats
+            if isinstance(users_response, dict) and 'users' in users_response:
+                users_list = users_response.get('users', [])
+            elif isinstance(users_response, list):
+                users_list = users_response
+            else:
+                self.log_error(f"Unexpected users response format: {type(users_response)}")
+                return []
+            
+            for user in users_list:
                 user_id = user.get('id')
                 if not user_id:
                     continue
@@ -135,6 +144,10 @@ class AudiobookShelfMediaService(BaseMediaService):
                 # Get user's library access
                 permissions = user.get('permissions', {})
                 library_ids = permissions.get('librariesAccessible', [])
+                
+                # Debug logging for raw data
+                self.log_info(f"AudioBookshelf user {user.get('username', 'Unknown')} raw data keys: {list(user.keys()) if isinstance(user, dict) else 'not a dict'}")
+                self.log_info(f"AudioBookshelf user {user.get('username', 'Unknown')} raw data size: {len(str(user))}")
                 
                 result.append({
                     'id': user_id,
@@ -144,7 +157,8 @@ class AudiobookShelfMediaService(BaseMediaService):
                     'thumb': None,  # AudiobookShelf doesn't provide avatars in user list
                     'is_home_user': False,
                     'library_ids': library_ids,
-                    'is_admin': user.get('type') == 'admin'
+                    'is_admin': user.get('type') == 'admin',
+                    'raw_data': user  # Store individual user's raw data (not the full response)
                 })
             
             return result

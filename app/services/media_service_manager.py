@@ -241,7 +241,9 @@ class MediaServiceManager:
                             access.external_username = user_data.get('username')
                             access.external_email = user_data.get('email')
                             access.allowed_library_ids = user_data.get('library_ids', [])
-                            access.user_raw_data = user_data.get('raw_data') or {}
+                            raw_data_to_store = user_data.get('raw_data') or {}
+                            current_app.logger.info(f"AudioBookshelf sync - Updating user {user_data.get('username')} raw_data: {type(raw_data_to_store)} with {len(str(raw_data_to_store))} chars")
+                            access.user_raw_data = raw_data_to_store
                             access.is_active = True
                             access.updated_at = datetime.utcnow()
                             # Update the missing status fields
@@ -281,6 +283,7 @@ class MediaServiceManager:
                     
                     # Store service-specific raw data in UserMediaAccess
                     user_raw_data = user_data.get('raw_data') or {}
+                    current_app.logger.info(f"AudioBookshelf sync - Creating new user {user_data.get('username')} raw_data: {type(user_raw_data)} with {len(str(user_raw_data))} chars")
                     
                     access = UserMediaAccess(
                         user_app_access_id=user.id if user else None,  # May be None for standalone server users
@@ -352,6 +355,11 @@ class MediaServiceManager:
                     if access.external_email != user_data.get('email'):
                         changes.append(f"Email changed from '{access.external_email}' to '{user_data.get('email')}'")
                         access.external_email = user_data.get('email')
+                    
+                    # Update raw data for existing users
+                    raw_data_to_store = user_data.get('raw_data') or {}
+                    current_app.logger.info(f"AudioBookshelf sync - Updating existing standalone user {user_data.get('username')} raw_data: {type(raw_data_to_store)} with {len(str(raw_data_to_store))} chars")
+                    access.user_raw_data = raw_data_to_store
                     
                     old_library_ids = set(access.allowed_library_ids or [])
                     new_library_ids = set(user_data.get('library_ids', []))
