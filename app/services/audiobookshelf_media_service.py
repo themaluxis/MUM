@@ -78,7 +78,8 @@ class AudiobookShelfMediaService(BaseMediaService):
         try:
             # Return the raw API response without any modifications
             libraries = self._make_request('libraries')
-            self.log_info(f"Retrieved raw libraries from AudiobookShelf")
+            self.log_info(f"Retrieved raw libraries from AudiobookShelf: {type(libraries)} with {len(libraries) if isinstance(libraries, list) else 'unknown'} items")
+            self.log_info(f"Raw libraries response structure: {libraries}")
             return libraries
         except Exception as e:
             self.log_error(f"Error fetching raw libraries: {e}")
@@ -91,8 +92,21 @@ class AudiobookShelfMediaService(BaseMediaService):
             libraries_response = self.get_libraries_raw()
             result = []
             
+            # Handle different response formats
+            if isinstance(libraries_response, list):
+                # Direct array response
+                libraries_list = libraries_response
+                self.log_info(f"AudiobookShelf returned libraries as direct array with {len(libraries_list)} items")
+            elif isinstance(libraries_response, dict):
+                # Wrapped in object
+                libraries_list = libraries_response.get('libraries', [])
+                self.log_info(f"AudiobookShelf returned libraries wrapped in object with {len(libraries_list)} items")
+            else:
+                self.log_error(f"Unexpected libraries response format: {type(libraries_response)}")
+                return []
+            
             # Process the raw data for internal use
-            for lib in libraries_response.get('libraries', []):
+            for lib in libraries_list:
                 result.append({
                     'id': lib.get('id', ''),
                     'name': lib.get('name', 'Unknown'),
