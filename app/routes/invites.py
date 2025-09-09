@@ -96,13 +96,14 @@ def list_invites():
                     'service_type': server.service_type.value
                 }
                 server_libraries[lib.external_id] = lib_data
-                # Also store in global lookup for easy access
-                all_libraries_lookup[lib.external_id] = lib_data
                 
-                # For Kavita, also store with prefixed format since it uses that
+                # Store in global lookup - use prefixed format for Kavita to match invite creation
                 if server.service_type.name.upper() == 'KAVITA':
                     prefixed_id = f"[{server.service_type.name.upper()}]-{server.server_nickname}-{lib.external_id}"
                     all_libraries_lookup[prefixed_id] = lib_data
+                else:
+                    # For other services, use raw external_id
+                    all_libraries_lookup[lib.external_id] = lib_data
             
             libraries_by_server[server.id] = server_libraries
             current_app.logger.debug(f"Loaded {len(server_libraries)} libraries for server {server.server_nickname}")
