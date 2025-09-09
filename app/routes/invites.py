@@ -7,7 +7,8 @@ from app.utils.timezone_utils import utcnow
 from urllib.parse import urlencode, quote as url_quote, urlparse, parse_qs, urlunparse 
 from plexapi.myplex import MyPlexAccount 
 from plexapi.exceptions import PlexApiException
-from app.models import Invite, Setting, EventType, UserAppAccess, InviteUsage, Owner, SettingValueType 
+from app.models import Invite, Setting, EventType, UserAppAccess, InviteUsage, Owner, SettingValueType
+from app.models_media_services import MediaServer 
 from app.forms import InviteCreateForm, InviteEditForm
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, calculate_expiry_date, permission_required
@@ -349,6 +350,40 @@ def create_invite():
 
     toast_message_text = ""
     toast_category = "info"
+
+    # Set up library choices BEFORE form validation for multi-server invites
+    if selected_server_ids and len(selected_server_ids) > 1:
+        # Multi-server invite - need to set up unique library choices
+        from app.models_media_services import MediaLibrary
+        all_valid_choices = []
+        
+        for server_id in selected_server_ids:
+            server = MediaServer.query.get(server_id)
+            if not server:
+                continue
+                
+            # Get libraries for this server from database
+            db_libraries = MediaLibrary.query.filter_by(server_id=server.id).all()
+            for lib in db_libraries:
+                if server.service_type.name.upper() == 'KAVITA':
+                    # Use prefixed format for Kavita to avoid ID conflicts
+                    unique_lib_id = f"[{server.service_type.name.upper()}]-{server.server_nickname}-{lib.external_id}"
+                    all_valid_choices.append((unique_lib_id, f"[{server.server_nickname}] {lib.name}"))
+                else:
+                    # Use raw UUID for non-conflicting UUID-based services
+                    all_valid_choices.append((lib.external_id, f"[{server.server_nickname}] {lib.name}"))
+        
+        # Update form choices for multi-server
+        form.libraries.choices = all_valid_choices
+    elif selected_server_ids and len(selected_server_ids) == 1:
+        # Single server - use simple library choices
+        from app.models_media_services import MediaLibrary
+        server_id = selected_server_ids[0]
+        db_libraries = MediaLibrary.query.filter_by(server_id=server_id).all()
+        form.libraries.choices = [(lib.external_id, lib.name) for lib in db_libraries]
+    else:
+        # No servers selected - empty choices
+        form.libraries.choices = []
 
     if form.validate_on_submit():
         # Validate that at least one server is selected
