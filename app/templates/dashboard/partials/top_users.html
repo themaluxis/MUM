@@ -67,7 +67,7 @@
                 {% for category_name, duration in categories %}
                 <div class="relative flex justify-between items-center pl-5 pr-5 pt-2.5 pb-2.5 text-sm shadow-[0px_30px_77px_0px_oklch(0_0_0_/_0.48)]">
                     <span class="text-white">{{ category_name }}</span>
-                    <span class="text-gray-300">{{ duration if duration != '0 min' else user.total_duration }}</span>
+                    <span class="text-gray-300">{{ duration }}</span>
                 </div>
                 {% endfor %}
             </div>
