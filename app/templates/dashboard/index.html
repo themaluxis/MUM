@@ -67,6 +67,13 @@
     </div>
     {% endif %}
 
+    <!-- Watch Statistics Section -->
+    {% if watch_statistics_data is defined %}
+    <div class="mb-8">
+        {% include 'dashboard/partials/watch_statistics.html' %}
+    </div>
+    {% endif %}
+
     <!-- Top Users Section -->
     {% if top_users_data is defined %}
     <div class="mb-8">

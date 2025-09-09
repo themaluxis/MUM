@@ -11,6 +11,114 @@ from app.services.media_service_manager import MediaServiceManager
 
 bp = Blueprint('dashboard', __name__)
 
+def _generate_watch_statistics_data(days=7, service_filters=None):
+    """Generate comprehensive watch statistics data similar to Tautulli"""
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    from sqlalchemy import func, desc
+    
+    # Calculate date range
+    end_date = datetime.now(timezone.utc)
+    if days == -1:  # All time
+        earliest_stream = MediaStreamHistory.query.order_by(MediaStreamHistory.started_at.asc()).first()
+        if earliest_stream:
+            start_date = earliest_stream.started_at
+        else:
+            start_date = end_date - timedelta(days=7)  # Fallback to 7 days
+    else:
+        start_date = end_date - timedelta(days=days-1)
+    
+    # Base query for the time period
+    base_query = MediaStreamHistory.query.filter(
+        MediaStreamHistory.started_at >= start_date,
+        MediaStreamHistory.started_at <= end_date
+    )
+    
+    # Add service filtering if specified
+    if service_filters and len(service_filters) > 0:
+        from app.models_media_services import MediaServer, ServiceType
+        # Join with MediaServer to filter by service type
+        base_query = base_query.join(MediaServer, MediaStreamHistory.server_id == MediaServer.id)
+        base_query = base_query.filter(MediaServer.service_type.in_([ServiceType(service) for service in service_filters]))
+    
+    # 1. Top Movies (by play count)
+    top_movies = base_query.filter(
+        MediaStreamHistory.media_type.in_(['movie', 'film'])
+    ).with_entities(
+        MediaStreamHistory.media_title,
+        func.count(MediaStreamHistory.id).label('play_count'),
+        func.sum(func.coalesce(MediaStreamHistory.duration_seconds, MediaStreamHistory.view_offset_at_end_seconds, 60)).label('total_duration')
+    ).group_by(MediaStreamHistory.media_title).order_by(desc('play_count')).limit(5).all()
+    
+    # 2. Top TV Shows (by play count)
+    top_shows = base_query.filter(
+        MediaStreamHistory.media_type.in_(['show', 'episode', 'tv', 'series'])
+    ).with_entities(
+        MediaStreamHistory.media_title,
+        func.count(MediaStreamHistory.id).label('play_count'),
+        func.sum(func.coalesce(MediaStreamHistory.duration_seconds, MediaStreamHistory.view_offset_at_end_seconds, 60)).label('total_duration')
+    ).group_by(MediaStreamHistory.media_title).order_by(desc('play_count')).limit(5).all()
+    
+    # 3. Top Platforms/Clients (by play count)
+    top_platforms = base_query.with_entities(
+        MediaStreamHistory.platform,
+        func.count(MediaStreamHistory.id).label('play_count'),
+        func.sum(func.coalesce(MediaStreamHistory.duration_seconds, MediaStreamHistory.view_offset_at_end_seconds, 60)).label('total_duration')
+    ).group_by(MediaStreamHistory.platform).order_by(desc('play_count')).limit(5).all()
+    
+    # 4. Overall Statistics
+    total_stats = base_query.with_entities(
+        func.count(MediaStreamHistory.id).label('total_plays'),
+        func.sum(func.coalesce(MediaStreamHistory.duration_seconds, MediaStreamHistory.view_offset_at_end_seconds, 60)).label('total_duration'),
+        func.count(func.distinct(MediaStreamHistory.media_title)).label('unique_titles'),
+        func.count(func.distinct(func.coalesce(MediaStreamHistory.user_app_access_uuid, MediaStreamHistory.user_media_access_uuid))).label('unique_users')
+    ).first()
+    
+    # 5. Most Concurrent Streams (approximate - count max streams per day)
+    # This is a simplified version - for true concurrent streams you'd need more complex logic
+    daily_stream_counts = base_query.with_entities(
+        func.date(MediaStreamHistory.started_at).label('stream_date'),
+        func.count(MediaStreamHistory.id).label('daily_count')
+    ).group_by(func.date(MediaStreamHistory.started_at)).order_by(desc('daily_count')).first()
+    
+    # 6. Average Session Length
+    avg_session = base_query.with_entities(
+        func.avg(func.coalesce(MediaStreamHistory.duration_seconds, MediaStreamHistory.view_offset_at_end_seconds, 60)).label('avg_duration')
+    ).first()
+    
+    # Format the data
+    watch_stats = {
+        'top_movies': [
+            {
+                'title': movie.media_title or 'Unknown Movie',
+                'plays': movie.play_count,
+                'duration': format_duration(int(movie.total_duration or 0))
+            } for movie in top_movies
+        ],
+        'top_shows': [
+            {
+                'title': show.media_title or 'Unknown Show',
+                'plays': show.play_count,
+                'duration': format_duration(int(show.total_duration or 0))
+            } for show in top_shows
+        ],
+        'top_platforms': [
+            {
+                'name': platform.platform or 'Unknown Platform',
+                'plays': platform.play_count,
+                'duration': format_duration(int(platform.total_duration or 0))
+            } for platform in top_platforms
+        ],
+        'total_plays': total_stats.total_plays or 0,
+        'total_duration': format_duration(int(total_stats.total_duration or 0)),
+        'unique_titles': total_stats.unique_titles or 0,
+        'unique_users': total_stats.unique_users or 0,
+        'avg_session_length': format_duration(int(avg_session.avg_duration or 0)) if avg_session.avg_duration else '0 min',
+        'peak_day_streams': daily_stream_counts.daily_count if daily_stream_counts else 0
+    }
+    
+    return watch_stats
+
 def _generate_top_users_data(days=7, limit=5):
     """Generate top users data for admin dashboard"""
     from datetime import datetime, timezone, timedelta
@@ -441,6 +549,21 @@ def index():
     chart_data = _generate_admin_streaming_chart_data(days)
     current_app.logger.debug(f"Dashboard: Chart data generated for {days} days")
 
+    # Get service filters from request
+    service_filters = request.args.getlist('services')  # Get list of selected services
+    if not service_filters:
+        service_filters = None  # Show all services by default
+    
+    # Get available services for the filter dropdown
+    from app.models_media_services import MediaServer, ServiceType
+    available_services = db.session.query(MediaServer.service_type).distinct().all()
+    available_services = [service.service_type for service in available_services]
+    
+    # Generate watch statistics data
+    current_app.logger.debug("Dashboard: Generating watch statistics data")
+    watch_statistics_data = _generate_watch_statistics_data(days, service_filters)
+    current_app.logger.debug(f"Dashboard: Watch statistics data generated")
+    
     # Generate top users data
     current_app.logger.debug("Dashboard: Generating top users data")
     top_users_data = _generate_top_users_data(days, limit=5)
@@ -458,8 +581,11 @@ def index():
                            recent_activities=recent_activities,
                            recent_activities_count=recent_activities_count,
                            chart_data=chart_data,
+                           watch_statistics_data=watch_statistics_data,
                            top_users_data=top_users_data,
-                           selected_days=days)
+                           selected_days=days,
+                           available_services=available_services,
+                           selected_services=service_filters or [])
     
     current_app.logger.info("=== ADMIN DASHBOARD ROUTE COMPLETE ===")
     return result

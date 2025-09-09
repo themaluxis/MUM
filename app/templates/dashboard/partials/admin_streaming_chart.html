@@ -51,9 +51,9 @@
             </div>
         </div>
 
-        <!-- Service Legend -->
+        <!-- Service Legend - Hidden on mobile for more chart space -->
         {% if chart_data.services %}
-        <div class="border-t border-base-300 pt-4">
+        <div class="border-t border-base-300 pt-4 hidden sm:block">
             <h3 class="text-sm font-semibold mb-3">Services</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {% for service in chart_data.services %}
@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     stacked: true,
                     beginAtZero: true,
                     title: {
-                        display: true,
+                        display: window.innerWidth >= 640, // Hide on mobile (< 640px)
                         text: 'Watch Time (minutes)'
                     },
                     ticks: {
