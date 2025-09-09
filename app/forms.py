@@ -281,9 +281,9 @@ class InviteEditForm(FlaskForm):
     clear_membership_duration = BooleanField('Clear Membership Duration (Set to Permanent)', default=False)
     
     libraries = SelectMultipleField('Grant Access to Libraries', coerce=str, validators=[Optional()])
-    allow_downloads = BooleanField('Enable Downloads (Allow Sync)', default=False)
-    invite_to_plex_home = BooleanField('Invite to Plex Home', default=False)
-    allow_live_tv = BooleanField('Allow Live TV Access', default=False)
+    allow_downloads = BooleanField('Enable Downloads (Allow Sync)', default=False, description="Allow the invited user to download/sync content from shared libraries.")
+    invite_to_plex_home = BooleanField('Invite to Plex Home', default=False, description="Invite the user to your Plex Home. This allows them to switch between users.")
+    allow_live_tv = BooleanField('Allow Live TV Access', default=False, description="Grant access to Live TV channels.")
     allow_4k_transcode = BooleanField('Allow 4K Transcode', default=False, description="Allow transcoding of 4K content (high server resource usage).")
     require_discord_auth = BooleanField("Make Discord Login Mandatory", default=False, description="Require the user to log in with Discord to use this invite.")
     require_discord_guild_membership = BooleanField("Require Discord Server Membership", default=False, description="Require the user to be a member of the configured Discord server.")
