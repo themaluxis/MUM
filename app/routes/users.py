@@ -1118,7 +1118,26 @@ def delete_user(user_uuid):
         username = access.external_username or 'Unknown'
         
         try:
-            # Delete the standalone UserMediaAccess record
+            # Delete from the actual service first
+            service = None
+            if access.server:
+                from app.services.media_service_factory import MediaServiceFactory
+                try:
+                    service = MediaServiceFactory.create_service_from_db(access.server)
+                    if service and access.external_user_id:
+                        current_app.logger.info(f"Deleting user {access.external_user_id} from {access.server.service_type.value} server: {access.server.server_nickname}")
+                        delete_success = service.delete_user(access.external_user_id)
+                        if delete_success:
+                            current_app.logger.info(f"Successfully deleted user from {access.server.service_type.value} server")
+                        else:
+                            current_app.logger.warning(f"Service reported failure deleting user from {access.server.service_type.value} server")
+                    else:
+                        current_app.logger.warning(f"No service or external_user_id available for deletion from {access.server.service_type.value}")
+                except Exception as e:
+                    current_app.logger.error(f"Error deleting user from {access.server.service_type.value} server: {e}")
+                    # Continue with database deletion even if service deletion fails
+            
+            # Delete the standalone UserMediaAccess record from database
             db.session.delete(access)
             db.session.commit()
             

@@ -278,19 +278,43 @@ class RommMediaService(BaseMediaService):
     
     def delete_user(self, user_id: str) -> bool:
         """Delete/remove user from RomM"""
+        current_app.logger.error(f"RomM delete_user method called with user_id: {user_id}")
+        print(f"RomM delete_user method called with user_id: {user_id}")  # Force console output
         try:
             if not self._setup_auth_headers():
                 self.log_error("Failed to setup authentication for user deletion")
                 return False
             
-            response = self.session.delete(f"{self.url.rstrip('/')}/api/users/{user_id}")
+            delete_url = f"{self.url.rstrip('/')}/api/users/{user_id}"
+            self.log_info(f"RomM: Attempting to delete user {user_id} using URL: {delete_url}")
+            self.log_info(f"RomM: Using authentication headers: {dict(self.session.headers)}")
+            
+            response = self.session.delete(delete_url)
+            
+            self.log_info(f"RomM: Delete response status: {response.status_code}")
+            self.log_info(f"RomM: Delete response headers: {dict(response.headers)}")
+            self.log_info(f"RomM: Delete response body: {response.text}")
+            
+            if response.status_code == 404:
+                self.log_error(f"RomM: User {user_id} not found (404). User may not exist or ID format is incorrect.")
+                return False
+            elif response.status_code == 403:
+                self.log_error(f"RomM: Access denied (403). Check if the authenticated user has permission to delete users.")
+                return False
+            elif response.status_code == 401:
+                self.log_error(f"RomM: Authentication failed (401). Check credentials.")
+                return False
+            
             response.raise_for_status()
             
-            self.log_info(f"Deleted user {user_id} from RomM")
+            self.log_info(f"RomM: Successfully deleted user {user_id}")
             return True
             
+        except requests.exceptions.HTTPError as e:
+            self.log_error(f"RomM: HTTP error deleting user {user_id}: {e.response.status_code} - {e.response.text}")
+            return False
         except Exception as e:
-            self.log_error(f"Error deleting user {user_id}: {e}")
+            self.log_error(f"RomM: Unexpected error deleting user {user_id}: {e}")
             return False
     
     def check_username_exists(self, username: str) -> bool:
