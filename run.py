@@ -1,7 +1,59 @@
 import os
+import logging
 from app import create_app, db
 from app.models import Setting, Owner # Import models that might be needed for initial checks or commands
 from flask_migrate import Migrate
+
+# Custom colored logging formatter
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter to add colors to log levels"""
+    
+    # ANSI color codes
+    COLORS = {
+        'DEBUG': '\033[36m',     # Cyan
+        'INFO': '\033[32m',      # Green
+        'WARNING': '\033[33m',   # Yellow
+        'ERROR': '\033[31m',     # Red
+        'CRITICAL': '\033[35m',  # Magenta
+        'RESET': '\033[0m'       # Reset color
+    }
+    
+    def format(self, record):
+        # Get the original formatted message
+        original_format = super().format(record)
+        
+        # Add color to the log level
+        level_name = record.levelname
+        if level_name in self.COLORS:
+            colored_level = f"{self.COLORS[level_name]}{level_name}{self.COLORS['RESET']}"
+            # Replace the level name in the formatted message
+            colored_format = original_format.replace(level_name, colored_level, 1)
+            return colored_format
+        
+        return original_format
+
+def setup_colored_logging(app):
+    """Setup colored logging for the Flask app"""
+    # Only add colors if we're in a terminal (Docker logs support ANSI colors)
+    if os.getenv('TERM') or os.getenv('COLORTERM') or True:  # Always enable for Docker
+        # Create colored formatter
+        colored_formatter = ColoredFormatter(
+            fmt='%(asctime)s %(name)s [%(levelname)s] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        
+        # Get the root logger and update its handlers
+        root_logger = logging.getLogger()
+        
+        # Update existing handlers
+        for handler in root_logger.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                handler.setFormatter(colored_formatter)
+        
+        # Also update Flask app logger handlers
+        for handler in app.logger.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                handler.setFormatter(colored_formatter)
 
 # Determine if the app is running inside Docker
 # This can be useful for certain configurations, though not strictly needed for this setup yet
@@ -12,6 +64,9 @@ from flask_migrate import Migrate
 # then potentially overridden by database settings once the app is initialized.
 app = create_app()
 migrate = Migrate(app, db)
+
+# Setup colored logging for better visibility in Docker logs
+setup_colored_logging(app)
 
 @app.shell_context_processor
 def make_shell_context():
