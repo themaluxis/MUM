@@ -94,7 +94,7 @@ def _generate_top_users_data(days=7, limit=5):
                 unique_services.append(service)
                 seen_services.add(service_key)
         
-        # Get category breakdown for this user
+        # Get category breakdown for this user (both duration and play count)
         category_query = db.session.query(
             MediaStreamHistory.media_type,
             func.sum(
@@ -103,7 +103,8 @@ def _generate_top_users_data(days=7, limit=5):
                     MediaStreamHistory.view_offset_at_end_seconds,
                     60
                 )
-            ).label('category_seconds')
+            ).label('category_seconds'),
+            func.count(MediaStreamHistory.id).label('category_plays')
         ).filter(
             MediaStreamHistory.started_at >= start_date,
             MediaStreamHistory.started_at <= end_date
@@ -117,31 +118,43 @@ def _generate_top_users_data(days=7, limit=5):
         
         category_stats = category_query.group_by(MediaStreamHistory.media_type).all()
         
-        # Map media types to categories
-        categories = {'tv': 0, 'movies': 0, 'music': 0, 'photos': 0}
+        # Map media types to categories (both duration and plays)
+        categories = {
+            'tv': {'seconds': 0, 'plays': 0},
+            'movies': {'seconds': 0, 'plays': 0},
+            'music': {'seconds': 0, 'plays': 0},
+            'photos': {'seconds': 0, 'plays': 0}
+        }
+        
         for category_stat in category_stats:
             media_type = (category_stat.media_type or '').lower()
             seconds = int(category_stat.category_seconds or 0)
+            plays = int(category_stat.category_plays or 0)
             
             if media_type in ['show', 'episode', 'tv', 'series']:
-                categories['tv'] += seconds
+                categories['tv']['seconds'] += seconds
+                categories['tv']['plays'] += plays
             elif media_type in ['movie', 'film']:
-                categories['movies'] += seconds
+                categories['movies']['seconds'] += seconds
+                categories['movies']['plays'] += plays
             elif media_type in ['track', 'music', 'audio', 'song']:
-                categories['music'] += seconds
+                categories['music']['seconds'] += seconds
+                categories['music']['plays'] += plays
             elif media_type in ['photo', 'image', 'picture']:
-                categories['photos'] += seconds
+                categories['photos']['seconds'] += seconds
+                categories['photos']['plays'] += plays
             else:
                 # Default unknown types to TV
-                categories['tv'] += seconds
+                categories['tv']['seconds'] += seconds
+                categories['tv']['plays'] += plays
         
-        # Format category durations
+        # Format category durations and plays
         formatted_categories = {}
-        for cat, seconds in categories.items():
-            if seconds > 0:
-                formatted_categories[cat] = format_duration(seconds)
+        for cat, data in categories.items():
+            if data['seconds'] > 0:
+                formatted_categories[cat] = f"{format_duration(data['seconds'])} ({data['plays']} plays)"
             else:
-                formatted_categories[cat] = '0 min'
+                formatted_categories[cat] = '0 min (0 plays)'
         
         total_seconds = int(stat.total_seconds or 0)
         
