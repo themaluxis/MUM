@@ -27,10 +27,10 @@ def monitor_media_sessions_task():
         
         # Check for any active media servers from the database
         all_servers = MediaServiceManager.get_all_servers(active_only=True)
-        current_app.logger.info(f"DEBUG: Found {len(all_servers)} active media servers in database")
+        current_app.logger.debug(f"Found {len(all_servers)} active media servers in database")
         
         for server in all_servers:
-            current_app.logger.info(f"DEBUG: Server - Name: {server.server_nickname}, Type: {server.service_type.value}, Active: {server.is_active}")
+            current_app.logger.debug(f"Server - Name: {server.server_nickname}, Type: {server.service_type.value}, Active: {server.is_active}")
         
         if not all_servers:
             current_app.logger.warning("No active media servers configured in the database. Skipping task.")
@@ -38,20 +38,20 @@ def monitor_media_sessions_task():
 
         try:
             # This gets sessions from all active servers (Plex, Jellyfin, etc.)
-            current_app.logger.info("DEBUG: Calling MediaServiceManager.get_all_active_sessions()...")
+            current_app.logger.debug("Calling MediaServiceManager.get_all_active_sessions()...")
             active_sessions = MediaServiceManager.get_all_active_sessions()
             now_utc = datetime.now(timezone.utc)
-            current_app.logger.info(f"DEBUG: Retrieved {len(active_sessions)} active sessions from MediaServiceManager")
+            current_app.logger.debug(f"Retrieved {len(active_sessions)} active sessions from MediaServiceManager")
             
             if len(active_sessions) == 0:
-                current_app.logger.info("DEBUG: No active sessions found - this could be normal if no one is streaming")
+                current_app.logger.debug("No active sessions found - this could be normal if no one is streaming")
             else:
-                current_app.logger.info(f"DEBUG: Active sessions details:")
+                current_app.logger.debug(f"Active sessions details:")
                 for i, session in enumerate(active_sessions):
                     if isinstance(session, dict):
-                        current_app.logger.info(f"  Session {i+1}: Jellyfin session ID {session.get('Id', 'unknown')}")
+                        current_app.logger.debug(f"  Session {i+1}: Jellyfin session ID {session.get('Id', 'unknown')}")
                     else:
-                        current_app.logger.info(f"  Session {i+1}: Plex session key {getattr(session, 'sessionKey', 'unknown')}")
+                        current_app.logger.debug(f"  Session {i+1}: Plex session key {getattr(session, 'sessionKey', 'unknown')}")
             
             current_app.logger.info(f"Found {len(active_sessions)} active sessions across all servers.")
 
@@ -347,9 +347,9 @@ def monitor_media_sessions_task():
                             history_record.view_offset_at_end_seconds = current_offset_s
                             current_app.logger.info(f"DEBUG: Successfully updated existing MediaStreamHistory record (ID: {history_record_id})")
                         else:
-                            current_app.logger.warning(f"DEBUG: Could not find existing MediaStreamHistory record with ID {history_record_id} for ongoing session {session_key}.")
+                            current_app.logger.debug(f"Could not find existing MediaStreamHistory record with ID {history_record_id} for ongoing session {session_key}.")
                     else:
-                        current_app.logger.error(f"DEBUG: CRITICAL: Session {session_key} was in tracked keys but had no DB ID!")
+                        current_app.logger.error(f"CRITICAL: Session {session_key} was in tracked keys but had no DB ID!")
 
                 # Update the user's last activity/streamed time
                 if mum_user:
@@ -363,9 +363,9 @@ def monitor_media_sessions_task():
                     db.session.add(user_media_access)
 
             # Commit all changes for this cycle
-            current_app.logger.info("DEBUG: About to commit all database changes...")
+            current_app.logger.debug("About to commit all database changes...")
             db.session.commit()
-            current_app.logger.info("DEBUG: Database commit successful!")
+            current_app.logger.debug("Database commit successful!")
             current_app.logger.info("=== MEDIA SESSION MONITOR TASK FINISHED ===")
             
         except Exception as e:

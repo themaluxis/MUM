@@ -673,16 +673,16 @@ def sync_library_content(library_id):
                 removed_check = removed > 0
                 errors_check = bool(errors_list and len(errors_list) > 0)
                 
-                current_app.logger.info(f"DEBUG SYNC RESULT: added_check = {added_check}")
-                current_app.logger.info(f"DEBUG SYNC RESULT: updated_check = {updated_check}")
-                current_app.logger.info(f"DEBUG SYNC RESULT: removed_check = {removed_check}")
-                current_app.logger.info(f"DEBUG SYNC RESULT: errors_check = {errors_check}")
+                current_app.logger.debug(f"SYNC RESULT: added_check = {added_check}")
+                current_app.logger.debug(f"SYNC RESULT: updated_check = {updated_check}")
+                current_app.logger.debug(f"SYNC RESULT: removed_check = {removed_check}")
+                current_app.logger.debug(f"SYNC RESULT: errors_check = {errors_check}")
                 
                 has_changes = added_check or updated_check or removed_check or errors_check
-                current_app.logger.info(f"DEBUG SYNC RESULT: has_changes = {has_changes} (type: {type(has_changes)})")
+                current_app.logger.debug(f"SYNC RESULT: has_changes = {has_changes} (type: {type(has_changes)})")
             except Exception as e:
-                current_app.logger.error(f"DEBUG: Error in has_changes comparison: {e}")
-                current_app.logger.error(f"DEBUG: Full result data: {result}")
+                current_app.logger.debug(f"Error in has_changes comparison: {e}")
+                current_app.logger.debug(f"Full result data: {result}")
                 raise
             
             if has_changes:
@@ -697,8 +697,8 @@ def sync_library_content(library_id):
                                                library_name=library.name)
                     current_app.logger.debug(f"DEBUG: Template rendered successfully")
                 except Exception as e:
-                    current_app.logger.error(f"DEBUG: Error rendering template: {e}")
-                    current_app.logger.error(f"DEBUG: normalized_result data: {normalized_result}")
+                    current_app.logger.debug(f"Error rendering template: {e}")
+                    current_app.logger.debug(f"normalized_result data: {normalized_result}")
                     raise
                 
                 try:
@@ -708,9 +708,9 @@ def sync_library_content(library_id):
                     else:
                         message = f"Library sync complete. {added} added, {updated} updated, {removed} removed."
                         category = "success"
-                    current_app.logger.debug(f"DEBUG: Message created: {message}")
+                    current_app.logger.debug(f"Message created: {message}")
                 except Exception as e:
-                    current_app.logger.error(f"DEBUG: Error creating message: {e}")
+                    current_app.logger.debug(f"Error creating message: {e}")
                     raise
                 
                 trigger_payload = {
@@ -726,7 +726,7 @@ def sync_library_content(library_id):
                 return make_response(modal_html, 200, headers)
             else:
                 # No changes - just show toast (no page refresh needed)
-                current_app.logger.info("DEBUG: Taking NO CHANGES path - should show toast only")
+                current_app.logger.debug("Taking NO CHANGES path - should show toast only")
                 total_items = result.get('total_items', 0)
                 trigger_payload = {
                     "showToastEvent": {
@@ -737,10 +737,10 @@ def sync_library_content(library_id):
                 headers = {
                     'HX-Trigger': json.dumps(trigger_payload)
                 }
-                current_app.logger.info(f"DEBUG: Returning empty response with headers: {headers}")
-                current_app.logger.info(f"DEBUG: Trigger payload: {trigger_payload}")
+                current_app.logger.debug(f"Returning empty response with headers: {headers}")
+                current_app.logger.debug(f"Trigger payload: {trigger_payload}")
                 response = make_response("", 200, headers)
-                current_app.logger.info(f"DEBUG: Response created successfully, returning to client")
+                current_app.logger.debug(f"Response created successfully, returning to client")
                 return response
         else:
             current_app.logger.error(f"Library sync failed: {result.get('error', 'Unknown error')}")

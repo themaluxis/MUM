@@ -533,10 +533,10 @@ def list_users():
                 current_app.logger.info(f"DEBUG: Service user {user.username} (ID: {user.id}) has {len(access_records)} access records")
             else:
                 access_records = []
-                current_app.logger.warning(f"DEBUG: Unknown user type: {user._user_type}")
+                current_app.logger.debug(f"Unknown user type: {user._user_type}")
         else:
             access_records = []
-            current_app.logger.warning(f"DEBUG: User {user.username} has no _user_type attribute")
+            current_app.logger.debug(f"User {user.username} has no _user_type attribute")
         
         # Process the access records for this user
         for access in access_records:

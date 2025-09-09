@@ -181,7 +181,7 @@ def sessions_partial():
                 service_data['stats']['wan_bandwidth_mbps'] = round(service_data['stats']['wan_bandwidth_mbps'], 1)
 
     except Exception as e:
-        current_app.logger.error(f"STREAMING_DEBUG: Error during streaming_sessions_partial: {e}", exc_info=True)
+        current_app.logger.debug(f"Error during streaming_sessions_partial: {e}", exc_info=True)
     
     if view_mode == 'categorized':
         return render_template('streaming/partials/sessions_categorized.html', 
