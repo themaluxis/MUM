@@ -184,21 +184,42 @@ class AudiobookShelfMediaService(BaseMediaService):
     def create_user(self, username: str, email: str, password: str = None, **kwargs) -> Dict[str, Any]:
         """Create new AudiobookShelf user"""
         try:
+            # Required fields according to API docs
             user_data = {
                 'username': username,
-                'email': email or '',
                 'password': password or 'changeme123',
-                'type': 'user',
-                'isActive': True
+                'type': 'user',  # Required: guest, user, or admin
+                'isActive': True,
+                'isLocked': False
+            }
+            
+            # Add email if provided (not required by API)
+            if email:
+                user_data['email'] = email
+            
+            # Set up permissions object with all required fields
+            library_ids = kwargs.get('library_ids', [])
+            user_data['permissions'] = {
+                'download': True,
+                'update': True,
+                'delete': False,
+                'upload': False,
+                'accessAllLibraries': len(library_ids) == 0,  # True if no specific libraries
+                'accessAllTags': True,
+                'accessExplicitContent': True
             }
             
             # Set library access if specified
-            library_ids = kwargs.get('library_ids', [])
             if library_ids:
-                user_data['permissions'] = {
-                    'librariesAccessible': library_ids,
-                    'accessAllLibraries': False
-                }
+                user_data['librariesAccessible'] = library_ids
+            else:
+                user_data['librariesAccessible'] = []  # Empty array means all libraries
+            
+            # Optional fields with defaults
+            user_data['mediaProgress'] = []
+            user_data['bookmarks'] = []
+            user_data['seriesHideFromContinueListening'] = []
+            user_data['itemTagsAccessible'] = []  # Empty array means all tags
             
             result = self._make_request('users', method='POST', data=user_data)
             
@@ -206,7 +227,7 @@ class AudiobookShelfMediaService(BaseMediaService):
                 'success': True,
                 'user_id': result.get('id'),
                 'username': username,
-                'email': email
+                'email': email or ''
             }
         except Exception as e:
             self.log_error(f"Error creating user: {e}")
