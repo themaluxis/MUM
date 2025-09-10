@@ -232,7 +232,7 @@ def list_users():
         current_app.logger.info(f"DEBUG: Found {len(all_access_records)} total access records (standalone + linked)")
         
         for access in all_access_records:
-            current_app.logger.info(f"DEBUG: Creating mock user for access ID {access.id}, username: {access.external_username}, server: {access.server.server_nickname}")
+            #current_app.logger.info(f"DEBUG: Creating mock user for access ID {access.id}, username: {access.external_username}, server: {access.server.server_nickname}")
             # Create a mock user object with the necessary attributes for display
             class MockUser:
                 def __init__(self, access):
@@ -326,11 +326,11 @@ def list_users():
             mock_user = MockUser(access)
             mock_user._user_type = 'service'  # Add type for processing
             service_users.append(mock_user)
-            current_app.logger.info(f"DEBUG: Added service user {mock_user.username} (UUID: {mock_user.uuid}) to list")
+            #current_app.logger.info(f"DEBUG: Added service user {mock_user.username} (UUID: {mock_user.uuid}) to list")
         
-        current_app.logger.info(f"Found {len(service_users)} standalone service users")
+        #current_app.logger.info(f"Found {len(service_users)} standalone service users")
         for service_user in service_users:
-            current_app.logger.info(f"  Standalone service user: {service_user.username} (Access ID: {service_user._access_record.id}, Server: {service_user._access_record.server.server_nickname})")
+            #current_app.logger.info(f"  Standalone service user: {service_user.username} (Access ID: {service_user._access_record.id}, Server: {service_user._access_record.server.server_nickname})")
             
             # Add service type information for standalone users so they get proper colors
             if not hasattr(service_user, '_user_type'):
@@ -390,19 +390,19 @@ def list_users():
         users_on_page = all_users[start_idx:end_idx]
     
     # Debug: Check for AllGas users specifically
-    allgas_users = [user for user in all_users if user.username == 'AllGas']
-    current_app.logger.info(f"DEBUG: Found {len(allgas_users)} AllGas users in total list")
-    for user in allgas_users:
-        server_name = getattr(user._access_record, 'server', {}).server_nickname if hasattr(user, '_access_record') else 'N/A'
-        current_app.logger.info(f"DEBUG: AllGas user - UUID: {getattr(user, 'uuid', user.id)}, type: {getattr(user, '_user_type', 'unknown')}, server: {server_name}")
+    #allgas_users = [user for user in all_users if user.username == 'AllGas']
+    #current_app.logger.info(f"DEBUG: Found {len(allgas_users)} AllGas users in total list")
+    #for user in allgas_users:
+    #    server_name = getattr(user._access_record, 'server', {}).server_nickname if hasattr(user, '_access_record') else 'N/A'
+    #    current_app.logger.info(f"DEBUG: AllGas user - UUID: {getattr(user, 'uuid', user.id)}, type: {getattr(user, '_user_type', 'unknown')}, server: {server_name}")
     
-    allgas_on_page = [user for user in users_on_page if user.username == 'AllGas']
-    if 'last_streamed' in sort_by_param:
-        current_app.logger.info(f"DEBUG: Found {len(allgas_on_page)} AllGas users on current page (processing all users for last_streamed sort)")
-    else:
-        current_app.logger.info(f"DEBUG: Found {len(allgas_on_page)} AllGas users on current page (start: {start_idx}, end: {end_idx})")
-    for user in allgas_on_page:
-        current_app.logger.info(f"DEBUG: AllGas on page - UUID: {getattr(user, 'uuid', user.id)}, type: {getattr(user, '_user_type', 'unknown')}")
+    #allgas_on_page = [user for user in users_on_page if user.username == 'AllGas']
+    #if 'last_streamed' in sort_by_param:
+    #    current_app.logger.info(f"DEBUG: Found {len(allgas_on_page)} AllGas users on current page (processing all users for last_streamed sort)")
+    #else:
+    #    current_app.logger.info(f"DEBUG: Found {len(allgas_on_page)} AllGas users on current page (start: {start_idx}, end: {end_idx})")
+    #for user in allgas_on_page:
+    #    current_app.logger.info(f"DEBUG: AllGas on page - UUID: {getattr(user, 'uuid', user.id)}, type: {getattr(user, '_user_type', 'unknown')}")
     
     # Create a mock pagination object
     class MockPagination:
@@ -544,7 +544,7 @@ def list_users():
             
             # Special handling for AllGas users to debug library issues
             if user.username == 'AllGas':
-                current_app.logger.info(f"DEBUG: AllGas library processing - Server: {access.server.server_nickname}, Raw libraries: {access.allowed_library_ids}")
+                #current_app.logger.info(f"DEBUG: AllGas library processing - Server: {access.server.server_nickname}, Raw libraries: {access.allowed_library_ids}")
                 # Check if libraries need filtering for this specific server
                 if access.allowed_library_ids:
                     server_specific_libs = []
@@ -556,7 +556,7 @@ def list_users():
                         elif not isinstance(lib_id, str) or not lib_id.startswith('['):
                             # This is already a clean library ID
                             server_specific_libs.append(lib_id)
-                    current_app.logger.info(f"DEBUG: AllGas filtered libraries for {access.server.server_nickname}: {server_specific_libs}")
+                    #current_app.logger.info(f"DEBUG: AllGas filtered libraries for {access.server.server_nickname}: {server_specific_libs}")
                     user_library_access_by_server[user_id][access.server_id] = server_specific_libs
                 else:
                     user_library_access_by_server[user_id][access.server_id] = access.allowed_library_ids
@@ -1203,7 +1203,7 @@ def mass_edit_libraries_form():
             
             if user_obj and user_type == "user_media_access":
                 service_user_ids.append(user_obj.id)
-                current_app.logger.info(f"DEBUG: Added service user ID {user_obj.id} from uuid {uid_str}")
+                #current_app.logger.info(f"DEBUG: Added service user ID {user_obj.id} from uuid {uid_str}")
             elif user_obj and user_type == "user_app_access":
                 current_app.logger.warning(f"Mass edit libraries attempted on local user {uid_str} - not supported")
             else:
