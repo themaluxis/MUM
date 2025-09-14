@@ -118,13 +118,13 @@ def monitor_media_sessions_task():
                             ).first()
                             if user_media_access:
                                 # Check if it's linked to a UserAppAccess account
-                                current_app.logger.info(f"DEBUG LINKED: Found UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id})")
-                                current_app.logger.info(f"DEBUG LINKED: user_app_access_id = {user_media_access.user_app_access_id}")
-                                current_app.logger.info(f"DEBUG LINKED: external_username = {user_media_access.external_username}")
-                                current_app.logger.info(f"DEBUG LINKED: server = {user_media_access.server.server_nickname}")
+                                current_app.logger.debug(f"LINKED: Found UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id})")
+                                current_app.logger.debug(f"LINKED: user_app_access_id = {user_media_access.user_app_access_id}")
+                                current_app.logger.debug(f"LINKED: external_username = {user_media_access.external_username}")
+                                current_app.logger.debug(f"LINKED: server = {user_media_access.server.server_nickname}")
                                 
                                 mum_user = user_media_access.user_app_access
-                                current_app.logger.info(f"DEBUG LINKED: user_app_access relationship = {mum_user}")
+                                current_app.logger.debug(f"LINKED: user_app_access relationship = {mum_user}")
                                 
                                 if not mum_user:
                                     current_app.logger.info(f"Found standalone UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}). Processing as standalone user.")
@@ -165,13 +165,13 @@ def monitor_media_sessions_task():
                             ).first()
                             if user_media_access:
                                 # Check if it's linked to a UserAppAccess account
-                                current_app.logger.info(f"DEBUG LINKED: Found UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id})")
-                                current_app.logger.info(f"DEBUG LINKED: user_app_access_id = {user_media_access.user_app_access_id}")
-                                current_app.logger.info(f"DEBUG LINKED: external_username = {user_media_access.external_username}")
-                                current_app.logger.info(f"DEBUG LINKED: server = {user_media_access.server.server_nickname}")
+                                current_app.logger.debug(f"LINKED: Found UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id})")
+                                current_app.logger.debug(f"LINKED: user_app_access_id = {user_media_access.user_app_access_id}")
+                                current_app.logger.debug(f"LINKED: external_username = {user_media_access.external_username}")
+                                current_app.logger.debug(f"LINKED: server = {user_media_access.server.server_nickname}")
                                 
                                 mum_user = user_media_access.user_app_access
-                                current_app.logger.info(f"DEBUG LINKED: user_app_access relationship = {mum_user}")
+                                current_app.logger.debug(f"LINKED: user_app_access relationship = {mum_user}")
                                 
                                 if not mum_user:
                                     current_app.logger.info(f"Found standalone UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id}). Processing as standalone user.")
@@ -278,19 +278,19 @@ def monitor_media_sessions_task():
                         continue
                     
                     if mum_user:
-                        current_app.logger.info(f"DEBUG: Creating new MediaStreamHistory record for linked user session {session_key}")
-                        current_app.logger.info(f"DEBUG: Linked User: {mum_user.username} (ID: {mum_user.id})")
+                        current_app.logger.debug(f"Creating new MediaStreamHistory record for linked user session {session_key}")
+                        current_app.logger.debug(f"Linked User: {mum_user.username} (ID: {mum_user.id})")
                         user_display_name = mum_user.username
                         user_id = mum_user.id
                     else:
-                        current_app.logger.info(f"DEBUG: Creating new MediaStreamHistory record for standalone user session {session_key}")
-                        current_app.logger.info(f"DEBUG: Standalone User: {user_media_access.get_display_name()} (UserMediaAccess ID: {user_media_access.id})")
+                        current_app.logger.debug(f"Creating new MediaStreamHistory record for standalone user session {session_key}")
+                        current_app.logger.debug(f"Standalone User: {user_media_access.get_display_name()} (UserMediaAccess ID: {user_media_access.id})")
                         user_display_name = user_media_access.get_display_name()
                         user_id = user_media_access.id
                     
-                    current_app.logger.info(f"DEBUG: Server: {current_server.server_nickname} (ID: {current_server.id})")
-                    current_app.logger.info(f"DEBUG: Media: {media_title} ({media_type})")
-                    current_app.logger.info(f"DEBUG: Platform: {platform}, Player: {player_title}")
+                    current_app.logger.debug(f"Server: {current_server.server_nickname} (ID: {current_server.id})")
+                    current_app.logger.debug(f"Media: {media_title} ({media_type})")
+                    current_app.logger.debug(f"Platform: {platform}, Player: {player_title}")
                     
                     new_history_record = MediaStreamHistory(
                         user_app_access_uuid=mum_user.uuid if mum_user else None,
@@ -314,22 +314,22 @@ def monitor_media_sessions_task():
                         view_offset_at_end_seconds=view_offset_s
                     )
                     
-                    current_app.logger.info(f"DEBUG: About to add MediaStreamHistory record to database...")
+                    current_app.logger.debug(f"About to add MediaStreamHistory record to database...")
                     db.session.add(new_history_record)
                     
-                    current_app.logger.info(f"DEBUG: About to flush database session...")
+                    current_app.logger.debug(f"About to flush database session...")
                     db.session.flush() # Flush to get the ID
                     
                     _active_stream_sessions[session_key] = new_history_record.id
-                    current_app.logger.info(f"DEBUG: Successfully created MediaStreamHistory record (ID: {new_history_record.id}) for session {session_key}.")
-                    current_app.logger.info(f"DEBUG: Added session {session_key} to _active_stream_sessions tracking")
+                    current_app.logger.debug(f"Successfully created MediaStreamHistory record (ID: {new_history_record.id}) for session {session_key}.")
+                    current_app.logger.debug(f"Added session {session_key} to _active_stream_sessions tracking")
                 
                 # If the session is ongoing, update its progress
                 else:
-                    current_app.logger.info(f"DEBUG: Updating existing session {session_key}")
+                    current_app.logger.debug(f"Updating existing session {session_key}")
                     history_record_id = _active_stream_sessions.get(session_key)
                     if history_record_id:
-                        current_app.logger.info(f"DEBUG: Found history record ID {history_record_id} for session {session_key}")
+                        current_app.logger.debug(f"Found history record ID {history_record_id} for session {session_key}")
                         history_record = db.session.get(MediaStreamHistory, history_record_id)
                         if history_record:
                             # Handle different session formats for progress updates
@@ -343,9 +343,9 @@ def monitor_media_sessions_task():
                                 position_ticks = play_state.get('PositionTicks', 0)
                                 current_offset_s = int(position_ticks / 10000000) if position_ticks else 0  # Convert ticks to seconds
                             
-                            current_app.logger.info(f"DEBUG: Updating progress from {history_record.view_offset_at_end_seconds}s to {current_offset_s}s")
+                            current_app.logger.debug(f"Updating progress from {history_record.view_offset_at_end_seconds}s to {current_offset_s}s")
                             history_record.view_offset_at_end_seconds = current_offset_s
-                            current_app.logger.info(f"DEBUG: Successfully updated existing MediaStreamHistory record (ID: {history_record_id})")
+                            current_app.logger.debug(f"Successfully updated existing MediaStreamHistory record (ID: {history_record_id})")
                         else:
                             current_app.logger.debug(f"Could not find existing MediaStreamHistory record with ID {history_record_id} for ongoing session {session_key}.")
                     else:
@@ -354,11 +354,11 @@ def monitor_media_sessions_task():
                 # Update the user's last activity/streamed time
                 if mum_user:
                     # For linked users, update the UserAppAccess last_streamed_at
-                    current_app.logger.info(f"DEBUG: Updating last_streamed_at for linked user {mum_user.username} (ID: {mum_user.id})")
+                    current_app.logger.debug(f"Updating last_streamed_at for linked user {mum_user.username} (ID: {mum_user.id})")
                     user_service.update_user_last_streamed_by_id(mum_user.id, now_utc)
                 else:
                     # For standalone users, update the UserMediaAccess last_activity_at
-                    current_app.logger.info(f"DEBUG: Updating last_activity_at for standalone user {user_media_access.get_display_name()} (UserMediaAccess ID: {user_media_access.id})")
+                    current_app.logger.debug(f"Updating last_activity_at for standalone user {user_media_access.get_display_name()} (UserMediaAccess ID: {user_media_access.id})")
                     user_media_access.last_activity_at = now_utc
                     db.session.add(user_media_access)
 

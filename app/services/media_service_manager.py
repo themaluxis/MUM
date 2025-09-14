@@ -363,11 +363,11 @@ class MediaServiceManager:
                     
                     old_library_ids = set(access.allowed_library_ids or [])
                     new_library_ids = set(user_data.get('library_ids', []))
-                    current_app.logger.info(f"DEBUG KAVITA SYNC: User {user_data.get('username', 'Unknown')} - Old IDs: {old_library_ids}, New IDs: {new_library_ids}")
+                    current_app.logger.debug(f"KAVITA SYNC: User {user_data.get('username', 'Unknown')} - Old IDs: {old_library_ids}, New IDs: {new_library_ids}")
                     if old_library_ids != new_library_ids:
                         added_ids = new_library_ids - old_library_ids
                         removed_ids = old_library_ids - new_library_ids
-                        current_app.logger.info(f"DEBUG KAVITA SYNC: Added: {added_ids}, Removed: {removed_ids}")
+                        current_app.logger.debug(f"KAVITA SYNC: Added: {added_ids}, Removed: {removed_ids}")
 
                         if added_ids:
                             # Use library_names from user_data if available (for services like Kavita)

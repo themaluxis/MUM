@@ -6,7 +6,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import or_, func, desc
 from app.models import UserAppAccess, Setting, EventType, Owner
 from app.models_media_services import ServiceType, MediaStreamHistory, UserMediaAccess
-from app.forms import MassUserEditForm
+from app.forms import MassUserEditForm, UserEditForm
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
 from app.services import user_service
@@ -188,7 +188,7 @@ def list_users():
     all_users = []
     
     # Add local users with a type indicator and process their avatars
-    current_app.logger.info(f"DEBUG: Found {len(app_users)} local users")
+    current_app.logger.debug(f"Found {len(app_users)} local users")
     for app_user in app_users:
         app_user._user_type = 'local'
         # Process avatar URL for local users using their linked media access accounts
@@ -203,7 +203,7 @@ def list_users():
         app_user.plex_join_date = earliest_join_date
         
         all_users.append(app_user)
-        current_app.logger.info(f"DEBUG: Local user {app_user.username} (UUID: {app_user.uuid}) added to list")
+        current_app.logger.debug(f"Local user {app_user.username} (UUID: {app_user.uuid}) added to list")
     
     # Add service users with a type indicator  
     for service_user in service_users:
@@ -587,3 +587,202 @@ def save_view_preference():
             
     current_app.logger.warning(f"Invalid view_mode '{view_mode}' received.")
     return 'Invalid view mode', 400
+
+
+@users_bp.route('/quick_edit_form/<uuid:user_uuid>')
+@login_required
+@permission_required('edit_user')
+def get_quick_edit_form(user_uuid):
+    """Get quick edit form for a user"""
+    # Get user by uuid
+    from app.utils.helpers import get_user_by_uuid
+    user_obj, user_type = get_user_by_uuid(str(user_uuid))
+    
+    if not user_obj:
+        current_app.logger.error(f"User not found with uuid: {user_uuid}")
+        return '<div class="alert alert-error">User not found.</div>'
+    
+    actual_id = user_obj.id
+    
+    if user_type == "user_app_access":
+        # Local user - get UserAppAccess record
+        user = UserAppAccess.query.get_or_404(actual_id)
+    elif user_type == "user_media_access":
+        # Service user - get UserMediaAccess record and create a compatible object
+        access = UserMediaAccess.query.get_or_404(actual_id)
+        
+        # Create a mock user object that's compatible with the form
+        class MockUser:
+            def __init__(self, access):
+                self.id = actual_id  # Use actual ID for form processing
+                self.username = access.external_username or 'Unknown'
+                self.email = access.external_email
+                self.notes = access.notes
+                self.created_at = access.created_at
+                self.last_login_at = access.last_activity_at
+                self.access_expires_at = access.access_expires_at
+                self.discord_user_id = access.discord_user_id
+                self.is_discord_bot_whitelisted = False  # Service users don't have this
+                self.is_purge_whitelisted = False  # Service users don't have this
+                self._access_record = access
+                self._is_service_user = True
+            
+            def get_display_name(self):
+                return self.username or 'Unknown'
+        
+        user = MockUser(access)
+    else:
+        return '<div class="alert alert-error">Unknown user type.</div>'
+    
+    form = UserEditForm(obj=user)  # Pre-populate form with existing data
+
+    # Populate dynamic choices - only show libraries from servers this user has access to
+    if user_type == "user_app_access":
+        # Local user - get all their UserMediaAccess records
+        user_access_records = UserMediaAccess.query.filter_by(user_app_access_id=actual_id).all()
+    elif user_type == "user_media_access":
+        # Service user - get their specific UserMediaAccess record
+        user_access_records = [user._access_record]
+    
+    available_libraries = {}
+    current_library_ids = []
+    current_app.logger.info(f"KAVITA QUICK EDIT: Building available libraries for user {user.id}")
+    
+    for access in user_access_records:
+        try:
+            # Get libraries from database instead of making API calls
+            from app.models_media_services import MediaLibrary
+            db_libraries = MediaLibrary.query.filter_by(server_id=access.server.id).all()
+            current_app.logger.info(f"KAVITA QUICK EDIT: Processing server {access.server.server_nickname} (type: {access.server.service_type.value})")
+            current_app.logger.info(f"KAVITA QUICK EDIT: User access record allowed_library_ids: {access.allowed_library_ids}")
+            current_app.logger.info(f"KAVITA QUICK EDIT: Server libraries from DB: {[{lib.external_id: lib.name} for lib in db_libraries]}")
+            
+            for lib in db_libraries:
+                lib_id = lib.external_id
+                lib_name = lib.name
+                if lib_id:
+                    # For Kavita, create compound IDs to match the format used in user access records
+                    if access.server.service_type.value == 'kavita':
+                        compound_lib_id = f"{lib_id}_{lib_name}"
+                        available_libraries[compound_lib_id] = lib_name
+                        current_app.logger.info(f"KAVITA QUICK EDIT: Added Kavita library: {compound_lib_id} -> {lib_name}")
+                    else:
+                        available_libraries[str(lib_id)] = lib_name
+                        current_app.logger.info(f"KAVITA QUICK EDIT: Added non-Kavita library: {lib_id} -> {lib_name}")
+            
+            # Collect current library IDs from this server
+            current_library_ids.extend(access.allowed_library_ids or [])
+        except Exception as e:
+            current_app.logger.error(f"Error getting libraries from {access.server.server_nickname}: {e}")
+    
+    current_app.logger.info(f"KAVITA QUICK EDIT: Final available_libraries: {available_libraries}")
+    form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
+    current_app.logger.info(f"KAVITA QUICK EDIT: Form choices set to: {form.libraries.choices}")
+    
+    # Pre-populate the fields with the user's current settings from all their servers
+    current_app.logger.info(f"KAVITA QUICK EDIT: Current library IDs from access records: {current_library_ids}")
+    current_app.logger.info(f"KAVITA QUICK EDIT: Available library keys: {list(available_libraries.keys())}")
+    
+    # Handle special case for Jellyfin users with '*' (all libraries access)
+    if current_library_ids == ['*']:
+        # If user has "All Libraries" access, check all available library checkboxes
+        form.libraries.data = list(available_libraries.keys())
+        current_app.logger.info(f"KAVITA QUICK EDIT: User has '*' access, setting all libraries: {form.libraries.data}")
+    else:
+        # Set the current library selections - handle both simple and compound formats
+        matched_libraries = []
+        for lib_id in current_library_ids:
+            lib_id_str = str(lib_id)
+            current_app.logger.info(f"KAVITA QUICK EDIT: Processing stored library ID: {lib_id_str}")
+            
+            # Direct match first
+            if lib_id_str in available_libraries:
+                matched_libraries.append(lib_id_str)
+                current_app.logger.info(f"KAVITA QUICK EDIT: Direct match for library: {lib_id_str}")
+            else:
+                # For Kavita, try multiple matching strategies
+                found_match = False
+                
+                # Strategy 1: Extract numeric part from stored compound ID and match against available numeric parts
+                if '_' in lib_id_str:
+                    stored_numeric = lib_id_str.split('_')[0]
+                    stored_name = lib_id_str.split('_', 1)[1] if '_' in lib_id_str else ''
+                    current_app.logger.info(f"KAVITA QUICK EDIT: Stored compound ID - numeric: {stored_numeric}, name: {stored_name}")
+                    
+                    for avail_lib_id in available_libraries.keys():
+                        if '_' in avail_lib_id:
+                            avail_numeric = avail_lib_id.split('_')[0]
+                            avail_name = avail_lib_id.split('_', 1)[1]
+                            current_app.logger.info(f"KAVITA QUICK EDIT: Checking against available - numeric: {avail_numeric}, name: {avail_name}")
+                            
+                            # Match by name (case insensitive) since numeric IDs might not match
+                            if stored_name.lower() == avail_name.lower():
+                                matched_libraries.append(avail_lib_id)
+                                current_app.logger.info(f"KAVITA QUICK EDIT: Name match: {lib_id_str} -> {avail_lib_id}")
+                                found_match = True
+                                break
+                
+                # Strategy 2: If stored ID is simple numeric, match against available compound IDs
+                if not found_match:
+                    for avail_lib_id in available_libraries.keys():
+                        if '_' in avail_lib_id:
+                            # Extract numeric part from compound ID (e.g., "2_Books" -> "2")
+                            numeric_part = avail_lib_id.split('_')[0]
+                            if numeric_part == lib_id_str:
+                                matched_libraries.append(avail_lib_id)
+                                current_app.logger.info(f"KAVITA QUICK EDIT: Numeric match: {lib_id_str} -> {avail_lib_id}")
+                                found_match = True
+                                break
+                        elif avail_lib_id == lib_id_str:
+                            matched_libraries.append(avail_lib_id)
+                            current_app.logger.info(f"KAVITA QUICK EDIT: Simple match: {lib_id_str}")
+                            found_match = True
+                            break
+                
+                if not found_match:
+                    current_app.logger.warning(f"KAVITA QUICK EDIT: No match found for stored library ID: {lib_id_str}")
+        
+        form.libraries.data = matched_libraries
+        current_app.logger.info(f"KAVITA QUICK EDIT: Set form.libraries.data to: {form.libraries.data}")
+    
+    # Get allow_downloads and allow_4k_transcode from UserMediaAccess records
+    # Use the first access record's values, or default to False if no access records
+    if user_access_records:
+        first_access = user_access_records[0]
+        form.allow_downloads.data = first_access.allow_downloads
+        form.allow_4k_transcode.data = first_access.allow_4k_transcode
+    else:
+        form.allow_downloads.data = False
+        form.allow_4k_transcode.data = True  # Default to True for 4K transcode
+    
+    # Set discord and purge whitelist flags (service users don't have these)
+    if hasattr(user, 'is_discord_bot_whitelisted'):
+        form.is_discord_bot_whitelisted.data = user.is_discord_bot_whitelisted
+    else:
+        form.is_discord_bot_whitelisted.data = False
+        
+    if hasattr(user, 'is_purge_whitelisted'):
+        form.is_purge_whitelisted.data = user.is_purge_whitelisted
+    else:
+        form.is_purge_whitelisted.data = False
+    
+    # Updated logic for DateField - the form will automatically populate access_expires_at 
+    # from the user object via obj=user, but we can explicitly set it if needed
+    if user.access_expires_at:
+        # Convert datetime to date for the DateField
+        form.access_expires_at.data = user.access_expires_at.date()
+    
+    # Build user_server_names for the template
+    user_server_names = {}
+    user_server_names[actual_id] = []
+    for access in user_access_records:
+        if access.server.server_nickname not in user_server_names[actual_id]:
+            user_server_names[actual_id].append(access.server.server_nickname)
+    
+    # We pass the _settings_tab_content partial, which contains the form we need.
+    return render_template(
+        'user/partials/settings_tab_content.html',
+        form=form,
+        user=user,
+        user_server_names=user_server_names
+    )

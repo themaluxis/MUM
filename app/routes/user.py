@@ -680,17 +680,17 @@ def view_service_account(server_nickname, server_username):
     user_access_records = [access]
     
     available_libraries = {}
-    current_app.logger.info(f"DEBUG KAVITA FORM: Building available libraries for user {user.id}")
+    current_app.logger.debug(f"KAVITA FORM: Building available libraries for user {user.id}")
     
     for access in user_access_records:
         try:
             service = MediaServiceFactory.create_service_from_db(access.server)
-            current_app.logger.info(f"DEBUG KAVITA FORM: Processing server {access.server.server_nickname} (type: {access.server.service_type.value})")
-            current_app.logger.info(f"DEBUG KAVITA FORM: User access record allowed_library_ids: {access.allowed_library_ids}")
+            current_app.logger.debug(f"KAVITA FORM: Processing server {access.server.server_nickname} (type: {access.server.service_type.value})")
+            current_app.logger.debug(f"KAVITA FORM: User access record allowed_library_ids: {access.allowed_library_ids}")
             
             if service:
                 server_libraries = service.get_libraries()
-                current_app.logger.info(f"DEBUG KAVITA FORM: Server libraries from API: {[{lib.get('id'): lib.get('name')} for lib in server_libraries]}")
+                current_app.logger.debug(f"KAVITA FORM: Server libraries from API: {[{lib.get('id'): lib.get('name')} for lib in server_libraries]}")
                 
                 for lib in server_libraries:
                     lib_id = lib.get('external_id') or lib.get('id')
@@ -700,16 +700,16 @@ def view_service_account(server_nickname, server_username):
                         if access.server.service_type.value == 'kavita':
                             compound_lib_id = f"{lib_id}_{lib_name}"
                             available_libraries[compound_lib_id] = lib_name
-                            current_app.logger.info(f"DEBUG KAVITA FORM: Added Kavita library: {compound_lib_id} -> {lib_name}")
+                            current_app.logger.debug(f"KAVITA FORM: Added Kavita library: {compound_lib_id} -> {lib_name}")
                         else:
                             available_libraries[str(lib_id)] = lib_name
-                            current_app.logger.info(f"DEBUG KAVITA FORM: Added non-Kavita library: {lib_id} -> {lib_name}")
+                            current_app.logger.debug(f"KAVITA FORM: Added non-Kavita library: {lib_id} -> {lib_name}")
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {access.server.server_nickname}: {e}")
     
-    current_app.logger.info(f"DEBUG KAVITA FORM: Final available_libraries: {available_libraries}")
+    current_app.logger.debug(f"KAVITA FORM: Final available_libraries: {available_libraries}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
-    current_app.logger.info(f"DEBUG KAVITA FORM: Form choices set to: {form.libraries.choices}")
+    current_app.logger.debug(f"KAVITA FORM: Form choices set to: {form.libraries.choices}")
 
     # Handle form submission for the settings tab
     if form.validate_on_submit(): # This handles (if request.method == 'POST' and form.validate())
@@ -825,7 +825,49 @@ def view_service_account(server_nickname, server_username):
                     # If user has "All Libraries" access, check all available library checkboxes
                     form_after_save.libraries.data = list(available_libraries.keys())
                 else:
-                    form_after_save.libraries.data = list(set(current_library_ids_after_save))
+                    # Apply the same matching logic as the quick edit form
+                    matched_libraries = []
+                    for lib_id in current_library_ids_after_save:
+                        lib_id_str = str(lib_id)
+                        # Direct match first
+                        if lib_id_str in available_libraries:
+                            matched_libraries.append(lib_id_str)
+                        else:
+                            # For Kavita, try multiple matching strategies
+                            found_match = False
+                            
+                            # Strategy 1: Extract numeric part from stored compound ID and match against available numeric parts
+                            if '_' in lib_id_str:
+                                stored_numeric = lib_id_str.split('_')[0]
+                                stored_name = lib_id_str.split('_', 1)[1] if '_' in lib_id_str else ''
+                                
+                                for avail_lib_id in available_libraries.keys():
+                                    if '_' in avail_lib_id:
+                                        avail_numeric = avail_lib_id.split('_')[0]
+                                        avail_name = avail_lib_id.split('_', 1)[1]
+                                        
+                                        # Match by name (case insensitive) since numeric IDs might not match
+                                        if stored_name.lower() == avail_name.lower():
+                                            matched_libraries.append(avail_lib_id)
+                                            found_match = True
+                                            break
+                            
+                            # Strategy 2: If stored ID is simple numeric, match against available compound IDs
+                            if not found_match:
+                                for avail_lib_id in available_libraries.keys():
+                                    if '_' in avail_lib_id:
+                                        # Extract numeric part from compound ID (e.g., "2_Books" -> "2")
+                                        numeric_part = avail_lib_id.split('_')[0]
+                                        if numeric_part == lib_id_str:
+                                            matched_libraries.append(avail_lib_id)
+                                            found_match = True
+                                            break
+                                    elif avail_lib_id == lib_id_str:
+                                        matched_libraries.append(avail_lib_id)
+                                        found_match = True
+                                        break
+                    
+                    form_after_save.libraries.data = matched_libraries
 
                 # OOB-SWAP LOGIC
                 # 1. Render the updated form for the modal (the primary target)
@@ -836,7 +878,23 @@ def view_service_account(server_nickname, server_username):
                     if access.server.server_nickname not in user_server_names_for_modal[user.uuid]:
                         user_server_names_for_modal[user.uuid].append(access.server.server_nickname)
                 
-                modal_html = render_template('user/partials/settings_tab.html', form=form_after_save, user=user, user_server_names=user_server_names_for_modal)
+                # Calculate form action for the reloaded form
+                user_servers = user_server_names_for_modal.get(user.uuid, [])
+                if user_servers:
+                    server_name = user_servers[0]
+                    username = user.get_display_name()
+                    form_action_for_reload = url_for('user.view_service_account', 
+                                                   server_nickname=server_name, 
+                                                   server_username=username, 
+                                                   tab='settings')
+                else:
+                    form_action_for_reload = '#'
+                
+                modal_html = render_template('user/partials/settings_tab_content.html', 
+                                           form=form_after_save, 
+                                           user=user, 
+                                           user_server_names=user_server_names_for_modal,
+                                           form_action_override=form_action_for_reload)
 
                 # 2. Render the updated user card for the OOB swap
                 # We need the same context that the main user list uses for a card
@@ -872,16 +930,33 @@ def view_service_account(server_nickname, server_username):
                         lib_names = user.library_names
                     else:
                         # Fallback to looking up in available_libraries
-                        # For Kavita unique IDs (format: "0_Comics"), extract the name part
                         lib_names = []
                         for lib_id in all_library_ids:
-                            if '_' in str(lib_id) and str(lib_id).split('_', 1)[0].isdigit():
-                                # This looks like a Kavita unique ID (e.g., "0_Comics"), extract the name
-                                lib_name = str(lib_id).split('_', 1)[1]
+                            lib_id_str = str(lib_id)
+                            if '_' in lib_id_str and lib_id_str.split('_', 1)[0].isdigit():
+                                # This looks like a Kavita compound ID (e.g., "0_Comics"), extract the name
+                                lib_name = lib_id_str.split('_', 1)[1]
                                 lib_names.append(lib_name)
                             else:
-                                # Regular library ID lookup
-                                lib_names.append(available_libraries.get(str(lib_id), f'Unknown Lib {lib_id}'))
+                                # Need to map simple numeric ID to library name
+                                found_name = None
+                                # Direct lookup first
+                                if lib_id_str in available_libraries:
+                                    found_name = available_libraries[lib_id_str]
+                                else:
+                                    # For Kavita, try to find the compound ID that matches this simple ID
+                                    for avail_lib_id, avail_lib_name in available_libraries.items():
+                                        if '_' in avail_lib_id:
+                                            # Extract numeric part from compound ID (e.g., "2_Books" -> "2")
+                                            numeric_part = avail_lib_id.split('_')[0]
+                                            if numeric_part == lib_id_str:
+                                                found_name = avail_lib_name
+                                                break
+                                        elif avail_lib_id == lib_id_str:
+                                            found_name = avail_lib_name
+                                            break
+                                
+                                lib_names.append(found_name or f'Unknown Lib {lib_id}')
                 user_sorted_libraries[user.uuid] = sorted(lib_names, key=str.lower)
                 
                 # Get Owner with plex_uuid for filtering (AppUsers don't have plex_uuid)
@@ -901,9 +976,12 @@ def view_service_account(server_nickname, server_username):
                 
                 # 3. Add the oob-swap attribute to the card's root div
                 card_html_oob = card_html.replace(f'id="user-card-{user.uuid}"', f'id="user-card-{user.uuid}" hx-swap-oob="true"')
+                current_app.logger.info(f"OOB SWAP DEBUG: Generated OOB swap for user-card-{user.uuid}")
+                current_app.logger.info(f"OOB SWAP DEBUG: Card HTML contains OOB attribute: {'hx-swap-oob' in card_html_oob}")
 
                 # 4. Combine the modal and card HTML for the response
                 final_html = modal_html + card_html_oob
+                current_app.logger.info(f"OOB SWAP DEBUG: Final HTML length: {len(final_html)} chars")
 
                 # Create the toast message payload
                 toast_payload = {
@@ -944,41 +1022,41 @@ def view_service_account(server_nickname, server_username):
         for access in user_access_records:
             current_library_ids.extend(access.allowed_library_ids or [])
         
-        current_app.logger.info(f"DEBUG KAVITA FORM: Current library IDs from access records: {current_library_ids}")
-        current_app.logger.info(f"DEBUG KAVITA FORM: Available library keys: {list(available_libraries.keys())}")
+        current_app.logger.debug(f"KAVITA FORM: Current library IDs from access records: {current_library_ids}")
+        current_app.logger.debug(f"KAVITA FORM: Available library keys: {list(available_libraries.keys())}")
         
         # Handle special case for Jellyfin users with '*' (all libraries access)
         if current_library_ids == ['*']:
             # If user has "All Libraries" access, check all available library checkboxes
             form.libraries.data = list(available_libraries.keys())
-            current_app.logger.info(f"DEBUG KAVITA FORM: Jellyfin wildcard case - setting form data to: {form.libraries.data}")
+            current_app.logger.debug(f"KAVITA FORM: Jellyfin wildcard case - setting form data to: {form.libraries.data}")
         else:
             # For Kavita users, ensure we're using the compound IDs that match the available_libraries keys
             validated_library_ids = []
             for lib_id in current_library_ids:
-                current_app.logger.info(f"DEBUG KAVITA FORM: Processing library ID: {lib_id}")
+                current_app.logger.debug(f"KAVITA FORM: Processing library ID: {lib_id}")
                 if str(lib_id) in available_libraries:
                     validated_library_ids.append(str(lib_id))
-                    current_app.logger.info(f"DEBUG KAVITA FORM: Direct match found for: {lib_id}")
+                    current_app.logger.debug(f"KAVITA FORM: Direct match found for: {lib_id}")
                 else:
-                    current_app.logger.info(f"DEBUG KAVITA FORM: No direct match for {lib_id}, searching for compound ID...")
+                    current_app.logger.debug(f"KAVITA FORM: No direct match for {lib_id}, searching for compound ID...")
                     # This might be a legacy ID format, try to find a matching compound ID
                     found_match = False
                     for available_id in available_libraries.keys():
                         if '_' in available_id and available_id.startswith(f"{lib_id}_"):
                             validated_library_ids.append(available_id)
-                            current_app.logger.info(f"DEBUG KAVITA FORM: Found compound match: {lib_id} -> {available_id}")
+                            current_app.logger.debug(f"KAVITA FORM: Found compound match: {lib_id} -> {available_id}")
                             found_match = True
                             break
                     
                     # If no compound match, try matching by library name (for Kavita ID changes)
                     if not found_match and '_' in str(lib_id):
                         stored_lib_name = str(lib_id).split('_', 1)[1]  # Extract name from stored ID
-                        current_app.logger.info(f"DEBUG KAVITA FORM: Trying name match for: {stored_lib_name}")
+                        current_app.logger.debug(f"KAVITA FORM: Trying name match for: {stored_lib_name}")
                         for available_id, available_name in available_libraries.items():
                             if available_name == stored_lib_name:
                                 validated_library_ids.append(available_id)
-                                current_app.logger.info(f"DEBUG KAVITA FORM: Found name match: {lib_id} -> {available_id} (name: {stored_lib_name})")
+                                current_app.logger.debug(f"KAVITA FORM: Found name match: {lib_id} -> {available_id} (name: {stored_lib_name})")
                                 found_match = True
                                 break
                     
@@ -986,19 +1064,19 @@ def view_service_account(server_nickname, server_username):
                         current_app.logger.warning(f"DEBUG KAVITA FORM: No match found for library ID: {lib_id}")
             
             form.libraries.data = list(set(validated_library_ids))  # Remove duplicates
-            current_app.logger.info(f"DEBUG KAVITA FORM: Final form.libraries.data: {form.libraries.data}")
+            current_app.logger.debug(f"KAVITA FORM: Final form.libraries.data: {form.libraries.data}")
         # Remove the old access_expires_in_days logic since we're now using DateField
         # The form will automatically populate access_expires_at from the user object via obj=user
 
     # Use UUID for user_service calls
-    current_app.logger.info(f"DEBUG STATS: Getting stats for {user.uuid}")
-    current_app.logger.info(f"DEBUG STATS: User type check - _is_service_user: {getattr(user, '_is_service_user', 'N/A')}")
+    current_app.logger.debug(f"STATS: Getting stats for {user.uuid}")
+    current_app.logger.debug(f"STATS: User type check - _is_service_user: {getattr(user, '_is_service_user', 'N/A')}")
     
     stream_stats = user_service.get_user_stream_stats(user.uuid)
-    current_app.logger.info(f"DEBUG STATS: Raw stream_stats returned: {stream_stats}")
+    current_app.logger.debug(f"STATS: Raw stream_stats returned: {stream_stats}")
     
     last_ip_map = user_service.get_bulk_last_known_ips([user.uuid])
-    current_app.logger.info(f"DEBUG STATS: Last IP map: {last_ip_map}")
+    current_app.logger.debug(f"STATS: Last IP map: {last_ip_map}")
     
     last_ip = last_ip_map.get(str(user.uuid))
     user.stream_stats = stream_stats
@@ -1007,19 +1085,19 @@ def view_service_account(server_nickname, server_username):
     user.last_known_ip = last_ip if last_ip else 'N/A'
     
     # Populate last_streamed_at field for the profile display
-    current_app.logger.info(f"DEBUG LAST_STREAMED: Populating last_streamed_at for user {user.uuid}")
+    current_app.logger.debug(f"LAST_STREAMED: Populating last_streamed_at for user {user.uuid}")
     last_stream = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
     user.last_streamed_at = last_stream.started_at if last_stream else None
-    current_app.logger.info(f"DEBUG LAST_STREAMED: Set user.last_streamed_at = {user.last_streamed_at}")
+    current_app.logger.debug(f"LAST_STREAMED: Set user.last_streamed_at = {user.last_streamed_at}")
     
-    current_app.logger.info(f"DEBUG STATS: Final stats - plays: {user.total_plays}, duration: {user.total_duration}, IP: {user.last_known_ip}")
+    current_app.logger.debug(f"STATS: Final stats - plays: {user.total_plays}, duration: {user.total_duration}, IP: {user.last_known_ip}")
     
     # Additional debugging - check what's actually in the database for this user
     db_records = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).count()
-    current_app.logger.info(f"DEBUG STATS: Direct DB check - MediaStreamHistory records for user_media_access_uuid={user.uuid}: {db_records}")
+    current_app.logger.debug(f"STATS: Direct DB check - MediaStreamHistory records for user_media_access_uuid={user.uuid}: {db_records}")
     
     # Check if user_service is looking in the right place
-    current_app.logger.info(f"DEBUG STATS: Checking user_service logic for user UUID: {user.uuid}")
+    current_app.logger.debug(f"STATS: Checking user_service logic for user UUID: {user.uuid}")
     
     stream_history_pagination = None
     kavita_reading_stats = None
@@ -1032,17 +1110,17 @@ def view_service_account(server_nickname, server_username):
         is_kavita_user = False
         kavita_user_id = None
         
-        current_app.logger.info(f"DEBUG KAVITA HISTORY: Checking user {user.id} for Kavita access")
-        current_app.logger.info(f"DEBUG KAVITA HISTORY: User access records: {[(access.server.server_nickname, access.server.service_type.value, access.external_user_id) for access in user_access_records]}")
+        current_app.logger.debug(f"KAVITA HISTORY: Checking user {user.id} for Kavita access")
+        current_app.logger.debug(f"KAVITA HISTORY: User access records: {[(access.server.server_nickname, access.server.service_type.value, access.external_user_id) for access in user_access_records]}")
         
         for access in user_access_records:
             if access.server.service_type.value == 'kavita':
                 is_kavita_user = True
                 kavita_user_id = access.external_user_id
-                current_app.logger.info(f"DEBUG KAVITA HISTORY: Found Kavita user! Server: {access.server.server_nickname}, External User ID: {kavita_user_id}")
+                current_app.logger.debug(f"KAVITA HISTORY: Found Kavita user! Server: {access.server.server_nickname}, External User ID: {kavita_user_id}")
                 break
         
-        current_app.logger.info(f"DEBUG KAVITA HISTORY: Is Kavita user: {is_kavita_user}, User ID: {kavita_user_id}")
+        current_app.logger.debug(f"KAVITA HISTORY: Is Kavita user: {is_kavita_user}, User ID: {kavita_user_id}")
         
         if is_kavita_user and kavita_user_id:
             # Get Kavita reading data
@@ -1058,44 +1136,44 @@ def view_service_account(server_nickname, server_username):
                     if service:
                         kavita_reading_stats = service.get_user_reading_stats(kavita_user_id)
                         kavita_reading_history = service.get_user_reading_history(kavita_user_id)
-                        current_app.logger.info(f"DEBUG KAVITA HISTORY: Stats: {kavita_reading_stats}")
-                        current_app.logger.info(f"DEBUG KAVITA HISTORY: History: {kavita_reading_history}")
+                        current_app.logger.debug(f"KAVITA HISTORY: Stats: {kavita_reading_stats}")
+                        current_app.logger.debug(f"KAVITA HISTORY: History: {kavita_reading_history}")
             except Exception as e:
                 current_app.logger.error(f"Error fetching Kavita reading data: {e}")
         
         if not is_kavita_user:
             # For non-Kavita users, use regular stream history
             # Check if this is a service user (MockServiceUser) or a regular UserAppAccess
-            current_app.logger.info(f"DEBUG HISTORY: Processing history for user ID {user.id}, username: {getattr(user, 'username', 'N/A')}")
-            current_app.logger.info(f"DEBUG HISTORY: User type: {type(user).__name__}")
-            current_app.logger.info(f"DEBUG HISTORY: Has _is_service_user: {hasattr(user, '_is_service_user')}")
-            current_app.logger.info(f"DEBUG HISTORY: _is_service_user value: {getattr(user, '_is_service_user', 'N/A')}")
+            current_app.logger.debug(f"HISTORY: Processing history for user ID {user.id}, username: {getattr(user, 'username', 'N/A')}")
+            current_app.logger.debug(f"HISTORY: User type: {type(user).__name__}")
+            current_app.logger.debug(f"HISTORY: Has _is_service_user: {hasattr(user, '_is_service_user')}")
+            current_app.logger.debug(f"HISTORY: _is_service_user value: {getattr(user, '_is_service_user', 'N/A')}")
             
             if hasattr(user, '_is_service_user') and user._is_service_user:
                 # This is a service user - we need to filter by user_media_access_uuid to get only this service's history
                 # For linked service accounts, history is stored with both user_app_access_uuid AND user_media_access_uuid
-                current_app.logger.info(f"DEBUG HISTORY: Service user - querying MediaStreamHistory with user_media_access_uuid={user.uuid}")
-                current_app.logger.info(f"DEBUG HISTORY: Access record details - server: {access.server.server_nickname}, service_type: {access.server.service_type.value}, external_username: {access.external_username}")
+                current_app.logger.debug(f"HISTORY: Service user - querying MediaStreamHistory with user_media_access_uuid={user.uuid}")
+                current_app.logger.debug(f"HISTORY: Access record details - server: {access.server.server_nickname}, service_type: {access.server.service_type.value}, external_username: {access.external_username}")
                 stream_history_pagination = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid)\
                     .order_by(MediaStreamHistory.started_at.desc())\
                     .paginate(page=page, per_page=15, error_out=False)
-                current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for service user")
+                current_app.logger.debug(f"HISTORY: Found {stream_history_pagination.total} history records for service user")
                 
                 # Enhance history records with MediaItem database IDs for clickable links
                 enhance_history_records_with_media_ids(stream_history_pagination.items)
                 
                 # Additional debugging - show sample records
                 if stream_history_pagination.items:
-                    current_app.logger.info(f"DEBUG HISTORY: Sample records:")
+                    current_app.logger.debug(f"HISTORY: Sample records:")
                     for i, record in enumerate(stream_history_pagination.items[:3]):
-                        current_app.logger.info(f"DEBUG HISTORY: Record {i+1}: {record.media_title} at {record.started_at} (user_media_access_uuid: {record.user_media_access_uuid}, user_app_access_uuid: {record.user_app_access_uuid})")
+                        current_app.logger.debug(f"HISTORY: Record {i+1}: {record.media_title} at {record.started_at} (user_media_access_uuid: {record.user_media_access_uuid}, user_app_access_uuid: {record.user_app_access_uuid})")
             else:
                 # This is a regular UserAppAccess - query by user_app_access_id
-                current_app.logger.info(f"DEBUG HISTORY: Regular UserAppAccess - querying MediaStreamHistory with user_app_access_uuid={user.uuid}")
+                current_app.logger.debug(f"HISTORY: Regular UserAppAccess - querying MediaStreamHistory with user_app_access_uuid={user.uuid}")
                 stream_history_pagination = MediaStreamHistory.query.filter_by(user_app_access_uuid=user.uuid)\
                     .order_by(MediaStreamHistory.started_at.desc())\
                     .paginate(page=page, per_page=15, error_out=False)
-                current_app.logger.info(f"DEBUG HISTORY: Found {stream_history_pagination.total} history records for regular user")
+                current_app.logger.debug(f"HISTORY: Found {stream_history_pagination.total} history records for regular user")
                 
                 # Enhance history records with MediaItem database IDs for clickable links
                 enhance_history_records_with_media_ids(stream_history_pagination.items)
@@ -1104,33 +1182,33 @@ def view_service_account(server_nickname, server_username):
             total_records = MediaStreamHistory.query.count()
             records_with_user_media_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_media_access_uuid.isnot(None)).count()
             records_with_user_app_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_app_access_uuid.isnot(None)).count()
-            current_app.logger.info(f"DEBUG HISTORY: Total MediaStreamHistory records: {total_records}")
-            current_app.logger.info(f"DEBUG HISTORY: Records with user_media_access_uuid: {records_with_user_media_access}")
-            current_app.logger.info(f"DEBUG HISTORY: Records with user_app_access_uuid: {records_with_user_app_access}")
+            current_app.logger.debug(f"HISTORY: Total MediaStreamHistory records: {total_records}")
+            current_app.logger.debug(f"HISTORY: Records with user_media_access_uuid: {records_with_user_media_access}")
+            current_app.logger.debug(f"HISTORY: Records with user_app_access_uuid: {records_with_user_app_access}")
             
             # Check specifically for this user's records
             if hasattr(user, '_is_service_user') and user._is_service_user:
                 specific_records = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).all()
-                current_app.logger.info(f"DEBUG HISTORY: Specific records for user_media_access_uuid {user.uuid}: {len(specific_records)}")
+                current_app.logger.debug(f"HISTORY: Specific records for user_media_access_uuid {user.uuid}: {len(specific_records)}")
                 for record in specific_records:
-                    current_app.logger.info(f"DEBUG HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
+                    current_app.logger.debug(f"HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
                 
                 # Check if this user is linked to a local account and if so, what other user_media_access_uuids exist for that local account
                 if access.user_app_access_id:
-                    current_app.logger.info(f"DEBUG HISTORY: This service account is linked to local user_app_access_id: {access.user_app_access_id}")
+                    current_app.logger.debug(f"HISTORY: This service account is linked to local user_app_access_id: {access.user_app_access_id}")
                     # Find all UserMediaAccess records for this local user
                     all_user_accesses = UserMediaAccess.query.filter_by(user_app_access_id=access.user_app_access_id).all()
-                    current_app.logger.info(f"DEBUG HISTORY: All UserMediaAccess records for local user:")
+                    current_app.logger.debug(f"HISTORY: All UserMediaAccess records for local user:")
                     for ua in all_user_accesses:
-                        current_app.logger.info(f"DEBUG HISTORY: - UserMediaAccess ID {ua.id}: {ua.server.server_nickname} ({ua.server.service_type.value}) - {ua.external_username}")
+                        current_app.logger.debug(f"HISTORY: - UserMediaAccess ID {ua.id}: {ua.server.server_nickname} ({ua.server.service_type.value}) - {ua.external_username}")
                         # Check how many history records exist for each
                         count = MediaStreamHistory.query.filter_by(user_media_access_uuid=ua.uuid).count()
-                        current_app.logger.info(f"DEBUG HISTORY:   -> Has {count} streaming history records")
+                        current_app.logger.debug(f"HISTORY:   -> Has {count} streaming history records")
             else:
                 specific_records = MediaStreamHistory.query.filter_by(user_app_access_uuid=user.uuid).all()
-                current_app.logger.info(f"DEBUG HISTORY: Specific records for user_app_access_uuid {user.uuid}: {len(specific_records)}")
+                current_app.logger.debug(f"HISTORY: Specific records for user_app_access_uuid {user.uuid}: {len(specific_records)}")
                 for record in specific_records:
-                    current_app.logger.info(f"DEBUG HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
+                    current_app.logger.debug(f"HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
             
     # Get user service types and server names for service-aware display
     user_service_types = {}
@@ -1449,10 +1527,10 @@ def view_app_user(username):
         user_app_access.last_known_ip = last_ip_map.get(str(user_uuid), 'N/A')
         
         # Populate last_streamed_at field for the profile display
-        current_app.logger.info(f"DEBUG LAST_STREAMED: Populating last_streamed_at for app user {user_app_access.uuid}")
+        current_app.logger.debug(f"LAST_STREAMED: Populating last_streamed_at for app user {user_app_access.uuid}")
         last_stream = MediaStreamHistory.query.filter_by(user_app_access_uuid=user_app_access.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
         user_app_access.last_streamed_at = last_stream.started_at if last_stream else None
-        current_app.logger.info(f"DEBUG LAST_STREAMED: Set user_app_access.last_streamed_at = {user_app_access.last_streamed_at}")
+        current_app.logger.debug(f"LAST_STREAMED: Set user_app_access.last_streamed_at = {user_app_access.last_streamed_at}")
     except Exception as e:
         current_app.logger.error(f"Error getting stream stats for local user {user_app_access.id}: {e}")
         # Provide empty stats as fallback
@@ -1502,7 +1580,7 @@ def view_app_user(username):
         
         # Enhance history entries with service account info
         for entry in streaming_history:
-            current_app.logger.info(f"DEBUG LOCAL HISTORY: Processing entry - user_media_access_uuid: {entry.user_media_access_uuid}, server_id: {getattr(entry, 'server_id', 'N/A')}")
+            current_app.logger.debug(f"LOCAL HISTORY: Processing entry - user_media_access_uuid: {entry.user_media_access_uuid}, server_id: {getattr(entry, 'server_id', 'N/A')}")
             
             if entry.user_media_access_uuid:
                 # Get the service account that was used for this stream
@@ -1512,7 +1590,7 @@ def view_app_user(username):
                     entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
                     entry.server_name = service_access.server.server_nickname if service_access.server else 'Unknown Server'
                     entry.service_username = service_access.external_username or 'Unknown'
-                    current_app.logger.info(f"DEBUG LOCAL HISTORY: Found service account - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
+                    current_app.logger.debug(f"LOCAL HISTORY: Found service account - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
                 else:
                     current_app.logger.warning(f"DEBUG LOCAL HISTORY: No service account found for user_media_access_uuid: {entry.user_media_access_uuid}")
                     entry.service_account = None
@@ -1521,7 +1599,7 @@ def view_app_user(username):
                     entry.service_username = 'Unknown'
             elif hasattr(entry, 'server_id') and entry.server_id:
                 # Try to find service account by server_id for this local user
-                current_app.logger.info(f"DEBUG LOCAL HISTORY: No user_media_access_uuid, trying server_id: {entry.server_id}")
+                current_app.logger.debug(f"LOCAL HISTORY: No user_media_access_uuid, trying server_id: {entry.server_id}")
                 service_access = UserMediaAccess.query.filter_by(
                     user_app_access_id=user_app_access.id,
                     server_id=entry.server_id
@@ -1531,7 +1609,7 @@ def view_app_user(username):
                     entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
                     entry.server_name = service_access.server.server_nickname if service_access.server else 'Unknown Server'
                     entry.service_username = service_access.external_username or 'Unknown'
-                    current_app.logger.info(f"DEBUG LOCAL HISTORY: Found service account by server_id - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
+                    current_app.logger.debug(f"LOCAL HISTORY: Found service account by server_id - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
                 else:
                     current_app.logger.warning(f"DEBUG LOCAL HISTORY: No service account found for server_id: {entry.server_id}")
                     entry.service_account = None

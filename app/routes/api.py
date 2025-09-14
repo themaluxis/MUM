@@ -644,7 +644,7 @@ def sync_library_content(library_id):
         
         if result['success']:
             current_app.logger.info(f"Library content sync completed successfully")
-            current_app.logger.debug(f"DEBUG: Full sync result keys: {list(result.keys())}")
+            current_app.logger.debug(f"Full sync result keys: {list(result.keys())}")
             
             # Add duration to result
             result['duration'] = duration
@@ -656,16 +656,16 @@ def sync_library_content(library_id):
             removed = result.get('removed', 0)
             
             # Debug logging to identify the issue
-            current_app.logger.info(f"DEBUG SYNC RESULT: added={added} (type: {type(added)})")
-            current_app.logger.info(f"DEBUG SYNC RESULT: updated={updated} (type: {type(updated)})")
-            current_app.logger.info(f"DEBUG SYNC RESULT: removed={removed} (type: {type(removed)})")
-            current_app.logger.info(f"DEBUG SYNC RESULT: errors={result.get('errors')} (type: {type(result.get('errors'))})")
-            current_app.logger.info(f"DEBUG SYNC RESULT: total_items={result.get('total_items', 'NOT_SET')}")
+            current_app.logger.debug(f"SYNC RESULT: added={added} (type: {type(added)})")
+            current_app.logger.debug(f"SYNC RESULT: updated={updated} (type: {type(updated)})")
+            current_app.logger.debug(f"SYNC RESULT: removed={removed} (type: {type(removed)})")
+            current_app.logger.debug(f"SYNC RESULT: errors={result.get('errors')} (type: {type(result.get('errors'))})")
+            current_app.logger.debug(f"SYNC RESULT: total_items={result.get('total_items', 'NOT_SET')}")
             
             try:
                 errors_list = result.get('errors', [])
-                current_app.logger.info(f"DEBUG SYNC RESULT: errors_list = {errors_list} (type: {type(errors_list)})")
-                current_app.logger.info(f"DEBUG SYNC RESULT: len(errors_list) = {len(errors_list)}")
+                current_app.logger.debug(f"SYNC RESULT: errors_list = {errors_list} (type: {type(errors_list)})")
+                current_app.logger.debug(f"SYNC RESULT: len(errors_list) = {len(errors_list)}")
                 
                 # Break down the logic step by step
                 added_check = added > 0
@@ -688,14 +688,14 @@ def sync_library_content(library_id):
             if has_changes:
                 # Use the original result (which already has the correct list and count fields)
                 normalized_result = result.copy()
-                current_app.logger.debug(f"DEBUG: About to render template with normalized_result keys: {list(normalized_result.keys())}")
+                current_app.logger.debug(f"About to render template with normalized_result keys: {list(normalized_result.keys())}")
                 
                 try:
                     # Show modal for changes or errors
                     modal_html = render_template('libraries/partials/library_content_sync_results_modal.html',
                                                sync_result=normalized_result,
                                                library_name=library.name)
-                    current_app.logger.debug(f"DEBUG: Template rendered successfully")
+                    current_app.logger.debug(f"Template rendered successfully")
                 except Exception as e:
                     current_app.logger.debug(f"Error rendering template: {e}")
                     current_app.logger.debug(f"normalized_result data: {normalized_result}")

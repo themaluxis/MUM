@@ -729,7 +729,7 @@ def encode_url_component(text):
     # Debug logging
     try:
         from flask import current_app
-        #current_app.logger.info(f"DEBUG encode_url_component: '{text}' -> '{encoded}'")
+        #current_app.logger.debug(f"encode_url_component: '{text}' -> '{encoded}'")
     except:
         pass  # Ignore if not in Flask context
     
@@ -921,7 +921,7 @@ def decode_url_component_variations(text):
     # Debug logging
     try:
         from flask import current_app
-        current_app.logger.info(f"DEBUG decode_url_component_variations: '{text}' -> {unique_variations}")
+        current_app.logger.debug(f"decode_url_component_variations: '{text}' -> {unique_variations}")
     except:
         pass  # Ignore if not in Flask context
     

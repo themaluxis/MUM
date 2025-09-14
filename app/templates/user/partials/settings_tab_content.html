@@ -1,6 +1,7 @@
-{# Expects 'form' and 'user' in context #}
-{# Determine the correct route and parameters based on user type #}
-{% if user.__class__.__name__ == 'AppUser' %}
+{# Use override form action if provided, otherwise determine based on user type #}
+{% if form_action_override %}
+    {% set form_action = form_action_override %}
+{% elif user.__class__.__name__ == 'AppUser' %}
     {% set form_params = {'username': user.username, 'tab': 'settings'} %}
     {% if request.args.get('back') %}{% set _ = form_params.update({'back': request.args.get('back')}) %}{% endif %}
     {% if request.args.get('back_view') %}{% set _ = form_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
@@ -19,7 +20,20 @@
     {% endif %}
 {% endif %}
 
-<div id="form-content" class="space-y-6">
+<!-- User Settings Form Content (for HTMX swapping) -->
+<form method="POST"
+      id="editUserForm"
+      action="{{ form_action }}"
+      hx-post="{{ form_action }}"
+      hx-target="#editUserForm"
+      hx-swap="outerHTML"
+      onsubmit="console.log('Form submitted to:', this.action); return true;"
+      hx-on::before-request="console.log('HTMX before request');"
+      hx-on::after-request="console.log('HTMX after request');"
+      hx-on::config-request="console.log('HTMX config request:', event.detail);"
+      hx-on::response-error="console.log('HTMX response error:', event.detail);">
+
+    <div class="space-y-6">
         <!-- Notes Section -->
         <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm overflow-hidden">
             <div class="bg-gradient-to-r from-yellow-50 dark:from-yellow-900/20 to-yellow-100 dark:to-yellow-800/20 p-4 border-b border-base-300">
@@ -251,13 +265,14 @@
             <button type="button" class="btn btn-ghost" onclick="quick_edit_user_modal.close()">
                 Cancel
             </button>
-            <button type="submit" class="btn btn-primary gap-2">
+            <button type="submit" class="btn btn-primary gap-2" 
+                    onclick="console.log('Save button clicked'); console.log('Form element:', document.getElementById('editUserForm')); return true;">
                 <i class="fa-solid fa-save w-4 h-4"></i>
                 Save Changes
             </button>
         </div>
     </div>
-</div>
+</form>
 
 <script>
 (function () {

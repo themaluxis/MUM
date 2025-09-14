@@ -1020,10 +1020,10 @@ def get_user_stream_stats(user_id):
     # Build query filter based on user type
     if user_type == "user_app_access":
         filter_condition = MediaStreamHistory.user_app_access_uuid == user_obj.uuid
-        current_app.logger.info(f"DEBUG STATS SERVICE: UUID lookup successful for {user_id} -> user_app_access_uuid: {user_obj.uuid}")
+        current_app.logger.debug(f"STATS SERVICE: UUID lookup successful for {user_id} -> user_app_access_uuid: {user_obj.uuid}")
     elif user_type == "user_media_access":
         filter_condition = MediaStreamHistory.user_media_access_uuid == user_obj.uuid
-        current_app.logger.info(f"DEBUG STATS SERVICE: UUID lookup successful for {user_id} -> user_media_access_uuid: {user_obj.uuid}")
+        current_app.logger.debug(f"STATS SERVICE: UUID lookup successful for {user_id} -> user_media_access_uuid: {user_obj.uuid}")
     else:
         current_app.logger.error(f"Invalid user type {user_type} for user ID: {user_id}")
         return {'global': {}, 'players': []}
@@ -1041,7 +1041,7 @@ def get_user_stream_stats(user_id):
         func.sum(case((MediaStreamHistory.started_at >= month_ago, MediaStreamHistory.duration_seconds), else_=0)).label('duration_30d')
     ).filter(filter_condition).first()
 
-    current_app.logger.info(f"DEBUG STATS SERVICE: Query result - plays: {stats_query.all_time_plays}, duration: {stats_query.all_time_duration}")
+    current_app.logger.debug(f"STATS SERVICE: Query result - plays: {stats_query.all_time_plays}, duration: {stats_query.all_time_duration}")
 
     global_stats = {
         'plays_24h': stats_query.plays_24h or 0,
