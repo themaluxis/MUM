@@ -88,7 +88,7 @@ def accept_invite_and_grant_access(invite: Invite, plex_user_uuid: str, plex_use
     # Look for existing user by Plex UUID via UserMediaAccess
     existing_mum_user = None
     if plex_user_uuid:
-        from app.models_media_services import UserMediaAccess, ServiceType, MediaServer
+        from app.models_media_services import MediaServer
         plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
         if plex_server:
             access = UserMediaAccess.query.filter_by(
