@@ -787,19 +787,34 @@ def library_detail(server_nickname, library_name):
             
             # Add media item for clickable links
             entry.linked_media_item = None
+            entry.linked_show_item = None
+            entry.is_episode = False
+            
             if entry.media_title:
-                # For episodes, try to find the show
+                # For episodes, try to find both the episode and the show
                 if entry.grandparent_title and entry.media_type == 'episode':
+                    entry.is_episode = True
+                    
+                    # Find the specific episode
+                    episode_item = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.title == entry.media_title,
+                        MediaItem.item_type == 'episode'
+                    ).first()
+                    if episode_item:
+                        entry.linked_media_item = episode_item
+                    
+                    # Find the show for URL generation
                     show_item = MediaItem.query.filter(
                         MediaItem.library_id == library.id,
                         MediaItem.title == entry.grandparent_title,
                         MediaItem.item_type == 'show'
                     ).first()
                     if show_item:
-                        entry.linked_media_item = show_item
+                        entry.linked_show_item = show_item
                 
                 # For movies and other content, find by direct title match
-                if not entry.linked_media_item:
+                else:
                     media_item = MediaItem.query.filter(
                         MediaItem.library_id == library.id,
                         MediaItem.title == entry.media_title

@@ -49,7 +49,11 @@
                                 <div class="flex items-center gap-3">
                                     <!-- Poster Image -->
                                     <div class="w-12 h-16 flex-shrink-0">
-                                        {% if activity.linked_media_item %}
+                                        {% if activity.is_episode and activity.linked_show_item and activity.linked_media_item %}
+                                            {# Episode: Link to episode detail page #}
+                                            <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=activity.linked_show_item.id, tv_show_slug=generate_url_slug(activity.grandparent_title), episode_slug=generate_url_slug(activity.media_title)) }}" class="block w-full h-full hover:opacity-80 transition-opacity">
+                                        {% elif activity.linked_media_item %}
+                                            {# Movie/Other: Link to media detail page #}
                                             <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=activity.linked_media_item.id, slug=generate_url_slug(activity.linked_media_item.title)) }}" class="block w-full h-full hover:opacity-80 transition-opacity">
                                         {% endif %}
                                         
@@ -77,14 +81,20 @@
                                             </div>
                                         {% endif %}
                                         
-                                        {% if activity.linked_media_item %}
+                                        {% if (activity.is_episode and activity.linked_show_item and activity.linked_media_item) or activity.linked_media_item %}
                                             </a>
                                         {% endif %}
                                     </div>
                                     
                                     <!-- Content Info -->
                                     <div class="flex flex-col min-w-0 flex-1">
-                                        {% if activity.linked_media_item %}
+                                        {% if activity.is_episode and activity.linked_show_item and activity.linked_media_item %}
+                                            {# Episode: Link to episode detail page #}
+                                            <a href="{{ url_for('libraries.episode_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=activity.linked_show_item.id, tv_show_slug=generate_url_slug(activity.grandparent_title), episode_slug=generate_url_slug(activity.media_title)) }}" class="font-medium truncate hover:text-primary transition-colors">
+                                                {{ activity.media_title or 'Unknown' }}
+                                            </a>
+                                        {% elif activity.linked_media_item %}
+                                            {# Movie/Other: Link to media detail page #}
                                             <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=activity.linked_media_item.id, slug=generate_url_slug(activity.linked_media_item.title)) }}" class="font-medium truncate hover:text-primary transition-colors">
                                                 {{ activity.media_title or 'Unknown' }}
                                             </a>
@@ -93,11 +103,19 @@
                                         {% endif %}
                                         
                                         {% if activity.grandparent_title or activity.parent_title %}
-                                            <span class="text-sm text-base-content/60 truncate">
-                                                {% if activity.grandparent_title %}{{ activity.grandparent_title }}{% endif %}
+                                            <div class="text-sm text-base-content/60 truncate">
+                                                {% if activity.grandparent_title %}
+                                                    {% if activity.linked_show_item %}
+                                                        <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=activity.linked_show_item.id, slug=generate_url_slug(activity.grandparent_title)) }}" class="hover:text-primary transition-colors">
+                                                            {{ activity.grandparent_title }}
+                                                        </a>
+                                                    {% else %}
+                                                        {{ activity.grandparent_title }}
+                                                    {% endif %}
+                                                {% endif %}
                                                 {% if activity.grandparent_title and activity.parent_title %} • {% endif %}
                                                 {% if activity.parent_title %}{{ activity.parent_title }}{% endif %}
-                                            </span>
+                                            </div>
                                         {% endif %}
                                         {% if activity.media_type %}
                                             <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1 w-fit mt-1">
