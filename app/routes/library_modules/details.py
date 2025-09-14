@@ -710,8 +710,82 @@ def library_detail(server_nickname, library_name):
             page=page, per_page=20, error_out=False
         )
         
-        # Enhance activity entries with user info
+        # Enhance activity entries with user info and poster images
         for entry in activity_pagination.items:
+            # Add poster information by looking up MediaItem
+            from app.models_media_services import MediaItem
+            entry.thumb_path = None
+            entry.grandparent_thumb_path = None  
+            entry.parent_thumb_path = None
+            
+            # Try to find the media item for this activity
+            if entry.media_title:
+                # For episodes, try to find by episode title and show (grandparent)
+                if entry.grandparent_title and entry.media_type == 'episode':
+                    episode_item = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.title == entry.media_title,
+                        MediaItem.item_type == 'episode'
+                    ).first()
+                    if episode_item and episode_item.thumb_path:
+                        entry.thumb_path = episode_item.thumb_path
+                    
+                    # Also get the show poster for fallback
+                    show_item = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.title == entry.grandparent_title,
+                        MediaItem.item_type == 'show'
+                    ).first()
+                    if show_item and show_item.thumb_path:
+                        entry.grandparent_thumb_path = show_item.thumb_path
+                        
+                # For movies and other content, find by direct title match
+                else:
+                    media_item = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.title == entry.media_title
+                    ).first()
+                    if media_item and media_item.thumb_path:
+                        entry.thumb_path = media_item.thumb_path
+                        
+                # For season-level content (if parent_title exists)
+                if entry.parent_title:
+                    parent_item = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.title == entry.parent_title
+                    ).first()
+                    if parent_item and parent_item.thumb_path:
+                        entry.parent_thumb_path = parent_item.thumb_path
+            
+            # Convert thumb paths to proper URLs
+            if entry.thumb_path:
+                if entry.thumb_path.startswith('/api/'):
+                    # Already a proxy URL
+                    pass
+                elif entry.thumb_path.startswith('http'):
+                    # Full URL - use as-is
+                    pass
+                else:
+                    # Convert to proxy URL
+                    entry.thumb_path = f"/api/media/{server.service_type.value}/images/proxy?path={entry.thumb_path.lstrip('/')}"
+            
+            if entry.grandparent_thumb_path:
+                if entry.grandparent_thumb_path.startswith('/api/'):
+                    pass
+                elif entry.grandparent_thumb_path.startswith('http'):
+                    pass
+                else:
+                    entry.grandparent_thumb_path = f"/api/media/{server.service_type.value}/images/proxy?path={entry.grandparent_thumb_path.lstrip('/')}"
+            
+            if entry.parent_thumb_path:
+                if entry.parent_thumb_path.startswith('/api/'):
+                    pass
+                elif entry.parent_thumb_path.startswith('http'):
+                    pass
+                else:
+                    entry.parent_thumb_path = f"/api/media/{server.service_type.value}/images/proxy?path={entry.parent_thumb_path.lstrip('/')}"
+            
+            # Add user info
             if entry.user_media_access_uuid:
                 user_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
                 if user_access:

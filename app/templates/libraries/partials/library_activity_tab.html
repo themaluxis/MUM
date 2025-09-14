@@ -46,21 +46,51 @@
                         {% for activity in recent_activity.items %}
                         <tr class="hover">
                             <td>
-                                <div class="flex flex-col">
-                                    <span class="font-medium">{{ activity.media_title or 'Unknown' }}</span>
-                                    {% if activity.grandparent_title or activity.parent_title %}
-                                        <span class="text-sm text-base-content/60">
-                                            {% if activity.grandparent_title %}{{ activity.grandparent_title }}{% endif %}
-                                            {% if activity.grandparent_title and activity.parent_title %} • {% endif %}
-                                            {% if activity.parent_title %}{{ activity.parent_title }}{% endif %}
-                                        </span>
-                                    {% endif %}
-                                    {% if activity.media_type %}
-                                        <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1 w-fit mt-1">
-                                            <i class="fa-solid fa-tag w-2.5 h-2.5"></i>
-                                            {{ activity.media_type }}
-                                        </span>
-                                    {% endif %}
+                                <div class="flex items-center gap-3">
+                                    <!-- Poster Image -->
+                                    <div class="w-12 h-16 flex-shrink-0">
+                                        {% if activity.thumb_path %}
+                                            <img src="{{ activity.thumb_path }}" 
+                                                 alt="{{ activity.media_title or 'Unknown' }}" 
+                                                 class="w-full h-full object-cover rounded border border-base-300 shadow-sm"
+                                                 loading="lazy"
+                                                 onerror="this.src='/static/img/favicon.ico'; this.classList.add('opacity-50');">
+                                        {% elif activity.grandparent_thumb_path %}
+                                            <img src="{{ activity.grandparent_thumb_path }}" 
+                                                 alt="{{ activity.grandparent_title or 'Unknown' }}" 
+                                                 class="w-full h-full object-cover rounded border border-base-300 shadow-sm"
+                                                 loading="lazy"
+                                                 onerror="this.src='/static/img/favicon.ico'; this.classList.add('opacity-50');">
+                                        {% elif activity.parent_thumb_path %}
+                                            <img src="{{ activity.parent_thumb_path }}" 
+                                                 alt="{{ activity.parent_title or 'Unknown' }}" 
+                                                 class="w-full h-full object-cover rounded border border-base-300 shadow-sm"
+                                                 loading="lazy"
+                                                 onerror="this.src='/static/img/favicon.ico'; this.classList.add('opacity-50');">
+                                        {% else %}
+                                            <div class="w-full h-full bg-base-300/50 rounded border border-base-300 flex items-center justify-center">
+                                                <i class="fa-solid fa-image text-base-content/40 text-lg"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Content Info -->
+                                    <div class="flex flex-col min-w-0 flex-1">
+                                        <span class="font-medium truncate">{{ activity.media_title or 'Unknown' }}</span>
+                                        {% if activity.grandparent_title or activity.parent_title %}
+                                            <span class="text-sm text-base-content/60 truncate">
+                                                {% if activity.grandparent_title %}{{ activity.grandparent_title }}{% endif %}
+                                                {% if activity.grandparent_title and activity.parent_title %} • {% endif %}
+                                                {% if activity.parent_title %}{{ activity.parent_title }}{% endif %}
+                                            </span>
+                                        {% endif %}
+                                        {% if activity.media_type %}
+                                            <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20 gap-1 w-fit mt-1">
+                                                <i class="fa-solid fa-tag w-2.5 h-2.5"></i>
+                                                {{ activity.media_type }}
+                                            </span>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </td>
                             <td>

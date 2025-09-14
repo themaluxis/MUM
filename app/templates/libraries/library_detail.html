@@ -226,7 +226,7 @@
                     </div>
                 {% elif active_tab == 'activity' %}
                     <!-- Activity Tab -->
-                    <div hx-get="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='activity', days=days_filter or 30) }}"
+                    <div hx-get="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='activity', days=request.args.get('days', 30), page=request.args.get('page', 1)) }}"
                          hx-trigger="load"
                          hx-target="this"
                          hx-swap="innerHTML">
