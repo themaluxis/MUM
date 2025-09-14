@@ -29,7 +29,7 @@
                 <div class="relative">
                     <input type="text" 
                            id="library-search" 
-                           placeholder="Search library content..." 
+                           placeholder="Search library content... (Press Enter to search)" 
                            class="input input-bordered w-full pl-10 pr-4"
                            value="{{ request.args.get('search', '') }}">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -329,8 +329,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const syncLibraryBtn = document.getElementById('sync-library-btn');
     const purgeLibraryBtn = document.getElementById('purge-library-btn');
     
-    let searchTimeout;
-    
     // Function to update URL and reload page with new parameters
     function updateLibraryView() {
         const currentUrl = new URL(window.location);
@@ -353,17 +351,11 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.href = currentUrl.toString();
     }
     
-    // Search input handler with debounce
+    // Search input handler - only search on Enter key
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(updateLibraryView, 500); // 500ms debounce
-        });
-        
         // Handle Enter key
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                clearTimeout(searchTimeout);
                 updateLibraryView();
             }
         });
