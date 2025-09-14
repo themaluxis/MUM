@@ -785,6 +785,28 @@ def library_detail(server_nickname, library_name):
                 else:
                     entry.parent_thumb_path = f"/api/media/{server.service_type.value}/images/proxy?path={entry.parent_thumb_path.lstrip('/')}"
             
+            # Add media item for clickable links
+            entry.linked_media_item = None
+            if entry.media_title:
+                # For episodes, try to find the show
+                if entry.grandparent_title and entry.media_type == 'episode':
+                    show_item = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.title == entry.grandparent_title,
+                        MediaItem.item_type == 'show'
+                    ).first()
+                    if show_item:
+                        entry.linked_media_item = show_item
+                
+                # For movies and other content, find by direct title match
+                if not entry.linked_media_item:
+                    media_item = MediaItem.query.filter(
+                        MediaItem.library_id == library.id,
+                        MediaItem.title == entry.media_title
+                    ).first()
+                    if media_item:
+                        entry.linked_media_item = media_item
+            
             # Add user info
             if entry.user_media_access_uuid:
                 user_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()

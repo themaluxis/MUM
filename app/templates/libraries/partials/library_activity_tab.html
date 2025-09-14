@@ -49,6 +49,10 @@
                                 <div class="flex items-center gap-3">
                                     <!-- Poster Image -->
                                     <div class="w-12 h-16 flex-shrink-0">
+                                        {% if activity.linked_media_item %}
+                                            <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=activity.linked_media_item.id, slug=generate_url_slug(activity.linked_media_item.title)) }}" class="block w-full h-full hover:opacity-80 transition-opacity">
+                                        {% endif %}
+                                        
                                         {% if activity.thumb_path %}
                                             <img src="{{ activity.thumb_path }}" 
                                                  alt="{{ activity.media_title or 'Unknown' }}" 
@@ -72,11 +76,22 @@
                                                 <i class="fa-solid fa-image text-base-content/40 text-lg"></i>
                                             </div>
                                         {% endif %}
+                                        
+                                        {% if activity.linked_media_item %}
+                                            </a>
+                                        {% endif %}
                                     </div>
                                     
                                     <!-- Content Info -->
                                     <div class="flex flex-col min-w-0 flex-1">
-                                        <span class="font-medium truncate">{{ activity.media_title or 'Unknown' }}</span>
+                                        {% if activity.linked_media_item %}
+                                            <a href="{{ url_for('libraries.media_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), media_id=activity.linked_media_item.id, slug=generate_url_slug(activity.linked_media_item.title)) }}" class="font-medium truncate hover:text-primary transition-colors">
+                                                {{ activity.media_title or 'Unknown' }}
+                                            </a>
+                                        {% else %}
+                                            <span class="font-medium truncate">{{ activity.media_title or 'Unknown' }}</span>
+                                        {% endif %}
+                                        
                                         {% if activity.grandparent_title or activity.parent_title %}
                                             <span class="text-sm text-base-content/60 truncate">
                                                 {% if activity.grandparent_title %}{{ activity.grandparent_title }}{% endif %}
