@@ -1,6 +1,7 @@
 # File: app/services/audiobookshelf_media_service.py
 from typing import List, Dict, Any, Optional, Tuple
 import requests
+import json
 from datetime import datetime
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
@@ -556,6 +557,163 @@ class AudiobookShelfMediaService(BaseMediaService):
         except Exception as e:
             self.log_error(f"Error fetching raw media data for item {media_id}: {e}")
             return {}
+
+    def get_active_sessions(self) -> List[Dict[str, Any]]:
+        """Get active AudioBookshelf listening sessions"""
+        try:
+            # Use the sessions API endpoint
+            endpoint = "sessions"
+            self.log_info(f"AudioBookshelf: Fetching active sessions from {endpoint}")
+            response = self._make_request(endpoint)
+            
+            # Extract sessions from the response
+            sessions = response.get('sessions', [])
+            self.log_info(f"AudioBookshelf: Retrieved {len(sessions)} active sessions")
+            
+            # Add server context to each session
+            for session in sessions:
+                session['server_name'] = self.name
+                session['server_id'] = self.server_id
+                session['service_type'] = self.service_type.value
+            
+            return sessions
+            
+        except Exception as e:
+            self.log_error(f"Error fetching active sessions: {e}")
+            return []
+
+    def get_formatted_sessions(self) -> List[Dict[str, Any]]:
+        """Get active AudioBookshelf sessions formatted for display"""
+        raw_sessions = self.get_active_sessions()
+        if not raw_sessions:
+            return []
+        
+        formatted_sessions = []
+        
+        for raw_session in raw_sessions:
+            try:
+                # Extract basic session info
+                session_id = raw_session.get('id', '')
+                user_info = raw_session.get('user', {})
+                user_name = user_info.get('username', 'Unknown User')
+                
+                # Media metadata
+                media_metadata = raw_session.get('mediaMetadata', {})
+                media_title = media_metadata.get('title', 'Unknown Title')
+                media_author = media_metadata.get('author', 'Unknown Author')
+                media_type = raw_session.get('mediaType', 'book').capitalize()
+                
+                # Device and player info
+                device_info = raw_session.get('deviceInfo', {})
+                player_platform = device_info.get('osName', 'Unknown OS')
+                browser_name = device_info.get('browserName', 'Unknown Browser')
+                player_title = f"{browser_name} on {player_platform}"
+                
+                # Progress and timing info
+                current_time = raw_session.get('currentTime', 0)
+                duration = raw_session.get('duration', 0)
+                progress = (current_time / duration * 100) if duration > 0 else 0
+                time_listening = raw_session.get('timeListening', 0)
+                
+                # Display title (episode or chapter info)
+                display_title = raw_session.get('displayTitle', media_title)
+                display_author = raw_session.get('displayAuthor', media_author)
+                
+                # Location info
+                location_ip = device_info.get('ipAddress', 'N/A')
+                
+                # Cover/thumbnail - leave None if no cover so template uses HTML placeholder
+                cover_path = raw_session.get('coverPath')
+                thumb_url = None
+                if cover_path:
+                    # Only set thumb_url if we have a valid cover path
+                    thumb_url = f"/api/media/audiobookshelf/images/proxy?path={cover_path.lstrip('/')}"
+                # If no cover_path, leave thumb_url as None so the template's {% else %} block 
+                # renders the HTML placeholder instead of trying to load an image
+                
+                # Format timestamps
+                started_at = raw_session.get('startedAt')
+                updated_at = raw_session.get('updatedAt')
+                
+                # Convert AudioBookshelf timestamps to readable format
+                import datetime
+                started_at_readable = None
+                if started_at:
+                    try:
+                        started_at_readable = datetime.datetime.fromtimestamp(started_at / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        started_at_readable = 'Unknown'
+                
+                # Format duration and current time
+                def format_time(seconds):
+                    if not seconds:
+                        return "0:00"
+                    hours = int(seconds // 3600)
+                    minutes = int((seconds % 3600) // 60)
+                    secs = int(seconds % 60)
+                    if hours > 0:
+                        return f"{hours}:{minutes:02d}:{secs:02d}"
+                    else:
+                        return f"{minutes}:{secs:02d}"
+                
+                current_time_formatted = format_time(current_time)
+                duration_formatted = format_time(duration)
+                time_listening_formatted = format_time(time_listening)
+                
+                # Session details for display
+                session_details = {
+                    'user': user_name,
+                    'mum_user_id': None,  # AudioBookshelf users aren't linked to local users yet
+                    'player_title': player_title,
+                    'player_platform': player_platform,
+                    'product': 'AudioBookshelf',
+                    'media_title': display_title,
+                    'grandparent_title': media_title if display_title != media_title else None,
+                    'parent_title': display_author,
+                    'media_type': media_type,
+                    'library_name': raw_session.get('libraryName', 'Unknown Library'),
+                    'year': None,  # AudioBookshelf doesn't provide year in session data
+                    'state': 'Playing',  # AudioBookshelf sessions are active sessions
+                    'progress': round(progress, 1),
+                    'thumb_url': thumb_url,
+                    'session_key': session_id,
+                    'user_avatar_url': None,  # Not available in session data
+                    'quality_detail': 'Original Audio',
+                    'stream_detail': 'Direct Stream',
+                    'container_detail': 'Audio File',
+                    'video_detail': 'N/A (Audio Only)',
+                    'audio_detail': 'Direct Stream (Original)',
+                    'subtitle_detail': 'N/A',
+                    'location_detail': f"Remote: {location_ip}",
+                    'is_public_ip': True,  # Assume public for now
+                    'location_ip': location_ip,
+                    'bandwidth_detail': 'Streaming Audio',
+                    'bitrate_calc': 0,  # Not provided by AudioBookshelf
+                    'location_type_calc': 'WAN',
+                    'is_transcode_calc': False,  # AudioBookshelf streams original files
+                    'raw_data_json': json.dumps(raw_session, indent=2),
+                    'raw_data_json_lines': json.dumps(raw_session, indent=2).splitlines(),
+                    'service_type': 'audiobookshelf',
+                    'server_name': self.name,
+                    # AudioBookshelf specific fields
+                    'current_time': current_time_formatted,
+                    'duration': duration_formatted,
+                    'time_listening': time_listening_formatted,
+                    'started_at': started_at_readable
+                }
+                
+                formatted_sessions.append(session_details)
+                
+            except Exception as e:
+                self.log_error(f"Error formatting AudioBookshelf session {raw_session.get('id', 'unknown')}: {e}")
+                continue
+        
+        return formatted_sessions
+
+    def terminate_session(self, session_id: str, reason: str = None) -> bool:
+        """Terminate an AudioBookshelf session (not supported by AudioBookshelf API)"""
+        self.log_warning(f"AudioBookshelf does not support session termination via API")
+        return False
 
     def check_username_exists(self, username: str) -> bool:
         """Check if a username already exists in AudiobookShelf"""
