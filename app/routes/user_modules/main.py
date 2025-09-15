@@ -180,6 +180,8 @@ def list_users():
             
             mock_user = MockUser(access)
             mock_user._user_type = 'service'
+            # Set avatar URL for service users directly from the access record
+            mock_user.avatar_url = access.external_avatar_url  # Use the external_avatar_url directly
             service_users.append(mock_user)
         
         current_app.logger.info(f"Found {len(service_users)} service users")

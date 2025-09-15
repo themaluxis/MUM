@@ -127,15 +127,47 @@
                                 </div>
                             </td>
                             <td>
-                                <div class="flex items-center gap-2">
-                                    {% if activity.user_type == 'local' %}
-                                        <i class="fa-solid fa-user text-primary text-sm"></i>
-                                    {% elif activity.user_type == 'service' %}
-                                        <i class="fa-solid fa-link text-secondary text-sm"></i>
-                                    {% else %}
-                                        <i class="fa-solid fa-question text-base-content/40 text-sm"></i>
-                                    {% endif %}
-                                    <span class="font-medium">{{ activity.user_display_name }}</span>
+                                <div class="flex items-center gap-3">
+                                    <!-- User Avatar -->
+                                    <div class="w-8 h-8 flex-shrink-0">
+                                        {% if activity.user_avatar_url %}
+                                            <img src="{{ activity.user_avatar_url }}" 
+                                                 alt="{{ activity.user_display_name }} avatar" 
+                                                 class="w-full h-full object-cover rounded-full border border-base-300"
+                                                 loading="lazy"
+                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            <!-- Fallback colored avatar with user initial -->
+                                            <div class="w-full h-full rounded-full border border-base-300 flex items-center justify-center text-white text-xs font-medium" style="display: none;
+                                                {% if activity.user_type == 'service' and server.service_type.value == 'plex' %}background-color: var(--color-plex, #e5a00d);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'jellyfin' %}background-color: var(--color-jellyfin, #00a4dc);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'emby' %}background-color: var(--color-emby, #52b54b);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'kavita' %}background-color: var(--color-kavita, #f39c12);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'audiobookshelf' %}background-color: var(--color-audiobookshelf, #8b5cf6);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'komga' %}background-color: var(--color-komga, #3b82f6);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'romm' %}background-color: var(--color-romm, #ef4444);
+                                                {% elif activity.user_type == 'local' %}background-color: var(--color-primary, #3b82f6);
+                                                {% else %}background-color: #6b7280;{% endif %}">
+                                                {{ activity.user_display_name[0]|upper if activity.user_display_name else 'U' }}
+                                            </div>
+                                        {% else %}
+                                            <!-- No avatar available, show colored initials -->
+                                            <div class="w-full h-full rounded-full border border-base-300 flex items-center justify-center text-white text-xs font-medium" style="
+                                                {% if activity.user_type == 'service' and server.service_type.value == 'plex' %}background-color: var(--color-plex, #e5a00d);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'jellyfin' %}background-color: var(--color-jellyfin, #00a4dc);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'emby' %}background-color: var(--color-emby, #52b54b);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'kavita' %}background-color: var(--color-kavita, #f39c12);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'audiobookshelf' %}background-color: var(--color-audiobookshelf, #8b5cf6);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'komga' %}background-color: var(--color-komga, #3b82f6);
+                                                {% elif activity.user_type == 'service' and server.service_type.value == 'romm' %}background-color: var(--color-romm, #ef4444);
+                                                {% elif activity.user_type == 'local' %}background-color: var(--color-primary, #3b82f6);
+                                                {% else %}background-color: #6b7280;{% endif %}">
+                                                {{ activity.user_display_name[0]|upper if activity.user_display_name else 'U' }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- User Name -->
+                                    <span class="font-medium truncate">{{ activity.user_display_name }}</span>
                                 </div>
                             </td>
                             <td>

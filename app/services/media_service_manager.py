@@ -262,6 +262,15 @@ class MediaServiceManager:
                                         access.service_join_date = join_date_dt.replace(tzinfo=None)
                                     except (ValueError, TypeError) as e:
                                         current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {user_data.get('username')}: {e}")
+                                
+                                # Extract and store Plex avatar URL
+                                thumb_url = user_data.get('thumb')
+                                if thumb_url:
+                                    if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
+                                        access.external_avatar_url = thumb_url
+                                    else:
+                                        access.external_avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                                    current_app.logger.info(f"Set Plex avatar URL for user {user_data.get('username')}: {access.external_avatar_url}")
                             
                             elif server.service_type == ServiceType.KAVITA:
                                 # Parse and set service_join_date from join_date field
@@ -300,7 +309,7 @@ class MediaServiceManager:
                         shares_back=user_data.get('shares_back', False)
                     )
                     
-                    # Set service-specific fields
+                    # Set service-specific fields for new users
                     if server.service_type == ServiceType.PLEX:
                         # Parse and set service_join_date from acceptedAt timestamp
                         accepted_at_str = user_data.get('accepted_at')
@@ -311,6 +320,15 @@ class MediaServiceManager:
                                 access.service_join_date = join_date_dt.replace(tzinfo=None)
                             except (ValueError, TypeError) as e:
                                 current_app.logger.warning(f"Failed to parse acceptedAt '{accepted_at_str}' for user {user_data.get('username')}: {e}")
+                        
+                        # Extract and store Plex avatar URL
+                        thumb_url = user_data.get('thumb')
+                        if thumb_url:
+                            if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
+                                access.external_avatar_url = thumb_url
+                            else:
+                                access.external_avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                            current_app.logger.info(f"Set Plex avatar URL for new user {user_data.get('username')}: {access.external_avatar_url}")
                     
                     elif server.service_type == ServiceType.KAVITA:
                         # Parse and set service_join_date from join_date field
@@ -360,6 +378,22 @@ class MediaServiceManager:
                     raw_data_to_store = user_data.get('raw_data') or {}
                     current_app.logger.info(f"AudioBookshelf sync - Updating existing standalone user {user_data.get('username')} raw_data: {type(raw_data_to_store)} with {len(str(raw_data_to_store))} chars")
                     access.user_raw_data = raw_data_to_store
+                    
+                    # Update service-specific fields for existing standalone users
+                    if server.service_type == ServiceType.PLEX:
+                        # Update Plex avatar URL
+                        thumb_url = user_data.get('thumb')
+                        if thumb_url:
+                            new_avatar_url = thumb_url if thumb_url.startswith(('https://plex.tv/', 'http://plex.tv/')) else f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                            if access.external_avatar_url != new_avatar_url:
+                                changes.append(f"Avatar URL updated")
+                                access.external_avatar_url = new_avatar_url
+                                current_app.logger.info(f"Updated Plex avatar URL for existing user {user_data.get('username')}: {access.external_avatar_url}")
+                        elif access.external_avatar_url:
+                            # Avatar was removed
+                            changes.append(f"Avatar URL removed")
+                            access.external_avatar_url = None
+                            current_app.logger.info(f"Removed Plex avatar URL for user {user_data.get('username')}")
                     
                     old_library_ids = set(access.allowed_library_ids or [])
                     new_library_ids = set(user_data.get('library_ids', []))
