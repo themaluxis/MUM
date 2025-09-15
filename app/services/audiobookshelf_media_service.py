@@ -546,6 +546,17 @@ class AudiobookShelfMediaService(BaseMediaService):
                 }
             }
 
+    def get_media_raw(self, media_id: str) -> Dict[str, Any]:
+        """Get raw API data for a specific media item"""
+        try:
+            endpoint = f"items/{media_id}"
+            self.log_info(f"AudioBookshelf: Fetching raw media data from {endpoint}")
+            response = self._make_request(endpoint)
+            return response
+        except Exception as e:
+            self.log_error(f"Error fetching raw media data for item {media_id}: {e}")
+            return {}
+
     def check_username_exists(self, username: str) -> bool:
         """Check if a username already exists in AudiobookShelf"""
         try:
