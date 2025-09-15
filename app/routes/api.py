@@ -1044,6 +1044,105 @@ def komga_image_proxy():
         current_app.logger.error(f"API komga_image_proxy: Unexpected error for item {item_id}: {e}", exc_info=True)
         return "Error fetching image", 500
 
+@bp.route('/media/audiobookshelf/images/proxy')
+@login_required
+def audiobookshelf_image_proxy():
+    """Proxy AudioBookshelf images through the application"""
+    image_path = request.args.get('path')
+    current_app.logger.info(f"API audiobookshelf_image_proxy: Called with path='{image_path}'")
+    
+    if not image_path:
+        current_app.logger.warning("API audiobookshelf_image_proxy: 'path' parameter is missing.")
+        abort(400)
+
+    audiobookshelf_servers = MediaServiceManager.get_servers_by_type(ServiceType.AUDIOBOOKSHELF)
+    if not audiobookshelf_servers:
+        current_app.logger.error("API audiobookshelf_image_proxy: No AudioBookshelf servers found.")
+        abort(503)
+    
+    # Use the first active AudioBookshelf server
+    abs_service = MediaServiceFactory.create_service_from_db(audiobookshelf_servers[0])
+    if not abs_service:
+        current_app.logger.error("API audiobookshelf_image_proxy: Could not get AudioBookshelf instance to proxy image.")
+        abort(503)
+
+    try:
+        # AudioBookshelf image URLs are typically /api/items/{id}/cover
+        # The path parameter should be something like "items/{id}/cover"
+        if not image_path.startswith('/'):
+            image_path = '/' + image_path
+        
+        # Build the full URL to the AudioBookshelf server
+        full_image_url = f"{abs_service.url.rstrip('/')}/api{image_path}"
+        
+        current_app.logger.debug(f"API audiobookshelf_image_proxy: Fetching image from AudioBookshelf URL: {full_image_url}")
+        
+        # If first attempt fails, try alternative endpoints
+        alternative_urls = []
+        
+        if image_path.startswith('items/'):
+            # Extract item ID for AudioBookshelf specific endpoints
+            item_id = image_path.split('/')[1] if '/' in image_path else image_path.replace('items/', '')
+            
+            # AudioBookshelf specific endpoint variations
+            alternative_urls.extend([
+                f"{abs_service.url.rstrip('/')}/api/items/{item_id}/cover",  # Standard cover endpoint
+                f"{abs_service.url.rstrip('/')}/api/items/{item_id}/thumbnail",  # Thumbnail endpoint
+                f"{abs_service.url.rstrip('/')}/feed/{item_id}/cover",  # Feed cover endpoint
+                f"{abs_service.url.rstrip('/')}/api/items/{item_id}/image",  # Generic image endpoint
+                f"{abs_service.url.rstrip('/')}/{image_path}",  # Without /api prefix
+                f"{abs_service.url.rstrip('/')}/api/{image_path.replace('/cover', '/cover.jpg')}",  # With .jpg extension
+                f"{abs_service.url.rstrip('/')}/api/{image_path.replace('/cover', '/cover.png')}",  # With .png extension
+            ])
+        else:
+            # Direct file path - serve as static file
+            alternative_urls.extend([
+                f"{abs_service.url.rstrip('/')}/{image_path}",  # Direct file path
+                f"{abs_service.url.rstrip('/')}/s/{image_path}",  # Static file endpoint
+            ])
+
+        headers = abs_service._get_headers()
+        timeout = get_api_timeout()
+        
+        # Try the primary URL first
+        urls_to_try = [full_image_url] + alternative_urls
+        last_error = None
+        
+        for i, url_to_try in enumerate(urls_to_try):
+            try:
+                current_app.logger.debug(f"API audiobookshelf_image_proxy: Attempt {i+1} - trying URL: {url_to_try}")
+                img_response = requests.get(url_to_try, headers=headers, stream=True, timeout=timeout)
+                img_response.raise_for_status()
+
+                content_type = img_response.headers.get('Content-Type', 'image/jpeg')
+                current_app.logger.info(f"API audiobookshelf_image_proxy: Success with URL: {url_to_try}")
+                return Response(img_response.iter_content(chunk_size=1024*8), content_type=content_type)
+                
+            except requests.exceptions.HTTPError as e:
+                last_error = e
+                current_app.logger.debug(f"API audiobookshelf_image_proxy: Attempt {i+1} failed with {e.response.status_code}: {url_to_try}")
+                continue
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                current_app.logger.debug(f"API audiobookshelf_image_proxy: Attempt {i+1} failed with RequestException: {e}")
+                continue
+        
+        # If all attempts failed, raise the last error
+        if isinstance(last_error, requests.exceptions.HTTPError):
+            raise last_error
+        else:
+            raise last_error or Exception("All URL attempts failed")
+
+    except requests.exceptions.HTTPError as e_http:
+        current_app.logger.error(f"API audiobookshelf_image_proxy: HTTPError ({e_http.response.status_code}) fetching from AudioBookshelf: {e_http} for path {image_path}")
+        abort(e_http.response.status_code)
+    except requests.exceptions.RequestException as e_req:
+        current_app.logger.error(f"API audiobookshelf_image_proxy: RequestException fetching from AudioBookshelf: {e_req} for path {image_path}")
+        abort(500)
+    except Exception as e:
+        current_app.logger.error(f"API audiobookshelf_image_proxy: Unexpected error for path {image_path}: {e}", exc_info=True)
+        abort(500)
+
 @bp.route('/media/jellyfin/users/avatar')
 @login_required
 def jellyfin_user_avatar_proxy():

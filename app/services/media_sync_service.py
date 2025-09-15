@@ -213,18 +213,29 @@ class MediaSyncService:
             thumb_path = None
             if item_data.get('thumb'):
                 thumb_url = item_data['thumb']
+                current_app.logger.info(f"SYNC DEBUG: Processing thumb_url for '{item_data.get('title')}': {thumb_url}")
                 if thumb_url.startswith('/api/'):
                     # Already a proxy URL (Jellyfin or other services) - store as-is
                     thumb_path = thumb_url
+                    current_app.logger.info(f"SYNC DEBUG: Stored as direct API URL: {thumb_path}")
                 elif '/api/media/plex/images/proxy' in thumb_url and 'path=' in thumb_url:
                     # Plex proxy URL: extract path
                     thumb_path = thumb_url.split('path=')[1]
+                    current_app.logger.info(f"SYNC DEBUG: Extracted Plex path: {thumb_path}")
+                elif '/api/media/audiobookshelf/images/proxy' in thumb_url and 'path=' in thumb_url:
+                    # AudioBookshelf proxy URL: store as-is (full proxy URL)
+                    thumb_path = thumb_url
+                    current_app.logger.info(f"SYNC DEBUG: Stored AudioBookshelf proxy URL: {thumb_path}")
                 elif thumb_url.startswith('/'):
                     # Direct path
                     thumb_path = thumb_url
+                    current_app.logger.info(f"SYNC DEBUG: Stored as direct path: {thumb_path}")
                 elif thumb_url.startswith('http'):
                     # Full URL (like RomM) - store as-is
                     thumb_path = thumb_url
+                    current_app.logger.info(f"SYNC DEBUG: Stored as full URL: {thumb_path}")
+            else:
+                current_app.logger.info(f"SYNC DEBUG: No thumb URL for '{item_data.get('title')}')")
             
             # Parse duration (handle different formats)
             duration = item_data.get('duration')

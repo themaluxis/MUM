@@ -1,6 +1,7 @@
 # File: app/services/audiobookshelf_media_service.py
 from typing import List, Dict, Any, Optional, Tuple
 import requests
+from datetime import datetime
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
 from app.utils.timeout_helper import get_api_timeout
@@ -19,6 +20,31 @@ class AudiobookShelfMediaService(BaseMediaService):
             'Content-Type': 'application/json'
         }
     
+    def _convert_timestamp(self, timestamp):
+        """Convert AudioBookshelf Unix timestamp to Python datetime object"""
+        if timestamp is None:
+            return None
+        try:
+            # AudioBookshelf returns timestamps in milliseconds
+            if isinstance(timestamp, (int, float)):
+                # Convert from milliseconds to seconds
+                timestamp_seconds = timestamp / 1000.0
+                return datetime.fromtimestamp(timestamp_seconds)
+            elif isinstance(timestamp, str):
+                try:
+                    # Try parsing as Unix timestamp
+                    timestamp_seconds = float(timestamp) / 1000.0
+                    return datetime.fromtimestamp(timestamp_seconds)
+                except ValueError:
+                    # Try parsing as ISO format
+                    return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            else:
+                # Already a datetime object
+                return timestamp
+        except (ValueError, TypeError, OSError) as e:
+            self.log_warning(f"Could not convert timestamp {timestamp}: {e}")
+            return None
+
     def _make_request(self, endpoint: str, method: str = 'GET', data: Dict = None):
         """Make API request to AudiobookShelf server"""
         url = f"{self.url.rstrip('/')}/api/{endpoint.lstrip('/')}"
@@ -358,6 +384,168 @@ class AudiobookShelfMediaService(BaseMediaService):
             self.log_error(f"Failed to get GeoIP info for {ip_address}: {e}")
             return {"status": "error", "message": str(e)}
     
+    def get_library_content(self, library_key: str, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
+        """Get library content from AudioBookshelf API"""
+        try:
+            # AudioBookshelf uses 0-indexed pages, so convert from 1-indexed
+            abs_page = page - 1 if page > 0 else 0
+            
+            # Build query parameters based on API documentation
+            params = []
+            if per_page > 0:
+                params.append(f"limit={per_page}")
+            params.append(f"page={abs_page}")
+            params.append("minified=0")  # Get full objects for better data
+            
+            query_string = "&".join(params)
+            endpoint = f"libraries/{library_key}/items?{query_string}"
+            
+            self.log_info(f"AudioBookshelf: Fetching library content from {endpoint}")
+            response = self._make_request(endpoint)
+            
+            # Extract items and metadata from response
+            items = response.get('results', [])
+            total = response.get('total', 0)
+            
+            self.log_info(f"AudioBookshelf: Retrieved {len(items)} items from library {library_key}, total: {total}")
+            
+            # Convert AudioBookshelf items to our standard format
+            processed_items = []
+            for item in items:
+                try:
+                    # Extract basic item info
+                    item_id = item.get('id', '')
+                    library_item = item  # The item itself is the library item
+                    media = library_item.get('media', {})
+                    metadata = media.get('metadata', {})
+                    
+                    # Handle different media types (book, podcast)
+                    media_type = library_item.get('mediaType', 'book')
+                    
+                    # Extract title and other metadata
+                    title = metadata.get('title', 'Unknown')
+                    
+                    # Extract additional metadata based on type
+                    if media_type == 'book':
+                        author = metadata.get('authors', [])
+                        if isinstance(author, list) and author:
+                            author = author[0] if isinstance(author[0], str) else author[0].get('name', 'Unknown')
+                        elif isinstance(author, str):
+                            pass  # Use as-is
+                        else:
+                            author = 'Unknown'
+                        
+                        series = metadata.get('series', [])
+                        series_name = series[0].get('name') if series and isinstance(series, list) and series else None
+                        
+                        processed_item = {
+                            'id': item_id,
+                            'title': title,
+                            'type': 'book',
+                            'author': author,
+                            'series': series_name,
+                            'year': metadata.get('publishedYear'),
+                            'summary': metadata.get('description', ''),
+                            'rating': None,  # AudioBookshelf doesn't seem to have ratings
+                            'duration': media.get('duration'),  # Duration in seconds
+                            'added_at': self._convert_timestamp(library_item.get('addedAt')),
+                            'updated_at': self._convert_timestamp(library_item.get('updatedAt')),
+                            'thumb': None,  # Will be processed if available
+                            'art': None,
+                            'raw_data': item
+                        }
+                        
+                    elif media_type == 'podcast':
+                        processed_item = {
+                            'id': item_id,
+                            'title': title,
+                            'type': 'podcast',
+                            'author': metadata.get('author', 'Unknown'),
+                            'description': metadata.get('description', ''),
+                            'year': None,
+                            'summary': metadata.get('description', ''),
+                            'rating': None,
+                            'duration': None,  # Podcasts have episodes with duration
+                            'added_at': self._convert_timestamp(library_item.get('addedAt')),
+                            'updated_at': self._convert_timestamp(library_item.get('updatedAt')),
+                            'thumb': None,
+                            'art': None,
+                            'raw_data': item
+                        }
+                    else:
+                        # Fallback for unknown types
+                        processed_item = {
+                            'id': item_id,
+                            'title': title,
+                            'type': media_type,
+                            'year': None,
+                            'summary': metadata.get('description', ''),
+                            'rating': None,
+                            'duration': media.get('duration'),
+                            'added_at': self._convert_timestamp(library_item.get('addedAt')),
+                            'updated_at': self._convert_timestamp(library_item.get('updatedAt')),
+                            'thumb': None,
+                            'art': None,
+                            'raw_data': item
+                        }
+                    
+                    # Handle cover/thumbnail if available
+                    cover_path = media.get('coverPath')
+                    self.log_info(f"AudioBookshelf: coverPath for '{title}': {cover_path}")
+                    
+                    if cover_path:
+                        # Try using the actual cover path from the API response
+                        # coverPath might be something like "/audiobooks/Terry Goodkind/.../cover.jpg"
+                        thumb_url = f"/api/media/audiobookshelf/images/proxy?path={cover_path.lstrip('/')}"
+                        processed_item['thumb'] = thumb_url
+                        self.log_info(f"AudioBookshelf: Generated thumb URL from coverPath for '{title}': {thumb_url}")
+                    elif item_id:
+                        # Fallback: try the standard items endpoint
+                        thumb_url = f"/api/media/audiobookshelf/images/proxy?path=items/{item_id}/cover"
+                        processed_item['thumb'] = thumb_url
+                        self.log_info(f"AudioBookshelf: Generated fallback thumb URL for '{title}': {thumb_url}")
+                    
+                    processed_items.append(processed_item)
+                    
+                except Exception as e:
+                    self.log_error(f"Error processing AudioBookshelf item {item.get('id', 'unknown')}: {e}")
+                    continue
+            
+            # Calculate pagination info (convert back to 1-indexed)
+            current_page = abs_page + 1
+            total_pages = (total + per_page - 1) // per_page if per_page > 0 else 1
+            has_next = current_page < total_pages
+            has_prev = current_page > 1
+            
+            return {
+                'success': True,
+                'items': processed_items,
+                'pagination': {
+                    'page': current_page,
+                    'per_page': per_page,
+                    'total_pages': total_pages,
+                    'total_items': total,
+                    'has_next': has_next,
+                    'has_prev': has_prev
+                }
+            }
+            
+        except Exception as e:
+            self.log_error(f"Error fetching library content for library {library_key}: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'items': [],
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total_pages': 0,
+                    'total_items': 0,
+                    'has_next': False,
+                    'has_prev': False
+                }
+            }
+
     def check_username_exists(self, username: str) -> bool:
         """Check if a username already exists in AudiobookShelf"""
         try:
