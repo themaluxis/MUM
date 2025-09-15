@@ -698,7 +698,8 @@ def library_detail(server_nickname, library_name):
             MediaStreamHistory.server_id == server.id,
             MediaStreamHistory.library_name == actual_library_name,
             MediaStreamHistory.started_at >= start_date,
-            MediaStreamHistory.started_at <= end_date
+            MediaStreamHistory.started_at <= end_date,
+            MediaStreamHistory.user_media_access_uuid.isnot(None)  # Only show service user activity
         ).order_by(MediaStreamHistory.started_at.desc())
         
         # Check the total count before pagination
@@ -822,15 +823,17 @@ def library_detail(server_nickname, library_name):
                     if media_item:
                         entry.linked_media_item = media_item
             
-            # Add user info
-            if entry.user_media_access_uuid:
-                user_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
-                if user_access:
-                    entry.user_display_name = user_access.get_display_name()
-                    entry.user_type = 'service'
-                    
-                    # Get avatar URL for service users
-                    entry.user_avatar_url = None
+            # Add user info - only service users since we filtered out local users
+            user_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
+            if user_access:
+                entry.user_display_name = user_access.get_display_name()
+                entry.user_type = 'service'
+                
+                # Get avatar URL for service users
+                entry.user_avatar_url = user_access.external_avatar_url  # Use the external_avatar_url we populate during sync
+                
+                # Fallback to legacy avatar lookup if external_avatar_url is not set
+                if not entry.user_avatar_url:
                     if server.service_type.value.lower() == 'plex':
                         # For Plex, check multiple possible locations for the thumb URL
                         thumb_url = None
@@ -858,25 +861,14 @@ def library_detail(server_nickname, library_name):
                         # For Jellyfin, use the external_user_id to get avatar
                         if user_access.external_user_id:
                             entry.user_avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user_access.external_user_id}"
-                else:
-                    entry.user_display_name = 'Unknown User'
-                    entry.user_type = 'unknown'
-                    entry.user_avatar_url = None
-            elif entry.user_app_access_uuid:
-                from app.models import UserAppAccess
-                user_app = UserAppAccess.query.filter_by(uuid=entry.user_app_access_uuid).first()
-                if user_app:
-                    entry.user_display_name = user_app.get_display_name()
-                    entry.user_type = 'local'
-                    entry.user_avatar_url = None  # Local users don't have service avatars
-                else:
-                    entry.user_display_name = 'Unknown User'
-                    entry.user_type = 'unknown'
-                    entry.user_avatar_url = None
+                
+                # Check if this service user is linked to a local account for clickable username
+                entry.user_app_access = user_access.user_app_access if user_access.user_app_access_id else None
             else:
                 entry.user_display_name = 'Unknown User'
                 entry.user_type = 'unknown'
                 entry.user_avatar_url = None
+                entry.user_app_access = None
         
         recent_activity = activity_pagination
     

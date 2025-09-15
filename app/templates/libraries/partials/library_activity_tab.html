@@ -167,7 +167,24 @@
                                     </div>
                                     
                                     <!-- User Name -->
-                                    <span class="font-medium truncate">{{ activity.user_display_name }}</span>
+                                    <div class="flex flex-col">
+                                        {# All service users are clickable to their service profile #}
+                                        <a href="{{ url_for('user.view_service_account', server_nickname=server.server_nickname, server_username=activity.user_display_name) }}" 
+                                           class="font-medium truncate hover:text-primary transition-colors">
+                                            {{ activity.user_display_name }}
+                                        </a>
+                                        
+                                        {% if activity.user_app_access %}
+                                            {# Service user linked to a local account #}
+                                            <div class="text-xs text-base-content/50">
+                                                Linked to 
+                                                <a href="{{ url_for('user.view_app_user', username=activity.user_app_access.username) }}" 
+                                                   class="hover:text-primary transition-colors">
+                                                    {{ activity.user_app_access.username }}
+                                                </a>
+                                            </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </td>
                             <td>
