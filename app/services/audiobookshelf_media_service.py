@@ -600,8 +600,21 @@ class AudiobookShelfMediaService(BaseMediaService):
                 # Media metadata
                 media_metadata = raw_session.get('mediaMetadata', {})
                 media_title = media_metadata.get('title', 'Unknown Title')
-                media_author = media_metadata.get('author', 'Unknown Author')
                 media_type = raw_session.get('mediaType', 'book').capitalize()
+                
+                # Extract author information
+                display_author = raw_session.get('displayAuthor')
+                if not display_author:
+                    # Fallback to authors array if displayAuthor not available
+                    authors = media_metadata.get('authors', [])
+                    if authors and isinstance(authors, list) and len(authors) > 0:
+                        first_author = authors[0]
+                        if isinstance(first_author, dict):
+                            display_author = first_author.get('name', 'Unknown Author')
+                        else:
+                            display_author = str(first_author)
+                    else:
+                        display_author = 'Unknown Author'
                 
                 # Device and player info
                 device_info = raw_session.get('deviceInfo', {})
@@ -617,7 +630,6 @@ class AudiobookShelfMediaService(BaseMediaService):
                 
                 # Display title (episode or chapter info)
                 display_title = raw_session.get('displayTitle', media_title)
-                display_author = raw_session.get('displayAuthor', media_author)
                 
                 # Location info
                 location_ip = device_info.get('ipAddress', 'N/A')
@@ -705,8 +717,8 @@ class AudiobookShelfMediaService(BaseMediaService):
                     'player_platform': player_platform,
                     'product': 'AudioBookshelf',
                     'media_title': display_title,
-                    'grandparent_title': media_title if display_title != media_title else None,
-                    'parent_title': display_author,
+                    'grandparent_title': None,  # Not used for audiobooks
+                    'parent_title': display_author,  # Author appears under the title
                     'media_type': media_type,
                     'library_name': raw_session.get('libraryName', 'Unknown Library'),
                     'year': None,  # AudioBookshelf doesn't provide year in session data

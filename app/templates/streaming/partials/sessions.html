@@ -256,6 +256,10 @@
                         <p class="text-xs text-primary" title="{{session.grandparent_title}}{% if session.parent_title %} - {{session.parent_title}}{% endif %}">
                             {{session.grandparent_title or ''}}{% if session.grandparent_title and session.parent_title %} - {% endif %}{{session.parent_title or ''}}
                         </p>
+                    {% elif session.service_type == 'audiobookshelf' and session.parent_title %}
+                        <p class="text-xs text-primary" title="{{session.parent_title}}">
+                            <i class="fa-solid fa-user-pen mr-1"></i>{{session.parent_title}}
+                        </p>
                     {% endif %}
                 </div>
             </div>
