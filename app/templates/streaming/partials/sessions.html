@@ -54,8 +54,9 @@
                                     loading="lazy"
                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                 <!-- Fallback when image fails to load -->
-                                <div class="absolute inset-0 bg-base-300 flex items-center justify-center text-base-content/40" style="display: none;">
-                                    <i class="fa-solid fa-image text-4xl"></i>
+                                <div class="w-full h-full bg-base-300 flex flex-col items-center justify-center text-xs text-base-content/50" style="display: none;">
+                                        <i class="fa-solid fa-image fa-2x mb-1"></i>
+                                        <div>No Poster</div>
                                 </div>
                             {% else %}
                                 <!-- No image placeholder -->

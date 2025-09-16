@@ -622,14 +622,21 @@ class AudiobookShelfMediaService(BaseMediaService):
                 # Location info
                 location_ip = device_info.get('ipAddress', 'N/A')
                 
-                # Cover/thumbnail - leave None if no cover so template uses HTML placeholder
+                # Cover/thumbnail - use same working pattern as media library
                 cover_path = raw_session.get('coverPath')
+                library_item_id = raw_session.get('libraryItemId')
+                self.log_info(f"AudioBookshelf session coverPath: {cover_path}, libraryItemId: {library_item_id}")
                 thumb_url = None
-                if cover_path:
-                    # Only set thumb_url if we have a valid cover path
+                
+                if library_item_id:
+                    # Use the same working pattern as media library: items/{id}/cover
+                    thumb_url = f"/api/media/audiobookshelf/images/proxy?path=items/{library_item_id}/cover"
+                    self.log_info(f"AudioBookshelf session thumb_url (using items pattern): {thumb_url}")
+                elif cover_path:
+                    # Fallback to original coverPath if no libraryItemId
                     thumb_url = f"/api/media/audiobookshelf/images/proxy?path={cover_path.lstrip('/')}"
-                # If no cover_path, leave thumb_url as None so the template's {% else %} block 
-                # renders the HTML placeholder instead of trying to load an image
+                    self.log_info(f"AudioBookshelf session thumb_url (using coverPath): {thumb_url}")
+                # If neither available, leave thumb_url as None for HTML placeholder
                 
                 # Format timestamps
                 started_at = raw_session.get('startedAt')
