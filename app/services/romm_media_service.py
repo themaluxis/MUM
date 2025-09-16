@@ -66,6 +66,19 @@ class RommMediaService(BaseMediaService):
             if not self._setup_auth_headers():
                 return False, "Authentication failed. Check API key."
             
+            # Get server version from heartbeat endpoint
+            version = 'Unknown'
+            try:
+                response = self.session.get(f"{self.url.rstrip('/')}/api/heartbeat")
+                response.raise_for_status()
+                heartbeat_data = response.json()
+                
+                # Extract version from SYSTEM.VERSION
+                system_info = heartbeat_data.get('SYSTEM', {})
+                version = system_info.get('VERSION', 'Unknown')
+            except Exception as e:
+                self.log_info(f"Could not get version from heartbeat: {e}")
+            
             # Test authenticated request - use platforms endpoint as it's more reliable
             response = self.session.get(f"{self.url.rstrip('/')}/api/platforms")
             response.raise_for_status()
@@ -73,7 +86,10 @@ class RommMediaService(BaseMediaService):
             platforms = response.json()
             platform_count = len(platforms) if isinstance(platforms, list) else 0
             
-            return True, f"Successfully connected to RomM server. Found {platform_count} platforms."
+            if version != 'Unknown':
+                return True, f"Successfully connected to RomM server (v{version}). Found {platform_count} platforms."
+            else:
+                return True, f"Successfully connected to RomM server. Found {platform_count} platforms."
             
         except requests.exceptions.ConnectTimeout:
             return False, "Connection to RomM timed out. Check if the server is running and accessible."
@@ -417,12 +433,16 @@ class RommMediaService(BaseMediaService):
             
             heartbeat_data = response.json()
             
+            # Extract version from SYSTEM.VERSION
+            system_info = heartbeat_data.get('SYSTEM', {})
+            version = system_info.get('VERSION', 'Unknown')
+            
             return {
                 'name': self.name,
                 'url': self.url,
                 'service_type': 'romm',
                 'online': True,
-                'version': heartbeat_data.get('version', 'Unknown'),
+                'version': version,
                 'platforms_count': heartbeat_data.get('platforms_count', 0),
                 'roms_count': heartbeat_data.get('roms_count', 0),
                 'users_count': heartbeat_data.get('users_count', 0)
