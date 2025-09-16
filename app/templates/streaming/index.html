@@ -23,6 +23,10 @@
             <span id="streaming-auto-refresh-loader" class="htmx-indicator loading loading-spinner loading-sm text-primary ml-2"></span>
         </div>
         <div class="flex items-center space-x-2 mt-4 sm:mt-0">
+            <button class="btn btn-ghost btn-sm" onclick="streaming_settings_modal.showModal()" title="Streaming Settings">
+                <i class="fa-solid fa-cog"></i>
+            </button>
+            
             <div class="dropdown dropdown-end">
                 <label tabindex="0" class="btn btn-ghost btn-sm" title="Change view">
                     <i class="fa-solid fa-eye mr-1"></i> View <i class="fa-solid fa-chevron-down fa-xs ml-1"></i>
@@ -213,6 +217,119 @@
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 <!-- END: GEOIP MODAL -->
+
+<!-- STREAMING SETTINGS MODAL -->
+<dialog id="streaming_settings_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-3xl bg-base-100 border border-base-300 shadow-2xl p-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-base-300">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <i class="fa-solid fa-cog text-primary text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold text-base-content">Streaming Settings</h3>
+                    <p class="text-sm text-base-content/60">Configure streaming monitoring and display options</p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost hover:bg-base-200">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <!-- Description Card -->
+            <div class="bg-base-200/50 rounded-lg p-4 mb-6 border border-base-300">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-info text-info text-sm"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-base-content mb-1">Stream Monitoring Configuration</h4>
+                        <p class="text-sm text-base-content/70 leading-relaxed">
+                            Control how frequently streaming sessions are monitored and whether to display real-time stream counts in the navigation bar.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <form id="streamingSettingsForm" 
+                  hx-post="{{ url_for('settings.update_streaming_settings') }}"
+                  hx-target="#streaming-settings-status"
+                  hx-swap="innerHTML"
+                  hx-indicator="#streaming-settings-loader">
+                
+                <!-- Settings Grid -->
+                <div class="space-y-4">
+                    <!-- Enable Nav Bar Stream Badge -->
+                    <div class="space-y-3">
+                        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-satellite-dish text-success text-sm"></i>
+                                <h5 class="font-medium text-base-content">Enable Nav Bar Stream Badge</h5>
+                            </div>
+                            <label class="label cursor-pointer justify-start p-0">
+                                <input type="checkbox" id="enable_navbar_stream_badge" name="enable_navbar_stream_badge" 
+                                       class="toggle toggle-primary mr-3" value="true">
+                                <span class="text-sm text-base-content/80">Enable real-time stream count in navigation</span>
+                            </label>
+                            <p class="text-xs text-base-content/60 mt-2">Shows a live badge in the navigation bar displaying the current number of active streams</p>
+                        </div>
+                        
+                        <!-- Warning Card -->
+                        <div class="bg-warning/10 border border-warning/20 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <i class="fa-solid fa-exclamation-triangle text-warning text-xs"></i>
+                                </div>
+                                <div>
+                                    <h5 class="font-medium text-base-content mb-1">Performance Impact</h5>
+                                    <p class="text-sm text-base-content/80 leading-relaxed">
+                                        Enabling this feature will override the session monitoring interval and check for streams every 5 seconds. 
+                                        This may increase server load but provides real-time updates.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Session Monitoring Interval -->
+                    <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-clock text-success text-sm"></i>
+                            <h5 class="font-medium text-base-content">Session Monitoring Interval (seconds)</h5>
+                        </div>
+                        <input type="number" id="session_monitoring_interval" name="session_monitoring_interval" 
+                               class="input input-bordered w-full" min="5" max="300" step="1">
+                        <p class="text-xs text-base-content/60 mt-2" id="interval-description">
+                            How often to check for new media sessions (in seconds). Disabled when Nav Bar Stream Badge is enabled.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Status Message -->
+                <div id="streaming-settings-status" class="mt-4 min-h-[1em]"></div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-base-300">
+                    <button type="button" class="btn btn-ghost" onclick="streaming_settings_modal.close()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary gap-2">
+                        <span id="streaming-settings-loader" class="htmx-indicator loading loading-spinner loading-xs"></span>
+                        <i class="fa-solid fa-save htmx-indicator-hide"></i>
+                        Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+<!-- END: STREAMING SETTINGS MODAL -->
 {% endblock %}
 
 {% block scripts %}
@@ -362,6 +479,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Start fake real-time timestamps on initial load
     //console.log('🚀 DOMContentLoaded - Starting fake realtime timestamps');
     startFakeRealtimeTimestamps();
+
+    // Initialize streaming settings modal
+    initializeStreamingSettings();
 
     // Listen for HTMX afterSettle event on the container to reset the countdown
     // after an auto-refresh or manual refresh completes.
@@ -571,6 +691,74 @@ function copyRawData(modalId) {
                     }, 2000);
                 }
             });
+        }
+    }
+}
+
+// Streaming Settings Modal Logic
+function initializeStreamingSettings() {
+    const navbarToggle = document.getElementById('enable_navbar_stream_badge');
+    const intervalInput = document.getElementById('session_monitoring_interval');
+    const intervalDescription = document.getElementById('interval-description');
+    
+    function updateIntervalField() {
+        if (navbarToggle && navbarToggle.checked) {
+            intervalInput.disabled = true;
+            intervalInput.classList.add('input-disabled');
+            intervalDescription.textContent = 'Disabled when Nav Bar Stream Badge is enabled. Badge updates every 5 seconds.';
+        } else {
+            intervalInput.disabled = false;
+            intervalInput.classList.remove('input-disabled');
+            intervalDescription.textContent = 'How often to check for new media sessions (in seconds). Disabled when Nav Bar Stream Badge is enabled.';
+        }
+    }
+    
+    // Load current settings when modal opens
+    function loadStreamingSettings() {
+        fetch('{{ url_for("settings.get_streaming_settings") }}')
+            .then(response => response.json())
+            .then(data => {
+                if (navbarToggle) {
+                    navbarToggle.checked = data.enable_navbar_stream_badge || false;
+                }
+                if (intervalInput) {
+                    intervalInput.value = data.session_monitoring_interval || 30;
+                }
+                updateIntervalField();
+            })
+            .catch(error => {
+                console.error('Error loading streaming settings:', error);
+            });
+    }
+    
+    // Listen for navbar toggle changes
+    if (navbarToggle) {
+        navbarToggle.addEventListener('change', updateIntervalField);
+    }
+    
+    // Handle form submission
+    const streamingSettingsForm = document.getElementById('streamingSettingsForm');
+    if (streamingSettingsForm) {
+        streamingSettingsForm.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.successful) {
+                setTimeout(() => {
+                    document.getElementById('streaming_settings_modal').close();
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('Streaming settings saved successfully!', 'success');
+                    }
+                }, 1000);
+            }
+        });
+    }
+    
+    // Load settings when modal is opened
+    const streamingSettingsModal = document.getElementById('streaming_settings_modal');
+    if (streamingSettingsModal) {
+        streamingSettingsModal.addEventListener('show', loadStreamingSettings);
+        // Also trigger when modal is clicked to open (since 'show' might not work)
+        const openButton = document.querySelector('button[onclick="streaming_settings_modal.showModal()"]');
+        if (openButton) {
+            openButton.addEventListener('click', loadStreamingSettings);
         }
     }
 }

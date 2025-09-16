@@ -1,7 +1,7 @@
 # File: app/routes/settings.py
 from flask import (
     Blueprint, render_template, redirect, url_for, 
-    flash, request, current_app, g, make_response, session
+    flash, request, current_app, g, make_response, session, jsonify
 )
 from flask_login import login_required, current_user, logout_user 
 import secrets
@@ -542,3 +542,56 @@ def logs_partial():
                            logs=logs, 
                            event_types=event_types,
                            current_per_page=items_per_page)
+
+@bp.route('/streaming-settings', methods=['GET'])
+@login_required
+@setup_required
+@permission_required('view_settings')
+def get_streaming_settings():
+    """Get current streaming settings as JSON"""
+    try:
+        enable_navbar_stream_badge = Setting.get('ENABLE_NAVBAR_STREAM_BADGE', 'false').lower() == 'true'
+        session_monitoring_interval = int(Setting.get('SESSION_MONITORING_INTERVAL_SECONDS', '30'))
+        
+        return jsonify({
+            'enable_navbar_stream_badge': enable_navbar_stream_badge,
+            'session_monitoring_interval': session_monitoring_interval
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error getting streaming settings: {e}")
+        return jsonify({'error': 'Failed to load settings'}), 500
+
+@bp.route('/streaming-settings', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('edit_settings')
+def update_streaming_settings():
+    """Update streaming settings"""
+    try:
+        enable_navbar_stream_badge = request.form.get('enable_navbar_stream_badge') == 'true'
+        session_monitoring_interval = request.form.get('session_monitoring_interval', '30')
+        
+        # Validate session monitoring interval
+        try:
+            interval_value = int(session_monitoring_interval)
+            if interval_value < 5 or interval_value > 300:
+                raise ValueError("Interval must be between 5 and 300 seconds")
+        except ValueError as e:
+            return jsonify({'error': f'Invalid session monitoring interval: {e}'}), 400
+        
+        # Save settings
+        Setting.set('ENABLE_NAVBAR_STREAM_BADGE', 'true' if enable_navbar_stream_badge else 'false')
+        Setting.set('SESSION_MONITORING_INTERVAL_SECONDS', str(interval_value))
+        
+        current_app.logger.info(f"Streaming settings updated by {current_user.username}: "
+                               f"navbar_badge={enable_navbar_stream_badge}, "
+                               f"interval={interval_value}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Streaming settings updated successfully!'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error updating streaming settings: {e}")
+        return jsonify({'error': 'Failed to save settings'}), 500
