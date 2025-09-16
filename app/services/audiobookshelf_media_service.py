@@ -622,6 +622,36 @@ class AudiobookShelfMediaService(BaseMediaService):
                 # Location info
                 location_ip = device_info.get('ipAddress', 'N/A')
                 
+                # Clean up IPv6-mapped IPv4 addresses for display
+                display_ip = location_ip
+                if location_ip and location_ip.startswith('::ffff:'):
+                    display_ip = location_ip[7:]  # Remove ::ffff: prefix for display
+                
+                # Determine if IP is LAN or WAN
+                def is_lan_ip(ip_str):
+                    """Check if IP address is in private/local range"""
+                    if not ip_str or ip_str == 'N/A':
+                        return False
+                    
+                    # Handle IPv6-mapped IPv4 addresses (::ffff:x.x.x.x)
+                    if ip_str.startswith('::ffff:'):
+                        ip_str = ip_str[7:]  # Remove ::ffff: prefix
+                    
+                    # Handle localhost
+                    if ip_str in ['127.0.0.1', 'localhost', '::1']:
+                        return True
+                    
+                    try:
+                        import ipaddress
+                        ip = ipaddress.ip_address(ip_str)
+                        return ip.is_private or ip.is_loopback
+                    except (ValueError, ipaddress.AddressValueError):
+                        # If we can't parse it, assume WAN for safety
+                        return False
+                
+                is_lan = is_lan_ip(location_ip)
+                location_type = "LAN" if is_lan else "WAN"
+                
                 # Cover/thumbnail - use same working pattern as media library
                 cover_path = raw_session.get('coverPath')
                 library_item_id = raw_session.get('libraryItemId')
@@ -691,12 +721,12 @@ class AudiobookShelfMediaService(BaseMediaService):
                     'video_detail': 'N/A (Audio Only)',
                     'audio_detail': 'Direct Stream (Original)',
                     'subtitle_detail': 'N/A',
-                    'location_detail': f"Remote: {location_ip}",
-                    'is_public_ip': True,  # Assume public for now
-                    'location_ip': location_ip,
-                    'bandwidth_detail': 'Streaming Audio',
+                    'location_detail': f"{location_type}: {display_ip}",
+                    'is_public_ip': not is_lan,
+                    'location_ip': display_ip,
+                    'bandwidth_detail': f'Streaming via {location_type}',
                     'bitrate_calc': 0,  # Not provided by AudioBookshelf
-                    'location_type_calc': 'WAN',
+                    'location_type_calc': location_type,
                     'is_transcode_calc': False,  # AudioBookshelf streams original files
                     'raw_data_json': json.dumps(raw_session, indent=2),
                     'raw_data_json_lines': json.dumps(raw_session, indent=2).splitlines(),
