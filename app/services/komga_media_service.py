@@ -64,9 +64,30 @@ class KomgaMediaService(BaseMediaService):
     def test_connection(self) -> Tuple[bool, str]:
         """Test connection to Komga server"""
         try:
-            # Try to get server info
+            # Get server version from actuator info endpoint
+            version = 'Unknown'
+            try:
+                # Komga actuator endpoint doesn't use the API versioning
+                url = f"{self.url.rstrip('/')}/actuator/info"
+                headers = self._get_headers()
+                timeout = get_api_timeout()
+                response = requests.get(url, headers=headers, timeout=timeout)
+                response.raise_for_status()
+                info_data = response.json()
+                
+                # Extract version from build info
+                build_info = info_data.get('build', {})
+                version = build_info.get('version', 'Unknown')
+            except Exception as e:
+                self.log_info(f"Could not get version from actuator/info: {e}")
+            
+            # Test basic connectivity
             self._make_request('users')
-            return True, "Connected to Komga successfully"
+            
+            if version != 'Unknown':
+                return True, f"Connected to Komga (v{version}) successfully"
+            else:
+                return True, "Connected to Komga successfully"
         except Exception as e:
             return False, f"Connection failed: {str(e)}"
     
@@ -219,14 +240,36 @@ class KomgaMediaService(BaseMediaService):
     def get_server_info(self) -> Dict[str, Any]:
         """Get Komga server information"""
         try:
-            # Komga doesn't have a specific version endpoint, so we'll use user info
-            self._make_request('users')
+            # Get server version from actuator info endpoint
+            version = 'Unknown'
+            online = True
+            
+            try:
+                # Komga actuator endpoint doesn't use the API versioning
+                url = f"{self.url.rstrip('/')}/actuator/info"
+                headers = self._get_headers()
+                timeout = get_api_timeout()
+                response = requests.get(url, headers=headers, timeout=timeout)
+                response.raise_for_status()
+                info_data = response.json()
+                
+                # Extract version from build info
+                build_info = info_data.get('build', {})
+                version = build_info.get('version', 'Unknown')
+            except Exception as e:
+                self.log_info(f"Could not get version from actuator/info in get_server_info: {e}")
+                # Test basic connectivity if version fetch fails
+                try:
+                    self._make_request('users')
+                except:
+                    online = False
+            
             return {
                 'name': self.name,
                 'url': self.url,
                 'service_type': self.service_type.value,
-                'online': True,
-                'version': 'Unknown'
+                'online': online,
+                'version': version
             }
         except:
             return {
