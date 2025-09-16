@@ -359,6 +359,10 @@ document.addEventListener('DOMContentLoaded', function () {
         resetAndStartCountdown();
     }
 
+    // Start fake real-time timestamps on initial load
+    //console.log('🚀 DOMContentLoaded - Starting fake realtime timestamps');
+    startFakeRealtimeTimestamps();
+
     // Listen for HTMX afterSettle event on the container to reset the countdown
     // after an auto-refresh or manual refresh completes.
     if (streamingContainer) {
@@ -368,6 +372,9 @@ document.addEventListener('DOMContentLoaded', function () {
             resetAndStartCountdown();
             // Ensure the auto-refresh URL is updated with current view
             updateAutoRefreshUrl();
+            // Restart fake real-time timestamps after content update
+            //console.log('🔄 HTMX afterSettle - Restarting fake realtime timestamps');
+            startFakeRealtimeTimestamps();
         });
     }
     
@@ -427,6 +434,105 @@ function setStreamingView(view) {
 
     // Update the auto-refresh URL
     updateAutoRefreshUrl();
+}
+
+// Global fake real-time timestamp functionality
+window.streamingTimestampIntervals = window.streamingTimestampIntervals || new Map();
+
+function parseTimeToSeconds(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':').map(Number);
+    if (parts.length === 2) {
+        return parts[0] * 60 + parts[1]; // MM:SS
+    } else if (parts.length === 3) {
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]; // HH:MM:SS
+    }
+    return 0;
+}
+
+function formatSecondsToTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+}
+
+function startFakeRealtimeTimestamps() {
+    //console.log('🕒 Starting fake realtime timestamps...');
+    
+    // Clear any existing intervals
+    window.streamingTimestampIntervals.forEach(interval => clearInterval(interval));
+    window.streamingTimestampIntervals.clear();
+    //console.log('🧹 Cleared existing intervals');
+
+    const timestampElements = document.querySelectorAll('.fake-realtime-timestamp');
+    //console.log(`🎯 Found ${timestampElements.length} timestamp elements`);
+    
+    timestampElements.forEach((element, index) => {
+        const sessionKey = element.dataset.sessionKey;
+        const initialTime = element.dataset.initialTime;
+        const duration = element.dataset.duration;
+        const initialProgress = parseFloat(element.dataset.progress);
+        const state = element.dataset.state;
+
+        //console.log(`📊 Element ${index + 1}:`, {
+        //    sessionKey,
+        //    initialTime,
+        //    duration,
+        //    initialProgress,
+        //    state,
+        //    element: element
+        //});
+
+        // Only increment if the session is playing/listening
+        if (state && (state.toLowerCase() === 'playing' || state.toLowerCase() === 'listening')) {
+            let currentSeconds = parseTimeToSeconds(initialTime);
+            const durationSeconds = parseTimeToSeconds(duration);
+            
+            //console.log(`▶️ Starting timer for session ${sessionKey}:`, {
+            //    currentSeconds,
+            //    durationSeconds,
+            //    initialTime,
+            //    duration
+            //});
+
+            const interval = setInterval(() => {
+                // Only increment if still playing and not at the end
+                if (currentSeconds < durationSeconds) {
+                    currentSeconds++;
+                    const currentTimeStr = formatSecondsToTime(currentSeconds);
+                    const newProgress = (currentSeconds / durationSeconds) * 100;
+                    
+                    //console.log(`⏰ Updating ${sessionKey}: ${currentTimeStr} / ${duration} (${newProgress.toFixed(1)}%)`);
+                    
+                    element.textContent = `${currentTimeStr} / ${duration} (${newProgress.toFixed(1)}%)`;
+                    
+                    // Update the progress bar if it exists for this session
+                    const progressBar = element.closest('.card').querySelector('progress');
+                    if (progressBar) {
+                        progressBar.value = newProgress;
+                        //console.log(`📊 Updated progress bar for ${sessionKey}: ${newProgress.toFixed(1)}%`);
+                    } else {
+                        console.log(`❌ No progress bar found for ${sessionKey}`);
+                    }
+                } else {
+                    console.log(`🏁 Session ${sessionKey} reached end of duration`);
+                }
+            }, 1000);
+
+            window.streamingTimestampIntervals.set(sessionKey, interval);
+            //console.log(`✅ Set interval for session ${sessionKey}`);
+        } else {
+            console.log(`⏸️ Skipping session ${sessionKey} - state: "${state}" (not playing/listening)`);
+        }
+    });
+    
+    //console.log(`🎬 Total active intervals: ${window.streamingTimestampIntervals.size}`);
 }
 
 // Global copy function for raw data modals

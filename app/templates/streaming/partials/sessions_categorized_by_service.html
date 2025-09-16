@@ -255,7 +255,19 @@
                                     {{ session.state | capitalize if session.state else 'Unknown' }}
                                     <!-- DEBUG: state='{{ session.state }}' -->
                                 </span>
-                                <span class="text-xs text-base-content/70">{{ session.progress | round(1) }}%
+                                <span class="text-xs text-base-content/70">
+                                    {% if session.service_type in ['audiobookshelf', 'plex'] and session.current_time and session.duration %}
+                                        <span class="fake-realtime-timestamp" 
+                                              data-initial-time="{{ session.current_time }}" 
+                                              data-duration="{{ session.duration }}" 
+                                              data-progress="{{ session.progress }}" 
+                                              data-state="{{ session.state }}"
+                                              data-session-key="{{ session.session_key }}">
+                                            {{ session.current_time }} / {{ session.duration }} ({{ session.progress | round(1) }}%)
+                                        </span>
+                                    {% else %}
+                                        {{ session.progress | round(1) }}%
+                                    {% endif %}
                                     <!-- DEBUG: progress='{{ session.progress }}' -->
                                 </span>
                             </div>
@@ -391,4 +403,5 @@
             }, 2000);
         });
     }
+
 </script>
