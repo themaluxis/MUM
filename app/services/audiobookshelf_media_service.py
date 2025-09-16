@@ -555,15 +555,63 @@ class AudiobookShelfMediaService(BaseMediaService):
             
             # Extract sessions from the response
             sessions = response.get('sessions', [])
-            self.log_info(f"AudioBookshelf: Retrieved {len(sessions)} active sessions")
+            self.log_info(f"AudioBookshelf: Retrieved {len(sessions)} sessions from API")
             
-            # Add server context to each session
-            for session in sessions:
+            # Debug: Log the full response structure
+            # self.log_info(f"AudioBookshelf: Full sessions API response: {response}")
+            
+            # Debug: Log details about each session
+            active_sessions = []
+            for i, session in enumerate(sessions):
+                # self.log_info(f"AudioBookshelf: Session {i+1} debug info:")
+                # self.log_info(f"  - ID: {session.get('id')}")
+                # self.log_info(f"  - User: {session.get('user', {}).get('username')}")
+                # self.log_info(f"  - Media: {session.get('mediaMetadata', {}).get('title')}")
+                # self.log_info(f"  - Started: {session.get('startedAt')}")
+                # self.log_info(f"  - Updated: {session.get('updatedAt')}")
+                # self.log_info(f"  - Current Time: {session.get('currentTime')}")
+                # self.log_info(f"  - Duration: {session.get('duration')}")
+                # self.log_info(f"  - Device Info: {session.get('deviceInfo', {})}")
+                
+                # Check if session appears to be active
+                current_time = session.get('currentTime', 0)
+                duration = session.get('duration', 0)
+                progress = (current_time / duration * 100) if duration > 0 else 0
+                
+                # Calculate how long ago the session was last updated
+                updated_at = session.get('updatedAt')
+                if updated_at:
+                    try:
+                        import datetime
+                        updated_timestamp = updated_at / 1000  # Convert from milliseconds
+                        updated_datetime = datetime.datetime.fromtimestamp(updated_timestamp)
+                        now = datetime.datetime.now()
+                        time_since_update = (now - updated_datetime).total_seconds()
+                        # self.log_info(f"  - Last updated: {time_since_update:.1f} seconds ago ({updated_datetime})")
+                        
+                        # Flag potentially stale sessions and filter them out
+                        if time_since_update > 15:  # 15 seconds
+                            # self.log_warning(f"  - POTENTIALLY STALE: Session hasn't been updated in {time_since_update:.1f} seconds - FILTERING OUT")
+                            continue  # Skip this stale session
+                        
+                    except Exception as e:
+                        # self.log_info(f"  - Could not parse update time: {e}")
+                        # If we can't parse the timestamp, assume it's stale and skip it
+                        # self.log_warning(f"  - Skipping session due to unparseable timestamp")
+                        continue
+                
+                # self.log_info(f"  - Progress: {progress:.1f}%")
+                # self.log_info(f"  - Session is ACTIVE (updated recently)")
+                
+                # Add server context to each session
                 session['server_name'] = self.name
                 session['server_id'] = self.server_id
                 session['service_type'] = self.service_type.value
+                
+                active_sessions.append(session)
             
-            return sessions
+            self.log_info(f"AudioBookshelf: Returning {len(active_sessions)} sessions to streaming page")
+            return active_sessions
             
         except Exception as e:
             self.log_error(f"Error fetching active sessions: {e}")
