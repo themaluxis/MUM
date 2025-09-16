@@ -19,7 +19,25 @@
 {% if sessions and sessions|length > 0 %}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
         {% for session in sessions %}
-        <div class="card bg-base-200 shadow-lg w-full max-w-md relative group" tabindex="0">
+        <!-- Determine service-specific gradient background -->
+        {% if session.service_type == 'plex' %}
+            {% set card_bg_class = "bg-gradient-to-br from-base-200 to-plex/10" %}
+        {% elif session.service_type == 'jellyfin' %}
+            {% set card_bg_class = "bg-gradient-to-br from-base-200 to-jellyfin/10" %}
+        {% elif session.service_type == 'emby' %}
+            {% set card_bg_class = "bg-gradient-to-br from-base-200 to-emby/10" %}
+        {% elif session.service_type == 'kavita' %}
+            {% set card_bg_class = "bg-gradient-to-br from-base-200 to-kavita/10" %}
+        {% elif session.service_type == 'audiobookshelf' %}
+            {% set card_bg_class = "bg-gradient-to-br from-base-200 to-audiobookshelf/10" %}
+        {% elif session.service_type == 'komga' %}
+            {% set card_bg_class = "bg-gradient-to-br from-base-200 to-komga/10" %}
+        {% elif session.service_type == 'romm' %}
+            {% set card_bg_class = "bg-gradient-to-br from-base-200 to-romm/10" %}
+        {% else %}
+            {% set card_bg_class = "bg-base-200" %}
+        {% endif %}
+        <div class="card {{ card_bg_class }} shadow-lg w-full max-w-md relative group" tabindex="0">
             <div class="absolute top-2 right-2 z-10 flex space-x-1
                         opacity-0 pointer-events-none 
                         transition-opacity duration-200 
