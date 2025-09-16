@@ -748,6 +748,26 @@ class PlexMediaService(BaseMediaService):
                 library_name = getattr(raw_session, 'librarySectionTitle', "N/A")
                 progress = (raw_session.viewOffset / raw_session.duration) * 100 if raw_session.duration else 0
                 
+                # Format time display like AudioBookshelf
+                def format_time_ms(milliseconds):
+                    if not milliseconds:
+                        return "0:00"
+                    seconds = int(milliseconds / 1000)
+                    hours = seconds // 3600
+                    minutes = (seconds % 3600) // 60
+                    secs = seconds % 60
+                    if hours > 0:
+                        return f"{hours}:{minutes:02d}:{secs:02d}"
+                    else:
+                        return f"{minutes}:{secs:02d}"
+                
+                current_time_formatted = format_time_ms(raw_session.viewOffset) if raw_session.viewOffset else "0:00"
+                duration_formatted = format_time_ms(raw_session.duration) if raw_session.duration else "0:00"
+                
+                # Debug logging for time formatting
+                self.log_info(f"Plex session time debug - viewOffset: {raw_session.viewOffset}, duration: {raw_session.duration}")
+                self.log_info(f"Plex session formatted times - current: '{current_time_formatted}', duration: '{duration_formatted}'")
+                
                 # Thumbnail handling
                 thumb_path = raw_session.thumb
                 if media_type == 'Episode' and hasattr(raw_session, 'grandparentThumb'):
@@ -953,7 +973,10 @@ class PlexMediaService(BaseMediaService):
                     'raw_data_json': raw_json_string,
                     'raw_data_json_lines': raw_json_string.splitlines(),
                     'service_type': 'plex',
-                    'server_name': self.name
+                    'server_name': self.name,
+                    # Add formatted time fields for enhanced progress display
+                    'current_time': current_time_formatted,
+                    'duration': duration_formatted
                 }
                 formatted_sessions.append(session_details)
                 

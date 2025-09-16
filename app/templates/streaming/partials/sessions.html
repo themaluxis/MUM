@@ -235,7 +235,12 @@
                             {{ session.state | capitalize if session.state else 'Unknown' }}
                             <!-- DEBUG: state='{{ session.state }}' -->
                         </span>
-                        <span class="text-xs text-base-content/70">{{ session.progress | round(1) }}%
+                        <span class="text-xs text-base-content/70">
+                            {% if session.service_type in ['audiobookshelf', 'plex'] and session.current_time and session.duration %}
+                                {{ session.current_time }} / {{ session.duration }} ({{ session.progress | round(1) }}%)
+                            {% else %}
+                                {{ session.progress | round(1) }}%
+                            {% endif %}
                             <!-- DEBUG: progress='{{ session.progress }}' -->
                         </span>
                     </div>
