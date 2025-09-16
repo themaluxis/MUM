@@ -55,8 +55,8 @@
                                     {% endif %}
                                 {% else %}
                                     <p class="text-sm"><strong class="text-error">Offline</strong></p>
-                                    <p class="text-xs text-base-content/70" title="{{ status.error_message | default('Could not connect.') }}">
-                                        {{ status.error_message | default('Could not connect.') | truncate(100, True) }}
+                                    <p class="text-xs text-base-content/70" title="{{ status.error_message or 'Could not connect.' }}">
+                                        {{ (status.error_message or 'Could not connect.') | truncate(100, True) }}
                                     </p>
                                 {% endif %}
                             </div>

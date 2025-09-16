@@ -73,25 +73,15 @@ class AudiobookShelfMediaService(BaseMediaService):
     def test_connection(self) -> Tuple[bool, str]:
         """Test connection to AudiobookShelf server"""
         try:
-            # Test authentication with /api/me endpoint
-            user_info = self._make_request('me')
-            username = user_info.get('username', 'Unknown')
+            # Get server info including version from /api/authorize endpoint
+            auth_info = self._make_request('authorize', method='POST')
+            username = auth_info.get('user', {}).get('username', 'Unknown')
             
-            # Get server version - try different endpoints
+            # Get server version from serverSettings
             version = 'Unknown'
-            try:
-                # Try /api/status first
-                status_info = self._make_request('status')
-                version = status_info.get('serverVersion', status_info.get('version', 'Unknown'))
-            except Exception as e:
-                self.log_info(f"Status endpoint failed: {e}, trying alternatives")
-                try:
-                    # Try /api/ping
-                    ping_info = self._make_request('ping')
-                    version = ping_info.get('serverVersion', ping_info.get('version', 'Unknown'))
-                except Exception as e2:
-                    self.log_info(f"Ping endpoint also failed: {e2}")
-                    # Don't fail the whole test if we can't get version info
+            server_settings = auth_info.get('serverSettings', {})
+            if server_settings:
+                version = server_settings.get('version', 'Unknown')
             
             if version != 'Unknown':
                 return True, f"Connected to AudiobookShelf (v{version}) as user '{username}'"
@@ -331,25 +321,22 @@ class AudiobookShelfMediaService(BaseMediaService):
     def get_server_info(self) -> Dict[str, Any]:
         """Get AudiobookShelf server information"""
         try:
-            # Try to get server info, with fallback for missing endpoints
+            # Get server info including version from /api/authorize endpoint
             version = 'Unknown'
             online = True
             
             try:
-                info = self._make_request('status')
-                version = info.get('serverVersion', info.get('version', 'Unknown'))
+                auth_info = self._make_request('authorize', method='POST')
+                server_settings = auth_info.get('serverSettings', {})
+                if server_settings:
+                    version = server_settings.get('version', 'Unknown')
             except Exception as e:
-                self.log_info(f"Status endpoint failed in get_server_info: {e}, trying alternatives")
+                self.log_info(f"Authorize endpoint failed in get_server_info: {e}, testing connectivity")
+                # Test basic connectivity
                 try:
-                    ping_info = self._make_request('ping')
-                    version = ping_info.get('serverVersion', ping_info.get('version', 'Unknown'))
-                except Exception as e2:
-                    self.log_info(f"Ping endpoint also failed in get_server_info: {e2}")
-                    # Still mark as online if we can reach the server at all
-                    try:
-                        self._make_request('me')  # Test basic connectivity
-                    except:
-                        online = False
+                    self._make_request('me')  # Test basic connectivity
+                except:
+                    online = False
             
             return {
                 'name': self.name,
