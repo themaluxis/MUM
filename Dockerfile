@@ -46,10 +46,8 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
 # This step invalidates cache AFTER pip install, which is good.
 COPY . .
 
-# Create necessary directories and user
+# Create necessary directories (user creation moved to entrypoint.sh)
 RUN mkdir -p /app/instance /.cache
-RUN addgroup -S -g "$PGID" mumgroup && \
-    adduser -S -G mumgroup -u "$PUID" mumuser
 
 # Healthcheck and expose (already good)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
