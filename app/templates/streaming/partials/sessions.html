@@ -228,7 +228,7 @@
                 <div class="mt-2">
                     <div class="flex justify-between items-center mb-0.5">
                         <span class="text-xs font-medium uppercase 
-                            {% if session.state and session.state.lower() == 'playing' %}text-success
+                            {% if session.state and session.state.lower() in ['playing', 'listening'] %}text-success
                             {% elif session.state and session.state.lower() == 'paused' %}text-warning
                             {% elif session.state and session.state.lower() == 'buffering' %}text-info
                             {% else %}text-base-content/70{% endif %}">
@@ -240,7 +240,7 @@
                         </span>
                     </div>
                     <progress class="progress progress-xs w-full 
-                        {% if session.state and session.state.lower() == 'playing' %}progress-success
+                        {% if session.state and session.state.lower() in ['playing', 'listening'] %}progress-success
                         {% elif session.state and session.state.lower() == 'paused' %}progress-warning 
                         {% elif session.state and session.state.lower() == 'buffering' %}progress-info
                         {% else %}progress-primary{% endif %}" 
