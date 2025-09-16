@@ -500,8 +500,42 @@ def toggle_invite_status(invite_id):
         status_text = "activated" if invite.is_active else "deactivated"
         log_event(EventType.SETTING_CHANGE, f"Invite '{invite.custom_path or invite.token}' (ID: {invite_id}) {status_text} by admin.", invite_id=invite_id, admin_id=current_user.id)
         
-        # Return the updated single invite card
-        return render_template('invites/partials/single_invite_card.html', invite=invite)
+        # Return the updated invite card row to match HTMX target
+        from datetime import datetime
+        from app.services.media_service_manager import MediaServiceManager
+        
+        now = datetime.now()
+        media_service_manager = MediaServiceManager()
+        all_servers = media_service_manager.get_all_servers(active_only=True)
+        
+        # Build library lookup for template
+        all_libraries_lookup = {}
+        for server in all_servers:
+            try:
+                from app.models_media_services import MediaLibrary
+                db_libraries = MediaLibrary.query.filter_by(server_id=server.id).all()
+                for lib in db_libraries:
+                    lib_data = {
+                        'id': lib.id,
+                        'external_id': lib.external_id,
+                        'name': lib.name,
+                        'server_id': server.id,
+                        'server_name': server.server_nickname,
+                        'service_type': server.service_type.value
+                    }
+                    if server.service_type.name.upper() == 'KAVITA':
+                        prefixed_id = f"[{server.service_type.name.upper()}]-{server.server_nickname}-{lib.external_id}"
+                        all_libraries_lookup[prefixed_id] = lib_data
+                    else:
+                        all_libraries_lookup[lib.external_id] = lib_data
+                        if server.service_type.name.upper() == 'AUDIOBOOKSHELF':
+                            prefixed_id = f"[{server.service_type.name.upper()}]-{server.server_nickname}-{lib.external_id}"
+                            all_libraries_lookup[prefixed_id] = lib_data
+            except Exception as e:
+                current_app.logger.error(f"Failed to load libraries for server {server.server_nickname}: {e}")
+        
+        # Return just the status badge for HTMX replacement
+        return render_template('invites/partials/status_badge.html', invite=invite)
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error toggling invite status {invite_id}: {e}")
