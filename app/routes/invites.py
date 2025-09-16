@@ -102,8 +102,13 @@ def list_invites():
                     prefixed_id = f"[{server.service_type.name.upper()}]-{server.server_nickname}-{lib.external_id}"
                     all_libraries_lookup[prefixed_id] = lib_data
                 else:
-                    # For other services, use raw external_id
+                    # For other services (including AudioBookshelf), use raw external_id
                     all_libraries_lookup[lib.external_id] = lib_data
+                    
+                    # For AudioBookshelf, also add a prefixed version for backward compatibility
+                    if server.service_type.name.upper() == 'AUDIOBOOKSHELF':
+                        prefixed_id = f"[{server.service_type.name.upper()}]-{server.server_nickname}-{lib.external_id}"
+                        all_libraries_lookup[prefixed_id] = lib_data
             
             libraries_by_server[server.id] = server_libraries
             current_app.logger.debug(f"Loaded {len(server_libraries)} libraries for server {server.server_nickname}")
@@ -111,6 +116,8 @@ def list_invites():
         except Exception as e:
             current_app.logger.error(f"Failed to load libraries for server {server.server_nickname}: {e}")
             libraries_by_server[server.id] = {}
+    else:
+        current_app.logger.debug("No invites found, skipping library loading for performance")
     
     # Discord settings
     discord_oauth_enabled = Setting.get_bool('DISCORD_OAUTH_ENABLED', False)
