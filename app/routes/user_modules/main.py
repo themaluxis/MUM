@@ -555,7 +555,7 @@ def list_users():
     if is_htmx:
         result = render_template('users/partials/user_list_content.html', **template_context)
     else:
-        result = render_template('users/list.html', **template_context)
+        result = render_template('users/index.html', **template_context)
     
     # Log performance for slow requests only
     total_time = time.time() - start_time
