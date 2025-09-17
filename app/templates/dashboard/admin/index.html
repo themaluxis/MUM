@@ -52,7 +52,7 @@
         </a>
         <div class="card bg-base-200 shadow-xl">
             <div class="card-body justify-between" id="server_status_card_content">
-                {% include 'dashboard/_partials/multi_service_status.html' with context %}
+                {% include 'dashboard/_partials/admin/multi_service_status.html' with context %}
             </div>
         </div>
     </div>
@@ -63,21 +63,21 @@
     <!-- Streaming Activity Chart -->
     {% if chart_data %}
     <div class="mb-8">
-        {% include 'dashboard/_partials/admin_streaming_chart.html' %}
+        {% include 'dashboard/_partials/admin/streaming_chart.html' %}
     </div>
     {% endif %}
 
     <!-- Watch Statistics Section -->
     {% if watch_statistics_data is defined %}
     <div class="mb-8">
-        {% include 'dashboard/_partials/watch_statistics.html' %}
+        {% include 'dashboard/_partials/admin/watch_statistics.html' %}
     </div>
     {% endif %}
 
     <!-- Top Users Section -->
     {% if top_users_data is defined %}
     <div class="mb-8">
-        {% include 'dashboard/_partials/top_users.html' %}
+        {% include 'dashboard/_partials/admin/top_users.html' %}
     </div>
     {% endif %}
 
