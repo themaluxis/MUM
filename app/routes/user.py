@@ -44,11 +44,44 @@ def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
     current_app.logger.info(f"CHART DATA DEBUG: Querying MediaStreamHistory for user_app_access_uuid={user.uuid}")
     current_app.logger.info(f"CHART DATA DEBUG: Date range: {start_date} to {end_date}")
     
-    history_query = MediaStreamHistory.query.filter(
-        MediaStreamHistory.user_app_access_uuid == user.uuid,
-        MediaStreamHistory.started_at >= start_date,
-        MediaStreamHistory.started_at <= end_date
-    )
+    # For local users, we need to include both:
+    # 1. Direct history (user_app_access_uuid)
+    # 2. Linked service account history (user_media_access_uuid from linked accounts)
+    if isinstance(user, UserAppAccess):
+        # Get all linked service accounts for this local user
+        linked_service_accounts = UserMediaAccess.query.filter_by(
+            user_app_access_id=user.id
+        ).all()
+        
+        current_app.logger.info(f"CHART DATA DEBUG: Found {len(linked_service_accounts)} linked service accounts")
+        for sa in linked_service_accounts:
+            current_app.logger.info(f"CHART DATA DEBUG: Linked account: {sa.server.server_nickname} - {sa.external_username} (uuid: {sa.uuid})")
+        
+        # Build query to include both direct and linked account history
+        if linked_service_accounts:
+            linked_uuids = [sa.uuid for sa in linked_service_accounts]
+            history_query = MediaStreamHistory.query.filter(
+                db.or_(
+                    MediaStreamHistory.user_app_access_uuid == user.uuid,
+                    MediaStreamHistory.user_media_access_uuid.in_(linked_uuids)
+                ),
+                MediaStreamHistory.started_at >= start_date,
+                MediaStreamHistory.started_at <= end_date
+            )
+        else:
+            # No linked accounts, use direct history only
+            history_query = MediaStreamHistory.query.filter(
+                MediaStreamHistory.user_app_access_uuid == user.uuid,
+                MediaStreamHistory.started_at >= start_date,
+                MediaStreamHistory.started_at <= end_date
+            )
+    else:
+        # For service users, use the original query
+        history_query = MediaStreamHistory.query.filter(
+            MediaStreamHistory.user_app_access_uuid == user.uuid,
+            MediaStreamHistory.started_at >= start_date,
+            MediaStreamHistory.started_at <= end_date
+        )
     
     streaming_history = history_query.all()
     
