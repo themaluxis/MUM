@@ -1468,23 +1468,6 @@ def profile():
     
     # Get linked service accounts if any
     linked_accounts = []
-    if isinstance(current_user, UserAppAccess):
-        # This is a UserAppAccess, get linked media access accounts directly
-        linked_accounts = current_user.media_accesses
-    else:
-        # No linked accounts for other user types
-        linked_accounts = []
-    
-    # Re-query the user to avoid detached instance issues
-    user = db.session.get(UserAppAccess, current_user.id)
-    if not user:
-        abort(404)
-    
-    return render_template(
-        'admin/account_settings.html',
-        title="Account Settings",
-        user=user
-    )
 
 @bp.route('/<username>')
 @login_required
@@ -1762,7 +1745,7 @@ def account():
         
         return redirect(url_for('user.account'))
     
-    return render_template('user/account.html',
+    return render_template('account/user/index.html',
                          title="My Account",
                          user=current_user,
                          change_password_form=change_password_form,
