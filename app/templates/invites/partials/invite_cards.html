@@ -227,12 +227,13 @@
                     <i class="fa-solid fa-chart-line"></i>
                 </button>
                 {% if current_user.has_permission('edit_invites') %}
+                <span id="invite-toggle-buttons-{{ invite.id }}">
                 {% if invite.is_active %}
                 <button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" title="Disable Invite" 
                         hx-confirm="Are you sure you want to disable this invite? It will no longer be usable."
                         hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
-                        hx-target="#invite-status-{{ invite.id }}"
-                        hx-swap="innerHTML"
+                        hx-target="#invite-toggle-buttons-{{ invite.id }}"
+                        hx-swap="outerHTML"
                         hx-indicator="this">
                     <i class="fa-solid fa-ban htmx-indicator-hide"></i>
                     <span class="htmx-indicator loading loading-spinner loading-xs"></span>
@@ -241,13 +242,14 @@
                 <button class="btn btn-xs btn-ghost text-success hover:bg-success/10" title="Enable Invite"
                         hx-confirm="Are you sure you want to enable this invite?"
                         hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
-                        hx-target="#invite-status-{{ invite.id }}"
-                        hx-swap="innerHTML"
+                        hx-target="#invite-toggle-buttons-{{ invite.id }}"
+                        hx-swap="outerHTML"
                         hx-indicator="this">
                     <i class="fa-solid fa-check htmx-indicator-hide"></i>
                     <span class="htmx-indicator loading loading-spinner loading-xs"></span>
                 </button>
                 {% endif %}
+                </span>
                 {% endif %}
                 {% if current_user.has_permission('delete_invites') %}
                 <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Delete Invite" hx-confirm="Are you sure you want to delete this invite?" hx-delete="{{ url_for('invites.delete_invite', invite_id=invite.id) }}" hx-target="#invite-row-{{ invite.id }}" hx-swap="outerHTML" hx-indicator="this">

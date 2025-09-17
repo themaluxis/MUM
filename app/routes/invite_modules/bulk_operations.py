@@ -96,3 +96,54 @@ def disable_multiple():
         db.session.rollback()
         current_app.logger.error(f"Error disabling multiple invites: {e}")
         return jsonify({"success": False, "message": "Error disabling invites"}), 500
+
+@invites_bp.route("/toggle_multiple", methods=["POST"])
+@login_required
+@setup_required
+@permission_required("edit_invites")
+def toggle_multiple():
+    """Toggle (enable/disable) multiple invites"""
+    invite_ids = request.form.getlist("invite_ids")
+    action = request.form.get("action", "disable")  # Default to disable for backwards compatibility
+    
+    if not invite_ids:
+        return jsonify({"success": False, "message": "No invites selected"}), 400
+    
+    try:
+        # Convert to integers and validate
+        invite_ids = [int(id) for id in invite_ids]
+        
+        # Determine the new status based on action
+        new_status = action == "enable"
+        action_text = "enabled" if new_status else "disabled"
+        
+        # Get invite details for logging
+        invites_to_toggle = Invite.query.filter(Invite.id.in_(invite_ids)).all()
+        invite_details = [(inv.id, inv.custom_path or inv.token) for inv in invites_to_toggle]
+        
+        # Toggle the invites
+        updated_count = Invite.query.filter(Invite.id.in_(invite_ids)).update(
+            {"is_active": new_status}, synchronize_session=False
+        )
+        db.session.commit()
+        
+        # Log the bulk toggle
+        for invite_id, path_or_token in invite_details:
+            log_event(EventType.SETTING_CHANGE, 
+                      f"Invite \"{path_or_token}\" {action_text} (bulk operation).", 
+                      invite_id=invite_id,
+                      admin_id=current_user.id)
+        
+        return jsonify({
+            "success": True, 
+            "message": f"Successfully {action_text} {updated_count} invite(s)",
+            "count": updated_count,
+            "action": action
+        })
+        
+    except ValueError:
+        return jsonify({"success": False, "message": "Invalid invite IDs"}), 400
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error toggling multiple invites: {e}")
+        return jsonify({"success": False, "message": f"Error {action}ing invites"}), 500

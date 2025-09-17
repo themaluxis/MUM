@@ -1,22 +1,24 @@
-{# Just the status badge content #}
-{% if not invite.is_active %} 
-    <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-red-500/10 text-red-400 border border-red-500/20">
-        <i class="fa-solid fa-ban w-3 h-3"></i>
-        Deactivated
-    </span>
-{% elif invite.is_expired %} 
-    <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
-        <i class="fa-solid fa-clock w-3 h-3"></i>
-        Expired
-    </span>
-{% elif invite.has_reached_max_uses %} 
-    <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-orange-500/10 text-orange-400 border border-orange-500/20">
-        <i class="fa-solid fa-users-slash w-3 h-3"></i>
-        Max Uses
-    </span>
-{% else %} 
-    <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-green-500/10 text-green-400 border border-green-500/20">
-        <i class="fa-solid fa-check-circle w-3 h-3"></i>
-        Active
-    </span>
+{# Just the toggle buttons for the card actions #}
+<span id="invite-toggle-buttons-{{ invite.id }}">
+{% if invite.is_active %}
+<button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" title="Disable Invite" 
+        hx-confirm="Are you sure you want to disable this invite? It will no longer be usable."
+        hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
+        hx-target="#invite-toggle-buttons-{{ invite.id }}"
+        hx-swap="outerHTML"
+        hx-indicator="this">
+    <i class="fa-solid fa-ban htmx-indicator-hide"></i>
+    <span class="htmx-indicator loading loading-spinner loading-xs"></span>
+</button>
+{% else %}
+<button class="btn btn-xs btn-ghost text-success hover:bg-success/10" title="Enable Invite"
+        hx-confirm="Are you sure you want to enable this invite?"
+        hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
+        hx-target="#invite-toggle-buttons-{{ invite.id }}"
+        hx-swap="outerHTML"
+        hx-indicator="this">
+    <i class="fa-solid fa-check htmx-indicator-hide"></i>
+    <span class="htmx-indicator loading loading-spinner loading-xs"></span>
+</button>
 {% endif %}
+</span>

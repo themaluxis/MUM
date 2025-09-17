@@ -534,8 +534,16 @@ def toggle_invite_status(invite_id):
             except Exception as e:
                 current_app.logger.error(f"Failed to load libraries for server {server.server_nickname}: {e}")
         
-        # Return just the status badge for HTMX replacement
-        return render_template('invites/partials/status_badge.html', invite=invite)
+        # Return just the toggle buttons for HTMX replacement
+        response = make_response(render_template('invites/partials/status_badge.html', invite=invite))
+        
+        # Trigger multiple updates: status badge and bulk actions
+        response.headers['HX-Trigger'] = json.dumps({
+            'refreshBulkActions': True,
+            'updateStatusBadge': {'inviteId': invite.id, 'isActive': invite.is_active}
+        })
+        
+        return response
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error toggling invite status {invite_id}: {e}")

@@ -281,17 +281,44 @@ function updateMassActions() {
     const massActionsContainer = document.getElementById('mass-actions-container');
     const selectedCountSpan = document.getElementById('selected-invites-count');
     const selectedCountSpanMobile = document.getElementById('selected-invites-count-mobile');
+    const disableSelectedButton = document.getElementById('disable-selected-button');
     const selectedCheckboxes = document.querySelectorAll('.invite-checkbox:checked');
     const allCheckboxes = document.querySelectorAll('.invite-checkbox');
     const selectedCount = selectedCheckboxes.length;
     
     if (selectedCountSpan) {
         selectedCountSpan.textContent = selectedCount;
-    } else {
     }
     
     if (selectedCountSpanMobile) {
         selectedCountSpanMobile.textContent = selectedCount;
+    }
+    
+    // Update disable/enable button text based on selected invites' status
+    if (disableSelectedButton && selectedCount > 0) {
+        const selectedCards = Array.from(selectedCheckboxes).map(cb => cb.closest('.invite-card'));
+        const activeCount = selectedCards.filter(card => {
+            const statusSpan = card.querySelector('[id^="invite-status-"]');
+            return statusSpan && statusSpan.textContent.includes('Active');
+        }).length;
+        const inactiveCount = selectedCount - activeCount;
+        
+        const buttonText = disableSelectedButton.querySelector('.hidden.sm\\:inline-block');
+        if (buttonText) {
+            if (activeCount > 0 && inactiveCount === 0) {
+                buttonText.textContent = 'Disable Selected';
+                disableSelectedButton.className = 'btn btn-warning';
+                disableSelectedButton.querySelector('i').className = 'fa-solid fa-ban mr-0 sm:mr-2';
+            } else if (inactiveCount > 0 && activeCount === 0) {
+                buttonText.textContent = 'Enable Selected';
+                disableSelectedButton.className = 'btn btn-success';
+                disableSelectedButton.querySelector('i').className = 'fa-solid fa-check mr-0 sm:mr-2';
+            } else {
+                buttonText.textContent = 'Toggle Selected';
+                disableSelectedButton.className = 'btn btn-warning';
+                disableSelectedButton.querySelector('i').className = 'fa-solid fa-refresh mr-0 sm:mr-2';
+            }
+        }
     }
     
     if (massActionsContainer) {
@@ -300,7 +327,6 @@ function updateMassActions() {
         } else {
             massActionsContainer.classList.add('hidden');
         }
-    } else {
     }
 }
 
@@ -390,7 +416,7 @@ function initializeInviteSelection() {
         });
     }
 
-    // Disable selected invites
+    // Toggle (disable/enable) selected invites
     if (disableSelectedButton) {
         disableSelectedButton.addEventListener('click', function() {
             const selectedCheckboxes = document.querySelectorAll('.invite-checkbox:checked');
@@ -398,13 +424,26 @@ function initializeInviteSelection() {
             
             if (selectedIds.length === 0) return;
 
-            if (confirm(`Are you sure you want to disable ${selectedIds.length} invite(s)?`)) {
+            // Determine action based on current button text
+            const buttonText = disableSelectedButton.querySelector('.hidden.sm\\:inline-block').textContent;
+            const isDisabling = buttonText.includes('Disable');
+            const isEnabling = buttonText.includes('Enable');
+            const actionText = isDisabling ? 'disable' : isEnabling ? 'enable' : 'toggle';
+            
+            if (confirm(`Are you sure you want to ${actionText} ${selectedIds.length} invite(s)?`)) {
                 // Create form data
                 const formData = new FormData();
                 selectedIds.forEach(id => formData.append('invite_ids', id));
+                
+                // Add action parameter to tell backend what to do
+                if (isEnabling) {
+                    formData.append('action', 'enable');
+                } else {
+                    formData.append('action', 'disable');
+                }
 
-                // Send disable request
-                fetch('{{ url_for("invites.disable_multiple") }}', {
+                // Send toggle request
+                fetch('{{ url_for("invites.toggle_multiple") }}', {
                     method: 'POST',
                     body: formData,
                     headers: {
@@ -417,14 +456,14 @@ function initializeInviteSelection() {
                         // Refresh the invite list
                         htmx.trigger(document.body, 'refreshInvitesList');
                         updateMassActions();
-                        if(typeof window.showToast === 'function') showToast(`Successfully disabled ${data.disabled_count} invite(s)`, 'success');
+                        if(typeof window.showToast === 'function') showToast(`Successfully ${actionText}d ${data.count} invite(s)`, 'success');
                     } else {
-                        if(typeof window.showToast === 'function') showToast('Error disabling invites: ' + (data.message || 'Unknown error'), 'error');
+                        if(typeof window.showToast === 'function') showToast(`Error ${actionText}ing invites: ` + (data.message || 'Unknown error'), 'error');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    if(typeof window.showToast === 'function') showToast('Error disabling invites', 'error');
+                    if(typeof window.showToast === 'function') showToast(`Error ${actionText}ing invites`, 'error');
                 });
             }
         });
@@ -488,6 +527,24 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
         const checkboxes = document.querySelectorAll('.invite-checkbox');
         
         updateMassActions();
+    }
+});
+
+// Listen for refresh bulk actions trigger
+document.body.addEventListener('refreshBulkActions', function() {
+    updateMassActions();
+});
+
+// Listen for status badge update trigger
+document.body.addEventListener('updateStatusBadge', function(event) {
+    const data = event.detail;
+    const statusSpan = document.getElementById('invite-status-' + data.inviteId);
+    if (statusSpan) {
+        if (data.isActive) {
+            statusSpan.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-green-500/10 text-green-400 border border-green-500/20"><i class="fa-solid fa-check-circle w-3 h-3"></i>Active</span>';
+        } else {
+            statusSpan.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-red-500/10 text-red-400 border border-red-500/20"><i class="fa-solid fa-ban w-3 h-3"></i>Deactivated</span>';
+        }
     }
 });
 </script>
