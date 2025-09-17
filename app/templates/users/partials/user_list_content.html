@@ -10,7 +10,7 @@
                 {% if user._user_type == 'local' %}
                     {% include 'users/partials/_local_user_card.html' with context %}
                 {% else %}
-                    {% include 'users/partials/_single_user_card.html' with context %}
+                    {% include 'users/partials/_service_user_card.html' with context %}
                 {% endif %}
             {% endfor %}
         </div>
