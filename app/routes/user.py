@@ -553,7 +553,7 @@ def index():
     
     current_app.logger.info(f"=== END CHART DEBUG ===")
     
-    return render_template('user/index.html', 
+    return render_template('dashboard/user/index.html', 
                          title="Dashboard", 
                          app_name=app_name,
                          user=current_user,
@@ -1235,7 +1235,7 @@ def view_service_account(server_nickname, server_username):
                              user_server_names=user_server_names)
         
     return render_template(
-        'user/profile.html',
+        'user/index.html',
         title=f"User Profile: {user.get_display_name()}",
         user=user,
         form=form,
@@ -1624,7 +1624,7 @@ def view_app_user(username):
                 entry.service_username = 'Unknown'
     
     return render_template(
-        'user/profile.html',
+        'user/index.html',
         title=f"App User Profile: {user_app_access.get_display_name()}",
         user=user_app_access,
         active_tab=tab,

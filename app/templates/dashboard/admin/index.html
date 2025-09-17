@@ -163,22 +163,5 @@ function openAllServersModal() {
         htmx.trigger(modalContent, 'modal-opened');
     }
 }
-
-// Any specific JS for the dashboard, if needed.
-// For example, if you wanted to auto-refresh the Plex status every X seconds:
-/*
-document.addEventListener('DOMContentLoaded', function() {
-    const plexStatusCard = document.getElementById('plex_status_card_content');
-    if (plexStatusCard) {
-        // Assuming the refresh button exists and has the hx-post attribute
-        const refreshButton = plexStatusCard.querySelector('button[hx-post]');
-        if (refreshButton) {
-            // setInterval(function() {
-            //     htmx.trigger(refreshButton, 'click'); // Programmatically trigger HTMX request
-            // }, 60000); // Refresh every 60 seconds
-        }
-    }
-});
-*/
 </script>
 {% endblock %}
