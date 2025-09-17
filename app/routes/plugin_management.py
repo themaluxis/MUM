@@ -159,25 +159,10 @@ def edit_server(plugin_id, server_id):
     
     if form.validate_on_submit():
         try:
-            # Debug: Check form fields
-            current_app.logger.info(f"DEBUG: Form has public_url attr: {hasattr(form, 'public_url')}")
-            if hasattr(form, 'public_url'):
-                current_app.logger.info(f"DEBUG: form.public_url is None: {form.public_url is None}")
-                if form.public_url:
-                    current_app.logger.info(f"DEBUG: form.public_url.data: {form.public_url.data}")
-            
             # Update server
             server.server_nickname = form.name.data
             server.url = form.url.data.rstrip('/')
-            
-            # Debug: Check api_key field
-            current_app.logger.info(f"DEBUG: form.api_key is None: {form.api_key is None}")
-            if form.api_key:
-                current_app.logger.info(f"DEBUG: form.api_key.data: {form.api_key.data}")
-                server.api_key = form.api_key.data
-            else:
-                current_app.logger.error("DEBUG: form.api_key is None!")
-                server.api_key = None
+            server.api_key = form.api_key.data
             
             server.public_url = form.public_url.data.rstrip('/') if hasattr(form, 'public_url') and form.public_url and form.public_url.data else None
             

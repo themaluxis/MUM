@@ -41,23 +41,23 @@
                             {% for server in user_servers %}
                                 <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg border border-base-300">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="{% if server.service_type.value == 'plex' %}background-color: var(--color-plex, #e5a00d);{% elif server.service_type.value == 'jellyfin' %}background-color: var(--color-jellyfin, #00a4dc);{% elif server.service_type.value == 'emby' %}background-color: var(--color-emby, #52b54b);{% elif server.service_type.value == 'kavita' %}background-color: var(--color-kavita, #f39c12);{% elif server.service_type.value == 'audiobookshelf' %}background-color: var(--color-audiobookshelf, #8b5cf6);{% elif server.service_type.value == 'komga' %}background-color: var(--color-komga, #3b82f6);{% elif server.service_type.value == 'romm' %}background-color: var(--color-romm, #ef4444);{% else %}background-color: #6b7280;{% endif %}">
                                             {% if server.service_type.value == 'plex' %}
-                                                <i class="fab fa-plex text-primary"></i>
+                                                <svg class="w-5 h-5 text-white" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor" stroke="transparent" stroke-linejoin="round" stroke-width="12"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
                                             {% elif server.service_type.value == 'jellyfin' %}
-                                                <i class="fas fa-server text-purple-500"></i>
+                                                <i class="fa-solid fa-cube text-white"></i>
                                             {% elif server.service_type.value == 'emby' %}
-                                                <i class="fas fa-server text-green-500"></i>
+                                                <i class="fa-solid fa-play-circle text-white"></i>
                                             {% elif server.service_type.value == 'kavita' %}
-                                                <i class="fas fa-book text-cyan-500"></i>
+                                                <i class="fa-solid fa-book text-white"></i>
                                             {% elif server.service_type.value == 'audiobookshelf' %}
-                                                <i class="fas fa-headphones text-purple-400"></i>
+                                                <i class="fa-solid fa-headphones text-white"></i>
                                             {% elif server.service_type.value == 'komga' %}
-                                                <i class="fas fa-book-open text-orange-500"></i>
+                                                <i class="fa-solid fa-book-open text-white"></i>
                                             {% elif server.service_type.value == 'romm' %}
-                                                <i class="fas fa-gamepad text-blue-500"></i>
+                                                <i class="fa-solid fa-gamepad text-white"></i>
                                             {% else %}
-                                                <i class="fas fa-server text-gray-500"></i>
+                                                <i class="fa-solid fa-server text-white"></i>
                                             {% endif %}
                                         </div>
                                         <div>
