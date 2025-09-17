@@ -43,6 +43,7 @@ class MediaServerForm(FlaskForm):
     api_key = StringField('API Key/Token', validators=[Optional()], description="Required for Plex, Emby, Jellyfin, Kavita, AudioBookshelf, and Komga.")
     username = StringField('Username', validators=[Optional()], description="Required for services like RomM and Komga that use username/password authentication")
     password = PasswordField('Password', validators=[Optional()], description="Required for services like RomM and Komga that use username/password authentication")
+    public_url = StringField('Public Server URL', validators=[Optional(), URL(message="Invalid URL format. Include http(s)://")], description="Optional public URL that users can access directly.")
     is_active = BooleanField('Active', default=True)
     submit = SubmitField('Save Server')
     

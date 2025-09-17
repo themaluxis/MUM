@@ -51,6 +51,7 @@ class MediaServer(db.Model):
     api_key = db.Column(db.String(512), nullable=True)  # For services that use API keys
     username = db.Column(db.String(255), nullable=True)  # For services that use username/password
     password = db.Column(db.String(512), nullable=True)  # Encrypted password
+    public_url = db.Column(db.String(512), nullable=True)  # Optional public URL for user access
     
     # Service-specific configuration stored as JSON
     config = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)

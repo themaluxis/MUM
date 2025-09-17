@@ -57,7 +57,16 @@ def add_server_setup(plugin_id):
                 return render_template('setup/add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
 
             # Save to database
-            server = MediaServer(server_nickname=form.name.data, service_type=ServiceType(form.service_type.data), url=form.url.data.rstrip('/'), api_key=form.api_key.data, username=form.username.data, password=form.password.data, is_active=form.is_active.data)
+            server = MediaServer(
+                server_nickname=form.name.data, 
+                service_type=ServiceType(form.service_type.data), 
+                url=form.url.data.rstrip('/'), 
+                api_key=form.api_key.data, 
+                username=form.username.data, 
+                password=form.password.data, 
+                public_url=form.public_url.data.rstrip('/') if form.public_url.data else None,
+                is_active=form.is_active.data
+            )
             db.session.add(server)
             db.session.commit()
             
@@ -114,7 +123,16 @@ def add_server():
                 return render_template('media_servers/add.html', form=form)
 
             # Save to database
-            server = MediaServer(server_nickname=form.name.data, service_type=ServiceType(form.service_type.data), url=form.url.data.rstrip('/'), api_key=form.api_key.data, username=form.username.data, password=form.password.data, is_active=form.is_active.data)
+            server = MediaServer(
+                server_nickname=form.name.data, 
+                service_type=ServiceType(form.service_type.data), 
+                url=form.url.data.rstrip('/'), 
+                api_key=form.api_key.data, 
+                username=form.username.data, 
+                password=form.password.data, 
+                public_url=form.public_url.data.rstrip('/') if form.public_url.data else None,
+                is_active=form.is_active.data
+            )
             db.session.add(server)
             db.session.commit()
             
@@ -166,6 +184,7 @@ def edit_server(server_id):
             server.username = form.username.data
             if form.password.data:  # Only update password if provided
                 server.password = form.password.data
+            server.public_url = form.public_url.data.rstrip('/') if form.public_url.data else None
             server.is_active = form.is_active.data
             
             db.session.commit()
@@ -217,6 +236,7 @@ def setup_edit_server(plugin_id, server_id):
                 server.username = form.username.data
                 if form.password.data:
                     server.password = form.password.data
+                server.public_url = form.public_url.data.rstrip('/') if form.public_url.data else None
                 server.is_active = form.is_active.data
                 db.session.commit()
                 flash(f'Media server "{server.server_nickname}" updated successfully!', 'success')

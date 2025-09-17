@@ -586,10 +586,13 @@ def index():
     
     current_app.logger.info(f"=== END CHART DEBUG ===")
     
+    # Ensure the user's media_accesses are loaded in the current session
+    user_with_accesses = db.session.merge(current_user)
+    
     return render_template('dashboard/user/index.html', 
                          title="Dashboard", 
                          app_name=app_name,
-                         user=current_user,
+                         user=user_with_accesses,
                          chart_data=chart_data,
                          selected_days=days,
                          selected_group_by=group_by)

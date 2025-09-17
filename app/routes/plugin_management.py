@@ -152,20 +152,39 @@ def edit_server(plugin_id, server_id):
     
     # Remove username/password fields for services that only use API tokens
     if plugin_id in ['plex', 'emby', 'jellyfin', 'kavita', 'komga']:
-        delattr(form, 'username')
-        delattr(form, 'password')
+        if hasattr(form, 'username'):
+            delattr(form, 'username')
+        if hasattr(form, 'password'):
+            delattr(form, 'password')
     
     if form.validate_on_submit():
         try:
+            # Debug: Check form fields
+            current_app.logger.info(f"DEBUG: Form has public_url attr: {hasattr(form, 'public_url')}")
+            if hasattr(form, 'public_url'):
+                current_app.logger.info(f"DEBUG: form.public_url is None: {form.public_url is None}")
+                if form.public_url:
+                    current_app.logger.info(f"DEBUG: form.public_url.data: {form.public_url.data}")
+            
             # Update server
             server.server_nickname = form.name.data
             server.url = form.url.data.rstrip('/')
-            server.api_key = form.api_key.data
+            
+            # Debug: Check api_key field
+            current_app.logger.info(f"DEBUG: form.api_key is None: {form.api_key is None}")
+            if form.api_key:
+                current_app.logger.info(f"DEBUG: form.api_key.data: {form.api_key.data}")
+                server.api_key = form.api_key.data
+            else:
+                current_app.logger.error("DEBUG: form.api_key is None!")
+                server.api_key = None
+            
+            server.public_url = form.public_url.data.rstrip('/') if hasattr(form, 'public_url') and form.public_url and form.public_url.data else None
             
             # Only update username/password for services that use them
-            if hasattr(form, 'username'):
+            if hasattr(form, 'username') and form.username:
                 server.username = form.username.data
-            if hasattr(form, 'password') and form.password.data:  # Only update password if provided
+            if hasattr(form, 'password') and form.password and form.password.data:  # Only update password if provided
                 server.password = form.password.data
                 
             server.is_active = form.is_active.data
@@ -230,6 +249,7 @@ def add_server(plugin_id):
                 api_key=form.api_key.data,
                 username=form.username.data,
                 password=form.password.data,
+                public_url=form.public_url.data.rstrip('/') if hasattr(form, 'public_url') and form.public_url and form.public_url.data else None,
                 service_type=service_type_enum,
                 is_active=form.is_active.data
             )

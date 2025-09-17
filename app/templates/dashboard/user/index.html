@@ -19,6 +19,73 @@
         
         <!-- Quick Stats Sidebar -->
         <div class="space-y-6">
+            <!-- Media Servers Card -->
+            <div class="card bg-base-200 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title text-lg mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002 2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                        </svg>
+                        Your Media Servers
+                    </h2>
+                    
+                    {% set user_servers = [] %}
+                    {% for media_access in user.media_accesses %}
+                        {% if media_access.server and media_access.is_active %}
+                            {% set _ = user_servers.append(media_access.server) %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if user_servers %}
+                        <div class="space-y-3">
+                            {% for server in user_servers %}
+                                <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg border border-base-300">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                            {% if server.service_type.value == 'plex' %}
+                                                <i class="fab fa-plex text-primary"></i>
+                                            {% elif server.service_type.value == 'jellyfin' %}
+                                                <i class="fas fa-server text-purple-500"></i>
+                                            {% elif server.service_type.value == 'emby' %}
+                                                <i class="fas fa-server text-green-500"></i>
+                                            {% elif server.service_type.value == 'kavita' %}
+                                                <i class="fas fa-book text-cyan-500"></i>
+                                            {% elif server.service_type.value == 'audiobookshelf' %}
+                                                <i class="fas fa-headphones text-purple-400"></i>
+                                            {% elif server.service_type.value == 'komga' %}
+                                                <i class="fas fa-book-open text-orange-500"></i>
+                                            {% elif server.service_type.value == 'romm' %}
+                                                <i class="fas fa-gamepad text-blue-500"></i>
+                                            {% else %}
+                                                <i class="fas fa-server text-gray-500"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-base-content">{{ server.server_nickname }}</div>
+                                            <div class="text-sm text-base-content/60">{{ server.service_type.value.title() }}</div>
+                                        </div>
+                                    </div>
+                                    {% if server.public_url %}
+                                        <a href="{{ server.public_url }}" 
+                                           target="_blank" 
+                                           rel="noopener noreferrer"
+                                           class="btn btn-xs btn-outline btn-primary">
+                                            <i class="fa-solid fa-external-link mr-1"></i>
+                                            Open Server
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fa-solid fa-server text-3xl text-base-content/30 mb-3"></i>
+                            <p class="text-base-content/70">No media servers available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
             <!-- Account Info Card -->
             <div class="card bg-base-200 shadow-xl">
                 <div class="card-body">

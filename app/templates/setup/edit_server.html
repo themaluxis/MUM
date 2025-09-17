@@ -52,6 +52,19 @@
                 {% endif %}
             </div>
 
+            <div class="form-control w-full mb-4" id="public-url-field" style="display: none;">
+                {{ form.public_url.label(class="label") }}
+                {{ form.public_url(class="input input-bordered w-full") }}
+                {% if form.public_url.errors %}
+                    <div class="label">
+                        <span class="label-text-alt text-error">{{ form.public_url.errors[0] }}</span>
+                    </div>
+                {% endif %}
+                <div class="label">
+                    <span class="label-text-alt">This URL will be available to users for direct access to this server</span>
+                </div>
+            </div>
+
             <div class="form-control mb-6">
                 <label class="label cursor-pointer justify-start">
                     {{ form.is_active(class="checkbox checkbox-primary mr-3") }}
@@ -68,4 +81,17 @@
         </form>
     </div>
 </div>
+
+<script>
+// Show/hide public URL field based on service type
+document.addEventListener('DOMContentLoaded', function() {
+    const serviceType = '{{ server.service_type.value }}';
+    const publicUrlField = document.getElementById('public-url-field');
+    
+    // Show public URL field for non-Plex services
+    if (serviceType !== 'plex') {
+        publicUrlField.style.display = 'block';
+    }
+});
+</script>
 {% endblock %}

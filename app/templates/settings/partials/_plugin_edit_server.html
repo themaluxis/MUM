@@ -149,6 +149,32 @@
         {% endif %}
     </div>
 
+    <!-- Public URL Section (for non-Plex services) -->
+    {% if plugin.plugin_id != 'plex' %}
+    <div class="space-y-4 mb-6">
+        <h4 class="font-medium text-base-content text-lg mb-3">
+            <i class="fa-solid fa-globe text-info text-sm mr-2"></i>
+            Public Access
+        </h4>
+        
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-external-link text-info text-sm"></i>
+                    <h5 class="font-medium text-base-content">{{ form.public_url.label.text }}</h5>
+                    <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">Optional</span>
+                </div>
+            </div>
+            {{ form.public_url(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.public_url.errors else "")) }}
+            {% if form.public_url.errors %}
+                <span class="text-error text-xs mt-1 block">{{ form.public_url.errors[0] }}</span>
+            {% else %}
+                <span class="text-base-content/60 text-xs mt-1 block">{{ form.public_url.description }}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Server Status Section -->
     <div class="space-y-4 mb-6">
         <h4 class="font-medium text-base-content text-lg mb-3">
