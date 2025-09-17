@@ -290,9 +290,9 @@ def create_app(config_name=None):
     def check_force_password_change():
         if current_user.is_authenticated and \
            getattr(current_user, 'force_password_change', False) and \
-           request.endpoint not in ['settings.account', 'static', 'auth.logout']:
+           request.endpoint not in ['settings.account', 'dashboard.account', 'static', 'auth.logout']:
             flash("For security, you must change your temporary password before proceeding.", "warning")
-            return redirect(url_for('settings.account'))
+            return redirect(url_for('dashboard.account'))
 
     @app.before_request
     def before_request_tasks():

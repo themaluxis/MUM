@@ -589,3 +589,13 @@ def index():
     
     current_app.logger.info("=== ADMIN DASHBOARD ROUTE COMPLETE ===")
     return result
+
+@bp.route('/account', methods=['GET', 'POST'])
+@login_required
+@setup_required
+@permission_required('manage_general_settings')
+def account():
+    """Admin account page - redirects to settings implementation"""
+    # Import here to avoid circular imports
+    from app.routes.settings import account as settings_account_handler
+    return settings_account_handler()

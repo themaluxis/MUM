@@ -183,7 +183,7 @@ def plex_sso_login_admin():
         # If user is already logged in, the "next page" should be their account settings.
         # Otherwise, it's a fresh login, so go to the dashboard.
         if current_user.is_authenticated:
-            session['plex_admin_login_next_url'] = url_for('settings.account')
+            session['plex_admin_login_next_url'] = url_for('dashboard.account')
         else:
             session['plex_admin_login_next_url'] = request.args.get('next') or url_for('dashboard.index')
 
@@ -195,7 +195,7 @@ def plex_sso_login_admin():
 
     # If an error occurs, send the user back to the most relevant page
     if current_user.is_authenticated:
-        return redirect(url_for('settings.account'))
+        return redirect(url_for('dashboard.account'))
     else:
         return redirect(url_for('auth.app_login'))
 
@@ -206,7 +206,7 @@ def plex_sso_callback_admin():
     client_id_from_session = session.get('plex_client_id_admin_login')
     
     # Context-aware fallback URL
-    fallback_url = url_for('settings.account') if current_user.is_authenticated else url_for('auth.app_login')
+    fallback_url = url_for('dashboard.account') if current_user.is_authenticated else url_for('auth.app_login')
     
     if not pin_id_from_session or not pin_code_from_session or not client_id_from_session:
         flash('Plex login callback invalid or session expired.', 'danger')

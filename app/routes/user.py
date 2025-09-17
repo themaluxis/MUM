@@ -1685,7 +1685,7 @@ def account():
     """User account management page - similar to admin account page"""
     # Ensure this is a regular user, not an owner
     if isinstance(current_user, Owner):
-        return redirect(url_for('settings.account'))
+        return redirect(url_for('dashboard.account'))
     
     # Ensure this is a UserAppAccess (user account)
     if not isinstance(current_user, UserAppAccess):

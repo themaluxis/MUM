@@ -90,7 +90,7 @@ def edit(admin_id):
     
     if admin_id == current_user.id:
         flash("To manage your own account, please use the 'My Account' page.", "info")
-        return redirect(url_for('settings.account'))
+        return redirect(url_for('dashboard.account'))
         
     form = UserAppAccessEditForm(obj=user)
     form.roles.choices = [(r.id, r.name) for r in Role.query.order_by('name')]
