@@ -33,19 +33,19 @@
     <div class="drawer">
         <input id="main-sidebar-drawer-toggle" type="checkbox" class="drawer-toggle" />
         <div class="drawer-content flex flex-col min-h-screen">
-            {% if current_user.__class__.__name__ == 'AppUser' and current_user.password_hash %}
-                {% include 'components/navigation/user_navbar.html' %}
+            {% if current_user.__class__.__name__ == 'UserAppAccess' and current_user.password_hash %}
+                {% include 'layouts/navigation/user_navbar.html' %}
             {% else %}
-                {% include 'components/navigation/admin_navbar.html' %}
+                {% include 'layouts/navigation/admin_navbar.html' %}
             {% endif %}
             {# Main content rendering call is below, outside this direct if/else for wrappers #}
     {% else %}
             {# Non-logged-in or setup state: Simpler flex layout #}
             <div class="flex flex-col min-h-screen">
                 {% if g.setup_complete == False and request.endpoint and request.endpoint.startswith('setup.') %}
-                {% include 'components/navigation/setup_navbar.html' %}
+                {% include 'layouts/navigation/setup_navbar.html' %}
                 {% else %}
-                {% include 'components/navigation/public_navbar.html' %}
+                {% include 'layouts/navigation/public_navbar.html' %}
                 {% endif %}
                 {# Main content rendering call is below, outside this direct if/else for wrappers #}
                 {% endif %}
