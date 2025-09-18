@@ -52,6 +52,9 @@ class MediaServer(db.Model):
     username = db.Column(db.String(255), nullable=True)  # For services that use username/password
     password = db.Column(db.String(512), nullable=True)  # Encrypted password
     public_url = db.Column(db.String(512), nullable=True)  # Optional public URL for user access
+    overseerr_enabled = db.Column(db.Boolean, default=False, nullable=False)  # Enable Overseerr integration
+    overseerr_url = db.Column(db.String(512), nullable=True)  # Overseerr server URL
+    overseerr_api_key = db.Column(db.String(512), nullable=True)  # Overseerr API key
     
     # Service-specific configuration stored as JSON
     config = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)

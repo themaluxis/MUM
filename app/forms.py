@@ -44,6 +44,9 @@ class MediaServerForm(FlaskForm):
     username = StringField('Username', validators=[Optional()], description="Required for services like RomM and Komga that use username/password authentication")
     password = PasswordField('Password', validators=[Optional()], description="Required for services like RomM and Komga that use username/password authentication")
     public_url = StringField('Public Server URL', validators=[Optional(), URL(message="Invalid URL format. Include http(s)://")], description="Optional public URL that users can access directly.")
+    overseerr_enabled = BooleanField('Enable Overseerr Integration', default=False, description="Enable Overseerr integration for request management")
+    overseerr_url = StringField('Overseerr URL', validators=[Optional(), URL(message="Invalid URL format. Include http(s)://")], description="URL of your Overseerr instance")
+    overseerr_api_key = StringField('Overseerr API Key', validators=[Optional()], description="API key for Overseerr authentication")
     is_active = BooleanField('Active', default=True)
     submit = SubmitField('Save Server')
     

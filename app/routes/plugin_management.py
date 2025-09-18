@@ -165,6 +165,9 @@ def edit_server(plugin_id, server_id):
             server.api_key = form.api_key.data
             
             server.public_url = form.public_url.data.rstrip('/') if hasattr(form, 'public_url') and form.public_url and form.public_url.data else None
+            server.overseerr_enabled = form.overseerr_enabled.data if hasattr(form, 'overseerr_enabled') and form.overseerr_enabled else False
+            server.overseerr_url = form.overseerr_url.data.rstrip('/') if hasattr(form, 'overseerr_url') and form.overseerr_url and form.overseerr_url.data else None
+            server.overseerr_api_key = form.overseerr_api_key.data if hasattr(form, 'overseerr_api_key') and form.overseerr_api_key and form.overseerr_api_key.data else None
             
             # Only update username/password for services that use them
             if hasattr(form, 'username') and form.username:
@@ -235,11 +238,29 @@ def add_server(plugin_id):
                 username=form.username.data,
                 password=form.password.data,
                 public_url=form.public_url.data.rstrip('/') if hasattr(form, 'public_url') and form.public_url and form.public_url.data else None,
+                overseerr_enabled=form.overseerr_enabled.data if hasattr(form, 'overseerr_enabled') and form.overseerr_enabled else False,
+                overseerr_url=form.overseerr_url.data.rstrip('/') if hasattr(form, 'overseerr_url') and form.overseerr_url and form.overseerr_url.data else None,
+                overseerr_api_key=form.overseerr_api_key.data if hasattr(form, 'overseerr_api_key') and form.overseerr_api_key and form.overseerr_api_key.data else None,
                 service_type=service_type_enum,
                 is_active=form.is_active.data
             )
             
             db.session.add(new_server)
+            db.session.flush()  # Get the server ID before commit
+            
+            # If this is a Plex server with Overseerr enabled, sync the user links from the test
+            if (plugin_id == 'plex' and new_server.overseerr_enabled and 
+                hasattr(request, 'overseerr_linked_users')):
+                from app.models_overseerr import OverseerrUserLink
+                success, message = OverseerrUserLink.sync_users(
+                    new_server.id, 
+                    request.overseerr_linked_users
+                )
+                if success:
+                    current_app.logger.info(f"Synced Overseerr user links for server {new_server.server_nickname}: {message}")
+                else:
+                    current_app.logger.error(f"Failed to sync Overseerr user links: {message}")
+            
             db.session.commit()
             
             # Enable the plugin if it's not already enabled
@@ -367,6 +388,74 @@ def test_connection(plugin_id):
         # Test the connection using our new utility
         success, message = test_server_connection(plugin_id, url, **credentials)
         
+        # If this is a Plex server and has Overseerr integration enabled, test Overseerr too
+        overseerr_test_result = None
+        if success and plugin_id == 'plex':
+            overseerr_enabled = data.get('overseerr_enabled', False)
+            overseerr_url = data.get('overseerr_url', '').strip()
+            overseerr_api_key = data.get('overseerr_api_key', '').strip()
+            
+            if overseerr_enabled:
+                if not overseerr_url or not overseerr_api_key:
+                    return jsonify({
+                        'success': False, 
+                        'message': 'Overseerr URL and API key are required when Overseerr integration is enabled'
+                    })
+                
+                # Test Overseerr connection
+                from app.services.overseerr_service import OverseerrService
+                overseerr = OverseerrService(overseerr_url, overseerr_api_key)
+                overseerr_success, overseerr_message = overseerr.test_connection()
+                
+                if not overseerr_success:
+                    return jsonify({
+                        'success': False, 
+                        'message': f'Plex connection successful, but Overseerr connection failed: {overseerr_message}'
+                    })
+                
+                # Get Plex users for linking
+                try:
+                    from app.services.media_service_factory import MediaServiceFactory
+                    plex_service = MediaServiceFactory.create_service({
+                        'service_type': 'plex',
+                        'url': url,
+                        'api_key': api_key
+                    })
+                    
+                    if plex_service:
+                        plex_users = plex_service.get_users()
+                        if plex_users:
+                            # Link users
+                            link_success, linked_users, link_message = overseerr.link_plex_users(plex_users)
+                            
+                            # Store linked users in request context for later use
+                            request.overseerr_linked_users = linked_users
+                            
+                            overseerr_test_result = {
+                                'success': link_success,
+                                'message': f'{overseerr_message}. {link_message}',
+                                'linked_users': linked_users
+                            }
+                        else:
+                            overseerr_test_result = {
+                                'success': True,
+                                'message': f'{overseerr_message}. No Plex users found to link.',
+                                'linked_users': []
+                            }
+                    else:
+                        overseerr_test_result = {
+                            'success': True,
+                            'message': f'{overseerr_message}. Could not retrieve Plex users for linking.',
+                            'linked_users': []
+                        }
+                except Exception as e:
+                    current_app.logger.error(f"Error linking Plex users to Overseerr: {e}")
+                    overseerr_test_result = {
+                        'success': True,
+                        'message': f'{overseerr_message}. Error linking users: {str(e)}',
+                        'linked_users': []
+                    }
+        
         # Log the test attempt
         log_event(
             EventType.SETTING_CHANGE,
@@ -374,7 +463,12 @@ def test_connection(plugin_id):
             admin_id=current_user.id
         )
         
-        return jsonify({'success': success, 'message': message})
+        # Return results
+        result = {'success': success, 'message': message}
+        if overseerr_test_result:
+            result['overseerr'] = overseerr_test_result
+        
+        return jsonify(result)
         
     except Exception as e:
         current_app.logger.error(f"Error testing plugin connection: {e}", exc_info=True)
@@ -423,6 +517,69 @@ def test_existing_server_connection(plugin_id, server_id):
         # Test the connection using our new utility
         success, message = test_server_connection(plugin_id, server.url, **credentials)
         
+        # If this is a Plex server and has Overseerr integration enabled, test Overseerr too
+        overseerr_test_result = None
+        if success and plugin_id == 'plex' and server.overseerr_enabled:
+            if server.overseerr_url and server.overseerr_api_key:
+                # Test Overseerr connection
+                from app.services.overseerr_service import OverseerrService
+                overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
+                overseerr_success, overseerr_message = overseerr.test_connection()
+                
+                if not overseerr_success:
+                    return jsonify({
+                        'success': False, 
+                        'message': f'Plex connection successful, but Overseerr connection failed: {overseerr_message}'
+                    })
+                
+                # Get Plex users for linking
+                try:
+                    from app.services.media_service_factory import MediaServiceFactory
+                    plex_service = MediaServiceFactory.create_service_from_db(server)
+                    
+                    if plex_service:
+                        plex_users = plex_service.get_users()
+                        if plex_users:
+                            # Link users and update the database
+                            link_success, linked_users, link_message = overseerr.link_plex_users(plex_users)
+                            
+                            # Update the database with new user links
+                            from app.models_overseerr import OverseerrUserLink
+                            sync_success, sync_message = OverseerrUserLink.sync_users(server.id, linked_users)
+                            
+                            if sync_success:
+                                current_app.logger.info(f"Updated Overseerr user links for server {server.server_nickname}: {sync_message}")
+                            
+                            overseerr_test_result = {
+                                'success': link_success,
+                                'message': f'{overseerr_message}. {link_message}',
+                                'linked_users': linked_users
+                            }
+                        else:
+                            overseerr_test_result = {
+                                'success': True,
+                                'message': f'{overseerr_message}. No Plex users found to link.',
+                                'linked_users': []
+                            }
+                    else:
+                        overseerr_test_result = {
+                            'success': True,
+                            'message': f'{overseerr_message}. Could not retrieve Plex users for linking.',
+                            'linked_users': []
+                        }
+                except Exception as e:
+                    current_app.logger.error(f"Error linking Plex users to Overseerr: {e}")
+                    overseerr_test_result = {
+                        'success': True,
+                        'message': f'{overseerr_message}. Error linking users: {str(e)}',
+                        'linked_users': []
+                    }
+            else:
+                return jsonify({
+                    'success': False, 
+                    'message': 'Overseerr is enabled but URL or API key is not configured'
+                })
+        
         # Log the test attempt
         log_event(
             EventType.SETTING_CHANGE,
@@ -430,7 +587,12 @@ def test_existing_server_connection(plugin_id, server_id):
             admin_id=current_user.id
         )
         
-        return jsonify({'success': success, 'message': message})
+        # Return results
+        result = {'success': success, 'message': message}
+        if overseerr_test_result:
+            result['overseerr'] = overseerr_test_result
+        
+        return jsonify(result)
         
     except Exception as e:
         current_app.logger.error(f"Error testing existing server connection: {e}", exc_info=True)

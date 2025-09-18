@@ -285,6 +285,11 @@
                             <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
                                 <i class="fa-solid fa-cog mr-2"></i>Settings
                             </a>
+                            {% if primary_service and primary_service.value == 'plex' %}
+                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='overseerr', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'overseerr' else '' }}">
+                                <i class="fa-solid fa-film mr-2" style="color: #a855f7;"></i>Overseerr
+                            </a>
+                            {% endif %}
                             {% if user.password_hash and user.used_invite_id %}
                             <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
                                 <i class="fa-solid fa-shield-alt mr-2"></i>Security
@@ -326,6 +331,8 @@
                     {% else %}
                         {% include 'user/partials/local_settings_tab.html' %}
                     {% endif %}
+                {% elif active_tab == 'overseerr' %}
+                    {% include 'user/partials/overseerr_tab.html' %}
                 {% elif active_tab == 'security' %}
                     {% include 'user/partials/security_tab.html' %}
                 {% endif %}

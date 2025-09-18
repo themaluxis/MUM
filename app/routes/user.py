@@ -716,17 +716,17 @@ def view_service_account(server_nickname, server_username):
     user_access_records = [access]
     
     available_libraries = {}
-    current_app.logger.debug(f"KAVITA FORM: Building available libraries for user {user.id}")
+    # current_app.logger.debug(f"KAVITA FORM: Building available libraries for user {user.id}")
     
     for access in user_access_records:
         try:
             service = MediaServiceFactory.create_service_from_db(access.server)
-            current_app.logger.debug(f"KAVITA FORM: Processing server {access.server.server_nickname} (type: {access.server.service_type.value})")
-            current_app.logger.debug(f"KAVITA FORM: User access record allowed_library_ids: {access.allowed_library_ids}")
+            # current_app.logger.debug(f"KAVITA FORM: Processing server {access.server.server_nickname} (type: {access.server.service_type.value})")
+            # current_app.logger.debug(f"KAVITA FORM: User access record allowed_library_ids: {access.allowed_library_ids}")
             
             if service:
                 server_libraries = service.get_libraries()
-                current_app.logger.debug(f"KAVITA FORM: Server libraries from API: {[{lib.get('id'): lib.get('name')} for lib in server_libraries]}")
+                # current_app.logger.debug(f"KAVITA FORM: Server libraries from API: {[{lib.get('id'): lib.get('name')} for lib in server_libraries]}")
                 
                 for lib in server_libraries:
                     lib_id = lib.get('external_id') or lib.get('id')
@@ -739,13 +739,13 @@ def view_service_account(server_nickname, server_username):
                             current_app.logger.debug(f"KAVITA FORM: Added Kavita library: {compound_lib_id} -> {lib_name}")
                         else:
                             available_libraries[str(lib_id)] = lib_name
-                            current_app.logger.debug(f"KAVITA FORM: Added non-Kavita library: {lib_id} -> {lib_name}")
+                            # current_app.logger.debug(f"KAVITA FORM: Added non-Kavita library: {lib_id} -> {lib_name}")
         except Exception as e:
             current_app.logger.error(f"Error getting libraries from {access.server.server_nickname}: {e}")
     
-    current_app.logger.debug(f"KAVITA FORM: Final available_libraries: {available_libraries}")
+    # current_app.logger.debug(f"KAVITA FORM: Final available_libraries: {available_libraries}")
     form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
-    current_app.logger.debug(f"KAVITA FORM: Form choices set to: {form.libraries.choices}")
+    # current_app.logger.debug(f"KAVITA FORM: Form choices set to: {form.libraries.choices}")
 
     # Handle form submission for the settings tab
     if form.validate_on_submit(): # This handles (if request.method == 'POST' and form.validate())
@@ -1058,8 +1058,8 @@ def view_service_account(server_nickname, server_username):
         for access in user_access_records:
             current_library_ids.extend(access.allowed_library_ids or [])
         
-        current_app.logger.debug(f"KAVITA FORM: Current library IDs from access records: {current_library_ids}")
-        current_app.logger.debug(f"KAVITA FORM: Available library keys: {list(available_libraries.keys())}")
+        # current_app.logger.debug(f"KAVITA FORM: Current library IDs from access records: {current_library_ids}")
+        # current_app.logger.debug(f"KAVITA FORM: Available library keys: {list(available_libraries.keys())}")
         
         # Handle special case for Jellyfin users with '*' (all libraries access)
         if current_library_ids == ['*']:
@@ -1070,18 +1070,18 @@ def view_service_account(server_nickname, server_username):
             # For Kavita users, ensure we're using the compound IDs that match the available_libraries keys
             validated_library_ids = []
             for lib_id in current_library_ids:
-                current_app.logger.debug(f"KAVITA FORM: Processing library ID: {lib_id}")
+                # current_app.logger.debug(f"KAVITA FORM: Processing library ID: {lib_id}")
                 if str(lib_id) in available_libraries:
                     validated_library_ids.append(str(lib_id))
-                    current_app.logger.debug(f"KAVITA FORM: Direct match found for: {lib_id}")
+                    # current_app.logger.debug(f"KAVITA FORM: Direct match found for: {lib_id}")
                 else:
-                    current_app.logger.debug(f"KAVITA FORM: No direct match for {lib_id}, searching for compound ID...")
+                    # current_app.logger.debug(f"KAVITA FORM: No direct match for {lib_id}, searching for compound ID...")
                     # This might be a legacy ID format, try to find a matching compound ID
                     found_match = False
                     for available_id in available_libraries.keys():
                         if '_' in available_id and available_id.startswith(f"{lib_id}_"):
                             validated_library_ids.append(available_id)
-                            current_app.logger.debug(f"KAVITA FORM: Found compound match: {lib_id} -> {available_id}")
+                            # current_app.logger.debug(f"KAVITA FORM: Found compound match: {lib_id} -> {available_id}")
                             found_match = True
                             break
                     
@@ -1100,7 +1100,7 @@ def view_service_account(server_nickname, server_username):
                         current_app.logger.warning(f"DEBUG KAVITA FORM: No match found for library ID: {lib_id}")
             
             form.libraries.data = list(set(validated_library_ids))  # Remove duplicates
-            current_app.logger.debug(f"KAVITA FORM: Final form.libraries.data: {form.libraries.data}")
+            # current_app.logger.debug(f"KAVITA FORM: Final form.libraries.data: {form.libraries.data}")
         # Remove the old access_expires_in_days logic since we're now using DateField
         # The form will automatically populate access_expires_at from the user object via obj=user
 
@@ -1753,3 +1753,342 @@ def account():
                          user=current_user,
                          change_password_form=change_password_form,
                          timezone_form=timezone_form)
+
+
+@bp.route('/overseerr-requests/<int:server_id>')
+@bp.route('/overseerr-requests/<int:server_id>/<server_nickname>/<server_username>')
+@login_required
+def get_overseerr_requests(server_id, server_nickname=None, server_username=None):
+    """Get Overseerr requests for the current user"""
+    try:
+        from app.services.overseerr_service import OverseerrService
+        from app.models_media_services import MediaServer
+        from app.models_overseerr import OverseerrUserLink
+        from flask import jsonify, render_template_string
+        
+        # Get the server
+        server = MediaServer.query.get_or_404(server_id)
+        
+        # Check if server has Overseerr enabled
+        if not server.overseerr_enabled or not server.overseerr_url or not server.overseerr_api_key:
+            return render_template_string("""
+                <div class="alert alert-warning">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    <div>Overseerr is not properly configured for this server.</div>
+                </div>
+            """)
+        
+        # Get the current user's Plex ID and details
+        plex_user_id = None
+        plex_username = None
+        plex_email = None
+        
+        # Debug: Log initial request context
+        current_app.logger.info(f"OVERSEERR DEBUG: Starting get_overseerr_requests for server_id={server_id}")
+        current_app.logger.info(f"OVERSEERR DEBUG: Route parameters - server_nickname={server_nickname}, server_username={server_username}")
+        
+        if server_nickname and server_username:
+            # This is a service account view - find the UserMediaAccess record
+            from urllib.parse import unquote
+            server_nickname = unquote(server_nickname)
+            server_username = unquote(server_username)
+            
+            current_app.logger.info(f"OVERSEERR DEBUG: After unquote - server_nickname={server_nickname}, server_username={server_username}")
+            
+            # Find the UserMediaAccess record for this service user
+            media_access = UserMediaAccess.query.join(MediaServer).filter(
+                MediaServer.server_nickname == server_nickname,
+                UserMediaAccess.external_username == server_username,
+                UserMediaAccess.server_id == server_id
+            ).first()
+            
+            current_app.logger.info(f"OVERSEERR DEBUG: Found media_access: {media_access}")
+            
+            if media_access:
+                plex_user_id = media_access.external_user_id
+                plex_username = media_access.external_username
+                plex_email = media_access.external_email
+                current_app.logger.info(f"OVERSEERR DEBUG: Media access data - plex_user_id={plex_user_id}, plex_username={plex_username}, plex_email={plex_email}")
+            else:
+                current_app.logger.warning(f"OVERSEERR DEBUG: No media_access found for server_nickname={server_nickname}, server_username={server_username}, server_id={server_id}")
+        else:
+            current_app.logger.info(f"OVERSEERR DEBUG: No server_nickname/server_username in route, checking current_user media_accesses")
+            
+            # Check if current_user has media_accesses attribute (not Owner)
+            if hasattr(current_user, 'media_accesses'):
+                current_app.logger.info(f"OVERSEERR DEBUG: current_user has media_accesses, checking {len(current_user.media_accesses)} records")
+                for i, media_access in enumerate(current_user.media_accesses):
+                    current_app.logger.info(f"OVERSEERR DEBUG:   Access {i+1}: server_id={media_access.server_id}, service_type={media_access.server.service_type.value}")
+                    if media_access.server_id == server_id and media_access.server.service_type.value == 'plex':
+                        plex_user_id = media_access.external_user_id
+                        plex_username = media_access.external_username
+                        plex_email = media_access.external_email
+                        current_app.logger.info(f"OVERSEERR DEBUG: Found matching Plex access - plex_user_id={plex_user_id}, plex_username={plex_username}")
+                        break
+            else:
+                current_app.logger.info(f"OVERSEERR DEBUG: current_user does not have media_accesses attribute (type: {type(current_user)})")
+        
+        current_app.logger.info(f"OVERSEERR DEBUG: Final values - plex_user_id={plex_user_id}, plex_username={plex_username}, plex_email={plex_email}")
+        
+        if not plex_user_id or not plex_username:
+            current_app.logger.warning(f"OVERSEERR DEBUG: Missing required data - plex_user_id={plex_user_id}, plex_username={plex_username}")
+            return render_template_string("""
+                <div class="alert alert-info">
+                    <i class="fa-solid fa-info-circle"></i>
+                    <div>No Plex account found for Overseerr requests. (Debug: plex_user_id={{ plex_user_id }}, plex_username={{ plex_username }})</div>
+                </div>
+            """, plex_user_id=plex_user_id, plex_username=plex_username)
+        
+        # Try to get the Overseerr user ID from the link table
+        overseerr_user_id = OverseerrUserLink.get_overseerr_user_id(server_id, plex_user_id)
+        current_app.logger.info(f"OVERSEERR DEBUG: Existing link check - overseerr_user_id={overseerr_user_id}")
+        
+        # If not linked, attempt lazy linking
+        if not overseerr_user_id:
+            current_app.logger.info(f"OVERSEERR DEBUG: No existing link found, attempting lazy link for Plex user {plex_username} (ID: {plex_user_id}) on server {server_id}")
+            
+            link_success, linked_overseerr_user_id, link_message = OverseerrUserLink.link_single_user(
+                server_id, plex_user_id, plex_username, plex_email
+            )
+            
+            current_app.logger.info(f"OVERSEERR DEBUG: Lazy link result - success={link_success}, overseerr_user_id={linked_overseerr_user_id}, message='{link_message}'")
+            
+            if link_success:
+                overseerr_user_id = linked_overseerr_user_id
+                current_app.logger.info(f"OVERSEERR DEBUG: Successfully linked user {plex_username} - {link_message}")
+            else:
+                current_app.logger.info(f"OVERSEERR DEBUG: Failed to link user {plex_username} - {link_message}")
+                
+                # Show a more helpful message based on the failure reason
+                if "not found in Overseerr" in link_message:
+                    error_message = f"""
+                        <div class="alert alert-warning">
+                            <i class="fa-solid fa-user-slash"></i>
+                            <div>
+                                <h4 class="font-bold">Account Not Found in Overseerr</h4>
+                                <div class="text-sm">
+                                    The Plex user <strong>{plex_username}</strong> was not found in Overseerr. 
+                                    Please ensure the user has signed into Overseerr at least once.
+                                </div>
+                                <div class="mt-2">
+                                    <a href="{server.overseerr_url}" 
+                                       target="_blank" 
+                                       rel="noopener noreferrer"
+                                       class="btn btn-sm btn-primary">
+                                        <i class="fa-solid fa-external-link mr-1"></i>
+                                        Open Overseerr
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    """
+                else:
+                    error_message = f"""
+                        <div class="alert alert-error">
+                            <i class="fa-solid fa-exclamation-triangle"></i>
+                            <div>
+                                <h4 class="font-bold">Linking Error</h4>
+                                <div class="text-sm">{link_message}</div>
+                                <div class="text-xs mt-1 opacity-70">Debug info: plex_user_id={plex_user_id}, plex_username={plex_username}</div>
+                            </div>
+                        </div>
+                    """
+                
+                return render_template_string(error_message, server=server)
+        
+        # Get requests from Overseerr with pagination
+        overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
+        
+        # Get pagination parameters from request
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        skip = (page - 1) * per_page
+        
+        current_app.logger.info(f"OVERSEERR DEBUG: Requesting page {page}, per_page {per_page}, skip {skip}")
+        
+        success, requests_list, pagination_info, message = overseerr.get_user_requests(overseerr_user_id, take=per_page, skip=skip)
+        
+        current_app.logger.info(f"OVERSEERR DEBUG: API returned {len(requests_list) if success else 0} requests, pagination: {pagination_info}")
+        
+        if not success:
+            return render_template_string("""
+                <div class="alert alert-error">
+                    <i class="fa-solid fa-exclamation-circle"></i>
+                    <div>
+                        <h4 class="font-bold">Error Loading Requests</h4>
+                        <div class="text-sm">{{ message }}</div>
+                    </div>
+                </div>
+            """, message=message)
+        
+        if not requests_list:
+            return render_template_string("""
+                <div class="text-center py-8">
+                    <div class="p-4 rounded-full bg-info/10 w-16 h-16 mx-auto flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-inbox text-2xl text-info"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-base-content mb-2">No Requests Found</h3>
+                    <p class="text-base-content/70 mb-4">
+                        This user hasn't made any requests yet. Use Overseerr to request movies and TV shows.
+                    </p>
+                    <a href="{{ server.overseerr_url }}" 
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="btn btn-primary">
+                        <i class="fa-solid fa-external-link mr-2"></i>
+                        Open Overseerr
+                    </a>
+                </div>
+            """, server=server)
+        
+        # Render requests list with pagination
+        return render_template_string("""
+            <div class="space-y-4">
+                <!-- Requests List -->
+                {% for request in requests %}
+                <div class="card bg-base-100 border border-base-300 shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="flex items-start gap-4">
+                            <!-- Poster Image -->
+                            {% if request.media and request.media.posterPath %}
+                            <div class="w-16 h-24 rounded-lg overflow-hidden bg-base-200 flex-shrink-0">
+                                <img src="https://image.tmdb.org/t/p/w154{{ request.media.posterPath }}" 
+                                     alt="{{ request.media.title or 'Unknown' }}"
+                                     class="w-full h-full object-cover"
+                                     onerror="this.parentElement.innerHTML='<div class="w-full h-full flex items-center justify-center"><i class="fa-solid fa-image text-base-content/30"></i></div>
+                            </div>
+                            {% else %}
+                            <div class="w-16 h-24 rounded-lg bg-base-200 flex items-center justify-center flex-shrink-0">
+                                <i class="fa-solid fa-image text-base-content/30"></i>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Request Details -->
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="font-semibold text-base-content">
+                                            {% if request.media %}
+                                                {% if request.media.mediaType == 'tv' and request.media.originalName %}
+                                                    {{ request.media.originalName }}
+                                                {% else %}
+                                                    {{ request.media.title or request.media.name or 'Unknown Title' }}
+                                                {% endif %}
+                                            {% else %}
+                                                Unknown Title
+                                            {% endif %}
+                                            {% if request.media and (request.media.releaseDate or request.media.firstAirDate) %}
+                                                <span class="text-sm font-normal text-base-content/60">
+                                                    ({{ (request.media.releaseDate or request.media.firstAirDate)[:4] }})
+                                                </span>
+                                            {% endif %}
+                                        </h4>
+                                        
+                                        <!-- Media Type & Genre -->
+                                        <div class="flex items-center gap-2 mt-1">
+                                            {% if request.media and request.media.mediaType %}
+                                            <span class="badge badge-sm {% if request.media.mediaType == 'movie' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                                {{ 'Movie' if request.media.mediaType == 'movie' else 'TV Show' }}
+                                            </span>
+                                            {% endif %}
+                                            
+                                            {% if request.media and request.media.genres and request.media.genres|length > 0 %}
+                                            <span class="text-xs text-base-content/50">
+                                                {{ request.media.genres[0].name }}{% if request.media.genres|length > 1 %}, {{ request.media.genres[1].name }}{% endif %}
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Request Status -->
+                                    <div class="flex flex-col items-end gap-1">
+                                        {% if request.status == 1 %}
+                                        <span class="badge badge-warning badge-sm">Pending</span>
+                                        {% elif request.status == 2 %}
+                                        <span class="badge badge-success badge-sm">Approved</span>
+                                        {% elif request.status == 3 %}
+                                        <span class="badge badge-success badge-sm">Available</span>
+                                        {% else %}
+                                        <span class="badge badge-ghost badge-sm">Unknown</span>
+                                        {% endif %}
+                                        
+                                        {% if request.media and request.media.voteAverage %}
+                                        <div class="flex items-center gap-1 text-xs text-base-content/60">
+                                            <i class="fa-solid fa-star text-yellow-500"></i>
+                                            <span>{{ "%.1f"|format(request.media.voteAverage) }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if request.media and request.media.overview %}
+                                <p class="text-sm text-base-content/70 mt-2 line-clamp-2">
+                                    {{ request.media.overview[:200] }}{% if request.media.overview|length > 200 %}...{% endif %}
+                                </p>
+                                {% endif %}
+                                
+                                <div class="flex items-center gap-4 mt-3 text-xs text-base-content/60">
+                                    <span>
+                                        <i class="fa-solid fa-calendar mr-1"></i>
+                                        Requested {{ request.createdAt[:10] }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <!-- Pagination Controls -->
+                {% if pagination.total_pages > 1 %}
+                <div class="flex items-center justify-between mt-6 p-4 bg-base-200/50 rounded-lg">
+                    <div class="text-sm text-base-content/70">
+                        Showing {{ ((pagination.current_page - 1) * pagination.results_per_page + 1) }} to 
+                        {{ (pagination.current_page * pagination.results_per_page) if pagination.current_page * pagination.results_per_page < pagination.total_results else pagination.total_results }} 
+                        of {{ pagination.total_results }} requests
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        {% if pagination.has_prev %}
+                        <button class="btn btn-sm btn-outline" 
+                                hx-get="{{ request.path }}?page={{ pagination.current_page - 1 }}&per_page={{ pagination.results_per_page }}"
+                                hx-target="#overseerr-requests-{{ server_id }}"
+                                hx-indicator="#loading-requests-{{ server_id }}">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        {% endif %}
+                        
+                        <span class="px-3 py-1 text-sm">
+                            Page {{ pagination.current_page }} of {{ pagination.total_pages }}
+                        </span>
+                        
+                        {% if pagination.has_next %}
+                        <button class="btn btn-sm btn-outline"
+                                hx-get="{{ request.path }}?page={{ pagination.current_page + 1 }}&per_page={{ pagination.results_per_page }}"
+                                hx-target="#overseerr-requests-{{ server_id }}"
+                                hx-indicator="#loading-requests-{{ server_id }}">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        """, 
+        requests=requests_list, 
+        pagination=pagination_info, 
+        server=server,
+        server_id=server_id,
+        request=request)
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in get_overseerr_requests: {e}")
+        return render_template_string("""
+            <div class="alert alert-error">
+                <i class="fa-solid fa-exclamation-circle"></i>
+                <div>
+                    <h4 class="font-bold">Unexpected Error</h4>
+                    <div class="text-sm">{{ error_message }}</div>
+                </div>
+            </div>
+        """, error_message=str(e))

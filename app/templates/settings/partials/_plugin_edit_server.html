@@ -150,6 +150,7 @@
     </div>
 
     <!-- Public URL Section (for non-Plex services) -->
+    <!-- Public URL Section (for non-Plex services) -->
     {% if plugin.plugin_id != 'plex' %}
     <div class="space-y-4 mb-6">
         <h4 class="font-medium text-base-content text-lg mb-3">
@@ -171,6 +172,59 @@
             {% else %}
                 <span class="text-base-content/60 text-xs mt-1 block">{{ form.public_url.description }}</span>
             {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Overseerr Integration Section (for Plex servers only) -->
+    {% if plugin.plugin_id == 'plex' %}
+    <div class="space-y-4 mb-6">
+        <h4 class="font-medium text-base-content text-lg mb-3">
+            <i class="fa-solid fa-film text-purple-600 text-sm mr-2"></i>
+            Overseerr Integration
+        </h4>
+        
+        <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+            <!-- Enable Overseerr Checkbox -->
+            <div class="flex items-center gap-3 mb-4">
+                {{ form.overseerr_enabled(class="checkbox checkbox-primary", id="overseerr_enabled") }}
+                <label for="overseerr_enabled" class="cursor-pointer">
+                    <span class="font-medium text-base-content">{{ form.overseerr_enabled.label.text }}</span>
+                    <span class="text-base-content/60 text-xs block">{{ form.overseerr_enabled.description }}</span>
+                </label>
+            </div>
+            
+            <!-- Overseerr URL Field -->
+            <div id="overseerr-fields" class="space-y-4">
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-link text-purple-600 text-sm"></i>
+                        <h5 class="font-medium text-base-content">{{ form.overseerr_url.label.text }}</h5>
+                        <span class="inline-flex items-center rounded-full bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20">Required when enabled</span>
+                    </div>
+                    {{ form.overseerr_url(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.overseerr_url.errors else "")) }}
+                    {% if form.overseerr_url.errors %}
+                        <span class="text-error text-xs mt-1 block">{{ form.overseerr_url.errors[0] }}</span>
+                    {% else %}
+                        <span class="text-base-content/60 text-xs mt-1 block">{{ form.overseerr_url.description }}</span>
+                    {% endif %}
+                </div>
+                
+                <!-- Overseerr API Key Field -->
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-key text-purple-600 text-sm"></i>
+                        <h5 class="font-medium text-base-content">{{ form.overseerr_api_key.label.text }}</h5>
+                        <span class="inline-flex items-center rounded-full bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20">Required when enabled</span>
+                    </div>
+                    {{ form.overseerr_api_key(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.overseerr_api_key.errors else "")) }}
+                    {% if form.overseerr_api_key.errors %}
+                        <span class="text-error text-xs mt-1 block">{{ form.overseerr_api_key.errors[0] }}</span>
+                    {% else %}
+                        <span class="text-base-content/60 text-xs mt-1 block">{{ form.overseerr_api_key.description }}</span>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
     {% endif %}
@@ -239,7 +293,23 @@ function testConnection() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showToast('Connection successful: ' + data.message, 'success');
+            let message = data.message;
+            
+            // Handle Overseerr results
+            if (data.overseerr) {
+                if (data.overseerr.success) {
+                    message += ` | Overseerr: ${data.overseerr.message}`;
+                    if (data.overseerr.linked_users && data.overseerr.linked_users.length > 0) {
+                        const linkedCount = data.overseerr.linked_users.filter(u => u.is_linked).length;
+                        message += ` (${linkedCount} users linked)`;
+                    }
+                } else {
+                    showToast('Overseerr connection failed: ' + data.overseerr.message, 'error');
+                    return;
+                }
+            }
+            
+            showToast('Connection successful: ' + message, 'success');
         } else {
             showToast('Connection failed: ' + data.message, 'error');
         }
@@ -252,5 +322,21 @@ function testConnection() {
         btn.disabled = false;
     });
 }
+
+// Handle Overseerr checkbox toggle
+document.addEventListener('DOMContentLoaded', function() {
+    const overseerrCheckbox = document.getElementById('overseerr_enabled');
+    const overseerrFields = document.getElementById('overseerr-fields');
+    
+    if (overseerrCheckbox && overseerrFields) {
+        // Set initial state based on current value
+        overseerrFields.style.display = overseerrCheckbox.checked ? 'block' : 'none';
+        
+        // Handle checkbox changes
+        overseerrCheckbox.addEventListener('change', function() {
+            overseerrFields.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+});
 
 </script>
