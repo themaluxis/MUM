@@ -1946,7 +1946,7 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
             <div class="space-y-4">
                 <!-- Requests List -->
                 {% for request in requests %}
-                <div class="card bg-base-100 border border-base-300 shadow-sm">
+                <div class="card bg-base-200 border border-base-300 shadow-sm">
                     <div class="card-body p-4">
                         <div class="flex items-start gap-4">
                             <!-- Poster Image -->

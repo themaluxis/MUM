@@ -1,21 +1,39 @@
 <!-- File: app/templates/user/partials/overseerr_tab.html -->
 <div class="space-y-6">
-    <!-- Overseerr Integration Status -->
-    <div class="card bg-base-100 shadow-lg border border-base-300">
-        <div class="card-header">
-            <div class="flex items-center justify-between p-6 border-b border-base-300">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 rounded-lg bg-purple-500/10">
-                        <i class="fa-solid fa-film text-lg text-purple-500"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-semibold text-base-content">Overseerr Integration</h2>
-                        <p class="text-sm text-base-content/70">Request movies and TV shows through Overseerr</p>
-                    </div>
-                </div>
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-purple-500/10">
+                <i class="fa-solid fa-film text-lg text-purple-500"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-semibold text-base-content">Requests</h2>
             </div>
         </div>
-        <div class="card-body p-6">
+        <!-- Show Open Overseerr button if there are overseerr servers -->
+        {% set plex_servers_check = [] %}
+        {% for media_access in user.media_accesses %}
+            {% if media_access.server and media_access.server.service_type.value == 'plex' and media_access.is_active %}
+                {% set _ = plex_servers_check.append(media_access.server) %}
+            {% endif %}
+        {% endfor %}
+        {% if plex_servers_check %}
+            {% set overseerr_url_found = [] %}
+            {% for server in plex_servers_check %}
+                {% if server.overseerr_enabled and server.overseerr_url and not overseerr_url_found %}
+                    {% set _ = overseerr_url_found.append(server.overseerr_url) %}
+                    <a href="{{ server.overseerr_url }}" 
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       class="btn btn-sm btn-outline btn-primary">
+                        <i class="fa-solid fa-external-link mr-1"></i>
+                        Open Overseerr
+                    </a>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    </div>
+    <!-- Overseerr Integration Status -->
+        <div class="">
             {% set plex_servers = [] %}
             {% for media_access in user.media_accesses %}
                 {% if media_access.server and media_access.server.service_type.value == 'plex' and media_access.is_active %}
@@ -36,23 +54,6 @@
                     <div class="space-y-6">
                         {% for server in overseerr_servers %}
                         <div class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <h3 class="font-semibold text-base-content">{{ server.server_nickname }} - Requests</h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="badge badge-success badge-sm">
-                                        <i class="fa-solid fa-check text-xs mr-1"></i>
-                                        Connected
-                                    </span>
-                                    <a href="{{ server.overseerr_url }}" 
-                                       target="_blank" 
-                                       rel="noopener noreferrer"
-                                       class="btn btn-xs btn-outline btn-primary">
-                                        <i class="fa-solid fa-external-link mr-1"></i>
-                                        Open Overseerr
-                                    </a>
-                                </div>
-                            </div>
-                            
                             <!-- Load user's requests via HTMX -->
                             <div id="overseerr-requests-{{ server.id }}" 
                                  {% if user._is_service_user is defined and user._is_service_user %}
@@ -106,6 +107,5 @@
                 </div>
             {% endif %}
         </div>
-    </div>
 
 </div>
