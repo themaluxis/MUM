@@ -291,6 +291,13 @@ function testConnection() {
     formData.api_key = document.querySelector('input[name="api_key"]').value;
     {% endif %}
     
+    // Include Overseerr fields for Plex servers
+    {% if plugin.plugin_id == 'plex' %}
+    formData.overseerr_enabled = document.querySelector('input[name="overseerr_enabled"]') ? document.querySelector('input[name="overseerr_enabled"]').checked : false;
+    formData.overseerr_url = document.querySelector('input[name="overseerr_url"]') ? document.querySelector('input[name="overseerr_url"]').value : '';
+    formData.overseerr_api_key = document.querySelector('input[name="overseerr_api_key"]') ? document.querySelector('input[name="overseerr_api_key"]').value : '';
+    {% endif %}
+    
     
     // Update button state
     testBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';

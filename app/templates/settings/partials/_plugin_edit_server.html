@@ -256,25 +256,35 @@
             <i class="fa-solid fa-times mr-2"></i>
             Cancel
         </a>
-        <button type="button" onclick="testConnection()" class="btn btn-outline h-12">
+        <button type="button" id="test-connection-btn" onclick="testConnection()" class="btn btn-outline h-12">
             <i class="fa-solid fa-wifi mr-2"></i>
             Test Connection
         </button>
-        {{ form.submit(class="btn btn-primary h-12 gap-2") }}
+        <button type="submit" id="save-server-btn" class="btn btn-primary h-12 gap-2" disabled>
+            <i class="fa-solid fa-save mr-2"></i>
+            Save Server
+        </button>
     </div>
 </form>
 
 <script>
+let connectionTested = false;
+
 function testConnection() {
     const form = document.querySelector('form');
-    const btn = event.target;
+    const btn = document.getElementById('test-connection-btn');
+    const saveBtn = document.getElementById('save-server-btn');
     const originalText = btn.innerHTML;
     
     // Collect form data
     const requestData = {
         service_type: '{{ plugin.plugin_id }}',
         url: document.querySelector('input[name="url"]').value,
-        api_key: document.querySelector('input[name="api_key"]').value
+        api_key: document.querySelector('input[name="api_key"]').value,
+        // Include Overseerr fields for Plex servers
+        overseerr_enabled: document.querySelector('input[name="overseerr_enabled"]') ? document.querySelector('input[name="overseerr_enabled"]').checked : false,
+        overseerr_url: document.querySelector('input[name="overseerr_url"]') ? document.querySelector('input[name="overseerr_url"]').value : '',
+        overseerr_api_key: document.querySelector('input[name="overseerr_api_key"]') ? document.querySelector('input[name="overseerr_api_key"]').value : ''
     };
     
     
@@ -310,18 +320,59 @@ function testConnection() {
             }
             
             showToast('Connection successful: ' + message, 'success');
+            connectionTested = true;
+            saveBtn.disabled = false;
         } else {
             showToast('Connection failed: ' + data.message, 'error');
+            connectionTested = false;
+            saveBtn.disabled = true;
         }
     })
     .catch(error => {
         showToast('Error testing connection: ' + error.message, 'error');
+        connectionTested = false;
+        saveBtn.disabled = true;
     })
     .finally(() => {
         btn.innerHTML = originalText;
         btn.disabled = false;
     });
 }
+
+// Add form change listeners to disable save button when inputs change
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const saveBtn = document.getElementById('save-server-btn');
+    
+    // Get all form inputs
+    const inputs = form.querySelectorAll('input, select, textarea');
+    
+    // Add change listeners to all form inputs
+    inputs.forEach(input => {
+        input.addEventListener('input', function() {
+            if (connectionTested) {
+                connectionTested = false;
+                saveBtn.disabled = true;
+            }
+        });
+        
+        input.addEventListener('change', function() {
+            if (connectionTested) {
+                connectionTested = false;
+                saveBtn.disabled = true;
+            }
+        });
+    });
+});
+
+// Prevent form submission if connection not tested
+document.querySelector('form').addEventListener('submit', function(e) {
+    if (!connectionTested) {
+        e.preventDefault();
+        showToast('Please test the connection before saving the server configuration.', 'warning');
+        return false;
+    }
+});
 
 // Handle Overseerr checkbox toggle
 document.addEventListener('DOMContentLoaded', function() {

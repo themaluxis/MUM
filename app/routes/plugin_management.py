@@ -413,48 +413,12 @@ def test_connection(plugin_id):
                         'message': f'Plex connection successful, but Overseerr connection failed: {overseerr_message}'
                     })
                 
-                # Get Plex users for linking
-                try:
-                    from app.services.media_service_factory import MediaServiceFactory
-                    plex_service = MediaServiceFactory.create_service({
-                        'service_type': 'plex',
-                        'url': url,
-                        'api_key': api_key
-                    })
-                    
-                    if plex_service:
-                        plex_users = plex_service.get_users()
-                        if plex_users:
-                            # Link users
-                            link_success, linked_users, link_message = overseerr.link_plex_users(plex_users)
-                            
-                            # Store linked users in request context for later use
-                            request.overseerr_linked_users = linked_users
-                            
-                            overseerr_test_result = {
-                                'success': link_success,
-                                'message': f'{overseerr_message}. {link_message}',
-                                'linked_users': linked_users
-                            }
-                        else:
-                            overseerr_test_result = {
-                                'success': True,
-                                'message': f'{overseerr_message}. No Plex users found to link.',
-                                'linked_users': []
-                            }
-                    else:
-                        overseerr_test_result = {
-                            'success': True,
-                            'message': f'{overseerr_message}. Could not retrieve Plex users for linking.',
-                            'linked_users': []
-                        }
-                except Exception as e:
-                    current_app.logger.error(f"Error linking Plex users to Overseerr: {e}")
-                    overseerr_test_result = {
-                        'success': True,
-                        'message': f'{overseerr_message}. Error linking users: {str(e)}',
-                        'linked_users': []
-                    }
+                # Overseerr connection successful - users will be linked automatically when they visit their tabs
+                overseerr_test_result = {
+                    'success': True,
+                    'message': f'{overseerr_message}. Users will be linked automatically when they access their Overseerr requests.',
+                    'linked_users': []
+                }
         
         # Log the test attempt
         log_event(
@@ -479,10 +443,15 @@ def test_connection(plugin_id):
 @setup_required
 @permission_required('manage_plugins')
 def test_existing_server_connection(plugin_id, server_id):
-    """Test connection for an existing server"""
+    """Test connection for an existing server using current form values"""
     try:
         from app.models_media_services import MediaServer, ServiceType
         from flask import jsonify
+        
+        # Get data from JSON request (current form values)
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'})
         
         # Convert plugin_id string to ServiceType enum
         try:
@@ -490,95 +459,85 @@ def test_existing_server_connection(plugin_id, server_id):
         except KeyError:
             return jsonify({'success': False, 'message': f'Invalid service type: {plugin_id}'})
         
-        # Get the existing server
+        # Get the existing server (for logging purposes)
         server = MediaServer.query.filter_by(id=server_id, service_type=service_type_enum).first()
         if not server:
             return jsonify({'success': False, 'message': 'Server not found'})
+        
+        # Use current form values instead of saved database values
+        url = data.get('url', '').strip()
+        api_key = data.get('api_key', '').strip()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        
+        # Validate required fields
+        if not url:
+            return jsonify({'success': False, 'message': 'URL is required'})
         
         # Prepare credentials based on service type
         credentials = {}
         
         if plugin_id in ['jellyfin', 'emby', 'plex', 'audiobookshelf', 'kavita', 'komga']:
             # Token-based authentication
-            if not server.api_key:
-                return jsonify({'success': False, 'message': f'API token not configured for this {plugin_id.title()} server'})
-            credentials['token'] = server.api_key
+            if not api_key:
+                return jsonify({'success': False, 'message': f'API token is required for {plugin_id.title()}'})
+            credentials['token'] = api_key
                 
         elif plugin_id in ['romm']:
             # Username/password authentication
-            if not server.username or not server.password:
-                return jsonify({'success': False, 'message': f'Username and password not configured for this {plugin_id.title()} server'})
-            credentials['username'] = server.username
-            credentials['password'] = server.password
+            if not username or not password:
+                return jsonify({'success': False, 'message': f'Username and password are required for {plugin_id.title()}'})
+            credentials['username'] = username
+            credentials['password'] = password
         
         else:
             return jsonify({'success': False, 'message': f'Unsupported service type: {plugin_id}'})
         
-        # Test the connection using our new utility
-        success, message = test_server_connection(plugin_id, server.url, **credentials)
+        # Test the connection using current form values
+        success, message = test_server_connection(plugin_id, url, **credentials)
         
         # If this is a Plex server and has Overseerr integration enabled, test Overseerr too
         overseerr_test_result = None
-        if success and plugin_id == 'plex' and server.overseerr_enabled:
-            if server.overseerr_url and server.overseerr_api_key:
-                # Test Overseerr connection
+        if success and plugin_id == 'plex':
+            overseerr_enabled = data.get('overseerr_enabled', False)
+            overseerr_url = data.get('overseerr_url', '').strip()
+            overseerr_api_key = data.get('overseerr_api_key', '').strip()
+            
+            # Debug logging to see what we're receiving
+            current_app.logger.info(f"OVERSEERR TEST DEBUG: overseerr_enabled={overseerr_enabled} (type: {type(overseerr_enabled)})")
+            current_app.logger.info(f"OVERSEERR TEST DEBUG: overseerr_url='{overseerr_url}' (length: {len(overseerr_url)})")
+            current_app.logger.info(f"OVERSEERR TEST DEBUG: overseerr_api_key='{overseerr_api_key[:10] if overseerr_api_key else ''}...' (length: {len(overseerr_api_key)})")
+            
+            if overseerr_enabled:
+                if not overseerr_url or not overseerr_api_key:
+                    current_app.logger.info(f"OVERSEERR TEST DEBUG: Validation failed - URL empty: {not overseerr_url}, API key empty: {not overseerr_api_key}")
+                    return jsonify({
+                        'success': False, 
+                        'message': 'Overseerr URL and API key are required when Overseerr integration is enabled'
+                    })
+                
+                # Test Overseerr connection using current form values
                 from app.services.overseerr_service import OverseerrService
-                overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
+                current_app.logger.info(f"OVERSEERR TEST DEBUG: Testing connection to {overseerr_url} with API key {overseerr_api_key[:10]}...")
+                
+                overseerr = OverseerrService(overseerr_url, overseerr_api_key)
                 overseerr_success, overseerr_message = overseerr.test_connection()
                 
+                current_app.logger.info(f"OVERSEERR TEST DEBUG: Connection test result - success={overseerr_success}, message='{overseerr_message}'")
+                
                 if not overseerr_success:
+                    current_app.logger.info(f"OVERSEERR TEST DEBUG: Overseerr test failed, returning error")
                     return jsonify({
                         'success': False, 
                         'message': f'Plex connection successful, but Overseerr connection failed: {overseerr_message}'
                     })
                 
-                # Get Plex users for linking
-                try:
-                    from app.services.media_service_factory import MediaServiceFactory
-                    plex_service = MediaServiceFactory.create_service_from_db(server)
-                    
-                    if plex_service:
-                        plex_users = plex_service.get_users()
-                        if plex_users:
-                            # Link users and update the database
-                            link_success, linked_users, link_message = overseerr.link_plex_users(plex_users)
-                            
-                            # Update the database with new user links
-                            from app.models_overseerr import OverseerrUserLink
-                            sync_success, sync_message = OverseerrUserLink.sync_users(server.id, linked_users)
-                            
-                            if sync_success:
-                                current_app.logger.info(f"Updated Overseerr user links for server {server.server_nickname}: {sync_message}")
-                            
-                            overseerr_test_result = {
-                                'success': link_success,
-                                'message': f'{overseerr_message}. {link_message}',
-                                'linked_users': linked_users
-                            }
-                        else:
-                            overseerr_test_result = {
-                                'success': True,
-                                'message': f'{overseerr_message}. No Plex users found to link.',
-                                'linked_users': []
-                            }
-                    else:
-                        overseerr_test_result = {
-                            'success': True,
-                            'message': f'{overseerr_message}. Could not retrieve Plex users for linking.',
-                            'linked_users': []
-                        }
-                except Exception as e:
-                    current_app.logger.error(f"Error linking Plex users to Overseerr: {e}")
-                    overseerr_test_result = {
-                        'success': True,
-                        'message': f'{overseerr_message}. Error linking users: {str(e)}',
-                        'linked_users': []
-                    }
-            else:
-                return jsonify({
-                    'success': False, 
-                    'message': 'Overseerr is enabled but URL or API key is not configured'
-                })
+                # Overseerr connection successful - users will be linked automatically when they visit their tabs
+                overseerr_test_result = {
+                    'success': True,
+                    'message': f'{overseerr_message}. Users will be linked automatically when they access their Overseerr requests.',
+                    'linked_users': []
+                }
         
         # Log the test attempt
         log_event(

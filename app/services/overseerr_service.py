@@ -19,18 +19,37 @@ class OverseerrService:
     def test_connection(self) -> Tuple[bool, str]:
         """Test connection to Overseerr instance"""
         try:
-            response = self.session.get(f"{self.base_url}/api/v1/status", timeout=10)
+            # First check if the base URL is reachable with the status endpoint (no auth required)
+            current_app.logger.info(f"OVERSEERR SERVICE DEBUG: Testing connection to {self.base_url}")
+            status_response = self.session.get(f"{self.base_url}/api/v1/status", timeout=10)
             
-            if response.status_code == 200:
-                data = response.json()
-                version = data.get('version', 'Unknown')
+            if status_response.status_code != 200:
+                return False, f"Cannot reach Overseerr server: HTTP {status_response.status_code}"
+            
+            # Get version from status for success message
+            status_data = status_response.json()
+            version = status_data.get('version', 'Unknown')
+            
+            # Now test authentication with a fast endpoint that requires a valid API key
+            current_app.logger.info(f"OVERSEERR SERVICE DEBUG: Testing API key authentication")
+            current_app.logger.info(f"OVERSEERR SERVICE DEBUG: Using API key: {self.api_key[:10]}...")
+            
+            # Use GET /user/1 endpoint to test auth (fast - single user lookup, user 1 is always admin/owner)
+            auth_response = self.session.get(f"{self.base_url}/api/v1/user/1", timeout=10)
+            
+            current_app.logger.info(f"OVERSEERR SERVICE DEBUG: Auth test response status: {auth_response.status_code}")
+            current_app.logger.info(f"OVERSEERR SERVICE DEBUG: Auth test response text: {auth_response.text[:200]}")
+            
+            if auth_response.status_code == 200:
                 return True, f"Connected to Overseerr v{version}"
-            elif response.status_code == 401:
+            elif auth_response.status_code == 401:
                 return False, "Invalid API key"
-            elif response.status_code == 403:
+            elif auth_response.status_code == 403:
                 return False, "API key does not have sufficient permissions"
+            elif auth_response.status_code == 404:
+                return False, "User 1 not found - Overseerr may not be properly initialized"
             else:
-                return False, f"HTTP {response.status_code}: {response.text[:100]}"
+                return False, f"Authentication failed: HTTP {auth_response.status_code}: {auth_response.text[:100]}"
                 
         except requests.exceptions.Timeout:
             return False, "Connection timeout - check URL and network connectivity"

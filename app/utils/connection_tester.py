@@ -94,10 +94,10 @@ def check_plex(url: str, token: str) -> Tuple[bool, str]:
         import xml.etree.ElementTree as ET
         root = ET.fromstring(response.content)
         
-        server_name = root.get('friendlyName', 'Unknown')
+        server_name = root.get('friendlyName', 'Unknown') # There is no "friendlyName" in /identity
         version = root.get('version', 'Unknown')
         
-        return True, f"Successfully connected to Plex server '{server_name}' (v{version})"
+        return True, f"Successfully connected to Plex server v{version}"
         
     except requests.exceptions.RequestException as e:
         return handle_connection_error(e, "Plex")
