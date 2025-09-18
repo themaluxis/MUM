@@ -1764,19 +1764,16 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
         from app.services.overseerr_service import OverseerrService
         from app.models_media_services import MediaServer
         from app.models_overseerr import OverseerrUserLink
-        from flask import jsonify, render_template_string
+        from flask import render_template
         
         # Get the server
         server = MediaServer.query.get_or_404(server_id)
         
         # Check if server has Overseerr enabled
         if not server.overseerr_enabled or not server.overseerr_url or not server.overseerr_api_key:
-            return render_template_string("""
-                <div class="alert alert-warning">
-                    <i class="fa-solid fa-exclamation-triangle"></i>
-                    <div>Overseerr is not properly configured for this server.</div>
-                </div>
-            """)
+            return render_template('user/partials/overseerr_error.html',
+                                 error_type='api_error',
+                                 message='Overseerr is not properly configured for this server.')
         
         # Get the current user's Plex ID and details
         plex_user_id = None
@@ -1832,12 +1829,9 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
         
         if not plex_user_id or not plex_username:
             current_app.logger.warning(f"OVERSEERR DEBUG: Missing required data - plex_user_id={plex_user_id}, plex_username={plex_username}")
-            return render_template_string("""
-                <div class="alert alert-info">
-                    <i class="fa-solid fa-info-circle"></i>
-                    <div>No Plex account found for Overseerr requests. (Debug: plex_user_id={{ plex_user_id }}, plex_username={{ plex_username }})</div>
-                </div>
-            """, plex_user_id=plex_user_id, plex_username=plex_username)
+            return render_template('user/partials/overseerr_error.html',
+                                 error_type='no_plex_account',
+                                 debug_info={'plex_user_id': plex_user_id, 'plex_username': plex_username})
         
         # Try to get the Overseerr user ID from the link table
         overseerr_user_id = OverseerrUserLink.get_overseerr_user_id(server_id, plex_user_id)
@@ -1859,42 +1853,17 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
             else:
                 current_app.logger.info(f"OVERSEERR DEBUG: Failed to link user {plex_username} - {link_message}")
                 
-                # Show a more helpful message based on the failure reason
+                # Show appropriate error message based on failure reason
                 if "not found in Overseerr" in link_message:
-                    error_message = f"""
-                        <div class="alert alert-warning">
-                            <i class="fa-solid fa-user-slash"></i>
-                            <div>
-                                <h4 class="font-bold">Account Not Found in Overseerr</h4>
-                                <div class="text-sm">
-                                    The Plex user <strong>{plex_username}</strong> was not found in Overseerr. 
-                                    Please ensure the user has signed into Overseerr at least once.
-                                </div>
-                                <div class="mt-2">
-                                    <a href="{server.overseerr_url}" 
-                                       target="_blank" 
-                                       rel="noopener noreferrer"
-                                       class="btn btn-sm btn-primary">
-                                        <i class="fa-solid fa-external-link mr-1"></i>
-                                        Open Overseerr
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    """
+                    return render_template('user/partials/overseerr_error.html',
+                                         error_type='user_not_found',
+                                         server=server,
+                                         debug_info={'plex_user_id': plex_user_id, 'plex_username': plex_username})
                 else:
-                    error_message = f"""
-                        <div class="alert alert-error">
-                            <i class="fa-solid fa-exclamation-triangle"></i>
-                            <div>
-                                <h4 class="font-bold">Linking Error</h4>
-                                <div class="text-sm">{link_message}</div>
-                                <div class="text-xs mt-1 opacity-70">Debug info: plex_user_id={plex_user_id}, plex_username={plex_username}</div>
-                            </div>
-                        </div>
-                    """
-                
-                return render_template_string(error_message, server=server)
+                    return render_template('user/partials/overseerr_error.html',
+                                         error_type='linking_error', 
+                                         message=link_message,
+                                         debug_info={'plex_user_id': plex_user_id, 'plex_username': plex_username})
         
         # Get requests from Overseerr with pagination
         overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
@@ -1911,184 +1880,20 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
         current_app.logger.info(f"OVERSEERR DEBUG: API returned {len(requests_list) if success else 0} requests, pagination: {pagination_info}")
         
         if not success:
-            return render_template_string("""
-                <div class="alert alert-error">
-                    <i class="fa-solid fa-exclamation-circle"></i>
-                    <div>
-                        <h4 class="font-bold">Error Loading Requests</h4>
-                        <div class="text-sm">{{ message }}</div>
-                    </div>
-                </div>
-            """, message=message)
+            return render_template('user/partials/overseerr_error.html', 
+                                 error_type='api_error',
+                                 message=message)
         
-        if not requests_list:
-            return render_template_string("""
-                <div class="text-center py-8">
-                    <div class="p-4 rounded-full bg-info/10 w-16 h-16 mx-auto flex items-center justify-center mb-4">
-                        <i class="fa-solid fa-inbox text-2xl text-info"></i>
-                    </div>
-                    <h3 class="text-lg font-semibold text-base-content mb-2">No Requests Found</h3>
-                    <p class="text-base-content/70 mb-4">
-                        This user hasn't made any requests yet. Use Overseerr to request movies and TV shows.
-                    </p>
-                    <a href="{{ server.overseerr_url }}" 
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="btn btn-primary">
-                        <i class="fa-solid fa-external-link mr-2"></i>
-                        Open Overseerr
-                    </a>
-                </div>
-            """, server=server)
-        
-        # Render requests list with pagination
-        return render_template_string("""
-            <div class="space-y-4">
-                <!-- Requests List -->
-                {% for request in requests %}
-                <div class="card bg-base-200 border border-base-300 shadow-sm">
-                    <div class="card-body p-4">
-                        <div class="flex items-start gap-4">
-                            <!-- Poster Image -->
-                            {% if request.media and request.media.posterPath %}
-                            <div class="w-16 h-24 rounded-lg overflow-hidden bg-base-200 flex-shrink-0">
-                                <img src="https://image.tmdb.org/t/p/w154{{ request.media.posterPath }}" 
-                                     alt="{{ request.media.title or 'Unknown' }}"
-                                     class="w-full h-full object-cover"
-                                     onerror="this.parentElement.innerHTML='<div class="w-full h-full flex items-center justify-center"><i class="fa-solid fa-image text-base-content/30"></i></div>
-                            </div>
-                            {% else %}
-                            <div class="w-16 h-24 rounded-lg bg-base-200 flex items-center justify-center flex-shrink-0">
-                                <i class="fa-solid fa-image text-base-content/30"></i>
-                            </div>
-                            {% endif %}
-                            
-                            <!-- Request Details -->
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-start justify-between">
-                                    <div class="flex-1">
-                                        <h4 class="font-semibold text-base-content">
-                                            {% if request.media %}
-                                                {% if request.media.mediaType == 'tv' and request.media.originalName %}
-                                                    {{ request.media.originalName }}
-                                                {% else %}
-                                                    {{ request.media.title or request.media.name or 'Unknown Title' }}
-                                                {% endif %}
-                                            {% else %}
-                                                Unknown Title
-                                            {% endif %}
-                                            {% if request.media and (request.media.releaseDate or request.media.firstAirDate) %}
-                                                <span class="text-sm font-normal text-base-content/60">
-                                                    ({{ (request.media.releaseDate or request.media.firstAirDate)[:4] }})
-                                                </span>
-                                            {% endif %}
-                                        </h4>
-                                        
-                                        <!-- Media Type & Genre -->
-                                        <div class="flex items-center gap-2 mt-1">
-                                            {% if request.media and request.media.mediaType %}
-                                            <span class="badge badge-sm {% if request.media.mediaType == 'movie' %}badge-primary{% else %}badge-secondary{% endif %}">
-                                                {{ 'Movie' if request.media.mediaType == 'movie' else 'TV Show' }}
-                                            </span>
-                                            {% endif %}
-                                            
-                                            {% if request.media and request.media.genres and request.media.genres|length > 0 %}
-                                            <span class="text-xs text-base-content/50">
-                                                {{ request.media.genres[0].name }}{% if request.media.genres|length > 1 %}, {{ request.media.genres[1].name }}{% endif %}
-                                            </span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Request Status -->
-                                    <div class="flex flex-col items-end gap-1">
-                                        {% if request.status == 1 %}
-                                        <span class="badge badge-warning badge-sm">Pending</span>
-                                        {% elif request.status == 2 %}
-                                        <span class="badge badge-success badge-sm">Approved</span>
-                                        {% elif request.status == 3 %}
-                                        <span class="badge badge-success badge-sm">Available</span>
-                                        {% else %}
-                                        <span class="badge badge-ghost badge-sm">Unknown</span>
-                                        {% endif %}
-                                        
-                                        {% if request.media and request.media.voteAverage %}
-                                        <div class="flex items-center gap-1 text-xs text-base-content/60">
-                                            <i class="fa-solid fa-star text-yellow-500"></i>
-                                            <span>{{ "%.1f"|format(request.media.voteAverage) }}</span>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                
-                                {% if request.media and request.media.overview %}
-                                <p class="text-sm text-base-content/70 mt-2 line-clamp-2">
-                                    {{ request.media.overview[:200] }}{% if request.media.overview|length > 200 %}...{% endif %}
-                                </p>
-                                {% endif %}
-                                
-                                <div class="flex items-center gap-4 mt-3 text-xs text-base-content/60">
-                                    <span>
-                                        <i class="fa-solid fa-calendar mr-1"></i>
-                                        Requested {{ request.createdAt[:10] }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-                
-                <!-- Pagination Controls -->
-                {% if pagination.total_pages > 1 %}
-                <div class="flex items-center justify-between mt-6 p-4 bg-base-200/50 rounded-lg">
-                    <div class="text-sm text-base-content/70">
-                        Showing {{ ((pagination.current_page - 1) * pagination.results_per_page + 1) }} to 
-                        {{ (pagination.current_page * pagination.results_per_page) if pagination.current_page * pagination.results_per_page < pagination.total_results else pagination.total_results }} 
-                        of {{ pagination.total_results }} requests
-                    </div>
-                    
-                    <div class="flex items-center gap-2">
-                        {% if pagination.has_prev %}
-                        <button class="btn btn-sm btn-outline" 
-                                hx-get="{{ request.path }}?page={{ pagination.current_page - 1 }}&per_page={{ pagination.results_per_page }}"
-                                hx-target="#overseerr-requests-{{ server_id }}"
-                                hx-indicator="#loading-requests-{{ server_id }}">
-                            <i class="fa-solid fa-chevron-left"></i>
-                        </button>
-                        {% endif %}
-                        
-                        <span class="px-3 py-1 text-sm">
-                            Page {{ pagination.current_page }} of {{ pagination.total_pages }}
-                        </span>
-                        
-                        {% if pagination.has_next %}
-                        <button class="btn btn-sm btn-outline"
-                                hx-get="{{ request.path }}?page={{ pagination.current_page + 1 }}&per_page={{ pagination.results_per_page }}"
-                                hx-target="#overseerr-requests-{{ server_id }}"
-                                hx-indicator="#loading-requests-{{ server_id }}">
-                            <i class="fa-solid fa-chevron-right"></i>
-                        </button>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        """, 
-        requests=requests_list, 
-        pagination=pagination_info, 
-        server=server,
-        server_id=server_id,
-        request=request)
+        # Render requests list with pagination using template
+        return render_template('user/partials/overseerr_requests.html',
+                             requests=requests_list, 
+                             pagination=pagination_info, 
+                             server=server,
+                             server_id=server_id,
+                             request=request)
         
     except Exception as e:
         current_app.logger.error(f"Error in get_overseerr_requests: {e}")
-        return render_template_string("""
-            <div class="alert alert-error">
-                <i class="fa-solid fa-exclamation-circle"></i>
-                <div>
-                    <h4 class="font-bold">Unexpected Error</h4>
-                    <div class="text-sm">{{ error_message }}</div>
-                </div>
-            </div>
-        """, error_message=str(e))
+        return render_template('user/partials/overseerr_error.html',
+                             error_type='unexpected_error',
+                             message=str(e))

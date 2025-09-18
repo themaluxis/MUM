@@ -1,0 +1,154 @@
+<!-- File: app/templates/user/partials/overseerr_requests.html -->
+{% if requests and requests|length > 0 %}
+    <!-- Requests List -->
+    <div class="space-y-4">
+        {% for request in requests %}
+        <div class="card bg-base-200 border border-base-300 shadow-sm">
+            <div class="card-body p-4">
+                <div class="flex items-start gap-4">
+                    <!-- Poster Image -->
+                    {% if request.media and request.media.posterPath %}
+                    <div class="w-16 h-24 rounded-lg overflow-hidden bg-base-200 flex-shrink-0">
+                        <img src="https://image.tmdb.org/t/p/w154{{ request.media.posterPath }}" 
+                             alt="{{ request.media.title or 'Unknown' }}"
+                             class="w-full h-full object-cover"
+                             onerror="this.parentElement.innerHTML='<div class=&quot;w-full h-full flex items-center justify-center&quot;><i class=&quot;fa-solid fa-image text-base-content/30&quot;></i></div>'"
+                        >
+                    </div>
+                    {% else %}
+                    <div class="w-16 h-24 rounded-lg bg-base-200 flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-image text-base-content/30"></i>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Request Details -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-base-content">
+                                    {% if request.media %}
+                                        {% if request.media.mediaType == 'tv' and request.media.originalName %}
+                                            {{ request.media.originalName }}
+                                        {% else %}
+                                            {{ request.media.title or request.media.name or 'Unknown Title' }}
+                                        {% endif %}
+                                    {% else %}
+                                        Unknown Title
+                                    {% endif %}
+                                    {% if request.media and (request.media.releaseDate or request.media.firstAirDate) %}
+                                        <span class="text-sm font-normal text-base-content/60">
+                                            ({{ (request.media.releaseDate or request.media.firstAirDate)[:4] }})
+                                        </span>
+                                    {% endif %}
+                                </h4>
+                                
+                                <!-- Media Type & Genre -->
+                                <div class="flex items-center gap-2 mt-1">
+                                    {% if request.media and request.media.mediaType %}
+                                    <span class="badge badge-sm {% if request.media.mediaType == 'movie' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                        {{ 'Movie' if request.media.mediaType == 'movie' else 'TV Show' }}
+                                    </span>
+                                    {% endif %}
+                                    
+                                    {% if request.media and request.media.genres and request.media.genres|length > 0 %}
+                                    <span class="text-xs text-base-content/50">
+                                        {{ request.media.genres[0].name }}{% if request.media.genres|length > 1 %}, {{ request.media.genres[1].name }}{% endif %}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Request Status -->
+                            <div class="flex flex-col items-end gap-1">
+                                {% if request.status == 1 %}
+                                <span class="badge badge-warning badge-sm">Pending</span>
+                                {% elif request.status == 2 %}
+                                <span class="badge badge-success badge-sm">Approved</span>
+                                {% elif request.status == 3 %}
+                                <span class="badge badge-success badge-sm">Available</span>
+                                {% else %}
+                                <span class="badge badge-ghost badge-sm">Unknown</span>
+                                {% endif %}
+                                
+                                {% if request.media and request.media.voteAverage %}
+                                <div class="flex items-center gap-1 text-xs text-base-content/60">
+                                    <i class="fa-solid fa-star text-yellow-500"></i>
+                                    <span>{{ "%.1f"|format(request.media.voteAverage) }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        {% if request.media and request.media.overview %}
+                        <p class="text-sm text-base-content/70 mt-2 line-clamp-2">
+                            {{ request.media.overview[:200] }}{% if request.media.overview|length > 200 %}...{% endif %}
+                        </p>
+                        {% endif %}
+                        
+                        <div class="flex items-center gap-4 mt-3 text-xs text-base-content/60">
+                            <span>
+                                <i class="fa-solid fa-calendar mr-1"></i>
+                                Requested {{ request.createdAt[:10] }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination Controls -->
+    {% if pagination.total_pages > 1 %}
+    <div class="flex items-center justify-between mt-6 p-4 bg-base-200/50 rounded-lg">
+        <div class="text-sm text-base-content/70">
+            Showing {{ ((pagination.current_page - 1) * pagination.results_per_page + 1) }} to 
+            {{ (pagination.current_page * pagination.results_per_page) if pagination.current_page * pagination.results_per_page < pagination.total_results else pagination.total_results }} 
+            of {{ pagination.total_results }} requests
+        </div>
+        
+        <div class="flex items-center gap-2">
+            {% if pagination.has_prev %}
+            <button class="btn btn-sm btn-outline" 
+                    hx-get="{{ request.path }}?page={{ pagination.current_page - 1 }}&per_page={{ pagination.results_per_page }}"
+                    hx-target="#overseerr-requests-{{ server_id }}"
+                    hx-indicator="#loading-requests-{{ server_id }}">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            {% endif %}
+            
+            <span class="px-3 py-1 text-sm">
+                Page {{ pagination.current_page }} of {{ pagination.total_pages }}
+            </span>
+            
+            {% if pagination.has_next %}
+            <button class="btn btn-sm btn-outline"
+                    hx-get="{{ request.path }}?page={{ pagination.current_page + 1 }}&per_page={{ pagination.results_per_page }}"
+                    hx-target="#overseerr-requests-{{ server_id }}"
+                    hx-indicator="#loading-requests-{{ server_id }}">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+{% else %}
+    <!-- No Requests Found -->
+    <div class="text-center py-8">
+        <div class="p-4 rounded-full bg-info/10 w-16 h-16 mx-auto flex items-center justify-center mb-4">
+            <i class="fa-solid fa-inbox text-2xl text-info"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-base-content mb-2">No Requests Found</h3>
+        <p class="text-base-content/70 mb-4">
+            This user hasn't made any requests yet. Use Overseerr to request movies and TV shows.
+        </p>
+        <a href="{{ server.overseerr_url }}" 
+           target="_blank"
+           rel="noopener noreferrer"
+           class="btn btn-primary">
+            <i class="fa-solid fa-external-link mr-2"></i>
+            Open Overseerr
+        </a>
+    </div>
+{% endif %}
