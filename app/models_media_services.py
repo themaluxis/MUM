@@ -164,6 +164,9 @@ class UserMediaAccess(db.Model):
     external_username = db.Column(db.String(255), nullable=True)
     external_email = db.Column(db.String(255), nullable=True)
     
+    # Overseerr integration
+    overseerr_user_id = db.Column(db.Integer, nullable=True, index=True)  # Overseerr user ID for request management
+    
     # Access permissions
     allowed_library_ids = db.Column(MutableList.as_mutable(JSONEncodedDict), default=list)
     allow_downloads = db.Column(db.Boolean, default=False, nullable=False)
@@ -277,6 +280,99 @@ class UserMediaAccess(db.Model):
             self.user_raw_data = data or {}
         elif data_type == 'stream':
             self.stream_raw_data = data or {}
+    
+    @classmethod
+    def get_overseerr_user_id(cls, server_id: int, plex_user_id: str):
+        """Get the Overseerr user ID for a given Plex user"""
+        user_access = cls.query.filter_by(
+            server_id=server_id,
+            external_user_id=plex_user_id,
+            is_active=True
+        ).first()
+        
+        return user_access.overseerr_user_id if user_access else None
+    
+    @classmethod
+    def link_single_user(cls, server_id: int, plex_user_id: str, plex_username: str, plex_email: str = None):
+        """Attempt to link a single Plex user to Overseerr on-demand"""
+        from app.services.overseerr_service import OverseerrService
+        from app.models_media_services import MediaServer
+        from app.extensions import db
+        from datetime import datetime
+        
+        try:
+            # Get the server to access Overseerr
+            server = MediaServer.query.get(server_id)
+            if not server or not server.overseerr_enabled or not server.overseerr_url or not server.overseerr_api_key:
+                return False, None, "Overseerr not properly configured for this server"
+            
+            # Get the user's media access record
+            user_access = cls.query.filter_by(
+                server_id=server_id,
+                external_user_id=plex_user_id
+            ).first()
+            
+            if not user_access:
+                return False, None, "User access record not found"
+            
+            # Check if user is already linked
+            if user_access.overseerr_user_id:
+                return True, user_access.overseerr_user_id, "User already linked"
+            
+            # Try to find the user in Overseerr
+            overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
+            success, overseerr_user, message = overseerr.get_user_by_plex_username(plex_username)
+            
+            if not success:
+                return False, None, f"Failed to check Overseerr: {message}"
+            
+            if not overseerr_user:
+                return False, None, "User not found in Overseerr"
+            
+            # User found! Update the user access record
+            overseerr_user_id = overseerr_user.get('id')
+            user_access.overseerr_user_id = overseerr_user_id
+            user_access.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            overseerr_username = overseerr_user.get('username', overseerr_user.get('email', 'Unknown'))
+            return True, overseerr_user_id, f"Successfully linked to Overseerr user: {overseerr_username}"
+            
+        except Exception as e:
+            db.session.rollback()
+            return False, None, f"Error linking user: {str(e)}"
+    
+    @classmethod
+    def sync_overseerr_users(cls, server_id: int, linked_users: list):
+        """Sync the Overseerr user links for a server"""
+        try:
+            # Update existing user access records with Overseerr user IDs
+            for user_data in linked_users:
+                plex_user_id = user_data.get('plex_id')
+                overseerr_user_id = user_data.get('overseerr_user_id')
+                is_linked = user_data.get('is_linked', False)
+                
+                if not plex_user_id:
+                    continue
+                
+                # Find the user access record
+                user_access = cls.query.filter_by(
+                    server_id=server_id,
+                    external_user_id=plex_user_id
+                ).first()
+                
+                if user_access:
+                    # Update with Overseerr user ID if linked
+                    user_access.overseerr_user_id = overseerr_user_id if is_linked else None
+                    user_access.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            linked_count = sum(1 for user in linked_users if user.get('is_linked', False))
+            return True, f"Synced {linked_count} of {len(linked_users)} Overseerr user links"
+            
+        except Exception as e:
+            db.session.rollback()
+            return False, f"Error syncing Overseerr user links: {str(e)}"
 
 class MediaItem(db.Model):
     """Store individual media items from libraries for faster access and search"""

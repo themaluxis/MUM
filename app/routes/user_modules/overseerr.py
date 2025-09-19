@@ -17,7 +17,6 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
     try:
         from app.services.overseerr_service import OverseerrService
         from app.models_media_services import MediaServer
-        from app.models_overseerr import OverseerrUserLink
         from flask import render_template
         
         # Get the server
@@ -87,15 +86,15 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
                                  error_type='no_plex_account',
                                  debug_info={'plex_user_id': plex_user_id, 'plex_username': plex_username})
         
-        # Try to get the Overseerr user ID from the link table
-        overseerr_user_id = OverseerrUserLink.get_overseerr_user_id(server_id, plex_user_id)
+        # Try to get the Overseerr user ID from user media access
+        overseerr_user_id = UserMediaAccess.get_overseerr_user_id(server_id, plex_user_id)
         current_app.logger.info(f"OVERSEERR DEBUG: Existing link check - overseerr_user_id={overseerr_user_id}")
         
         # If not linked, attempt lazy linking
         if not overseerr_user_id:
             current_app.logger.info(f"OVERSEERR DEBUG: No existing link found, attempting lazy link for Plex user {plex_username} (ID: {plex_user_id}) on server {server_id}")
             
-            link_success, linked_overseerr_user_id, link_message = OverseerrUserLink.link_single_user(
+            link_success, linked_overseerr_user_id, link_message = UserMediaAccess.link_single_user(
                 server_id, plex_user_id, plex_username, plex_email
             )
             

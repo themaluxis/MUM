@@ -251,8 +251,8 @@ def add_server(plugin_id):
             # If this is a Plex server with Overseerr enabled, sync the user links from the test
             if (plugin_id == 'plex' and new_server.overseerr_enabled and 
                 hasattr(request, 'overseerr_linked_users')):
-                from app.models_overseerr import OverseerrUserLink
-                success, message = OverseerrUserLink.sync_users(
+                from app.models_media_services import UserMediaAccess
+                success, message = UserMediaAccess.sync_overseerr_users(
                     new_server.id, 
                     request.overseerr_linked_users
                 )
