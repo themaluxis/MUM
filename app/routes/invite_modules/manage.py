@@ -15,7 +15,7 @@ from app.services.media_service_manager import MediaServiceManager
 from . import invites_bp
 import json
 
-@invites_bp.route('/manage') 
+@invites_bp.route('/invites') 
 @login_required
 @setup_required
 @permission_required('manage_invites')
@@ -136,7 +136,7 @@ def list_invites():
         grouped_servers[service_type_name].append(server)
 
     # For a full page load, render the main list.html
-    result = render_template('invites/list.html', 
+    result = render_template('invites/admin/index.html', 
                            title="Manage Invites", 
                            invites_count=invites_count, 
                            form=form, 
