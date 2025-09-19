@@ -670,6 +670,34 @@ def library_detail(server_nickname, library_name):
             
         media_content = get_library_media_content(library, page, per_page, search_query, sort_by)
     
+    # Get collections for Plex libraries  
+    collections_content = None
+    if tab == 'collections' and server.service_type.value.lower() == 'plex':
+        try:
+            # Create service instance to get collections
+            service = MediaServiceFactory.create_service_from_db(server)
+            if service and hasattr(service, 'get_library_collections'):
+                # Use the external_id (library UUID) to get collections
+                library_uuid = library.external_id
+                current_app.logger.info(f"Fetching collections for Plex library {library_uuid}")
+                
+                collections_data = service.get_library_collections(library_uuid)
+                if collections_data.get('success'):
+                    collections_content = {
+                        'collections': collections_data.get('collections', []),
+                        'library_name': collections_data.get('library_name', library.name),
+                        'library_type': collections_data.get('library_type', 'unknown')
+                    }
+                else:
+                    current_app.logger.error(f"Failed to fetch collections: {collections_data.get('error', 'Unknown error')}")
+                    collections_content = {'collections': [], 'error': collections_data.get('error')}
+            else:
+                current_app.logger.error("Plex service does not support get_library_collections method")
+                collections_content = {'collections': [], 'error': 'Service does not support collections retrieval'}
+        except Exception as e:
+            current_app.logger.error(f"Error fetching collections for library {library.external_id}: {e}")
+            collections_content = {'collections': [], 'error': str(e)}
+
     # Get recent activity for this library
     recent_activity = []
     if tab == 'activity':
@@ -873,12 +901,18 @@ def library_detail(server_nickname, library_name):
         recent_activity = activity_pagination
     
     # Handle HTMX requests for tab content
-    if request.headers.get('HX-Request') and tab == 'activity':
-        return render_template('libraries/partials/library_activity_tab.html',
-                             library=library,
-                             server=server,
-                             recent_activity=recent_activity,
-                             days_filter=request.args.get('days', 30))
+    if request.headers.get('HX-Request'):
+        if tab == 'activity':
+            return render_template('libraries/partials/library_activity_tab.html',
+                                 library=library,
+                                 server=server,
+                                 recent_activity=recent_activity,
+                                 days_filter=request.args.get('days', 30))
+        elif tab == 'collections':
+            return render_template('libraries/partials/library_collections_tab.html',
+                                 library=library,
+                                 server=server,
+                                 collections_content=collections_content)
     
     return render_template('libraries/library_detail.html',
                          title=f"Library: {library_name}",
@@ -889,6 +923,7 @@ def library_detail(server_nickname, library_name):
                          chart_data=chart_data,
                          user_stats=user_stats,
                          media_content=media_content,
+                         collections_content=collections_content,
                          active_tab=tab,
                          selected_days=request.args.get('days', 30) if tab == 'stats' else None,
                          days_filter=request.args.get('days', 30) if tab == 'activity' else None,

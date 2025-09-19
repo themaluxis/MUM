@@ -132,6 +132,12 @@
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'media' else '' }}">
                         <i class="fa-solid fa-film mr-2"></i>Media
                     </a>
+                    {% if server.service_type.value == 'plex' %}
+                    <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='collections') }}"
+                       class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'collections' else '' }}">
+                        <i class="fa-solid fa-layer-group mr-2"></i>Collections
+                    </a>
+                    {% endif %}
                     <a role="tab" href="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='stats') }}"
                        class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'stats' else '' }}">
                         <i class="fa-solid fa-chart-bar mr-2"></i>Stats
@@ -231,6 +237,14 @@
                          hx-target="this"
                          hx-swap="innerHTML">
                         {% include 'libraries/partials/library_activity_tab.html' %}
+                    </div>
+                {% elif active_tab == 'collections' %}
+                    <!-- Collections Tab -->
+                    <div hx-get="{{ url_for('libraries.library_detail', server_nickname=server.server_nickname, library_name=encode_url_component(library.name), tab='collections') }}"
+                         hx-trigger="load"
+                         hx-target="this"
+                         hx-swap="innerHTML">
+                        {% include 'libraries/partials/library_collections_tab.html' %}
                     </div>
                 {% endif %}
             </div>

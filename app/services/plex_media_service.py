@@ -184,6 +184,89 @@ class PlexMediaService(BaseMediaService):
         
         return libraries
     
+    def get_library_collections(self, library_id: str) -> Dict[str, Any]:
+        """Get collections for a specific Plex library"""
+        server = self._get_server_instance()
+        if not server:
+            return {'success': False, 'error': 'Could not connect to Plex server', 'collections': []}
+        
+        try:
+            # Find the library by UUID or key
+            library_section = None
+            for lib in server.library.sections():
+                if (hasattr(lib, 'uuid') and str(lib.uuid) == str(library_id)) or \
+                   (hasattr(lib, 'key') and str(lib.key) == str(library_id)):
+                    library_section = lib
+                    break
+            
+            if not library_section:
+                return {'success': False, 'error': f'Library with ID {library_id} not found', 'collections': []}
+            
+            # Get collections from the library
+            collections = []
+            try:
+                # Use the collections() method if available
+                if hasattr(library_section, 'collections'):
+                    for collection in library_section.collections():
+                        try:
+                            collections.append({
+                                'key': getattr(collection, 'key', None),
+                                'title': getattr(collection, 'title', 'Unknown Collection'),
+                                'summary': getattr(collection, 'summary', ''),
+                                'thumb': getattr(collection, 'thumb', None),
+                                'art': getattr(collection, 'art', None),
+                                'childCount': getattr(collection, 'childCount', 0),
+                                'addedAt': str(getattr(collection, 'addedAt', None)) if getattr(collection, 'addedAt', None) else None,
+                                'updatedAt': str(getattr(collection, 'updatedAt', None)) if getattr(collection, 'updatedAt', None) else None,
+                                'guid': getattr(collection, 'guid', None),
+                                'ratingKey': getattr(collection, 'ratingKey', None),
+                                'smart': getattr(collection, 'smart', False)
+                            })
+                        except Exception as e:
+                            self.log_warning(f"Error processing collection {getattr(collection, 'title', 'Unknown')}: {e}")
+                            continue
+                
+                # If collections() method doesn't exist, try direct API call
+                else:
+                    # Use direct API call as fallback
+                    collections_url = f"/library/sections/{library_section.key}/collections"
+                    collections_data = server.query(collections_url)
+                    
+                    if collections_data is not None:
+                        for collection_elem in collections_data:
+                            try:
+                                collections.append({
+                                    'key': collection_elem.get('key'),
+                                    'title': collection_elem.get('title', 'Unknown Collection'),
+                                    'summary': collection_elem.get('summary', ''),
+                                    'thumb': collection_elem.get('thumb'),
+                                    'art': collection_elem.get('art'),
+                                    'childCount': int(collection_elem.get('childCount', 0)),
+                                    'addedAt': collection_elem.get('addedAt'),
+                                    'updatedAt': collection_elem.get('updatedAt'),
+                                    'guid': collection_elem.get('guid'),
+                                    'ratingKey': collection_elem.get('ratingKey'),
+                                    'smart': collection_elem.get('smart', '0') == '1'
+                                })
+                            except Exception as e:
+                                self.log_warning(f"Error processing collection element: {e}")
+                                continue
+                
+            except Exception as e:
+                self.log_error(f"Error fetching collections for library {library_id}: {e}")
+                return {'success': False, 'error': f'Error fetching collections: {str(e)}', 'collections': []}
+            
+            return {
+                'success': True,
+                'collections': collections,
+                'library_name': getattr(library_section, 'title', 'Unknown Library'),
+                'library_type': getattr(library_section, 'type', 'unknown')
+            }
+            
+        except Exception as e:
+            self.log_error(f"Error in get_library_collections: {e}")
+            return {'success': False, 'error': str(e), 'collections': []}
+    
     def _legacy_get_libraries_with_raw_data(self) -> List[Dict[str, Any]]:
         """Legacy method - kept for reference but not used"""
         server = self._get_server_instance()
