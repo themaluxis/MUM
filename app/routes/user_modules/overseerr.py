@@ -107,7 +107,7 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
                 current_app.logger.info(f"OVERSEERR DEBUG: Failed to link user {plex_username} - {link_message}")
                 
                 # Show appropriate error message based on failure reason
-                if "not found in Overseerr" in link_message:
+                if "User not found in Overseerr" in link_message or "No Overseerr user found" in link_message:
                     return render_template('user/partials/overseerr_error.html',
                                          error_type='user_not_found',
                                          server=server,

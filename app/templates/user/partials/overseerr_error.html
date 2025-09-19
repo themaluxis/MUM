@@ -14,24 +14,15 @@
         </div>
     </div>
 {% elif error_type == 'user_not_found' %}
-    <div class="alert alert-warning">
-        <i class="fa-solid fa-user-slash"></i>
-        <div>
-            <h4 class="font-bold">Account Not Found in Overseerr</h4>
-            <div class="text-sm">
-                The Plex user <strong>{{ debug_info.plex_username }}</strong> was not found in Overseerr. 
-                Please ensure the user has signed into Overseerr at least once.
-            </div>
-            <div class="mt-2">
-                <a href="{{ server.overseerr_url }}" 
-                   target="_blank" 
-                   rel="noopener noreferrer"
-                   class="btn btn-sm btn-primary">
-                    <i class="fa-solid fa-external-link mr-1"></i>
-                    Open Overseerr
-                </a>
-            </div>
+    <!-- User Not Found in Overseerr -->
+    <div class="text-center py-8">
+        <div class="p-4 rounded-full bg-warning/10 w-16 h-16 mx-auto flex items-center justify-center mb-4">
+            <i class="fa-solid fa-user-slash text-2xl text-warning"></i>
         </div>
+        <h3 class="text-lg font-semibold text-base-content mb-2">Account Not Found in Overseerr</h3>
+        <p class="text-base-content/70 mb-4">
+            {{ debug_info.plex_username }} hasn't signed into Overseerr yet.<br>
+        </p>
     </div>
 {% elif error_type == 'api_error' %}
     <div class="alert alert-error">
