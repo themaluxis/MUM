@@ -340,7 +340,9 @@ def process_invite_form(invite_path_or_token):
             if discord_ready and plex_ready and account_ready:
                 current_step = invite_steps[-1]  # Set this as current step
     
-    use_steps_template = allow_user_accounts or show_discord_button or has_multiple_servers_available
+    # Always use the steps template for a consistent, modern design
+    # The steps template handles all scenarios properly (user accounts disabled, single server, etc.)
+    use_steps_template = True
     
     # Prepare template variables for current step
     server_username_taken = False
