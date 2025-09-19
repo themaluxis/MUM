@@ -1,7 +1,7 @@
 # File: app/routes/user_modules/overseerr.py
 """Overseerr integration and requests functionality"""
 
-from flask import render_template, current_app, request
+from flask import render_template, current_app
 from flask_login import login_required, current_user
 from app.models import UserAppAccess
 from app.models_media_services import UserMediaAccess, MediaServer
@@ -123,8 +123,9 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
         overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
         
         # Get pagination parameters from request
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 20))
+        from flask import request as flask_request
+        page = int(flask_request.args.get('page', 1))
+        per_page = int(flask_request.args.get('per_page', 20))
         skip = (page - 1) * per_page
         
         current_app.logger.info(f"OVERSEERR DEBUG: Requesting page {page}, per_page {per_page}, skip {skip}")
@@ -144,10 +145,113 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
                              pagination=pagination_info, 
                              server=server,
                              server_id=server_id,
-                             request=request)
+                             request=flask_request)
         
     except Exception as e:
         current_app.logger.error(f"Error in get_overseerr_requests: {e}")
         return render_template('user/partials/overseerr_error.html',
                              error_type='unexpected_error',
                              message=str(e))
+
+
+
+@user_bp.route('/overseerr-request-update', methods=['POST'])
+@login_required
+def update_request_status():
+    """Update the status of an Overseerr request (approve/decline)"""
+    current_app.logger.info("UPDATE REQUEST STATUS ROUTE HIT!")
+    try:
+        from app.services.overseerr_service import OverseerrService
+        from app.models_media_services import MediaServer
+        from flask import jsonify, request as flask_request
+        
+        # Get parameters from request JSON
+        data = flask_request.get_json()
+        server_id = data.get('server_id')
+        request_id = data.get('request_id')
+        status = data.get('status')
+        
+        current_app.logger.info(f"UPDATE REQUEST STATUS ROUTE CALLED: server_id={server_id}, request_id={request_id}, status={status}")
+        
+        # Validate parameters
+        if not all([server_id, request_id, status]):
+            current_app.logger.error(f"Missing parameters: server_id={server_id}, request_id={request_id}, status={status}")
+            return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+        
+        # Validate status parameter
+        if status not in ['approve', 'decline']:
+            current_app.logger.error(f"Invalid status parameter: {status}")
+            return jsonify({'success': False, 'message': 'Invalid status parameter'}), 400
+        
+        # Get the server
+        current_app.logger.info(f"Getting server with ID: {server_id}")
+        server = MediaServer.query.get_or_404(server_id)
+        current_app.logger.info(f"Server found: {server.server_nickname if server else 'None'}")
+        
+        # Check if server has Overseerr enabled
+        if not server.overseerr_enabled or not server.overseerr_url or not server.overseerr_api_key:
+            current_app.logger.error(f"Overseerr not properly configured for server {server_id}")
+            return jsonify({'success': False, 'message': 'Overseerr is not properly configured for this server'}), 400
+        
+        # Initialize Overseerr service
+        overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
+        
+        # Update request status via API
+        success, message = overseerr.update_request_status(request_id, status)
+        
+        if success:
+            return jsonify({'success': True, 'message': f'Request {status}d successfully'})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+            
+    except Exception as e:
+        current_app.logger.error(f"Error updating request status: {e}")
+        current_app.logger.error(f"Exception type: {type(e)}")
+        current_app.logger.error(f"Exception args: {e.args}")
+        import traceback
+        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'message': f'An unexpected error occurred: {str(e)}'}), 500
+
+
+@user_bp.route('/overseerr-request-delete', methods=['DELETE'])
+@login_required
+def delete_request():
+    """Delete an Overseerr request"""
+    try:
+        from app.services.overseerr_service import OverseerrService
+        from app.models_media_services import MediaServer
+        from flask import jsonify, request as flask_request
+        
+        # Get parameters from request JSON
+        data = flask_request.get_json()
+        server_id = data.get('server_id')
+        request_id = data.get('request_id')
+        
+        current_app.logger.info(f"DELETE REQUEST ROUTE CALLED: server_id={server_id}, request_id={request_id}")
+        
+        # Validate parameters
+        if not all([server_id, request_id]):
+            current_app.logger.error(f"Missing parameters: server_id={server_id}, request_id={request_id}")
+            return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+        
+        # Get the server
+        server = MediaServer.query.get_or_404(server_id)
+        
+        # Check if server has Overseerr enabled
+        if not server.overseerr_enabled or not server.overseerr_url or not server.overseerr_api_key:
+            return jsonify({'success': False, 'message': 'Overseerr is not properly configured for this server'}), 400
+        
+        # Initialize Overseerr service
+        overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
+        
+        # Delete request via API
+        success, message = overseerr.delete_request(request_id)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Request deleted successfully'})
+        else:
+            return jsonify({'success': False, 'message': message}), 400
+            
+    except Exception as e:
+        current_app.logger.error(f"Error deleting request: {e}")
+        return jsonify({'success': False, 'message': 'An unexpected error occurred'}), 500

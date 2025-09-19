@@ -1,5 +1,8 @@
 <!-- File: app/templates/user/partials/overseerr_requests.html -->
 {% if requests and requests|length > 0 %}
+    <!-- CSRF Token for AJAX requests -->
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    
     <!-- Requests List -->
     <div class="space-y-4">
         {% for request in requests %}
@@ -81,13 +84,51 @@
                                 </span>
                                 <!-- Request Status -->
                                 {% if request.status == 1 %}
-                                <span class="badge badge-warning badge-sm">Pending</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="badge badge-warning badge-sm">Pending</span>
+                                    <button class="btn btn-xs btn-success" 
+                                            onclick="updateRequestStatus({{ server_id }}, {{ request.id }}, 'approve', this)"
+                                            title="Approve Request">
+                                        <i class="fa-solid fa-check"></i>
+                                    </button>
+                                    <button class="btn btn-xs btn-error" 
+                                            onclick="updateRequestStatus({{ server_id }}, {{ request.id }}, 'decline', this)"
+                                            title="Decline Request">
+                                        <i class="fa-solid fa-times"></i>
+                                    </button>
+                                    <button class="btn btn-xs btn-ghost" 
+                                            onclick="deleteRequest({{ server_id }}, {{ request.id }}, this)"
+                                            title="Delete Request">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
                                 {% elif request.status == 2 %}
-                                <span class="badge badge-success badge-sm">Approved</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="badge badge-success badge-sm">Approved</span>
+                                    <button class="btn btn-xs btn-ghost" 
+                                            onclick="deleteRequest({{ server_id }}, {{ request.id }}, this)"
+                                            title="Delete Request">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
                                 {% elif request.status == 3 %}
-                                <span class="badge badge-success badge-sm">Available</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="badge badge-success badge-sm">Available</span>
+                                    <button class="btn btn-xs btn-ghost" 
+                                            onclick="deleteRequest({{ server_id }}, {{ request.id }}, this)"
+                                            title="Delete Request">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
                                 {% else %}
-                                <span class="badge badge-ghost badge-sm">Unknown</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="badge badge-ghost badge-sm">Unknown</span>
+                                    <button class="btn btn-xs btn-ghost" 
+                                            onclick="deleteRequest({{ server_id }}, {{ request.id }}, this)"
+                                            title="Delete Request">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
                                 {% endif %}
                             </div>
                         </div>
@@ -174,13 +215,51 @@
                             </span>
                             <!-- Request Status -->
                             {% if request.status == 1 %}
-                            <span class="badge badge-warning badge-sm">Pending</span>
+                            <div class="flex items-center gap-2">
+                                <span class="badge badge-warning badge-sm">Pending</span>
+                                <button class="btn btn-xs btn-success" 
+                                        onclick="updateRequestStatus({{ server_id }}, {{ request.id }}, 'approve', this)"
+                                        title="Approve Request">
+                                    <i class="fa-solid fa-check"></i>
+                                </button>
+                                <button class="btn btn-xs btn-error" 
+                                        onclick="updateRequestStatus({{ server_id }}, {{ request.id }}, 'decline', this)"
+                                        title="Decline Request">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
+                                <button class="btn btn-xs btn-ghost" 
+                                        onclick="deleteRequest({{ server_id }}, {{ request.id }}, this)"
+                                        title="Delete Request">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
                             {% elif request.status == 2 %}
-                            <span class="badge badge-success badge-sm">Approved</span>
+                            <div class="flex items-center gap-2">
+                                <span class="badge badge-success badge-sm">Approved</span>
+                                <button class="btn btn-xs btn-ghost" 
+                                        onclick="deleteRequest({{ server_id }}, {{ request.id }}, this)"
+                                        title="Delete Request">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
                             {% elif request.status == 3 %}
-                            <span class="badge badge-success badge-sm">Available</span>
+                            <div class="flex items-center gap-2">
+                                <span class="badge badge-success badge-sm">Available</span>
+                                <button class="btn btn-xs btn-ghost" 
+                                        onclick="deleteRequest({{ server_id }}, {{ request.id }}, this)"
+                                        title="Delete Request">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
                             {% else %}
-                            <span class="badge badge-ghost badge-sm">Unknown</span>
+                            <div class="flex items-center gap-2">
+                                <span class="badge badge-ghost badge-sm">Unknown</span>
+                                <button class="btn btn-xs btn-ghost" 
+                                        onclick="deleteRequest({{ server_id }}, {{ request.id }}, this)"
+                                        title="Delete Request">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
                             {% endif %}
                         </div>
                     </div>
@@ -237,3 +316,142 @@
         </p>
     </div>
 {% endif %}
+
+<script>
+function updateRequestStatus(serverId, requestId, status, buttonElement) {
+    // Disable the button and show loading state
+    const originalContent = buttonElement.innerHTML;
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
+    
+    // Make the API call
+    fetch('/user/overseerr-request-update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        },
+        body: JSON.stringify({
+            server_id: serverId,
+            request_id: requestId,
+            status: status
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            const badge = buttonElement.parentElement.querySelector('.badge');
+            if (status === 'approve') {
+                badge.className = 'badge badge-success badge-sm';
+                badge.textContent = 'Approved';
+            } else {
+                badge.className = 'badge badge-error badge-sm';
+                badge.textContent = 'Declined';
+            }
+            
+            // Remove the action buttons
+            buttonElement.parentElement.querySelectorAll('button').forEach(btn => btn.remove());
+            
+            // Show toast notification
+            if (typeof showToast === 'function') {
+                showToast(data.message, 'success');
+            }
+        } else {
+            // Show error message
+            if (typeof showToast === 'function') {
+                showToast(data.message, 'error');
+            } else {
+                alert('Error: ' + data.message);
+            }
+            
+            // Restore button
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = originalContent;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // Show error message
+        if (typeof showToast === 'function') {
+            showToast('An error occurred while updating the request', 'error');
+        } else {
+            alert('An error occurred while updating the request');
+        }
+        
+        // Restore button
+        buttonElement.disabled = false;
+        buttonElement.innerHTML = originalContent;
+    });
+}
+
+function deleteRequest(serverId, requestId, buttonElement) {
+    // Show confirmation dialog
+    if (!confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
+        return;
+    }
+    
+    // Disable the button and show loading state
+    const originalContent = buttonElement.innerHTML;
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
+    
+    // Make the API call
+    fetch('/user/overseerr-request-delete', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        },
+        body: JSON.stringify({
+            server_id: serverId,
+            request_id: requestId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the entire request card from the DOM
+            const requestCard = buttonElement.closest('.card');
+            if (requestCard) {
+                requestCard.style.transition = 'opacity 0.3s ease-out';
+                requestCard.style.opacity = '0';
+                setTimeout(() => {
+                    requestCard.remove();
+                }, 300);
+            }
+            
+            // Show toast notification
+            if (typeof showToast === 'function') {
+                showToast(data.message, 'success');
+            }
+        } else {
+            // Show error message
+            if (typeof showToast === 'function') {
+                showToast(data.message, 'error');
+            } else {
+                alert('Error: ' + data.message);
+            }
+            
+            // Restore button
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = originalContent;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // Show error message
+        if (typeof showToast === 'function') {
+            showToast('An error occurred while deleting the request', 'error');
+        } else {
+            alert('An error occurred while deleting the request');
+        }
+        
+        // Restore button
+        buttonElement.disabled = false;
+        buttonElement.innerHTML = originalContent;
+    });
+}
+</script>

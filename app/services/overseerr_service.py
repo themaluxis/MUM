@@ -298,3 +298,88 @@ class OverseerrService:
         except Exception as e:
             current_app.logger.error(f"Overseerr link plex users error: {e}")
             return False, [], f"Error linking users: {str(e)}"
+    
+    def update_request_status(self, request_id, status):
+        """
+        Update the status of an Overseerr request
+        
+        Args:
+            request_id (int): The ID of the request to update
+            status (str): The new status ('approve' or 'decline')
+            
+        Returns:
+            tuple: (success: bool, message: str)
+        """
+        try:
+            url = f"{self.base_url}/api/v1/request/{request_id}/{status}"
+            headers = {
+                'X-Api-Key': self.api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            current_app.logger.info(f"OVERSEERR: Updating request {request_id} to {status}")
+            
+            response = requests.post(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                current_app.logger.info(f"OVERSEERR: Successfully {status}d request {request_id}")
+                return True, f"Request {status}d successfully"
+            else:
+                error_msg = f"Failed to {status} request: HTTP {response.status_code}"
+                try:
+                    error_data = response.json()
+                    if 'message' in error_data:
+                        error_msg = error_data['message']
+                except:
+                    pass
+                current_app.logger.error(f"OVERSEERR: {error_msg}")
+                return False, error_msg
+                
+        except requests.RequestException as e:
+            current_app.logger.error(f"OVERSEERR: Request error updating status: {str(e)}")
+            return False, f"Connection error: {str(e)}"
+        except Exception as e:
+            current_app.logger.error(f"OVERSEERR: Unexpected error updating status: {str(e)}")
+            return False, f"Unexpected error: {str(e)}"
+    
+    def delete_request(self, request_id):
+        """
+        Delete an Overseerr request
+        
+        Args:
+            request_id (int): The ID of the request to delete
+            
+        Returns:
+            tuple: (success: bool, message: str)
+        """
+        try:
+            url = f"{self.base_url}/api/v1/request/{request_id}"
+            headers = {
+                'X-Api-Key': self.api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            current_app.logger.info(f"OVERSEERR: Deleting request {request_id}")
+            
+            response = requests.delete(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                current_app.logger.info(f"OVERSEERR: Successfully deleted request {request_id}")
+                return True, "Request deleted successfully"
+            else:
+                error_msg = f"Failed to delete request: HTTP {response.status_code}"
+                try:
+                    error_data = response.json()
+                    if 'message' in error_data:
+                        error_msg = error_data['message']
+                except:
+                    pass
+                current_app.logger.error(f"OVERSEERR: {error_msg}")
+                return False, error_msg
+                
+        except requests.RequestException as e:
+            current_app.logger.error(f"OVERSEERR: Request error deleting request: {str(e)}")
+            return False, f"Connection error: {str(e)}"
+        except Exception as e:
+            current_app.logger.error(f"OVERSEERR: Unexpected error deleting request: {str(e)}")
+            return False, f"Unexpected error: {str(e)}"
