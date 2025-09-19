@@ -16,12 +16,5 @@
             <i class="fa-solid fa-sun swap-on fill-current w-5 h-5"></i> 
             <i class="fa-solid fa-moon swap-off fill-current w-5 h-5"></i> 
         </label>
-
-        {# Only show Admin Login if setup is complete and not on the invite processing page itself #}
-        {% if g.setup_complete and not (request.endpoint and request.endpoint == 'invites.process_invite_form') %}
-            <a href="{{ url_for('auth.app_login') }}" class="btn btn-ghost">
-                <i class="fa-solid fa-right-to-bracket mr-1"></i> Admin Login
-            </a>
-        {% endif %}
     </div>
 </div>

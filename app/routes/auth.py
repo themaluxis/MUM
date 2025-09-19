@@ -356,11 +356,6 @@ def logout_setup():
         logout_user()
     session.clear(); flash('Logged out of setup.', 'info'); return redirect(url_for('setup.account_setup'))
 
-@bp.route('/user/login', methods=['GET', 'POST'])
-def user_login():
-    """User login for regular user accounts - DEPRECATED: Use /auth/login instead"""
-    # Redirect to the unified login page
-    return redirect(url_for('auth.app_login'))
         
 
 DISCORD_API_BASE_URL = 'https://discord.com/api/v10'
