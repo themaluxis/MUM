@@ -114,7 +114,17 @@
                                                     {% endif %}
                                                 {% endif %}
                                                 {% if activity.grandparent_title and activity.parent_title %} • {% endif %}
-                                                {% if activity.parent_title %}{{ activity.parent_title }}{% endif %}
+                                                {% if activity.parent_title %}
+                                                    {{ activity.parent_title }}
+                                                    {# Add episode number if this is an episode and we have the linked media item #}
+                                                    {% if activity.is_episode and activity.linked_media_item and activity.linked_media_item.extra_metadata %}
+                                                        {% set season_num = activity.linked_media_item.extra_metadata.get('seasonNumber') or activity.linked_media_item.extra_metadata.get('season_number') or activity.linked_media_item.extra_metadata.get('season') or activity.linked_media_item.extra_metadata.get('parentIndex') %}
+                                                        {% set episode_num = activity.linked_media_item.extra_metadata.get('episodeNumber') or activity.linked_media_item.extra_metadata.get('episode_number') or activity.linked_media_item.extra_metadata.get('episode') or activity.linked_media_item.extra_metadata.get('index') %}
+                                                        {% if episode_num is not none %}
+                                                            • E{{ "%02d"|format(episode_num) }}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
                                             </div>
                                         {% endif %}
                                         {% if activity.media_type %}
