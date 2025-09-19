@@ -1,6 +1,7 @@
 {# File: app/templates/users/partials/_service_user_card.html #}
 {# Expects 'user' object and other context variables like 'user_sorted_libraries', 'admins_by_uuid' etc. #}
 {# Determine service-specific background tint and selection colors #}
+<!-- User Service Card -->
 {% set service_types = user_service_types.get(user.uuid, []) %}
 {% set primary_service = service_types[0] if service_types else None %}
 {% if primary_service %}
@@ -377,12 +378,14 @@
                 {% if user._user_type == 'service' %}
                     {# Service user - route to /user/{server_nickname}/{username} #}
                     <a href="{{ url_for('user.view_service_account', server_nickname=user._access_record.server.server_nickname, server_username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                        <i class="fa-solid fa-user"></i>
+                    </a>
                 {% else %}
                     {# Local user - route to /user/{username} #}
                     <a href="{{ url_for('user.view_app_user', username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                        <i class="fa-solid fa-user"></i>
+                    </a>
                 {% endif %}
-                    <i class="fa-solid fa-user"></i>
-                </a>
             {% endif %}
             {% endif %}
             {% if current_user.has_permission('edit_user') %}
