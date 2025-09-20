@@ -26,23 +26,23 @@
                 Delete <span id="history-selected-count">0</span> Selected Item(s)
             </button>
         </div>
-        
-        <!-- Columns Dropdown -->
-        <div class="dropdown dropdown-end">
-            <label tabindex="0" class="btn btn-ghost btn-sm" title="Select columns">
-                <i class="fa-solid fa-table-columns mr-1"></i> Columns
-            </label>
-            <ul tabindex="0" id="history-column-selector-menu" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 max-h-96 overflow-y-auto z-50">
-                <!-- Column options will be populated by JavaScript -->
-            </ul>
-        </div>
     </div>
 
     <!-- History Table -->
     <div class="bg-base-100 rounded-xl border border-base-300/60 overflow-hidden">
         <!-- Table Header -->
-        <div class="bg-base-200/50 px-6 py-4 border-b border-base-300/60">
+        <div class="bg-base-200/50 px-6 py-4 border-b border-base-300/60 flex justify-between items-center">
             <h3 class="font-semibold text-base-content">Recent Activity</h3>
+            
+            <!-- Columns Dropdown -->
+            <div class="dropdown dropdown-end">
+                <label tabindex="0" class="btn btn-ghost btn-sm" title="Select columns">
+                    <i class="fa-solid fa-table-columns mr-1"></i> Columns
+                </label>
+                <ul tabindex="0" id="history-column-selector-menu" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 max-h-96 overflow-y-auto z-50">
+                    <!-- Column options will be populated by JavaScript -->
+                </ul>
+            </div>
         </div>
 
         <!-- Table Content -->
