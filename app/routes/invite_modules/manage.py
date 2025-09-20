@@ -136,7 +136,7 @@ def list_invites():
         grouped_servers[service_type_name].append(server)
 
     # For a full page load, render the main list.html
-    result = render_template('invites/admin/index.html', 
+    result = render_template('invites/index.html', 
                            title="Manage Invites", 
                            invites_count=invites_count, 
                            form=form, 
