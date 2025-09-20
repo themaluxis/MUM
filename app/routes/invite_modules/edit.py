@@ -13,7 +13,7 @@ from app.utils.helpers import setup_required, calculate_expiry_date, log_event, 
 from app.services.media_service_manager import MediaServiceManager
 from . import invites_bp
 
-@invites_bp.route('/manage/edit/<int:invite_id>', methods=['GET'])
+@invites_bp.route('/invites/edit/<int:invite_id>', methods=['GET'])
 @login_required
 @setup_required
 def get_edit_invite_form(invite_id):
@@ -151,7 +151,7 @@ def get_edit_invite_form(invite_id):
         global_require_guild=global_require_guild
     )
 
-@invites_bp.route('/manage/edit/<int:invite_id>', methods=['POST'])
+@invites_bp.route('/invites/edit/<int:invite_id>', methods=['POST'])
 @login_required
 @setup_required
 @permission_required('edit_invites')

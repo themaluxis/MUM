@@ -158,7 +158,7 @@ def list_invites():
     
     return result
 
-@invites_bp.route('/manage/create', methods=['POST'])
+@invites_bp.route('/invites/create', methods=['POST'])
 @login_required
 @setup_required
 @permission_required('create_invites')
@@ -484,7 +484,7 @@ def create_invite():
             for error in errors_list: flash(f"Error in {getattr(form, field).label.text}: {error}", "danger")
         return redirect(url_for('invites.list_invites'))
 
-@invites_bp.route('/manage/toggle-status/<int:invite_id>', methods=['POST'])
+@invites_bp.route('/invites/toggle-status/<int:invite_id>', methods=['POST'])
 @login_required
 @setup_required
 @permission_required('edit_invites')
@@ -549,7 +549,7 @@ def toggle_invite_status(invite_id):
         current_app.logger.error(f"Error toggling invite status {invite_id}: {e}")
         return f'<div class="alert alert-error"><span>Error updating invite status: {e}</span></div>', 500
 
-@invites_bp.route('/manage/delete/<int:invite_id>', methods=['DELETE'])
+@invites_bp.route('/invites/delete/<int:invite_id>', methods=['DELETE'])
 @login_required
 @setup_required
 @permission_required('delete_invites')
@@ -601,7 +601,7 @@ def delete_invite(invite_id):
         
         return make_response("", 200, headers) # Still 200, toast will show error
 
-@invites_bp.route('/manage/usages/<int:invite_id>', methods=['GET'])
+@invites_bp.route('/invites/usages/<int:invite_id>', methods=['GET'])
 @login_required
 @setup_required
 def view_invite_usages(invite_id):

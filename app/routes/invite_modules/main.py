@@ -30,7 +30,7 @@ def process_invite_form(invite_path_or_token):
         log_event(EventType.INVITE_VIEWED, f"Invite '{invite.custom_path or invite.token}' (ID: {invite.id}) viewed/accessed.", invite_id=invite.id)
 
     if error_message_from_validation: 
-        return render_template('invites/public_invite.html', error=error_message_from_validation, invite=None, form=FlaskForm(), discord_sso_is_mandatory=False, show_discord_button=False)
+        return render_template('invite/steps/index.html', error=error_message_from_validation, invite=None, form=FlaskForm(), discord_sso_is_mandatory=False, show_discord_button=False)
 
     if not invite:
         flash("The invite link is invalid or no longer available.", "danger")
@@ -342,7 +342,6 @@ def process_invite_form(invite_path_or_token):
     
     # Always use the steps template for a consistent, modern design
     # The steps template handles all scenarios properly (user accounts disabled, single server, etc.)
-    use_steps_template = True
     
     # Prepare template variables for current step
     server_username_taken = False
@@ -360,9 +359,7 @@ def process_invite_form(invite_path_or_token):
         elif already_authenticated_plex_user_info:
             default_username = already_authenticated_plex_user_info.get('username', '')
         
-    template_name = 'invites/public_invite_steps.html' if use_steps_template else 'invites/public_invite.html'
-    
-    return render_template(template_name, 
+    return render_template('invite/steps/index.html', 
                            form=form_instance, 
                            invite=invite, 
                            error=None,
@@ -478,7 +475,7 @@ def invite_code_entry():
             # Valid invite - redirect to the invite process
             return redirect(url_for('invites.process_invite_form', invite_path_or_token=invite_code))
     
-    return render_template('invites/invite_code_entry.html', form=form, error_message=error_message) 
+    return render_template('invite/index.html', form=form, error_message=error_message) 
 
 def get_server_url(server):
     """Get the appropriate URL for a server based on its type"""
