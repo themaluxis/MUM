@@ -427,7 +427,7 @@ def invite_success():
             else:
                 has_other = True
     
-    return render_template('invites/success.html', 
+    return render_template('invite/steps/_success.html', 
                          username=username, 
                          configured_servers=configured_servers,
                          has_plex=has_plex,

@@ -122,7 +122,7 @@
                                 (not has_plex_servers or already_authenticated_plex_user) and 
                                 (not allow_user_accounts or user_account_created) and
                                 not (current_step and current_step.id.startswith('server_access_')) %}
-                            {% include 'invite/steps/_success_step.html' %}
+                            {% include 'invite/steps/_completion_step.html' %}
                         
                         {# Fallback - show first required step #}
                         {% else %}
@@ -133,7 +133,7 @@
                             {% elif has_plex_servers and not already_authenticated_plex_user %}
                                 {% include 'invite/steps/_plex_step.html' %}
                             {% else %}
-                                {% include 'invite/steps/_success_step.html' %}
+                                {% include 'invite/steps/_completion_step.html' %}
                             {% endif %}
                         {% endif %}
                     </div>
