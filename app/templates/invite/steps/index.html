@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %} 
-<div class="min-h-[calc(100vh-12rem)] bg-gradient-to-br from-base-100 to-base-200 flex items-center justify-center p-4">
+<!-- app\templates\invite\steps\index.html -->
+<div class="min-h-[calc(100vh-12rem)] flex items-center justify-center p-4">
     <div class="w-full max-w-4xl">
         {% if error %}
             <!-- Error State -->
@@ -102,37 +103,37 @@
                     <div class="step-content">
                         {# User Account Creation Step #}
                         {% if allow_user_accounts and not user_account_created %}
-                            {% include 'invites/steps/_user_account_step.html' %}
+                            {% include 'invite/steps/_user_account_step.html' %}
                         
                         {# Discord Authentication Step #}
                         {% elif show_discord_button and not already_authenticated_discord_user %}
-                            {% include 'invites/steps/_discord_step.html' %}
+                            {% include 'invite/steps/_discord_step.html' %}
                         
                         {# Plex Authentication Step (only if there are Plex servers) #}
                         {% elif has_plex_servers and not already_authenticated_plex_user %}
-                            {% include 'invites/steps/_plex_step.html' %}
+                            {% include 'invite/steps/_plex_step.html' %}
                         
                         {# Individual Server Access Steps #}
                         {% elif current_step and current_step.id.startswith('server_access_') %}
-                            {% include 'invites/steps/_server_access_step.html' %}
+                            {% include 'invite/steps/_server_access_step.html' %}
                         
                         {# Check if all steps are completed #}
                         {% elif (not show_discord_button or already_authenticated_discord_user) and 
                                 (not has_plex_servers or already_authenticated_plex_user) and 
                                 (not allow_user_accounts or user_account_created) and
                                 not (current_step and current_step.id.startswith('server_access_')) %}
-                            {% include 'invites/steps/_success_step.html' %}
+                            {% include 'invite/steps/_success_step.html' %}
                         
                         {# Fallback - show first required step #}
                         {% else %}
                             {% if allow_user_accounts and not user_account_created %}
-                                {% include 'invites/steps/_user_account_step.html' %}
+                                {% include 'invite/steps/_user_account_step.html' %}
                             {% elif show_discord_button and not already_authenticated_discord_user %}
-                                {% include 'invites/steps/_discord_step.html' %}
+                                {% include 'invite/steps/_discord_step.html' %}
                             {% elif has_plex_servers and not already_authenticated_plex_user %}
-                                {% include 'invites/steps/_plex_step.html' %}
+                                {% include 'invite/steps/_plex_step.html' %}
                             {% else %}
-                                {% include 'invites/steps/_success_step.html' %}
+                                {% include 'invite/steps/_success_step.html' %}
                             {% endif %}
                         {% endif %}
                     </div>

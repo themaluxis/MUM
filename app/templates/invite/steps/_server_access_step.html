@@ -1,4 +1,4 @@
-<!-- Individual Server Access Step -->
+<!-- Individual Server Access Step app\templates\invite\steps\_server_access_step.html -->
 <div class="step-section bg-base-200/30 border border-base-300 rounded-lg p-6" id="{{ current_step.id }}">
     <!-- Step Header -->
     <div class="flex items-center gap-3 mb-6">
@@ -48,21 +48,6 @@
             {% endif %}
         </div>
     {% endif %}
-
-    <!-- Server Info Card -->
-    <div class="bg-info/10 border border-info/20 rounded-lg p-4 mb-6">
-        <div class="flex items-start gap-3">
-            <div class="w-6 h-6 rounded-full bg-info/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <i class="fa-solid fa-server text-info text-xs"></i>
-            </div>
-            <div>
-                <h4 class="font-medium text-info mb-1">{{ current_step.server_name }}</h4>
-                <p class="text-sm text-base-content/80">
-                    {{ current_step.server_type }} Media Server
-                </p>
-            </div>
-        </div>
-    </div>
 
     <form method="POST" action="{{ url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token) }}">
         {{ form.hidden_tag() }}
@@ -181,5 +166,5 @@
     </form>
 
     <!-- Include server access details partial -->
-    {% include 'invites/steps/_server_access_details.html' %}
+    {% include 'invite/steps/_server_access_details.html' %}
 </div>

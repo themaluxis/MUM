@@ -1,5 +1,5 @@
-<!-- Server Access Details (collapsible section) -->
-{% if current_step and current_step.id.startswith('server_access_') and already_authenticated_plex_user and (not discord_sso_is_mandatory or already_authenticated_discord_user) %}
+<!-- Server Access Details (collapsible section) app\templates\invite\steps\_server_access_details.html -->
+{% if current_step and current_step.id.startswith('server_access_') and (not discord_sso_is_mandatory or already_authenticated_discord_user) %}
     <div class="bg-base-200/30 border border-base-300 rounded-lg mt-6 overflow-hidden">
         <details class="group">
             <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-base-200/50 transition-colors">
@@ -149,13 +149,13 @@
                 </div>
                 
                 <!-- Invite Information -->
-                <div class="bg-base-100/50 border border-base-300/50 rounded-lg p-4">
+                <div class="bg-secondary/10 border border-secondary/20 rounded-lg p-4">
                     <div class="flex items-start gap-3">
-                        <div class="w-6 h-6 rounded-full bg-base-300/50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <i class="fa-solid fa-calendar text-base-content/60 text-xs"></i>
+                        <div class="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-calendar text-secondary text-xs"></i>
                         </div>
                         <div>
-                            <h4 class="font-medium text-base-content mb-2">Invite Details</h4>
+                            <h4 class="font-medium text-secondary mb-2">Invite Details</h4>
                             <div class="space-y-1 text-sm text-base-content/80">
                                 <div class="flex items-center gap-2">
                                     <i class="fa-regular fa-clock w-4 text-base-content/60"></i>

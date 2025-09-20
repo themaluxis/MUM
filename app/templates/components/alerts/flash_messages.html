@@ -1,6 +1,6 @@
-<!-- File: app/templates/components/_flash_messages.html -->
 {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
+    <!-- File: app/templates/components/_flash_messages.html -->
         <div class="max-w-3xl mx-auto my-4 space-y-2 z-50 relative"> {# Added z-50 and relative for potential overlap issues #}
             {% for category, message in messages %}
                 {% set alert_class = 'alert-info' %}
