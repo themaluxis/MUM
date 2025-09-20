@@ -194,6 +194,8 @@
                                 <option value="last_streamed_asc" {% if request.args.get('sort_by')=='last_streamed_asc' %}selected{% endif %}>Last Streamed (Oldest)</option>
                                 <option value="created_at_desc" {% if request.args.get('sort_by')=='created_at_desc' %}selected{% endif %}>Date Added (Newest)</option>
                                 <option value="created_at_asc" {% if request.args.get('sort_by')=='created_at_asc' %}selected{% endif %}>Date Added (Oldest)</option>
+                                <option value="service_join_date_desc" {% if request.args.get('sort_by')=='service_join_date_desc' %}selected{% endif %}>Date Service Joined (Newest)</option>
+                                <option value="service_join_date_asc" {% if request.args.get('sort_by')=='service_join_date_asc' %}selected{% endif %}>Date Service Joined (Oldest)</option>
                             </select>
                         </div>
                         

@@ -224,6 +224,8 @@ def list_users():
             all_users.sort(key=lambda u: getattr(u, 'username', '').lower(), reverse=reverse_sort)
         elif 'created_at' in sort_by_param:
             all_users.sort(key=lambda u: getattr(u, 'created_at', datetime.min.replace(tzinfo=timezone.utc)) or datetime.min.replace(tzinfo=timezone.utc), reverse=reverse_sort)
+        elif 'service_join_date' in sort_by_param:
+            all_users.sort(key=lambda u: getattr(u, 'service_join_date', None) or getattr(u, 'plex_join_date', None) or datetime.min.replace(tzinfo=timezone.utc), reverse=reverse_sort)
         elif 'email' in sort_by_param:
             all_users.sort(key=lambda u: getattr(u, 'email', '').lower(), reverse=reverse_sort)
     
