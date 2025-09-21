@@ -355,7 +355,7 @@ def toggle_discord_partial():
     if form.enable_discord_oauth.data:
         form.discord_client_id.data = Setting.get('DISCORD_CLIENT_ID', form.discord_client_id.data)
     # Pass the boolean from the form directly to the partial for its state
-    return render_template('settings/partials/discord_oauth_fields.html', form=form, discord_invite_redirect_uri=discord_invite_redirect_uri, discord_admin_link_redirect_uri=discord_admin_link_redirect_uri, initial_discord_enabled_state=form.enable_discord_oauth.data)
+    return render_template('settings/discord/_partials/discord_oauth_fields.html', form=form, discord_invite_redirect_uri=discord_invite_redirect_uri, discord_admin_link_redirect_uri=discord_admin_link_redirect_uri, initial_discord_enabled_state=form.enable_discord_oauth.data)
 
 
 @bp.route('/finish')
