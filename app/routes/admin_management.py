@@ -48,14 +48,14 @@ def create():
         return response
     
     # If validation fails, re-render the form partial with errors
-    return render_template('admin/partials/create_admin_modal.html', form=form), 422
+    return render_template('settings/admins/_partials/create_admin_modal.html', form=form), 422
 
 @bp.route('/create_form')
 @login_required
 @permission_required('create_admin')
 def create_form():
     form = UserAppAccessCreateForm()
-    return render_template('admin/partials/create_admin_modal.html', form=form)
+    return render_template('settings/admins/_partials/create_admin_modal.html', form=form)
 
 @bp.route('/delete/<int:admin_id>', methods=['POST'])
 @login_required
@@ -105,7 +105,7 @@ def edit(admin_id):
         form.roles.data = [r.id for r in user.roles]
 
     return render_template(
-        'admin/edit.html',
+        'settings/admins/edit.html',
         title="Edit User",
         admin=user,
         form=form,
@@ -141,7 +141,7 @@ def reset_password(admin_id):
             return response
         else:
             # Re-render form with validation errors for HTMX
-            return render_template('admin/partials/reset_password_modal.html', form=form, admin=user), 422
+            return render_template('settings/admins/_partials/reset_password_modal.html', form=form, admin=user), 422
     
     # For GET request, just render the form
-    return render_template('admin/partials/reset_password_modal.html', form=form, admin=user)
+    return render_template('settings/admins/_partials/reset_password_modal.html', form=form, admin=user)
