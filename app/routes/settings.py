@@ -538,7 +538,7 @@ def logs_partial():
     event_types = list(EventType) 
     
     # This now renders the new partial for the log list content
-    return render_template('settings/partials/logs_list.html', 
+    return render_template('settings/logs/_partials/logs_table.html', 
                            logs=logs, 
                            event_types=event_types,
                            current_per_page=items_per_page)

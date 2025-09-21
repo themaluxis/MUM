@@ -90,10 +90,10 @@
                     {% include 'account/index.html' %}
                     
                 {% elif active_tab == 'general' %}
-                    {% include 'settings/partials/general.html' %}
+                    {% include 'settings/general/index.html' %}
                     
                 {% elif active_tab == 'user_accounts' %}
-                    {% include 'settings/partials/user_accounts.html' %}
+                    {% include 'settings/user_accounts/index.html' %}
                     
                 {% elif active_tab == 'discord' %}
                     {% include 'settings/partials/discord.html' %}
@@ -109,7 +109,7 @@
                 {% elif active_tab == 'plugin_add_server' %}
                     {% include 'settings/partials/_plugin_add_server.html' %}
                 {% elif active_tab == 'advanced' %}
-                    {% include 'settings/partials/advanced.html' %}
+                    {% include 'settings/advanced/index.html' %}
                 {% elif active_tab == 'admins' %}
                     {% include 'settings/admins/index.html' %}
                 {% elif active_tab == 'admins_edit' %}
@@ -119,7 +119,7 @@
                 {% elif active_tab == 'roles_edit' %}
                     {% include 'roles/partials/edit_settings.html' %}
                 {% elif active_tab == 'logs' %}
-                    {% include 'settings/partials/logs.html' %}
+                    {% include 'settings/logs/index.html' %}
                 {% else %}
                     <div class="text-center p-8">
                         <i class="fa-solid fa-arrow-left fa-2x text-base-content/30 mb-4"></i>
