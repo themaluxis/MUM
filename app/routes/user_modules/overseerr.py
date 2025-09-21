@@ -24,7 +24,7 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
         
         # Check if server has Overseerr enabled
         if not server.overseerr_enabled or not server.overseerr_url or not server.overseerr_api_key:
-            return render_template('user/partials/overseerr_error.html',
+            return render_template('user/partials/profile_tabs/overseerr_error.html',
                                  error_type='api_error',
                                  message='Overseerr is not properly configured for this server.')
         
@@ -82,7 +82,7 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
         
         if not plex_user_id or not plex_username:
             current_app.logger.warning(f"OVERSEERR DEBUG: Missing required data - plex_user_id={plex_user_id}, plex_username={plex_username}")
-            return render_template('user/partials/overseerr_error.html',
+            return render_template('user/partials/profile_tabs/overseerr_error.html',
                                  error_type='no_plex_account',
                                  debug_info={'plex_user_id': plex_user_id, 'plex_username': plex_username})
         
@@ -108,12 +108,12 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
                 
                 # Show appropriate error message based on failure reason
                 if "User not found in Overseerr" in link_message or "No Overseerr user found" in link_message:
-                    return render_template('user/partials/overseerr_error.html',
+                    return render_template('user/partials/profile_tabs/overseerr_error.html',
                                          error_type='user_not_found',
                                          server=server,
                                          debug_info={'plex_user_id': plex_user_id, 'plex_username': plex_username})
                 else:
-                    return render_template('user/partials/overseerr_error.html',
+                    return render_template('user/partials/profile_tabs/overseerr_error.html',
                                          error_type='linking_error', 
                                          message=link_message,
                                          debug_info={'plex_user_id': plex_user_id, 'plex_username': plex_username})
@@ -134,12 +134,12 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
         current_app.logger.info(f"OVERSEERR DEBUG: API returned {len(requests_list) if success else 0} requests, pagination: {pagination_info}")
         
         if not success:
-            return render_template('user/partials/overseerr_error.html', 
+            return render_template('user/partials/profile_tabs/overseerr_error.html', 
                                  error_type='api_error',
                                  message=message)
         
         # Render requests list with pagination using template
-        return render_template('user/partials/overseerr_requests.html',
+        return render_template('user/partials/profile_tabs/overseerr_requests.html',
                              requests=requests_list, 
                              pagination=pagination_info, 
                              server=server,
@@ -148,7 +148,7 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
         
     except Exception as e:
         current_app.logger.error(f"Error in get_overseerr_requests: {e}")
-        return render_template('user/partials/overseerr_error.html',
+        return render_template('user/partials/profile_tabs/overseerr_error.html',
                              error_type='unexpected_error',
                              message=str(e))
 

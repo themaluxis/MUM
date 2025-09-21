@@ -783,9 +783,9 @@ def get_quick_edit_form(user_uuid):
         if access.server.server_nickname not in user_server_names[actual_id]:
             user_server_names[actual_id].append(access.server.server_nickname)
     
-    # We pass the _settings_tab_content partial, which contains the form we need.
+    # We pass the settings_quick_edit_modal partial, which contains the form we need.
     return render_template(
-        'user/partials/settings_tab_content.html',
+        'user/partials/modals/settings_quick_edit_modal.html',
         form=form,
         user=user,
         user_server_names=user_server_names

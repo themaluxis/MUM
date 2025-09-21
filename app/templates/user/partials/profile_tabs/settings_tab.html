@@ -19,6 +19,23 @@
     {% endif %}
 {% endif %}
 
+<!-- DEBUG: Form action and user info -->
+<script>
+console.log('🐛 SETTINGS TAB DEBUG:');
+console.log('Form action:', '{{ form_action }}');
+console.log('User type:', '{{ user.__class__.__name__ }}');
+console.log('User ID/Username:', '{{ user.id if user.id else user.username }}');
+{% if user.__class__.__name__ != 'AppUser' %}
+console.log('User servers:', {{ user_server_names.get(user.id, []) | tojson if user_server_names else '[]' }});
+{% endif %}
+console.log('Form params (safe):', '{{ form_params }}');
+</script>
+
+<!-- WRAP CONTENT IN FORM -->
+<form method="POST" action="{{ form_action }}" id="settings-form" 
+      onsubmit="console.log('🐛 FORM SUBMITTED!'); console.log('Action:', this.action); console.log('Method:', this.method); return true;">
+    {{ form.hidden_tag() }}
+    
 <div id="form-content" class="space-y-6">
         <!-- Notes Section -->
         <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm overflow-hidden">
@@ -251,12 +268,14 @@
             <button type="button" class="btn btn-ghost" onclick="quick_edit_user_modal.close()">
                 Cancel
             </button>
-            <button type="submit" class="btn btn-primary gap-2">
+            <button type="submit" class="btn btn-primary gap-2" 
+                    onclick="console.log('🐛 SAVE BUTTON CLICKED!'); console.log('Form action:', '{{ form_action }}'); console.log('Form element:', this.form); console.log('Form method:', this.form ? this.form.method : 'NO FORM'); return true;">
                 <i class="fa-solid fa-save w-4 h-4"></i>
                 Save Changes
             </button>
         </div>
     </div>
+</form> <!-- Close form wrapper -->
 
 <script>
 (function () {

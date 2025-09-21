@@ -308,7 +308,7 @@
             <!-- Tab Content -->
             <div class="p-6">
                 {% if active_tab == 'profile' %}
-                    {% include 'user/partials/profile_tab.html' %}
+                    {% include 'user/partials/profile_tabs/profile_tab.html' %}
                 {% elif active_tab == 'history' %}
                     {% if is_service_user and server %}
                         <div id="user-history-container" 
@@ -321,20 +321,20 @@
                             </div>
                         </div>
                     {% elif not is_service_user %}
-                        {% include 'user/partials/local_history_tab.html' %}
+                        {% include 'user/partials/profile_tabs/local_history_tab.html' %}
                     {% else %}
-                        {% include 'user/partials/history_tab.html' %}
+                        {% include 'user/partials/profile_tabs/history_tab.html' %}
                     {% endif %}
                 {% elif active_tab == 'settings' %}
                     {% if is_service_user %}
-                        {% include 'user/partials/settings_tab.html' %}
+                        {% include 'user/partials/profile_tabs/settings_tab.html' %}
                     {% else %}
-                        {% include 'user/partials/local_settings_tab.html' %}
+                        {% include 'user/partials/profile_tabs/local_settings_tab.html' %}
                     {% endif %}
                 {% elif active_tab == 'overseerr' %}
-                    {% include 'user/partials/overseerr_tab.html' %}
+                    {% include 'user/partials/profile_tabs/overseerr_tab.html' %}
                 {% elif active_tab == 'security' %}
-                    {% include 'user/partials/security_tab.html' %}
+                    {% include 'user/partials/profile_tabs/security_tab.html' %}
                 {% endif %}
             </div>
         </div>
