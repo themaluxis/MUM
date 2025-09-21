@@ -99,15 +99,15 @@
                     {% include 'settings/partials/discord.html' %}
 
                 {% elif active_tab == 'plugins' %}
-                    {% include 'settings/partials/_plugins.html' %}
+                    {% include 'settings/plugins/index.html' %}
                 {% elif active_tab == 'plugin_install' %}
-                    {% include 'settings/partials/_plugin_install.html' %}
+                    {% include 'settings/plugins/_partials/plugin_install.html' %}
                 {% elif active_tab == 'plugin_configure' %}
-                    {% include 'settings/partials/_plugin_configure.html' %}
+                    {% include 'settings/plugins/_partials/plugin_configure.html' %}
                 {% elif active_tab == 'plugin_edit_server' %}
-                    {% include 'settings/partials/_plugin_edit_server.html' %}
+                    {% include 'settings/plugins/_partials/plugin_edit_server.html' %}
                 {% elif active_tab == 'plugin_add_server' %}
-                    {% include 'settings/partials/_plugin_add_server.html' %}
+                    {% include 'settings/plugins/_partials/plugin_add_server.html' %}
                 {% elif active_tab == 'advanced' %}
                     {% include 'settings/advanced/index.html' %}
                 {% elif active_tab == 'admins' %}

@@ -85,7 +85,7 @@ def enable_plugin(plugin_id):
         available_plugins = plugin_manager.get_available_plugins()
         enabled_plugins = [p.plugin_id for p in plugin_manager.get_enabled_plugins()]
         
-        response = make_response(render_template('settings/partials/_plugins.html', 
+        response = make_response(render_template('settings/plugins/index.html', 
                                                available_plugins=available_plugins,
                                                enabled_plugins=enabled_plugins))
         response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": toast_message, "category": toast_category}})
@@ -129,7 +129,7 @@ def disable_plugin(plugin_id):
         available_plugins = plugin_manager.get_available_plugins()
         enabled_plugins = [p.plugin_id for p in plugin_manager.get_enabled_plugins()]
         
-        response = make_response(render_template('settings/partials/_plugins.html', 
+        response = make_response(render_template('settings/plugins/index.html', 
                                                available_plugins=available_plugins,
                                                enabled_plugins=enabled_plugins))
         response.headers['HX-Trigger'] = json.dumps({"showToastEvent": {"message": toast_message, "category": toast_category}})
