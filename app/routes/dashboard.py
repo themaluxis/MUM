@@ -572,7 +572,7 @@ def index():
     current_app.logger.info("Dashboard: Rendering template with data")
     current_app.logger.debug(f"Dashboard: Template data - users: {total_users}, invites: {active_invites_count}, streams: {active_streams_count}, servers: {server_count}, activities: {len(recent_activities)}")
     
-    result = render_template('dashboard/admin/index.html',
+    result = render_template('dashboard/index.html',
                            title="Dashboard",
                            total_users=total_users,
                            active_invites_count=active_invites_count,

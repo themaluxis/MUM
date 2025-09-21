@@ -179,7 +179,7 @@ def account():
         timezone_form.time_format.data = prefs.get('time_format', '12')
 
     return render_template(
-        'account/admin/index.html', #<-- Render the new standalone template
+        'account/index.html', #<-- Render the new standalone template
         title="My Account",
         set_password_form=set_password_form,
         change_password_form=change_password_form,

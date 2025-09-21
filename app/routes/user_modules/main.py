@@ -86,7 +86,7 @@ def index():
     # Ensure the user's media_accesses are loaded in the current session
     user_with_accesses = db.session.merge(current_user)
     
-    return render_template('dashboard/user/index.html', 
+    return render_template('user_portal/dashboard.html', 
                          title="Dashboard", 
                          app_name=app_name,
                          user=user_with_accesses,

@@ -68,8 +68,9 @@ def account():
             flash('Timezone preferences have been updated successfully.', 'success')
             return redirect(url_for('user.account'))
     
-    return render_template('account/user/index.html',
+    return render_template('user_portal/account.html',
                          title="Account Settings",
+                         user=current_user,
                          change_password_form=change_password_form,
                          timezone_form=timezone_form)
 

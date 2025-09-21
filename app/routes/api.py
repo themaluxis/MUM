@@ -280,7 +280,7 @@ def check_server_status(server_id):
         'last_check_time': None,  # Don't show last check time since it's always "just now"
         'multi_server': False
     }
-    return render_template('dashboard/_partials/admin/multi_service_status.html', server_status=server_status_data)
+    return render_template('dashboard/_partials/multi_service_status.html', server_status=server_status_data)
 
 @bp.route('/dashboard/server-status', methods=['GET'])
 @login_required
@@ -294,7 +294,7 @@ def get_dashboard_server_status():
     current_app.logger.info(f"DASHBOARD CARD: Online={server_status_data.get('online_count', 'N/A')}, Offline={server_status_data.get('offline_count', 'N/A')}")
     current_app.logger.debug(f"Api.py - get_dashboard_server_status(): Fresh server status: {server_status_data}")
 
-    return render_template('dashboard/_partials/admin/multi_service_status.html', server_status=server_status_data)
+    return render_template('dashboard/_partials/multi_service_status.html', server_status=server_status_data)
 
 @bp.route('/dashboard/all-servers-modal', methods=['GET'])
 @login_required

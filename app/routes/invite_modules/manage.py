@@ -393,7 +393,7 @@ def create_invite():
                 if service_type_name not in grouped_servers:
                     grouped_servers[service_type_name] = []
                 grouped_servers[service_type_name].append(server)
-            return render_template('invites/partials/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
+            return render_template('invites/partials/modals/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
         
         custom_path = form.custom_path.data.strip() if form.custom_path.data else None
         if custom_path:
@@ -408,7 +408,7 @@ def create_invite():
                     if service_type_name not in grouped_servers:
                         grouped_servers[service_type_name] = []
                     grouped_servers[service_type_name].append(server)
-                return render_template('invites/partials/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
+                return render_template('invites/partials/modals/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
         
         # Convert date object to datetime at the end of the selected day
         from datetime import date
@@ -479,7 +479,7 @@ def create_invite():
                 if service_type_name not in grouped_servers:
                     grouped_servers[service_type_name] = []
                 grouped_servers[service_type_name].append(server)
-            return render_template('invites/partials/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
+            return render_template('invites/partials/modals/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
         for field, errors_list in form.errors.items():
             for error in errors_list: flash(f"Error in {getattr(form, field).label.text}: {error}", "danger")
         return redirect(url_for('invites.list_invites'))
@@ -608,4 +608,4 @@ def view_invite_usages(invite_id):
     from app.models import InviteUsage
     invite = Invite.query.get_or_404(invite_id)
     usages = InviteUsage.query.filter_by(invite_id=invite.id).order_by(InviteUsage.used_at.desc()).all()
-    return render_template('invites/partials/usage_modal.html', invite=invite, usages=usages)
+    return render_template('invites/partials/modals/usage_modal.html', invite=invite, usages=usages)
