@@ -5379,6 +5379,9 @@
   .bg-teal-400 {
     background-color: var(--color-teal-400);
   }
+  .bg-transparent {
+    background-color: transparent;
+  }
   .bg-warning {
     background-color: var(--color-warning);
   }
@@ -7853,6 +7856,11 @@
     @media (width >= 48rem) {
       font-size: var(--text-6xl);
       line-height: var(--tw-leading, var(--text-6xl--line-height));
+    }
+  }
+  .lg\:col-span-1 {
+    @media (width >= 64rem) {
+      grid-column: span 1 / span 1;
     }
   }
   .lg\:col-span-2 {

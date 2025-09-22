@@ -542,7 +542,7 @@ def sync_server_libraries(server_id):
                         }]
                 
                 # Show modal for changes or errors
-                modal_html = render_template('libraries/partials/server_sync_results_modal.html',
+                modal_html = render_template('libraries/_partials/server_sync_results_modal.html',
                                            sync_result=result,
                                            server_name=server_name)
                 
@@ -692,7 +692,7 @@ def sync_library_content(library_id):
                 
                 try:
                     # Show modal for changes or errors
-                    modal_html = render_template('libraries/partials/library_content_sync_results_modal.html',
+                    modal_html = render_template('libraries/_partials/library_content_sync_results_modal.html',
                                                sync_result=normalized_result,
                                                library_name=library.name)
                     current_app.logger.debug(f"Template rendered successfully")

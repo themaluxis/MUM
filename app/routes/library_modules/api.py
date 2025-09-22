@@ -53,7 +53,7 @@ def sync_show_episodes_api(show_id):
             current_app.logger.info(f"Episodes content after sync: {episodes_content.get('total', 0) if episodes_content else 'None'} total episodes")
             
             # Return the episodes content HTML (for HTMX replacement)
-            return render_template('libraries/partials/episodes_content.html',
+            return render_template('library/_partials/episodes_content.html',
                                  episodes_content=episodes_content,
                                  episodes_cached=True,  # After sync, episodes are cached
                                  media_details=show.to_dict(),

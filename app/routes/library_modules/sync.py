@@ -141,7 +141,7 @@ def sync_libraries():
         
         if has_changes:
             # Show modal for changes or errors
-            modal_html = render_template('libraries/partials/sync_results_modal.html',
+            modal_html = render_template('library/_partials/sync_results_modal.html',
                                        sync_result=sync_result)
             
             if sync_result['errors'] == 0:

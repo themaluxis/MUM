@@ -87,7 +87,7 @@ def index():
     # Check if this is an HTMX request for just the content
     if request.headers.get('HX-Request'):
         return render_template(
-            'libraries/partials/libraries_content.html',
+            'libraries/_partials/libraries_content.html',
             libraries_by_service=libraries_by_service,
             simple_libraries=simple_libraries,
             total_servers=total_servers,

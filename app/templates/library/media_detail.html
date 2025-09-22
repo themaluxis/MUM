@@ -293,15 +293,15 @@
 
                 {% elif active_tab == 'episodes' and library.library_type and library.library_type.lower() in ['show', 'tv', 'series', 'tvshows'] %}
                     <!-- Episodes Tab -->
-                    {% include 'libraries/partials/episodes_grid.html' %}
+                    {% include 'library/_partials/episodes_grid.html' %}
                 
                 {% elif active_tab == 'issues' and library.library_type and library.library_type.lower() in ['comic', 'comics'] and server.service_type.value == 'komga' %}
                     <!-- Issues Tab -->
-                    {% include 'libraries/partials/issues_grid.html' %}
+                    {% include 'library/_partials/issues_grid.html' %}
                 
                 {% elif active_tab == 'activity' %}
                     <!-- Activity Tab -->
-                    {% include 'libraries/partials/media_activity_tab.html' %}
+                    {% include 'library/_partials/media_activity_tab.html' %}
                 {% endif %}
             </div>
 

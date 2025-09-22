@@ -276,7 +276,7 @@ def episode_detail(server_nickname, library_name, media_id, tv_show_slug, episod
     
     streaming_history = activity_pagination
     
-    return render_template('libraries/episode_detail.html',
+    return render_template('library/episode_detail.html',
                          title=f"Episode: {episode_details.get('title')}",
                          episode_details=episode_details,
                          tv_show_item=tv_show_item,
@@ -533,7 +533,7 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
     if request.headers.get('HX-Request'):
         if tab == 'episodes':
             current_app.logger.info(f"HTMX EPISODES DEBUG: Rendering template with media_item.id = {media_item.id}")
-            return render_template('libraries/partials/episodes_content.html',
+            return render_template('library/_partials/episodes_content.html',
                                  episodes_content=episodes_content,
                                  episodes_cached=episodes_cached,
                                  media_details=media_details,
@@ -542,20 +542,20 @@ def media_detail(server_nickname, library_name, media_id, slug=None):
                                  server=server,
                                  current_sort_by=sort_by)
         elif tab == 'issues':
-            return render_template('libraries/partials/issues_content.html',
+            return render_template('library/_partials/issues_content.html',
                                  issues_content=issues_content,
                                  media_details=media_details,
                                  library=library,
                                  server=server)
         elif tab == 'activity':
-            return render_template('libraries/partials/media_activity_tab.html',
+            return render_template('library/_partials/media_activity_tab.html',
                                  streaming_history=streaming_history,
                                  media_details=media_details,
                                  library=library,
                                  server=server,
                                  days_filter=days_filter)
     
-    return render_template('libraries/media_detail.html',
+    return render_template('library/media_detail.html',
                          title=f"{media_details.get('title', 'Media')} - {library.name}",
                          media_details=media_details,
                          media_item=media_item,
@@ -903,18 +903,18 @@ def library_detail(server_nickname, library_name):
     # Handle HTMX requests for tab content
     if request.headers.get('HX-Request'):
         if tab == 'activity':
-            return render_template('libraries/partials/library_activity_tab.html',
+            return render_template('library/_partials/library_activity_tab.html',
                                  library=library,
                                  server=server,
                                  recent_activity=recent_activity,
                                  days_filter=request.args.get('days', 30))
         elif tab == 'collections':
-            return render_template('libraries/partials/library_collections_tab.html',
+            return render_template('library/_partials/library_collections_tab.html',
                                  library=library,
                                  server=server,
                                  collections_content=collections_content)
     
-    return render_template('libraries/library_detail.html',
+    return render_template('library/index.html',
                          title=f"Library: {library_name}",
                          library=library,
                          server=server,

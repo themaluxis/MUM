@@ -199,12 +199,12 @@
                 {% elif active_tab == 'media' %}
                     <!-- Media Tab -->
                     <div class="space-y-6">
-                        {% include 'libraries/partials/library_media_grid.html' %}
+                        {% include 'library/_partials/library_media_grid.html' %}
                     </div>
                 {% elif active_tab == 'stats' %}
                     <!-- Stats Tab -->
                     <div class="space-y-6">
-                        {% include 'libraries/partials/library_stats_chart.html' %}
+                        {% include 'library/_partials/library_stats_chart.html' %}
                     </div>
                 {% elif active_tab == 'activity' %}
                     <!-- Activity Tab -->
@@ -212,7 +212,7 @@
                          hx-trigger="load"
                          hx-target="this"
                          hx-swap="innerHTML">
-                        {% include 'libraries/partials/library_activity_tab.html' %}
+                        {% include 'library/_partials/library_activity_tab.html' %}
                     </div>
                 {% elif active_tab == 'collections' %}
                     <!-- Collections Tab -->
@@ -220,7 +220,7 @@
                          hx-trigger="load"
                          hx-target="this"
                          hx-swap="innerHTML">
-                        {% include 'libraries/partials/library_collections_tab.html' %}
+                        {% include 'library/_partials/library_collections_tab.html' %}
                     </div>
                 {% endif %}
             </div>
