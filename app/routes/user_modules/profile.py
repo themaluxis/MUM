@@ -715,7 +715,7 @@ def view_service_account(server_nickname, server_username):
                 admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts if admin.plex_uuid}
 
                 card_html = render_template(
-                    'users/_partials/_service_user_card.html',
+                    'users/_partials/user_cards/_service_user_card.html',
                     user=user,
                     user_sorted_libraries=user_sorted_libraries,
                     user_service_types=user_service_types,

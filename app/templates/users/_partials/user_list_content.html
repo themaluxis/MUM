@@ -8,9 +8,9 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {% for user in users.items %}
                 {% if user._user_type == 'local' %}
-                    {% include 'users/_partials/_local_user_card.html' with context %}
+                    {% include 'users/_partials/user_cards/_local_user_card.html' with context %}
                 {% else %}
-                    {% include 'users/_partials/_service_user_card.html' with context %}
+                    {% include 'users/_partials/user_cards/_service_user_card.html' with context %}
                 {% endif %}
             {% endfor %}
         </div>
