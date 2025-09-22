@@ -3,10 +3,10 @@
 
 {% if current_view == 'table' %}
     {# Render the existing table partial #}
-    {% include 'invites/partials/invite_table.html' with context %}
+    {% include 'invites/_partials/invite_table.html' with context %}
 {% else %}
     {# Render the new cards partial #}
-    {% include 'invites/partials/invite_cards.html' with context %}
+    {% include 'invites/_partials/invite_cards.html' with context %}
     
     {# Pagination for cards view #}
     {% if invites.pages > 1 %}

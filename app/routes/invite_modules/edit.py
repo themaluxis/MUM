@@ -143,7 +143,7 @@ def get_edit_invite_form(invite_id):
     form.require_discord_guild_membership.data = invite.require_discord_guild_membership
 
     return render_template(
-        'invites/partials/modals/edit_invite_modal.html',
+        'invites/_partials/modals/edit_invite_modal.html',
         form=form,
         invite=invite,
         grouped_servers=grouped_servers,
@@ -179,7 +179,7 @@ def update_invite(invite_id):
     
     # If validation fails, re-render the form partial with errors
     return render_template(
-        'invites/partials/modals/edit_invite_modal.html',
+        'invites/_partials/modals/edit_invite_modal.html',
         form=form,
         invite=invite,
         global_require_guild=False
