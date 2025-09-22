@@ -3139,6 +3139,15 @@
     font-size: 2rem;
     font-weight: 800;
   }
+  .stat-desc {
+    grid-column-start: 1;
+    white-space: nowrap;
+    color: var(--color-base-content);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    }
+    font-size: 0.75rem;
+  }
   .stat-title {
     grid-column-start: 1;
     white-space: nowrap;
@@ -6373,6 +6382,9 @@
   .text-jellyfin-400 {
     color: var(--color-jellyfin-400);
   }
+  .text-jellyfin-500 {
+    color: var(--color-jellyfin-500);
+  }
   .text-jellyfin-700 {
     color: var(--color-jellyfin-700);
   }
@@ -6432,6 +6444,9 @@
   }
   .text-plex-400 {
     color: var(--color-plex-400);
+  }
+  .text-plex-500 {
+    color: var(--color-plex-500);
   }
   .text-plex-700 {
     color: var(--color-plex-700);

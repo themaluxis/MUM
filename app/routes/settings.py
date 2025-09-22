@@ -3,9 +3,11 @@ from flask import (
     Blueprint, render_template, redirect, url_for, 
     flash, request, current_app, g, make_response, session, jsonify
 )
+import requests
 from flask_login import login_required, current_user, logout_user 
 import secrets
-from app.models import UserAppAccess, Invite, HistoryLog, Setting, EventType, SettingValueType, Owner, Role, UserPreferences 
+from app.models import UserAppAccess, Invite, HistoryLog, Setting, EventType, SettingValueType, Owner, Role, UserPreferences
+from app.models_media_services import MediaServer 
 from app.forms import (
     GeneralSettingsForm, DiscordConfigForm, SetPasswordForm, ChangePasswordForm, TimezonePreferenceForm, AdvancedSettingsForm
 )
@@ -595,3 +597,115 @@ def update_streaming_settings():
     except Exception as e:
         current_app.logger.error(f"Error updating streaming settings: {e}")
         return jsonify({'error': 'Failed to save settings'}), 500
+
+
+@bp.route('/api_debug')
+@login_required
+@setup_required
+@permission_required('manage_advanced_settings')
+def api_debug():
+    """API Debug page for testing server APIs"""
+    # Get all available media servers
+    servers = MediaServer.query.filter_by(is_active=True).order_by(MediaServer.server_nickname).all()
+    
+    return render_template('settings/index.html', 
+                         title="API Debug", 
+                         active_tab='api_debug',
+                         servers=servers)
+
+
+@bp.route('/api_debug_execute', methods=['POST'])
+@login_required
+@setup_required
+@permission_required('manage_advanced_settings')
+def api_debug_execute():
+    """Execute API call for debugging"""
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Request must be JSON'}), 400
+            
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+            
+        method = data.get('method', 'GET')
+        endpoint = data.get('endpoint', '')
+        server_id = data.get('server_id')
+        
+        if not server_id or not endpoint:
+            return jsonify({'error': 'Server and endpoint are required'}), 400
+            
+        # Get the server
+        server = MediaServer.query.get(server_id)
+        if not server:
+            return jsonify({'error': 'Server not found'}), 404
+            
+        # Construct full URL
+        base_url = server.url.rstrip('/')
+        if not endpoint.startswith('/'):
+            endpoint = '/' + endpoint
+        full_url = base_url + endpoint
+        
+        # Prepare headers and auth
+        headers = {'Content-Type': 'application/json'}
+        auth = None
+        
+        # Add service-specific authentication
+        if server.service_type.value == 'plex':
+            if server.api_key:
+                headers['X-Plex-Token'] = server.api_key
+        elif server.service_type.value in ['jellyfin', 'emby']:
+            if server.api_key:
+                headers['X-Emby-Token'] = server.api_key
+        elif server.service_type.value in ['kavita', 'audiobookshelf', 'komga', 'romm']:
+            if server.api_key:
+                headers['Authorization'] = f'Bearer {server.api_key}'
+        
+        # Add basic auth if username/password provided
+        if server.username and server.password:
+            auth = (server.username, server.password)
+            
+        # Execute the request
+        timeout = 30
+        
+        if method.upper() == 'GET':
+            response = requests.get(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
+        elif method.upper() == 'POST':
+            response = requests.post(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
+        elif method.upper() == 'PUT':
+            response = requests.put(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
+        elif method.upper() == 'DELETE':
+            response = requests.delete(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
+        else:
+            return jsonify({'error': f'Unsupported method: {method}'}), 400
+            
+        # Parse response
+        try:
+            response_json = response.json()
+        except:
+            response_json = None
+            
+        # Build result
+        result = {
+            'success': True,
+            'status_code': response.status_code,
+            'status_text': response.reason,
+            'headers': dict(response.headers),
+            'url': full_url,
+            'method': method.upper(),
+            'response_text': response.text,
+            'response_json': response_json,
+            'elapsed_ms': int(response.elapsed.total_seconds() * 1000)
+        }
+        
+        return jsonify(result)
+        
+    except requests.exceptions.Timeout:
+        return jsonify({'error': 'Request timed out'}), 408
+    except requests.exceptions.ConnectionError:
+        return jsonify({'error': 'Connection error - could not reach server'}), 502
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'Request error: {str(e)}'}), 500
+    except Exception as e:
+        current_app.logger.error(f"API Debug error: {e}")
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500

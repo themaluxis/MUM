@@ -41,6 +41,7 @@
                         {% endif %}
                         {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_advanced_settings') %}
                         <li><a href="{{ url_for('settings.advanced') }}" class="{{ 'active menu-active' if active_tab == 'advanced' else '' }}"><i class="fa-solid fa-cogs mr-2"></i> Advanced</a></li>
+                        <li><a href="{{ url_for('settings.api_debug') }}" class="{{ 'active menu-active' if active_tab == 'api_debug' else '' }}"><i class="fa-solid fa-code mr-2"></i> API Debug</a></li>
                         {% endif %}
                     </ul>
                 </li>
@@ -75,6 +76,7 @@
                     {% endif %}
                     {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_advanced_settings') %}
                     <option value="{{ url_for('settings.advanced') }}" {% if active_tab == 'advanced' %}selected{% endif %}>Advanced</option>
+                    <option value="{{ url_for('settings.api_debug') }}" {% if active_tab == 'api_debug' %}selected{% endif %}>API Debug</option>
                     {% endif %}
                 </select>
             </div>
@@ -110,6 +112,8 @@
                     {% include 'settings/plugins/_partials/plugin_add_server.html' %}
                 {% elif active_tab == 'advanced' %}
                     {% include 'settings/advanced/index.html' %}
+                {% elif active_tab == 'api_debug' %}
+                    {% include 'settings/api_debug/index.html' %}
                 {% elif active_tab == 'admins' %}
                     {% include 'settings/admins/index.html' %}
                 {% elif active_tab == 'admins_edit' %}
