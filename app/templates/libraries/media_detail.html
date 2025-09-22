@@ -7,44 +7,20 @@
 <!-- Media Detail Page -->
 {# Determine service-specific colors and gradients #}
 {% if server.service_type.value == 'plex' %}
-    {% set header_gradient = "bg-gradient-to-r from-plex/10 to-plex/20" %}
-    {% set service_color = "plex" %}
-    {% set service_icon = "fa-brands fa-plex" %}
     {% set service_name = "Plex" %}
 {% elif server.service_type.value == 'jellyfin' %}
-    {% set header_gradient = "bg-gradient-to-r from-jellyfin/10 to-jellyfin/20" %}
-    {% set service_color = "jellyfin" %}
-    {% set service_icon = "fa-solid fa-cube" %}
     {% set service_name = "Jellyfin" %}
 {% elif server.service_type.value == 'emby' %}
-    {% set header_gradient = "bg-gradient-to-r from-emby/10 to-emby/20" %}
-    {% set service_color = "emby" %}
-    {% set service_icon = "fa-solid fa-play-circle" %}
     {% set service_name = "Emby" %}
 {% elif server.service_type.value == 'kavita' %}
-    {% set header_gradient = "bg-gradient-to-r from-kavita/10 to-kavita/20" %}
-    {% set service_color = "kavita" %}
-    {% set service_icon = "fa-solid fa-book" %}
     {% set service_name = "Kavita" %}
 {% elif server.service_type.value == 'audiobookshelf' %}
-    {% set header_gradient = "bg-gradient-to-r from-audiobookshelf/10 to-audiobookshelf/20" %}
-    {% set service_color = "audiobookshelf" %}
-    {% set service_icon = "fa-solid fa-headphones" %}
     {% set service_name = "AudiobookShelf" %}
 {% elif server.service_type.value == 'komga' %}
-    {% set header_gradient = "bg-gradient-to-r from-komga/10 to-komga/20" %}
-    {% set service_color = "komga" %}
-    {% set service_icon = "fa-solid fa-book-open" %}
     {% set service_name = "Komga" %}
 {% elif server.service_type.value == 'romm' %}
-    {% set header_gradient = "bg-gradient-to-r from-romm/10 to-romm/20" %}
-    {% set service_color = "romm" %}
-    {% set service_icon = "fa-solid fa-gamepad" %}
     {% set service_name = "RomM" %}
 {% else %}
-    {% set header_gradient = "bg-gradient-to-r from-primary/10 to-secondary/10" %}
-    {% set service_color = "primary" %}
-    {% set service_icon = "fa-solid fa-server" %}
     {% set service_name = "Unknown Service" %}
 {% endif %}
 
