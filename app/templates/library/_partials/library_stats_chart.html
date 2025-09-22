@@ -93,7 +93,8 @@
             {% for user in user_stats %}
             <div class="bg-base-100 rounded-lg p-4 border border-base-300 hover:bg-base-100/70 transition-colors text-center">
                 <div class="flex flex-col items-center mb-3">
-                    <div class="avatar mb-2">
+                    <a href="{{ url_for('user.view_service_account', server_nickname=user.server_nickname, server_username=user.username, tab='history') }}" 
+                       class="avatar mb-2 hover:scale-105 transition-transform">
                         <div class="mask mask-circle w-12 h-12">
                             {% if user.avatar_url %}
                                 <img src="{{ user.avatar_url }}" 
@@ -110,11 +111,15 @@
                                 </div>
                             {% endif %}
                         </div>
-                    </div>
+                    </a>
                     <div class="w-full">
-                        <div class="font-semibold text-sm truncate" title="{{ user.display_name }}">{{ user.display_name }}</div>
+                        <a href="{{ url_for('user.view_service_account', server_nickname=user.server_nickname, server_username=user.username, tab='history') }}" 
+                           class="font-semibold text-sm truncate hover:text-primary transition-colors block" 
+                           title="{{ user.display_name }}">{{ user.display_name }}</a>
                         {% if user.username and user.username != user.display_name %}
-                            <div class="text-xs text-base-content/60 truncate" title="@{{ user.username }}">@{{ user.username }}</div>
+                            <a href="{{ url_for('user.view_service_account', server_nickname=user.server_nickname, server_username=user.username, tab='history') }}" 
+                               class="text-xs text-base-content/60 truncate hover:text-primary transition-colors block" 
+                               title="@{{ user.username }}">@{{ user.username }}</a>
                         {% endif %}
                     </div>
                 </div>

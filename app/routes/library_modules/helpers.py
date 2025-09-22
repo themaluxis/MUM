@@ -362,7 +362,8 @@ def get_library_user_stats(library, days=30):
                 'avatar_url': avatar_url,
                 'play_count': stat.play_count,
                 'total_duration_seconds': total_seconds,
-                'total_duration_formatted': duration_formatted
+                'total_duration_formatted': duration_formatted,
+                'server_nickname': library.server.server_nickname
             })
         
         return user_stats
