@@ -75,15 +75,15 @@
             <div class="space-y-4">
                 <!-- Added Users Section -->
                 {% set section_type = 'added' %}
-                {% include 'users/partials/sync_section.html' with context %}
+                {% include 'users/_partials/sync_section.html' with context %}
 
                 <!-- Updated Users Section -->
                 {% set section_type = 'updated' %}
-                {% include 'users/partials/sync_section.html' with context %}
+                {% include 'users/_partials/sync_section.html' with context %}
 
                 <!-- Removed Users Section -->
                 {% set section_type = 'removed' %}
-                {% include 'users/partials/sync_section.html' with context %}
+                {% include 'users/_partials/sync_section.html' with context %}
             </div>
         {% endif %}
 

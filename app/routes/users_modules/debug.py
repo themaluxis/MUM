@@ -103,7 +103,7 @@ def get_user_debug_info(user_uuid):
             current_app.logger.info(f"  - Server: {access.server.server_nickname} (Type: {access.server.service_type.value})")
         
         # Render the template with the user data
-        return render_template('users/partials/user_debug_info_modal.html', user=user)
+        return render_template('users/_partials/user_debug_info_modal.html', user=user)
         
     except Exception as e:
         current_app.logger.error(f"Error getting debug info for user {user_uuid}: {e}", exc_info=True)

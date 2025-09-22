@@ -116,7 +116,7 @@ def mass_edit_libraries_form():
         for server_id, server_data in service_info['servers'].items():
             current_app.logger.debug(f"Server {server_id} ({server_data['server_name']}) has {len(server_data['users'])} users: {server_data['users']}")
     
-    return render_template('users/partials/_mass_edit_libraries.html', 
+    return render_template('users/_partials/_mass_edit_libraries.html', 
                            services_data=services_data)
 
 
@@ -576,7 +576,7 @@ def mass_edit_users():
         'allow_user_accounts': False
     }
 
-    response_html = render_template('users/partials/user_list_content.html', **template_context)
+    response_html = render_template('users/_partials/user_list_content.html', **template_context)
     
     response = make_response(response_html)
     toast_payload = {"showToastEvent": {"message": toast_message, "category": toast_category}}
@@ -637,7 +637,7 @@ def preview_purge_inactive_users():
             ignore_creation_date_for_never_streamed=ignore_creation_date
         )
         
-        return render_template('users/partials/purge_preview_modal.html', 
+        return render_template('users/_partials/purge_preview_modal.html', 
                                preview_data=preview_data,
                                inactive_days=inactive_days,
                                exclude_sharers=exclude_sharers,

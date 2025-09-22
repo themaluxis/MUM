@@ -48,9 +48,9 @@
             <div class="space-y-3">
                 {% for detail in grouped_data %}
                     {% if detail.type == 'linked_group' %}
-                        {% include 'users/partials/sync_linked_group.html' with context %}
+                        {% include 'users/_partials/sync_linked_group.html' with context %}
                     {% else %}
-                        {% include 'users/partials/sync_standalone_account.html' with context %}
+                        {% include 'users/_partials/sync_standalone_account.html' with context %}
                     {% endif %}
                 {% endfor %}
             </div>

@@ -640,7 +640,7 @@ def view_service_account(server_nickname, server_username):
                             'name': available_libraries[lib_id]
                         })
                 
-                modal_html = render_template('user/partials/modals/settings_quick_edit_modal.html', 
+                modal_html = render_template('user/_partials/modals/settings_quick_edit_modal.html', 
                                            form=form_after_save, 
                                            user=user, 
                                            user_server_names=user_server_names_for_modal,
@@ -715,7 +715,7 @@ def view_service_account(server_nickname, server_username):
                 admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts if admin.plex_uuid}
 
                 card_html = render_template(
-                    'users/partials/_service_user_card.html',
+                    'users/_partials/_service_user_card.html',
                     user=user,
                     user_sorted_libraries=user_sorted_libraries,
                     user_service_types=user_service_types,
@@ -778,7 +778,7 @@ def view_service_account(server_nickname, server_username):
                         'name': available_libraries[lib_id_str]
                     })
             
-            return render_template('user/partials/profile_tabs/settings_tab.html', 
+            return render_template('user/_partials/profile_tabs/settings_tab.html', 
                                  form=form, 
                                  user=user), 422
 
@@ -992,7 +992,7 @@ def view_service_account(server_nickname, server_username):
     if request.headers.get('HX-Request') and tab == 'history':
         # UUID is already available on user objects for the delete function
             
-        return render_template('user/partials/profile_tabs/history_tab_content.html', 
+        return render_template('user/_partials/profile_tabs/history_tab_content.html', 
                              user=user, 
                              history_logs=stream_history_pagination,
                              kavita_reading_stats=kavita_reading_stats,

@@ -27,7 +27,7 @@ def sync_all_users():
         if not sync_result['success']:
             current_app.logger.error(f"User sync failed: {sync_result.get('message', 'Unknown error')}")
             # Show modal with the detailed error messages from the unified service
-            modal_html = render_template('users/partials/sync_results_modal.html',
+            modal_html = render_template('users/_partials/sync_results_modal.html',
                                        sync_result=sync_result)
             trigger_payload = {
                 "showToastEvent": {"message": "Sync encountered errors. See details.", "category": "error"},
@@ -49,7 +49,7 @@ def sync_all_users():
             
             if has_changes:
                 # Show modal for changes or errors
-                modal_html = render_template('users/partials/sync_results_modal.html',
+                modal_html = render_template('users/_partials/sync_results_modal.html',
                                            sync_result=sync_result)
                 trigger_payload = {
                     "showToastEvent": {"message": sync_result.get('message', 'Sync completed'), "category": "success"},
@@ -84,7 +84,7 @@ def sync_all_users():
             'error_messages': [f"Critical synchronization error: {str(e)}"],
             'servers_synced': 0
         }
-        modal_html = render_template('users/partials/sync_results_modal.html',
+        modal_html = render_template('users/_partials/sync_results_modal.html',
                                      sync_result=sync_result)
         trigger_payload = {
             "showToastEvent": {"message": "Sync failed due to critical error. See details.", "category": "error"},

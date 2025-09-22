@@ -30,7 +30,7 @@
                     {% set service_type = service_account.service_type %}
                     {% set server_name = service_account.server_name %}
                     {% set username = service_account.username %}
-                    {% include 'users/partials/sync_service_badge.html' with context %}
+                    {% include 'users/_partials/sync_service_badge.html' with context %}
                     
                     {% if service_account.changes %}
                         <div class="space-y-1 ml-2 mt-2">

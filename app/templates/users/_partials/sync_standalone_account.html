@@ -7,7 +7,7 @@
         {% set service_type = detail.service_type %}
         {% set server_name = detail.server_name %}
         {% set username = detail.username %}
-        {% include 'users/partials/sync_service_badge.html' with context %}
+        {% include 'users/_partials/sync_service_badge.html' with context %}
     </div>
     {% if detail.changes %}
         <div class="space-y-1">

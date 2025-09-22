@@ -108,12 +108,12 @@ def reset_app_user_password(username):
             return make_response("<!-- success -->", 200, {'HX-Trigger': json.dumps(toast)})
         else:
             # Return form with errors
-            return render_template('user/partials/modals/reset_password_modal.html', 
+            return render_template('user/_partials/modals/reset_password_modal.html', 
                                  form=form, 
                                  user=user_app_access)
     
     # GET request - render the form
-    return render_template('user/partials/modals/reset_password_modal.html', 
+    return render_template('user/_partials/modals/reset_password_modal.html', 
                          form=form, 
                          user=user_app_access)
 
@@ -193,11 +193,11 @@ def reset_password(username=None, server_nickname=None, server_username=None):
             return make_response("<!-- success -->", 200, {'HX-Trigger': json.dumps(toast)})
         else:
             # Return form with errors for HTMX
-            return render_template('user/partials/modals/reset_password_modal.html', 
+            return render_template('user/_partials/modals/reset_password_modal.html', 
                                  form=form, 
                                  user=user_app_access)
     
     # GET request - render the modal form
-    return render_template('user/partials/modals/reset_password_modal.html', 
+    return render_template('user/_partials/modals/reset_password_modal.html', 
                          form=form, 
                          user=user_app_access)

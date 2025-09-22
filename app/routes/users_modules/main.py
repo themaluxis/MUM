@@ -555,7 +555,7 @@ def list_users():
     }
     
     if is_htmx:
-        result = render_template('users/partials/user_list_content.html', **template_context)
+        result = render_template('users/_partials/user_list_content.html', **template_context)
     else:
         result = render_template('users/index.html', **template_context)
     
@@ -785,7 +785,7 @@ def get_quick_edit_form(user_uuid):
     
     # We pass the settings_quick_edit_modal partial, which contains the form we need.
     return render_template(
-        'user/partials/modals/settings_quick_edit_modal.html',
+        'user/_partials/modals/settings_quick_edit_modal.html',
         form=form,
         user=user,
         user_server_names=user_server_names
