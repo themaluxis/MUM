@@ -47,7 +47,7 @@ def create():
 
     # The GET request rendering remains the same, but the template it renders will be changed.
     return render_template(
-        'roles/create.html',
+        'settings/roles/create.html',
         title="Create New Role",
         form=form,
         active_tab='roles' # Keep 'roles' highlighted in the main settings sidebar

@@ -45,10 +45,10 @@
 
 <div class="min-h-[400px]">
     {% if active_role_tab == 'display' %}
-        {% include 'roles/partials/display_tab.html' %}
+        {% include 'settings/roles/_partials/display_tab.html' %}
     {% elif active_role_tab == 'permissions' %}
-        {% include 'roles/partials/permissions_tab.html' %}
+        {% include 'settings/roles/_partials/permissions_tab.html' %}
     {% elif active_role_tab == 'members' %}
-        {% include 'roles/partials/members_tab.html' %}
+        {% include 'settings/roles/_partials/members_tab.html' %}
     {% endif %}
 </div>
