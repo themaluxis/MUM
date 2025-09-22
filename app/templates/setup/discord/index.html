@@ -29,7 +29,7 @@
         {# This content will be loaded by HTMX if Discord OAuth is enabled #}
         {# We pass the form to the partial template so it can render the fields #}
         {% if form.enable_discord_oauth.data or saved_discord_enabled %}
-            {% include 'setup/_discord_oauth_fields.html' with context %}
+            {% include 'setup/discord/_partials/discord_oauth_fields.html' with context %}
         {% else %}
             <div class="alert alert-info my-4">
                 <i class="fa-solid fa-circle-info fa-lg mr-2"></i>

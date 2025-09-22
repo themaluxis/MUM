@@ -328,7 +328,7 @@ def discord_config():
         if enable_discord:
             if not form.discord_client_id.data or not form.discord_client_secret.data:
                 flash('Discord Client ID and Secret are required if enabled.', 'warning')
-                return render_template('setup/discord.html', form=form, discord_invite_redirect_uri=discord_invite_redirect_uri, discord_admin_link_redirect_uri=discord_admin_link_redirect_uri, saved_discord_enabled=enable_discord, prev_step_url=url_for('setup.app_config'), completed_steps=get_completed_steps(), current_step_id='discord')
+                return render_template('setup/discord/index.html', form=form, discord_invite_redirect_uri=discord_invite_redirect_uri, discord_admin_link_redirect_uri=discord_admin_link_redirect_uri, saved_discord_enabled=enable_discord, prev_step_url=url_for('setup.app_config'), completed_steps=get_completed_steps(), current_step_id='discord')
             Setting.set('DISCORD_CLIENT_ID', form.discord_client_id.data, SettingValueType.STRING); Setting.set('DISCORD_CLIENT_SECRET', form.discord_client_secret.data, SettingValueType.SECRET)
             Setting.set('DISCORD_REDIRECT_URI_INVITE', discord_invite_redirect_uri, SettingValueType.STRING); Setting.set('DISCORD_REDIRECT_URI_ADMIN_LINK', discord_admin_link_redirect_uri, SettingValueType.STRING)
             log_event(EventType.DISCORD_CONFIG_SAVE, "Discord OAuth enabled/configured.", admin_id=current_user.id); flash('Discord configuration saved.', 'success')
@@ -343,7 +343,7 @@ def discord_config():
         form.enable_discord_oauth.data = current_discord_enabled
         if current_discord_enabled: form.discord_client_id.data = Setting.get('DISCORD_CLIENT_ID')
     saved_discord_enabled_for_partial = form.enable_discord_oauth.data 
-    return render_template('setup/discord.html', form=form, discord_invite_redirect_uri=discord_invite_redirect_uri, discord_admin_link_redirect_uri=discord_admin_link_redirect_uri, saved_discord_enabled=saved_discord_enabled_for_partial, prev_step_url=url_for('setup.app_config'), completed_steps=get_completed_steps(), current_step_id='discord')
+    return render_template('setup/discord/index.html', form=form, discord_invite_redirect_uri=discord_invite_redirect_uri, discord_admin_link_redirect_uri=discord_admin_link_redirect_uri, saved_discord_enabled=saved_discord_enabled_for_partial, prev_step_url=url_for('setup.app_config'), completed_steps=get_completed_steps(), current_step_id='discord')
 
 @bp.route('/discord/toggle_partial', methods=['POST'])
 @login_required
@@ -355,7 +355,7 @@ def toggle_discord_partial():
     if form.enable_discord_oauth.data:
         form.discord_client_id.data = Setting.get('DISCORD_CLIENT_ID', form.discord_client_id.data)
     # Pass the boolean from the form directly to the partial for its state
-    return render_template('settings/discord/_partials/discord_oauth_fields.html', form=form, discord_invite_redirect_uri=discord_invite_redirect_uri, discord_admin_link_redirect_uri=discord_admin_link_redirect_uri, initial_discord_enabled_state=form.enable_discord_oauth.data)
+    return render_template('setup/discord/_partials/discord_oauth_fields.html', form=form, discord_invite_redirect_uri=discord_invite_redirect_uri, discord_admin_link_redirect_uri=discord_admin_link_redirect_uri, initial_discord_enabled_state=form.enable_discord_oauth.data)
 
 
 @bp.route('/finish')
@@ -420,7 +420,7 @@ def plugins():
     
     completed_steps = get_completed_steps()
     
-    return render_template('setup/plugins.html', 
+    return render_template('setup/plugins/index.html', 
                            plugins=core_plugins,
                            completed_steps=completed_steps,
                            current_step_id='plugins')

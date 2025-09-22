@@ -184,14 +184,14 @@ def sessions_partial():
         current_app.logger.debug(f"Error during streaming_sessions_partial: {e}", exc_info=True)
     
     if view_mode == 'categorized':
-        return render_template('streaming/partials/sessions_categorized.html', 
+        return render_template('streaming/_partials/sessions_categorized.html', 
                                sessions_by_server=sessions_by_server, 
                                summary_stats=summary_stats)
     elif view_mode == 'service':
-        return render_template('streaming/partials/sessions_categorized_by_service.html', 
+        return render_template('streaming/_partials/sessions_categorized_by_service.html', 
                                sessions_by_service=sessions_by_service, 
                                summary_stats=summary_stats)
     else:
-        return render_template('streaming/partials/sessions.html', 
+        return render_template('streaming/_partials/sessions.html', 
                                sessions=active_sessions_data, 
                                summary_stats=summary_stats)

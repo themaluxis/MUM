@@ -24,7 +24,7 @@ def setup_list_servers(plugin_id):
     servers = [s for s in MediaServiceManager.get_all_servers(active_only=False) if s.service_type.value == plugin_id]
     
     return render_template(
-        'setup/servers.html',
+        'setup/plugins/plugins_servers_list.html',
         servers=servers,
         plugin=plugin,
         completed_steps=get_completed_steps(),
@@ -49,12 +49,12 @@ def add_server_setup(plugin_id):
             service = MediaServiceFactory.create_service(server_config)
             if not service:
                 flash('Unsupported service type', 'danger')
-                return render_template('setup/add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
+                return render_template('setup/plugins/plugins_add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
 
             success, message = service.test_connection()
             if not success:
                 flash(f'Connection test failed: {message}', 'danger')
-                return render_template('setup/add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
+                return render_template('setup/plugins/plugins_add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
 
             # Save to database
             server = MediaServer(
@@ -97,7 +97,7 @@ def add_server_setup(plugin_id):
         if request.method == 'POST':
             current_app.logger.warning(f"Form validation failed. Errors: {form.errors}")
 
-    return render_template('setup/add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
+    return render_template('setup/plugins/plugins_add_server.html', form=form, completed_steps=get_completed_steps(), current_step_id='plugins')
 
 
 
@@ -141,7 +141,7 @@ def setup_edit_server(plugin_id, server_id):
         else:
             current_app.logger.warning(f"Form validation failed. Errors: {form.errors}")
 
-    return render_template('setup/edit_server.html', form=form, server=server, completed_steps=get_completed_steps(), current_step_id='plugins')
+    return render_template('setup/plugins/plugins_edit_server.html', form=form, server=server, completed_steps=get_completed_steps(), current_step_id='plugins')
 
 @bp.route('/servers/<int:server_id>/delete', methods=['POST'])
 @login_required
