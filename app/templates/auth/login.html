@@ -1,61 +1,286 @@
-<!-- File: app/templates/auth/app_login.html -->
+<!-- File: app/templates/auth/login.html -->
 {% extends "base.html" %}
 
 {% block title %}{{ super() }} - Login{% endblock title %}
 
-{% block content %} 
-<div class="hero min-h-[calc(100vh-10rem)] bg-base-100">
-    <div class="hero-content flex-col lg:flex-row-reverse">
-        <div class="text-center lg:text-left lg:pl-8">
-            <h1 class="text-5xl font-bold">{{ g.app_name or "Multimedia User Manager" }}</h1>
-            <p class="py-6">
-                {% if allow_user_accounts %}
-                    Login with your admin or user account credentials.
-                {% else %}
-                    Administrator login. Please use your Plex account or the credentials established during setup.
-                {% endif %}
-            </p>
-        </div>
-        <div class="card shrink-0 w-full max-w-sm shadow-2xl bg-base-200">
-            {# The formaction on the Plex button handles the separate POST destination #}
-            <form method="POST" action="{{ url_for('auth.app_login') }}" class="card-body">
-                {{ form.hidden_tag() }}
-                                
-                {# --- Username/password fields are always available --- #}
-                <div class="form-control">
-                    {{ form.username.label(class="label") }}
-                    {% if allow_user_accounts %}
-                        {{ form.username(class="input input-bordered " + ("input-error" if form.username.errors else ""), placeholder="Admin or User Username") }}
-                    {% else %}
-                        {{ form.username(class="input input-bordered " + ("input-error" if form.username.errors else ""), placeholder="Username") }}
-                    {% endif %}
-                    {% if form.username.errors %}{% for error in form.username.errors %}<label class="label"><span class="label-text-alt text-error">{{ error }}</span></label>{% endfor %}{% endif %}
-                </div>
-                <div class="form-control">
-                    {{ form.password.label(class="label") }}
-                    {{ form.password(class="input input-bordered " + ("input-error" if form.password.errors else ""), placeholder="Password") }}
-                    {% if form.password.errors %}{% for error in form.password.errors %}<label class="label"><span class="label-text-alt text-error">{{ error }}</span></label>{% endfor %}{% endif %}
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-primary/5 via-base-100 to-secondary/5 flex items-center justify-center p-4">
+    <div class="w-full max-w-6xl">
+        <div class="grid lg:grid-cols-2 gap-8 items-center">
+            
+            <!-- Left Side - Branding & Info -->
+            <div class="order-2 lg:order-1 text-center lg:text-left">
+                <div class="mb-8">
+                    <div class="flex items-center justify-center lg:justify-start mb-6">
+                        <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mr-4">
+                            <i class="fas fa-film text-primary text-2xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-4xl lg:text-5xl font-bold text-base-content">{{ g.app_name or "MUM" }}</h1>
+                            <p class="text-lg text-base-content/70 font-medium">Multimedia User Manager</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 text-base-content/80">
+                        {% if allow_user_accounts %}
+                            <p class="text-lg">Welcome back! Sign in to access your media dashboard and manage your multimedia experience.</p>
+                            <div class="flex flex-wrap justify-center lg:justify-start gap-4 text-sm">
+                                <div class="flex items-center">
+                                    <i class="fas fa-users text-primary mr-2"></i>
+                                    <span>User Accounts</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-shield-alt text-primary mr-2"></i>
+                                    <span>Admin Access</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-server text-primary mr-2"></i>
+                                    <span>Multi-Service Support</span>
+                                </div>
+                            </div>
+                        {% else %}
+                            <p class="text-lg">Administrator login portal. Use your Plex account or the credentials configured during setup.</p>
+                            <div class="flex flex-wrap justify-center lg:justify-start gap-4 text-sm">
+                                <div class="flex items-center">
+                                    <i class="fas fa-crown text-primary mr-2"></i>
+                                    <span>Admin Portal</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-cog text-primary mr-2"></i>
+                                    <span>System Management</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-chart-line text-primary mr-2"></i>
+                                    <span>Analytics & Insights</span>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
                 
-                <div class="form-control mt-6">
-                    {{ form.submit(class="btn btn-primary") }}
+                <!-- Feature Highlights -->
+                <div class="hidden lg:block">
+                    <h3 class="text-xl font-semibold text-base-content mb-4">Platform Features</h3>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div class="bg-base-200/50 rounded-lg p-3">
+                            <i class="fas fa-play text-primary mb-2"></i>
+                            <div class="font-medium">Plex Integration</div>
+                            <div class="text-base-content/60">Seamless media streaming</div>
+                        </div>
+                        <div class="bg-base-200/50 rounded-lg p-3">
+                            <i class="fas fa-cube text-primary mb-2"></i>
+                            <div class="font-medium">Multi-Service</div>
+                            <div class="text-base-content/60">Jellyfin, Emby & more</div>
+                        </div>
+                        <div class="bg-base-200/50 rounded-lg p-3">
+                            <i class="fas fa-user-friends text-primary mb-2"></i>
+                            <div class="font-medium">User Management</div>
+                            <div class="text-base-content/60">Invites & permissions</div>
+                        </div>
+                        <div class="bg-base-200/50 rounded-lg p-3">
+                            <i class="fas fa-chart-bar text-primary mb-2"></i>
+                            <div class="font-medium">Analytics</div>
+                            <div class="text-base-content/60">Usage insights</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side - Login Form -->
+            <div class="order-1 lg:order-2">
+                <div class="bg-base-100 border border-base-300 rounded-2xl shadow-2xl p-8 max-w-md mx-auto">
+                    <div class="text-center mb-8">
+                        <h2 class="text-2xl font-bold text-base-content mb-2">Welcome Back</h2>
+                        <p class="text-base-content/60">
+                            {% if allow_user_accounts %}
+                                Sign in to your account to continue
+                            {% else %}
+                                Administrator access required
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('auth.app_login') }}" class="space-y-6">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Username Field -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium text-base-content">
+                                    <i class="fas fa-user mr-2 text-base-content/60"></i>
+                                    Username
+                                </span>
+                            </label>
+                            <div class="relative">
+                                {% if allow_user_accounts %}
+                                    {{ form.username(class="input input-bordered w-full pl-4 " + ("input-error" if form.username.errors else ""), placeholder="Enter your username") }}
+                                {% else %}
+                                    {{ form.username(class="input input-bordered w-full pl-4 " + ("input-error" if form.username.errors else ""), placeholder="Admin username") }}
+                                {% endif %}
+                            </div>
+                            {% if form.username.errors %}
+                                {% for error in form.username.errors %}
+                                    <label class="label">
+                                        <span class="label-text-alt text-error">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </span>
+                                    </label>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <!-- Password Field -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-medium text-base-content">
+                                    <i class="fas fa-lock mr-2 text-base-content/60"></i>
+                                    Password
+                                </span>
+                            </label>
+                            <div class="relative">
+                                {{ form.password(class="input input-bordered w-full pl-4 " + ("input-error" if form.password.errors else ""), placeholder="Enter your password") }}
+                            </div>
+                            {% if form.password.errors %}
+                                {% for error in form.password.errors %}
+                                    <label class="label">
+                                        <span class="label-text-alt text-error">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </span>
+                                    </label>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <!-- Sign In Button -->
+                        <div class="form-control">
+                            {{ form.submit(class="btn btn-primary w-full text-lg h-12") }}
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="divider text-base-content/60">
+                            <span class="bg-base-100 px-4">or continue with</span>
+                        </div>
+
+                        <!-- Plex SSO Button -->
+                        <div class="form-control">
+                            <button formaction="{{ url_for('auth.plex_sso_login_admin') }}" 
+                                    type="submit" 
+                                    name="sso_method" 
+                                    value="plex" 
+                                    class="btn btn-outline w-full text-lg h-12 border-plex text-plex hover:bg-plex hover:text-black hover:border-plex transition-all duration-300"
+                                    formnovalidate>
+                                <i class="fab fa-plex mr-3 text-xl"></i>
+                                Sign in with Plex
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Additional Info -->
+                    <div class="mt-8 pt-6 border-t border-base-300">
+                        <div class="text-center text-sm text-base-content/60">
+                            {% if allow_user_accounts %}
+                                <p>Need an account? Contact your administrator for an invite.</p>
+                            {% else %}
+                                <p>Secure administrator access to {{ g.app_name or "MUM" }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
 
-                <div class="divider">OR</div>
-
-                {# Plex SSO button is always visible #}
-                <div class="form-control">
-                    <button formaction="{{ url_for('auth.plex_sso_login_admin') }}" 
-                            type="submit" 
-                            name="sso_method" 
-                            value="plex" 
-                            class="btn btn-primary w-full bg-plex hover:bg-plex-600 border-plex hover:border-plex-600 text-black"
-                            formnovalidate>  {# <-- ADD THIS ATTRIBUTE #}
-                        <i class="fa-solid fa-right-to-bracket mr-2"></i> Sign In with Plex
-                    </button>
+                <!-- Security Notice -->
+                <div class="mt-6 text-center">
+                    <div class="inline-flex items-center text-xs text-base-content/50">
+                        <i class="fas fa-shield-alt mr-2"></i>
+                        <span>Your connection is secure and encrypted</span>
+                    </div>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+/* Custom animations and effects */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-container {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+/* Enhanced form focus states */
+.input:focus {
+    box-shadow: 0 0 0 3px rgba(var(--p), 0.2);
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+/* Hover effects for feature cards */
+.bg-base-200\/50:hover {
+    background-color: rgba(var(--b2), 0.8);
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+}
+
+/* Enhanced button hover effects */
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Gradient background enhancement */
+.bg-gradient-to-br {
+    background-attachment: fixed;
+}
+
+/* Mobile responsiveness improvements */
+@media (max-width: 1024px) {
+    .min-h-screen {
+        min-height: calc(100vh - 4rem);
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add login container animation class
+    const loginContainer = document.querySelector('.bg-base-100.border');
+    if (loginContainer) {
+        loginContainer.classList.add('login-container');
+    }
+
+    // Enhanced form validation feedback
+    const inputs = document.querySelectorAll('.input');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+        
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+            if (this.value.trim() !== '') {
+                this.parentElement.classList.add('has-value');
+            } else {
+                this.parentElement.classList.remove('has-value');
+            }
+        });
+    });
+
+    // Auto-focus first input on desktop
+    if (window.innerWidth > 768) {
+        const firstInput = document.querySelector('input[name="username"]');
+        if (firstInput) {
+            setTimeout(() => firstInput.focus(), 300);
+        }
+    }
+});
+</script>
 {% endblock content %}
