@@ -23,27 +23,27 @@
                     
                     <div class="space-y-4 text-base-content/80">
                         {% if allow_user_accounts %}
-                            <p class="text-lg">Welcome back! Sign in to access your media dashboard and manage your multimedia experience.</p>
+                            <p class="text-lg">Welcome to your personal media hub! Access your content, manage your preferences, and explore your multimedia library.</p>
                             <div class="flex flex-wrap justify-center lg:justify-start gap-4 text-sm">
                                 <div class="flex items-center">
-                                    <i class="fas fa-users text-primary mr-2"></i>
-                                    <span>User Accounts</span>
+                                    <i class="fas fa-play text-primary mr-2"></i>
+                                    <span>Stream Content</span>
                                 </div>
                                 <div class="flex items-center">
-                                    <i class="fas fa-shield-alt text-primary mr-2"></i>
-                                    <span>Admin Access</span>
+                                    <i class="fas fa-user-cog text-primary mr-2"></i>
+                                    <span>Personal Dashboard</span>
                                 </div>
                                 <div class="flex items-center">
                                     <i class="fas fa-server text-primary mr-2"></i>
-                                    <span>Multi-Service Support</span>
+                                    <span>Multi-Service Access</span>
                                 </div>
                             </div>
                         {% else %}
-                            <p class="text-lg">Administrator login portal. Use your Plex account or the credentials configured during setup.</p>
+                            <p class="text-lg">Administrator access portal. Sign in to manage your media services and user accounts.</p>
                             <div class="flex flex-wrap justify-center lg:justify-start gap-4 text-sm">
                                 <div class="flex items-center">
                                     <i class="fas fa-crown text-primary mr-2"></i>
-                                    <span>Admin Portal</span>
+                                    <span>Admin Controls</span>
                                 </div>
                                 <div class="flex items-center">
                                     <i class="fas fa-cog text-primary mr-2"></i>
@@ -51,7 +51,7 @@
                                 </div>
                                 <div class="flex items-center">
                                     <i class="fas fa-chart-line text-primary mr-2"></i>
-                                    <span>Analytics & Insights</span>
+                                    <span>Analytics & Reports</span>
                                 </div>
                             </div>
                         {% endif %}
@@ -62,26 +62,49 @@
                 <div class="hidden lg:block">
                     <h3 class="text-xl font-semibold text-base-content mb-4">Platform Features</h3>
                     <div class="grid grid-cols-2 gap-4 text-sm">
+                        {% if allow_user_accounts %}
                         <div class="bg-base-200/50 rounded-lg p-3">
-                            <i class="fas fa-play text-primary mb-2"></i>
-                            <div class="font-medium">Plex Integration</div>
-                            <div class="text-base-content/60">Seamless media streaming</div>
+                            <i class="fas fa-film text-primary mb-2"></i>
+                            <div class="font-medium">Your Library</div>
+                            <div class="text-base-content/60">Personal media collection</div>
                         </div>
                         <div class="bg-base-200/50 rounded-lg p-3">
-                            <i class="fas fa-cube text-primary mb-2"></i>
-                            <div class="font-medium">Multi-Service</div>
-                            <div class="text-base-content/60">Jellyfin, Emby & more</div>
+                            <i class="fas fa-history text-primary mb-2"></i>
+                            <div class="font-medium">Watch History</div>
+                            <div class="text-base-content/60">Track your viewing</div>
                         </div>
                         <div class="bg-base-200/50 rounded-lg p-3">
-                            <i class="fas fa-user-friends text-primary mb-2"></i>
+                            <i class="fas fa-download text-primary mb-2"></i>
+                            <div class="font-medium">Offline Access</div>
+                            <div class="text-base-content/60">Download for later</div>
+                        </div>
+                        <div class="bg-base-200/50 rounded-lg p-3">
+                            <i class="fas fa-mobile-alt text-primary mb-2"></i>
+                            <div class="font-medium">Multi-Device</div>
+                            <div class="text-base-content/60">Access anywhere</div>
+                        </div>
+                        {% else %}
+                        <div class="bg-base-200/50 rounded-lg p-3">
+                            <i class="fas fa-users text-primary mb-2"></i>
                             <div class="font-medium">User Management</div>
-                            <div class="text-base-content/60">Invites & permissions</div>
+                            <div class="text-base-content/60">Manage accounts & access</div>
+                        </div>
+                        <div class="bg-base-200/50 rounded-lg p-3">
+                            <i class="fas fa-server text-primary mb-2"></i>
+                            <div class="font-medium">Server Control</div>
+                            <div class="text-base-content/60">Multi-service support</div>
                         </div>
                         <div class="bg-base-200/50 rounded-lg p-3">
                             <i class="fas fa-chart-bar text-primary mb-2"></i>
                             <div class="font-medium">Analytics</div>
                             <div class="text-base-content/60">Usage insights</div>
                         </div>
+                        <div class="bg-base-200/50 rounded-lg p-3">
+                            <i class="fas fa-shield-alt text-primary mb-2"></i>
+                            <div class="font-medium">Security</div>
+                            <div class="text-base-content/60">Access control</div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -90,10 +113,16 @@
             <div class="order-1 lg:order-2">
                 <div class="bg-base-100 border border-base-300 rounded-2xl shadow-2xl p-8 max-w-md mx-auto">
                     <div class="text-center mb-8">
-                        <h2 class="text-2xl font-bold text-base-content mb-2">Welcome Back</h2>
+                        <h2 class="text-2xl font-bold text-base-content mb-2">
+                            {% if allow_user_accounts %}
+                                Sign In
+                            {% else %}
+                                Admin Login
+                            {% endif %}
+                        </h2>
                         <p class="text-base-content/60">
                             {% if allow_user_accounts %}
-                                Sign in to your account to continue
+                                Enter your credentials to access your media dashboard
                             {% else %}
                                 Administrator access required
                             {% endif %}
@@ -179,7 +208,7 @@
                     <div class="mt-8 pt-6 border-t border-base-300">
                         <div class="text-center text-sm text-base-content/60">
                             {% if allow_user_accounts %}
-                                <p>Need an account? Contact your administrator for an invite.</p>
+                                <p>New here? You'll need an invite from your administrator to create an account.</p>
                             {% else %}
                                 <p>Secure administrator access to {{ g.app_name or "MUM" }}</p>
                             {% endif %}
