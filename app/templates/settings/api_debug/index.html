@@ -186,33 +186,35 @@
         <!-- Tab Content -->
         <div id="tab-content" class="mt-4">
             <!-- Formatted Response -->
-            <div id="content-formatted" class="tab-content block">
+            <div id="content-formatted" class="tab-content" style="display: block;">
                 <pre id="formatted-response" class="bg-base-300 rounded-lg p-4 overflow-auto max-h-96 text-sm whitespace-pre-wrap"></pre>
             </div>
             
             <!-- Raw Response -->
-            <div id="content-raw" class="tab-content hidden">
+            <div id="content-raw" class="tab-content" style="display: none;">
                 <pre id="raw-response" class="bg-base-300 rounded-lg p-4 overflow-auto max-h-96 text-sm whitespace-pre-wrap"></pre>
             </div>
             
             <!-- Headers -->
-            <div id="content-headers" class="tab-content hidden">
-                <div id="headers-table" class="overflow-x-auto">
-                    <table class="table table-zebra table-compact">
-                        <thead>
-                            <tr>
-                                <th>Header</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody id="headers-tbody">
-                        </tbody>
-                    </table>
+            <div id="content-headers" class="tab-content" style="display: none;">
+                <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="table w-full">
+                            <thead class="bg-base-200/50">
+                                <tr class="border-b border-base-300">
+                                    <th class="font-medium text-sm text-base-content/80 p-4">Header</th>
+                                    <th class="font-medium text-sm text-base-content/80 p-4">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="headers-tbody">
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             
             <!-- cURL Command -->
-            <div id="content-curl" class="tab-content hidden">
+            <div id="content-curl" class="tab-content" style="display: none;">
                 <pre id="curl-command" class="bg-base-300 rounded-lg p-4 overflow-auto text-sm whitespace-pre-wrap"></pre>
                 <div class="mt-2">
                     <button id="copy-curl" class="btn btn-sm btn-outline">
@@ -486,19 +488,28 @@ document.addEventListener('DOMContentLoaded', function() {
         tab.addEventListener('click', function(e) {
             e.preventDefault();
             
+            console.log('Tab clicked:', this.id);
+            
             // Remove active class from all tabs
             document.querySelectorAll('[role="tab"]').forEach(t => t.classList.remove('tab-active'));
             // Add active class to clicked tab
             this.classList.add('tab-active');
             
             // Hide all content
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.style.display = 'none';
+                console.log('Hiding content:', content.id);
+            });
             
             // Show relevant content
             const contentId = 'content-' + this.id.replace('tab-', '');
+            console.log('Looking for content ID:', contentId);
             const contentElement = document.getElementById(contentId);
             if (contentElement) {
-                contentElement.classList.remove('hidden');
+                contentElement.style.display = 'block';
+                console.log('Showing content:', contentId);
+            } else {
+                console.error('Content element not found:', contentId);
             }
         });
     });
@@ -582,6 +593,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function displayResults(result) {
         console.log('Displaying results:', result);
+        console.log('Result response_text:', result.response_text);
+        console.log('Result headers:', result.headers);
+        console.log('Result response_json:', result.response_json);
         
         // Update summary stats
         document.getElementById('status-code').textContent = result.status_code;
@@ -629,23 +643,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Raw Response
         const rawEl = document.getElementById('raw-response');
-        rawEl.textContent = result.response_text;
-        console.log('Set raw content:', result.response_text.length, 'characters');
+        if (result.response_text && result.response_text.length > 0) {
+            rawEl.textContent = result.response_text;
+            console.log('Set raw content:', result.response_text.length, 'characters');
+        } else {
+            rawEl.textContent = 'No response body received';
+            console.log('No raw response content');
+        }
 
         // Headers
         const headersTable = document.getElementById('headers-tbody');
         headersTable.innerHTML = '';
-        Object.entries(result.headers).forEach(([key, value]) => {
+        
+        if (result.headers && Object.keys(result.headers).length > 0) {
+            Object.entries(result.headers).forEach(([key, value]) => {
+                const row = headersTable.insertRow();
+                row.className = 'border-b border-base-200/50 hover:bg-base-200/30 transition-colors';
+                
+                const keyCell = row.insertCell(0);
+                keyCell.className = 'p-4 font-medium text-sm text-base-content';
+                keyCell.textContent = key;
+                
+                const valueCell = row.insertCell(1);
+                valueCell.className = 'p-4 text-sm text-base-content/80 break-all';
+                valueCell.textContent = value;
+            });
+            console.log('Set headers:', Object.keys(result.headers).length, 'headers');
+        } else {
             const row = headersTable.insertRow();
-            row.insertCell(0).textContent = key;
-            row.insertCell(1).textContent = value;
-        });
-        console.log('Set headers:', Object.keys(result.headers).length, 'headers');
+            row.className = 'border-b border-base-200/50';
+            const cell = row.insertCell(0);
+            cell.colSpan = 2;
+            cell.className = 'p-4 text-center text-base-content/60 italic';
+            cell.textContent = 'No response headers received';
+            console.log('No headers in response');
+        }
 
         // cURL Command
-        const curlCommand = generateCurlCommand(result);
-        document.getElementById('curl-command').textContent = curlCommand;
-        console.log('Set cURL command:', curlCommand.length, 'characters');
+        const curlCommandEl = document.getElementById('curl-command');
+        try {
+            const curlCommand = generateCurlCommand(result);
+            if (curlCommand && curlCommand.length > 0) {
+                curlCommandEl.textContent = curlCommand;
+                console.log('Set cURL command:', curlCommand.length, 'characters');
+            } else {
+                curlCommandEl.textContent = 'Unable to generate cURL command';
+                console.log('Failed to generate cURL command');
+            }
+        } catch (e) {
+            curlCommandEl.textContent = 'Error generating cURL command: ' + e.message;
+            console.error('cURL generation error:', e);
+        }
 
         // Show results section
         resultsSection.classList.remove('hidden');
@@ -653,8 +701,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function displayError(error) {
+        console.log('Displaying error:', error);
+        
         document.getElementById('error-message').textContent = error;
         errorSection.classList.remove('hidden');
+        
+        // Clear any previous results
+        resultsSection.classList.add('hidden');
+        
+        // Reset all tab content to show error state
+        document.getElementById('formatted-response').textContent = 'Request failed - no response data';
+        document.getElementById('raw-response').textContent = 'Request failed - no response data';
+        
+        const headersTable = document.getElementById('headers-tbody');
+        headersTable.innerHTML = '';
+        const row = headersTable.insertRow();
+        const cell = row.insertCell(0);
+        cell.colSpan = 2;
+        cell.textContent = 'Request failed - no headers available';
+        cell.className = 'text-center text-base-content/60 italic';
+        
+        document.getElementById('curl-command').textContent = 'Request failed - unable to generate cURL command';
     }
 
     // XML formatting function
@@ -683,16 +750,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function generateCurlCommand(result) {
+        console.log('Generating cURL command with result:', result);
+        
+        if (!result || !result.method || !result.url) {
+            console.error('Invalid result object for cURL generation:', result);
+            return 'Error: Invalid response data';
+        }
+        
         let cmd = `curl -X ${result.method} \\\n  "${result.url}"`;
         
         // Add common headers (excluding some that curl adds automatically)
         const skipHeaders = ['content-length', 'host', 'user-agent', 'connection'];
-        Object.entries(result.headers).forEach(([key, value]) => {
-            if (!skipHeaders.includes(key.toLowerCase())) {
-                cmd += ` \\\n  -H "${key}: ${value}"`;
-            }
-        });
         
+        if (result.headers && typeof result.headers === 'object') {
+            Object.entries(result.headers).forEach(([key, value]) => {
+                if (!skipHeaders.includes(key.toLowerCase())) {
+                    cmd += ` \\\n  -H "${key}: ${value}"`;
+                }
+            });
+            console.log('Added headers to cURL command');
+        } else {
+            console.log('No headers to add to cURL command');
+        }
+        
+        console.log('Generated cURL command:', cmd);
         return cmd;
     }
 
