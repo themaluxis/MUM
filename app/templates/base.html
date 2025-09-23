@@ -92,6 +92,7 @@
                             <ul class="ml-4">
                                 {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_general_settings') %}
                                 <li><a href="{{ url_for('settings.general') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.general' else '' }}"><i class="fa-solid fa-sliders fa-fw"></i> General</a></li>
+                                <li><a href="{{ url_for('settings.user_accounts') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.user_accounts' else '' }}"><i class="fa-solid fa-user-plus fa-fw"></i> User Accounts</a></li>
                                 {% endif %}
                                 {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('view_admins_tab') %}
                                     {% set admin_area_active = request.endpoint and (request.endpoint.startswith('admin_management.') or request.endpoint.startswith('role_management.')) %}
@@ -122,6 +123,7 @@
                                 {% endif %}
                                 {% if current_user.__class__.__name__ == 'Owner' or current_user.has_permission('manage_advanced_settings') %}
                                 <li><a href="{{ url_for('settings.advanced') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.advanced' else '' }}"><i class="fa-solid fa-gears fa-fw"></i> Advanced</a></li>
+                                <li><a href="{{ url_for('settings.api_debug') }}" class="{{ 'active menu-active' if request.endpoint == 'settings.api_debug' else '' }}"><i class="fa-solid fa-code fa-fw"></i> API Debug</a></li>
                                 {% endif %}
                             </ul>
                         </details>
