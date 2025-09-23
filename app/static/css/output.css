@@ -6214,6 +6214,9 @@
   .text-audiobookshelf-400 {
     color: var(--color-audiobookshelf-400);
   }
+  .text-audiobookshelf-500 {
+    color: var(--color-audiobookshelf-500);
+  }
   .text-audiobookshelf-700 {
     color: var(--color-audiobookshelf-700);
   }
@@ -6303,6 +6306,9 @@
   }
   .text-emby-400 {
     color: var(--color-emby-400);
+  }
+  .text-emby-500 {
+    color: var(--color-emby-500);
   }
   .text-emby-700 {
     color: var(--color-emby-700);
@@ -6394,6 +6400,9 @@
   .text-kavita-400 {
     color: var(--color-kavita-400);
   }
+  .text-kavita-500 {
+    color: var(--color-kavita-500);
+  }
   .text-kavita-700 {
     color: var(--color-kavita-700);
   }
@@ -6402,6 +6411,9 @@
   }
   .text-komga-400 {
     color: var(--color-komga-400);
+  }
+  .text-komga-500 {
+    color: var(--color-komga-500);
   }
   .text-komga-700 {
     color: var(--color-komga-700);

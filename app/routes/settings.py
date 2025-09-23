@@ -694,8 +694,14 @@ def api_debug_execute():
             response = requests.post(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
         elif method.upper() == 'PUT':
             response = requests.put(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
+        elif method.upper() == 'PATCH':
+            response = requests.patch(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
         elif method.upper() == 'DELETE':
             response = requests.delete(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
+        elif method.upper() == 'HEAD':
+            response = requests.head(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
+        elif method.upper() == 'OPTIONS':
+            response = requests.options(full_url, headers=headers, auth=auth, timeout=timeout, verify=False)
         else:
             return jsonify({'error': f'Unsupported method: {method}'}), 400
             

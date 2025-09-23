@@ -51,7 +51,10 @@
                         <option value="GET">GET</option>
                         <option value="POST">POST</option>
                         <option value="PUT">PUT</option>
+                        <option value="PATCH">PATCH</option>
                         <option value="DELETE">DELETE</option>
+                        <option value="HEAD">HEAD</option>
+                        <option value="OPTIONS">OPTIONS</option>
                     </select>
                 </div>
 
@@ -259,8 +262,8 @@
                         Plex
                     </h4>
                     <div class="space-y-2 text-xs">
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v2/systems" data-format="json">
-                            GET /api/v2/systems (JSON)
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/identity" data-format="xml">
+                            GET /identity (XML)
                         </button>
                         <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/library/sections" data-format="xml">
                             GET /library/sections (XML)
@@ -296,21 +299,90 @@
                     </div>
                 </div>
 
-                <!-- Generic Examples -->
+                <!-- Emby Examples -->
                 <div class="bg-base-200 rounded-lg p-4">
-                    <h4 class="font-semibold text-sm mb-2 text-gray-500">
-                        <i class="fa-solid fa-server mr-1"></i>
-                        Generic
+                    <h4 class="font-semibold text-sm mb-2 text-emby-500">
+                        <i class="fa-solid fa-play-circle mr-1"></i>
+                        Emby
                     </h4>
                     <div class="space-y-2 text-xs">
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v1/status">
-                            GET /api/v1/status
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/System/Info" data-format="json">
+                            GET /System/Info (JSON)
                         </button>
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v1/libraries">
-                            GET /api/v1/libraries
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/Users" data-format="json">
+                            GET /Users (JSON)
                         </button>
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/health">
-                            GET /health
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/Library/VirtualFolders" data-format="json">
+                            GET /Library/VirtualFolders (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/Sessions" data-format="json">
+                            GET /Sessions (JSON)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Kavita Examples -->
+                <div class="bg-base-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-sm mb-2 text-kavita-500">
+                        <i class="fa-solid fa-book mr-1"></i>
+                        Kavita
+                    </h4>
+                    <div class="space-y-2 text-xs">
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/Server/version" data-format="json">
+                            GET /api/Server/version (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/Library" data-format="json">
+                            GET /api/Library (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/Series" data-format="json" data-params='[{"key":"libraryId","value":"1"}]'>
+                            GET /api/Series?libraryId=1 (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/Stats/server-info" data-format="json">
+                            GET /api/Stats/server-info (JSON)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AudiobookShelf Examples -->
+                <div class="bg-base-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-sm mb-2 text-audiobookshelf-500">
+                        <i class="fa-solid fa-headphones mr-1"></i>
+                        AudiobookShelf
+                    </h4>
+                    <div class="space-y-2 text-xs">
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/status" data-format="json">
+                            GET /api/status (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/libraries" data-format="json">
+                            GET /api/libraries (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/users" data-format="json">
+                            GET /api/users (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/items" data-format="json" data-params='[{"key":"library","value":"lib_1"}]'>
+                            GET /api/items?library=lib_1 (JSON)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Komga Examples -->
+                <div class="bg-base-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-sm mb-2 text-komga-500">
+                        <i class="fa-solid fa-book-open mr-1"></i>
+                        Komga
+                    </h4>
+                    <div class="space-y-2 text-xs">
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v1/actuator/health" data-format="json">
+                            GET /api/v1/actuator/health (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v1/libraries" data-format="json">
+                            GET /api/v1/libraries (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v1/series" data-format="json" data-params='[{"key":"library_id","value":"1"}]'>
+                            GET /api/v1/series?library_id=1 (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v1/users/me" data-format="json">
+                            GET /api/v1/users/me (JSON)
                         </button>
                     </div>
                 </div>
