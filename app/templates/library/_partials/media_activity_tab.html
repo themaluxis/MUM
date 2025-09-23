@@ -40,7 +40,7 @@
                             <th class="text-left">Started</th>
                             <th class="text-left">Duration</th>
                             <th class="text-left">Progress</th>
-                            <th class="text-left">Device</th>
+                            <th class="text-left">Player / Platform</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -97,7 +97,7 @@
                                         <div class="text-xs text-base-content/60">
                                             {{ activity.parent_title }}
                                             {# Add episode number if we have access to the linked media item #}
-                                            {% if hasattr(activity, 'linked_media_item') and activity.linked_media_item and activity.linked_media_item.extra_metadata %}
+                                            {% if activity.linked_media_item and activity.linked_media_item.extra_metadata %}
                                                 {% set episode_num = activity.linked_media_item.extra_metadata.get('episodeNumber') or activity.linked_media_item.extra_metadata.get('episode_number') or activity.linked_media_item.extra_metadata.get('episode') or activity.linked_media_item.extra_metadata.get('index') %}
                                                 {% if episode_num is not none %}
                                                     • E{{ "%02d"|format(episode_num) }}
@@ -153,10 +153,10 @@
                             </td>
                             <td>
                                 <div class="text-sm">
-                                    {% if activity.device_name %}
-                                        <div class="flex items-center gap-1">
-                                            <i class="fa-solid fa-tv text-base-content/60 text-xs"></i>
-                                            {{ activity.device_name }}
+                                    {% if activity.player or activity.product or activity.platform %}
+                                        <div>
+                                            <div class="font-medium">{{ activity.player or 'Unknown Player' }}</div>
+                                            <div class="text-xs text-base-content/60">{{ activity.product or activity.platform or 'Unknown Platform' }}</div>
                                         </div>
                                     {% else %}
                                         <span class="text-base-content/40">Unknown</span>
