@@ -630,6 +630,8 @@ def api_debug_execute():
             
         method = data.get('method', 'GET')
         endpoint = data.get('endpoint', '')
+        response_format = data.get('response_format', 'json')
+        parameters = data.get('parameters', [])
         server_id = data.get('server_id')
         
         if not server_id or not endpoint:
@@ -640,14 +642,32 @@ def api_debug_execute():
         if not server:
             return jsonify({'error': 'Server not found'}), 404
             
-        # Construct full URL
+        # Construct full URL with parameters
         base_url = server.url.rstrip('/')
         if not endpoint.startswith('/'):
             endpoint = '/' + endpoint
         full_url = base_url + endpoint
         
+        # Add query parameters
+        if parameters:
+            query_params = []
+            for param in parameters:
+                if param.get('key') and param.get('value'):
+                    query_params.append(f"{param['key']}={param['value']}")
+            if query_params:
+                separator = '&' if '?' in full_url else '?'
+                full_url += separator + '&'.join(query_params)
+        
         # Prepare headers and auth
-        headers = {'Content-Type': 'application/json'}
+        headers = {}
+        
+        # Set content type based on response format
+        if response_format == 'xml':
+            headers['Accept'] = 'application/xml, text/xml'
+        else:
+            headers['Accept'] = 'application/json'
+            
+        headers['Content-Type'] = 'application/json'
         auth = None
         
         # Add service-specific authentication
@@ -679,11 +699,23 @@ def api_debug_execute():
         else:
             return jsonify({'error': f'Unsupported method: {method}'}), 400
             
-        # Parse response
+        # Parse response based on format
+        response_json = None
+        response_xml = None
+        
         try:
-            response_json = response.json()
+            if response_format == 'xml' or 'xml' in response.headers.get('content-type', '').lower():
+                response_xml = response.text
+                # Try to also parse as JSON if possible
+                try:
+                    response_json = response.json()
+                except:
+                    pass
+            else:
+                response_json = response.json()
         except:
-            response_json = None
+            # If JSON parsing fails, treat as text
+            pass
             
         # Build result
         result = {
@@ -695,6 +727,8 @@ def api_debug_execute():
             'method': method.upper(),
             'response_text': response.text,
             'response_json': response_json,
+            'response_xml': response_xml,
+            'response_format': response_format,
             'elapsed_ms': int(response.elapsed.total_seconds() * 1000)
         }
         

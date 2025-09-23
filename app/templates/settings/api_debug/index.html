@@ -41,7 +41,7 @@
             </div>
         </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
                 <!-- HTTP Method -->
                 <div class="form-control">
                     <label class="label">
@@ -66,6 +66,17 @@
                     </label>
                 </div>
 
+                <!-- Response Format -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-medium">Response Format</span>
+                    </label>
+                    <select id="response-format" class="select select-bordered">
+                        <option value="json">JSON</option>
+                        <option value="xml">XML</option>
+                    </select>
+                </div>
+
                 <!-- Server Selection -->
                 <div class="form-control">
                     <label class="label">
@@ -80,6 +91,26 @@
                         {% endfor %}
                     </select>
                 </div>
+            </div>
+
+            <!-- Parameters Section -->
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Query Parameters</span>
+                </label>
+                <div id="parameters-container" class="space-y-2">
+                    <div class="flex gap-2 items-center parameter-row">
+                        <input type="text" placeholder="Parameter name" class="input input-bordered flex-1 param-key" />
+                        <input type="text" placeholder="Parameter value" class="input input-bordered flex-1 param-value" />
+                        <button type="button" class="btn btn-sm btn-outline btn-error remove-param" disabled>
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                <button type="button" id="add-param" class="btn btn-sm btn-outline mt-2">
+                    <i class="fa-solid fa-plus mr-2"></i>
+                    Add Parameter
+                </button>
             </div>
 
             <!-- Request URL Preview -->
@@ -146,7 +177,7 @@
 
         <!-- Response Tabs -->
         <div role="tablist" class="tabs tabs-boxed mb-4">
-            <a id="tab-json" role="tab" class="tab tab-active">JSON Response</a>
+            <a id="tab-formatted" role="tab" class="tab tab-active">Formatted Response</a>
             <a id="tab-raw" role="tab" class="tab">Raw Response</a>
             <a id="tab-headers" role="tab" class="tab">Headers</a>
             <a id="tab-curl" role="tab" class="tab">cURL Command</a>
@@ -154,9 +185,9 @@
 
         <!-- Tab Content -->
         <div id="tab-content" class="mt-4">
-            <!-- JSON Response -->
-            <div id="content-json" class="tab-content block">
-                <pre id="json-response" class="bg-base-300 rounded-lg p-4 overflow-auto max-h-96 text-sm whitespace-pre-wrap"></pre>
+            <!-- Formatted Response -->
+            <div id="content-formatted" class="tab-content block">
+                <pre id="formatted-response" class="bg-base-300 rounded-lg p-4 overflow-auto max-h-96 text-sm whitespace-pre-wrap"></pre>
             </div>
             
             <!-- Raw Response -->
@@ -226,14 +257,17 @@
                         Plex
                     </h4>
                     <div class="space-y-2 text-xs">
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v2/systems">
-                            GET /api/v2/systems
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/api/v2/systems" data-format="json">
+                            GET /api/v2/systems (JSON)
                         </button>
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/library/sections">
-                            GET /library/sections
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/library/sections" data-format="xml">
+                            GET /library/sections (XML)
                         </button>
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/status/sessions">
-                            GET /status/sessions
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/status/sessions" data-format="json">
+                            GET /status/sessions (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/library/sections/1/all" data-format="xml" data-params='[{"key":"type","value":"1"}]'>
+                            GET /library/sections/1/all?type=1 (XML)
                         </button>
                     </div>
                 </div>
@@ -245,14 +279,17 @@
                         Jellyfin
                     </h4>
                     <div class="space-y-2 text-xs">
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/System/Info">
-                            GET /System/Info
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/System/Info" data-format="json">
+                            GET /System/Info (JSON)
                         </button>
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/Users">
-                            GET /Users
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/Users" data-format="json">
+                            GET /Users (JSON)
                         </button>
-                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/Library/VirtualFolders">
-                            GET /Library/VirtualFolders
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/Library/VirtualFolders" data-format="json">
+                            GET /Library/VirtualFolders (JSON)
+                        </button>
+                        <button class="example-btn block w-full text-left hover:text-primary" data-method="GET" data-endpoint="/Items" data-format="json" data-params='[{"key":"Recursive","value":"true"},{"key":"IncludeItemTypes","value":"Movie"}]'>
+                            GET /Items?Recursive=true&IncludeItemTypes=Movie
                         </button>
                     </div>
                 </div>
@@ -283,12 +320,15 @@
 document.addEventListener('DOMContentLoaded', function() {
     const methodSelect = document.getElementById('http-method');
     const endpointInput = document.getElementById('api-endpoint');
+    const responseFormatSelect = document.getElementById('response-format');
     const serverSelect = document.getElementById('server-select');
     const fullUrlSpan = document.getElementById('full-url');
     const executeBtn = document.getElementById('execute-btn');
     const loadingSpinner = document.getElementById('loading-spinner');
     const resultsSection = document.getElementById('results-section');
     const errorSection = document.getElementById('error-section');
+    const parametersContainer = document.getElementById('parameters-container');
+    const addParamBtn = document.getElementById('add-param');
 
     // Update full URL when inputs change
     function updateFullUrl() {
@@ -299,7 +339,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (serverUrl && endpoint) {
             const baseUrl = serverUrl.replace(/\/$/, '');
             const fullEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
-            fullUrlSpan.textContent = baseUrl + fullEndpoint;
+            
+            // Add query parameters
+            const params = getQueryParameters();
+            const queryString = params.length > 0 ? '?' + params.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&') : '';
+            
+            fullUrlSpan.textContent = baseUrl + fullEndpoint + queryString;
             executeBtn.disabled = false;
         } else {
             fullUrlSpan.textContent = 'Select a server and enter an endpoint to see the full URL';
@@ -307,15 +352,131 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Get query parameters from the form
+    function getQueryParameters() {
+        const params = [];
+        const paramRows = parametersContainer.querySelectorAll('.parameter-row');
+        
+        paramRows.forEach(row => {
+            const key = row.querySelector('.param-key').value.trim();
+            const value = row.querySelector('.param-value').value.trim();
+            if (key && value) {
+                params.push({ key, value });
+            }
+        });
+        
+        return params;
+    }
+
+    // Add parameter row
+    function addParameterRow() {
+        const row = document.createElement('div');
+        row.className = 'flex gap-2 items-center parameter-row';
+        row.innerHTML = `
+            <input type="text" placeholder="Parameter name" class="input input-bordered flex-1 param-key" />
+            <input type="text" placeholder="Parameter value" class="input input-bordered flex-1 param-value" />
+            <button type="button" class="btn btn-sm btn-outline btn-error remove-param">
+                <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+        `;
+        
+        parametersContainer.appendChild(row);
+        
+        // Add event listeners for new inputs
+        const keyInput = row.querySelector('.param-key');
+        const valueInput = row.querySelector('.param-value');
+        const removeBtn = row.querySelector('.remove-param');
+        
+        keyInput.addEventListener('input', updateFullUrl);
+        valueInput.addEventListener('input', updateFullUrl);
+        removeBtn.addEventListener('click', () => {
+            row.remove();
+            updateRemoveButtons();
+            updateFullUrl();
+        });
+        
+        updateRemoveButtons();
+    }
+
+    // Update remove button states
+    function updateRemoveButtons() {
+        const rows = parametersContainer.querySelectorAll('.parameter-row');
+        rows.forEach((row, index) => {
+            const removeBtn = row.querySelector('.remove-param');
+            removeBtn.disabled = rows.length === 1;
+        });
+    }
+
     methodSelect.addEventListener('change', updateFullUrl);
     endpointInput.addEventListener('input', updateFullUrl);
+    responseFormatSelect.addEventListener('change', updateFullUrl);
     serverSelect.addEventListener('change', updateFullUrl);
+
+    // Add parameter button event listener
+    addParamBtn.addEventListener('click', addParameterRow);
+
+    // Initialize parameter input event listeners
+    parametersContainer.querySelectorAll('.param-key, .param-value').forEach(input => {
+        input.addEventListener('input', updateFullUrl);
+    });
+
+    // Initialize remove button event listeners
+    parametersContainer.querySelectorAll('.remove-param').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.target.closest('.parameter-row').remove();
+            updateRemoveButtons();
+            updateFullUrl();
+        });
+    });
+
+    // Initialize remove button states
+    updateRemoveButtons();
 
     // Example button handlers
     document.querySelectorAll('.example-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             methodSelect.value = this.dataset.method;
             endpointInput.value = this.dataset.endpoint;
+            
+            // Set response format if specified
+            if (this.dataset.format) {
+                responseFormatSelect.value = this.dataset.format;
+            }
+            
+            // Clear existing parameters
+            const existingRows = parametersContainer.querySelectorAll('.parameter-row');
+            existingRows.forEach((row, index) => {
+                if (index > 0) row.remove(); // Keep first row, remove others
+            });
+            
+            // Clear first row
+            const firstRow = parametersContainer.querySelector('.parameter-row');
+            firstRow.querySelector('.param-key').value = '';
+            firstRow.querySelector('.param-value').value = '';
+            
+            // Add parameters if specified
+            if (this.dataset.params) {
+                try {
+                    const params = JSON.parse(this.dataset.params);
+                    params.forEach((param, index) => {
+                        if (index === 0) {
+                            // Use first existing row
+                            firstRow.querySelector('.param-key').value = param.key;
+                            firstRow.querySelector('.param-value').value = param.value;
+                        } else {
+                            // Add new row
+                            addParameterRow();
+                            const newRow = parametersContainer.lastElementChild;
+                            newRow.querySelector('.param-key').value = param.key;
+                            newRow.querySelector('.param-value').value = param.value;
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error parsing example parameters:', e);
+                }
+            }
+            
+            updateRemoveButtons();
             updateFullUrl();
         });
     });
@@ -346,7 +507,9 @@ document.addEventListener('DOMContentLoaded', function() {
     executeBtn.addEventListener('click', async function() {
         const method = methodSelect.value;
         const endpoint = endpointInput.value.trim();
+        const responseFormat = responseFormatSelect.value;
         const serverId = serverSelect.value;
+        const parameters = getQueryParameters();
 
         if (!serverId || !endpoint) {
             alert('Please select a server and enter an endpoint');
@@ -379,6 +542,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     method: method,
                     endpoint: endpoint,
+                    response_format: responseFormat,
+                    parameters: parameters,
                     server_id: serverId
                 })
             });
@@ -440,15 +605,26 @@ document.addEventListener('DOMContentLoaded', function() {
             statusEl.classList.add('text-warning');
         }
 
-        // JSON Response
-        const jsonEl = document.getElementById('json-response');
-        if (result.response_json) {
+        // Formatted Response (JSON or XML)
+        const formattedEl = document.getElementById('formatted-response');
+        if (result.response_format === 'xml' && result.response_xml) {
+            // Format XML response
+            try {
+                const formatted = formatXml(result.response_xml);
+                formattedEl.textContent = formatted;
+                console.log('Set XML content:', formatted.length, 'characters');
+            } catch (e) {
+                formattedEl.textContent = result.response_xml;
+                console.log('XML formatting failed, using raw XML');
+            }
+        } else if (result.response_json) {
+            // Format JSON response
             const formattedJson = JSON.stringify(result.response_json, null, 2);
-            jsonEl.textContent = formattedJson;
+            formattedEl.textContent = formattedJson;
             console.log('Set JSON content:', formattedJson.length, 'characters');
         } else {
-            jsonEl.textContent = 'Response is not valid JSON';
-            console.log('No valid JSON in response');
+            formattedEl.textContent = 'Response could not be formatted';
+            console.log('No valid JSON or XML in response');
         }
 
         // Raw Response
@@ -481,11 +657,36 @@ document.addEventListener('DOMContentLoaded', function() {
         errorSection.classList.remove('hidden');
     }
 
+    // XML formatting function
+    function formatXml(xml) {
+        const PADDING = ' '.repeat(2);
+        const reg = /(>)(<)(\/*)/g;
+        let formatted = xml.replace(reg, '$1\r\n$2$3');
+        let pad = 0;
+        
+        return formatted.split('\r\n').map((line) => {
+            let indent = 0;
+            if (line.match(/.+<\/\w[^>]*>$/)) {
+                indent = 0;
+            } else if (line.match(/^<\/\w/) && pad > 0) {
+                pad -= 1;
+            } else if (line.match(/^<\w[^>]*[^\/]>.*$/)) {
+                indent = 1;
+            } else {
+                indent = 0;
+            }
+            
+            const padding = PADDING.repeat(pad);
+            pad += indent;
+            return padding + line;
+        }).join('\n');
+    }
+
     function generateCurlCommand(result) {
         let cmd = `curl -X ${result.method} \\\n  "${result.url}"`;
         
         // Add common headers (excluding some that curl adds automatically)
-        const skipHeaders = ['content-length', 'host', 'user-agent'];
+        const skipHeaders = ['content-length', 'host', 'user-agent', 'connection'];
         Object.entries(result.headers).forEach(([key, value]) => {
             if (!skipHeaders.includes(key.toLowerCase())) {
                 cmd += ` \\\n  -H "${key}: ${value}"`;
