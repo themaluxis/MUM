@@ -1,8 +1,8 @@
-"""initial schema
+"""Initial migration
 
-Revision ID: 527b5672e58b
+Revision ID: c278f68ebade
 Revises: 
-Create Date: 2025-08-29 21:52:56.101971
+Create Date: 2025-09-27 13:42:59.622403
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import app
 
 
 # revision identifiers, used by Alembic.
-revision = '527b5672e58b'
+revision = 'c278f68ebade'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -28,6 +28,10 @@ def upgrade():
     sa.Column('api_key', sa.String(length=512), nullable=True),
     sa.Column('username', sa.String(length=255), nullable=True),
     sa.Column('password', sa.String(length=512), nullable=True),
+    sa.Column('public_url', sa.String(length=512), nullable=True),
+    sa.Column('overseerr_enabled', sa.Boolean(), nullable=False),
+    sa.Column('overseerr_url', sa.String(length=512), nullable=True),
+    sa.Column('overseerr_api_key', sa.String(length=512), nullable=True),
     sa.Column('config', app.extensions.JSONEncodedDict(), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
@@ -204,6 +208,7 @@ def upgrade():
     sa.Column('server_id', sa.Integer(), nullable=False),
     sa.Column('external_id', sa.String(length=255), nullable=False),
     sa.Column('parent_id', sa.String(length=255), nullable=True),
+    sa.Column('rating_key', sa.String(length=255), nullable=True),
     sa.Column('title', sa.String(length=500), nullable=False),
     sa.Column('sort_title', sa.String(length=500), nullable=True),
     sa.Column('item_type', sa.String(length=50), nullable=False),
@@ -229,6 +234,7 @@ def upgrade():
         batch_op.create_index('idx_media_items_external_id', ['external_id'], unique=False)
         batch_op.create_index('idx_media_items_last_synced', ['last_synced'], unique=False)
         batch_op.create_index('idx_media_items_library_type', ['library_id', 'item_type'], unique=False)
+        batch_op.create_index('idx_media_items_rating_key', ['rating_key'], unique=False)
         batch_op.create_index('idx_media_items_title', ['title'], unique=False)
         batch_op.create_index('idx_media_items_year', ['year'], unique=False)
 
@@ -317,6 +323,7 @@ def upgrade():
     sa.Column('external_user_alt_id', sa.String(length=255), nullable=True),
     sa.Column('external_username', sa.String(length=255), nullable=True),
     sa.Column('external_email', sa.String(length=255), nullable=True),
+    sa.Column('overseerr_user_id', sa.Integer(), nullable=True),
     sa.Column('allowed_library_ids', app.extensions.JSONEncodedDict(), nullable=True),
     sa.Column('allow_downloads', sa.Boolean(), nullable=False),
     sa.Column('allow_4k_transcode', sa.Boolean(), nullable=False),
@@ -349,6 +356,7 @@ def upgrade():
     with op.batch_alter_table('user_media_access', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_user_media_access_access_expires_at'), ['access_expires_at'], unique=False)
         batch_op.create_index(batch_op.f('ix_user_media_access_external_user_id'), ['external_user_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_user_media_access_overseerr_user_id'), ['overseerr_user_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_user_media_access_server_id'), ['server_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_user_media_access_service_join_date'), ['service_join_date'], unique=False)
         batch_op.create_index(batch_op.f('ix_user_media_access_used_invite_id'), ['used_invite_id'], unique=False)
@@ -375,6 +383,7 @@ def upgrade():
     sa.Column('grandparent_title', sa.String(length=255), nullable=True),
     sa.Column('parent_title', sa.String(length=255), nullable=True),
     sa.Column('library_name', sa.String(length=255), nullable=True),
+    sa.Column('external_media_item_id', sa.String(length=255), nullable=True),
     sa.Column('media_duration_seconds', sa.Integer(), nullable=True),
     sa.Column('view_offset_at_end_seconds', sa.Integer(), nullable=True),
     sa.Column('service_data', app.extensions.JSONEncodedDict(), nullable=True),
@@ -406,6 +415,7 @@ def downgrade():
         batch_op.drop_index(batch_op.f('ix_user_media_access_used_invite_id'))
         batch_op.drop_index(batch_op.f('ix_user_media_access_service_join_date'))
         batch_op.drop_index(batch_op.f('ix_user_media_access_server_id'))
+        batch_op.drop_index(batch_op.f('ix_user_media_access_overseerr_user_id'))
         batch_op.drop_index(batch_op.f('ix_user_media_access_external_user_id'))
         batch_op.drop_index(batch_op.f('ix_user_media_access_access_expires_at'))
 
@@ -427,6 +437,7 @@ def downgrade():
     with op.batch_alter_table('media_items', schema=None) as batch_op:
         batch_op.drop_index('idx_media_items_year')
         batch_op.drop_index('idx_media_items_title')
+        batch_op.drop_index('idx_media_items_rating_key')
         batch_op.drop_index('idx_media_items_library_type')
         batch_op.drop_index('idx_media_items_last_synced')
         batch_op.drop_index('idx_media_items_external_id')
