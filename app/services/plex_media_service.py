@@ -1227,11 +1227,11 @@ class PlexMediaService(BaseMediaService):
                     thumb_url = None
                     if hasattr(item, 'thumb') and item.thumb:
                         # Manually construct relative URL to avoid url_for issues with external hosts
-                        thumb_url = f"/api/media/plex/images/proxy?path={item.thumb.lstrip('/')}"
+                        thumb_url = f"/admin/api/media/plex/images/proxy?path={item.thumb.lstrip('/')}"
                         # current_app.logger.debug(f"Generated Plex thumb URL: {thumb_url}")
                     elif hasattr(item, 'art') and item.art:
                         # Manually construct relative URL to avoid url_for issues with external hosts
-                        thumb_url = f"/api/media/plex/images/proxy?path={item.art.lstrip('/')}"
+                        thumb_url = f"/admin/api/media/plex/images/proxy?path={item.art.lstrip('/')}"
                         # current_app.logger.debug(f"Generated Plex art URL: {thumb_url}")
                     
                     # Extract year from originallyAvailableAt
@@ -1441,10 +1441,10 @@ class PlexMediaService(BaseMediaService):
                     thumb_url = None
                     if hasattr(episode, 'thumb') and episode.thumb:
                         # Manually construct relative URL to avoid url_for issues with external hosts
-                        thumb_url = f"/api/media/plex/images/proxy?path={episode.thumb.lstrip('/')}"
+                        thumb_url = f"/admin/api/media/plex/images/proxy?path={episode.thumb.lstrip('/')}"
                     elif hasattr(episode, 'art') and episode.art:
                         # Fallback to art if thumb is not available
-                        thumb_url = f"/api/media/plex/images/proxy?path={episode.art.lstrip('/')}"
+                        thumb_url = f"/admin/api/media/plex/images/proxy?path={episode.art.lstrip('/')}"
                     
                     # Extract year from originallyAvailableAt
                     year = None

@@ -269,7 +269,7 @@ class MediaServiceManager:
                                     if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
                                         access.external_avatar_url = thumb_url
                                     else:
-                                        access.external_avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                                        access.external_avatar_url = f"/admin/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
                                     current_app.logger.info(f"Set Plex avatar URL for user {user_data.get('username')}: {access.external_avatar_url}")
                             
                             elif server.service_type == ServiceType.KAVITA:
@@ -327,7 +327,7 @@ class MediaServiceManager:
                             if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
                                 access.external_avatar_url = thumb_url
                             else:
-                                access.external_avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                                access.external_avatar_url = f"/admin/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
                             current_app.logger.info(f"Set Plex avatar URL for new user {user_data.get('username')}: {access.external_avatar_url}")
                     
                     elif server.service_type == ServiceType.KAVITA:
@@ -384,7 +384,7 @@ class MediaServiceManager:
                         # Update Plex avatar URL
                         thumb_url = user_data.get('thumb')
                         if thumb_url:
-                            new_avatar_url = thumb_url if thumb_url.startswith(('https://plex.tv/', 'http://plex.tv/')) else f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+                            new_avatar_url = thumb_url if thumb_url.startswith(('https://plex.tv/', 'http://plex.tv/')) else f"/admin/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
                             if access.external_avatar_url != new_avatar_url:
                                 changes.append(f"Avatar URL updated")
                                 access.external_avatar_url = new_avatar_url

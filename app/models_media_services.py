@@ -440,15 +440,18 @@ class MediaItem(db.Model):
         # Handle different thumbnail formats for different services
         thumb_url = None
         if self.thumb_path:
-            if self.thumb_path.startswith('/api/'):
-                # Already a proxy URL (Jellyfin or other services)
+            if self.thumb_path.startswith('/admin/api/'):
+                # Already a proxy URL with correct prefix (Jellyfin or other services)
                 thumb_url = self.thumb_path
+            elif self.thumb_path.startswith('/api/'):
+                # Legacy proxy URL without admin prefix - add it
+                thumb_url = f"/admin{self.thumb_path}"
             elif self.thumb_path.startswith('http'):
                 # Full URL (like RomM) - use as-is
                 thumb_url = self.thumb_path
             else:
                 # Plex format: regular path that needs proxy construction
-                thumb_url = f"/api/media/{self.server.service_type.value}/images/proxy?path={self.thumb_path.lstrip('/')}"
+                thumb_url = f"/admin/api/media/{self.server.service_type.value}/images/proxy?path={self.thumb_path.lstrip('/')}"
         
         # Extract season and episode numbers for episodes
         season_number = None

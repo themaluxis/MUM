@@ -837,7 +837,7 @@ class JellyfinMediaService(BaseMediaService):
                     thumb_url = None
                     if item.get('Id'):
                         # Manually construct relative URL to avoid url_for issues with external hosts
-                        thumb_url = f"/api/media/jellyfin/images/proxy?item_id={item['Id']}&image_type=Primary"
+                        thumb_url = f"/admin/api/media/jellyfin/images/proxy?item_id={item['Id']}&image_type=Primary"
                         #current_app.logger.debug(f"Generated Jellyfin thumb URL: {thumb_url}")
                     
                     # Extract year from PremiereDate
