@@ -11,7 +11,7 @@ from app.models import Invite, Setting, EventType
 from app.utils.helpers import setup_required, log_event
 from app.utils.timeout_helper import get_api_timeout
 from app.services.media_service_factory import MediaServiceFactory
-from . import invites_bp
+from . import invites_public_bp as invites_bp
 import requests
 
 DISCORD_API_BASE_URL = 'https://discord.com/api/v10'

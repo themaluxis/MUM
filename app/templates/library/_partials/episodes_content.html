@@ -2,7 +2,7 @@
 {% if not episodes_cached %}
 <!-- Syncing Indicator -->
 <div id="sync-indicator" 
-     hx-post="/api/sync-episodes/{{ media_item.id }}"
+     hx-post="/admin/api/sync-episodes/{{ media_item.id }}"
      hx-target="#episodes-content"
      hx-trigger="load"
      hx-swap="innerHTML">
@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (btnText) btnText.textContent = 'Syncing...';
             
             // Make sync request
-            fetch(`/api/sync-episodes/${showId}`, {
+            fetch(`/admin/api/sync-episodes/${showId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (btnText) btnText.textContent = 'Purging...';
             
             // Make purge request
-            fetch(`/api/purge-episodes/${showId}`, {
+            fetch(`/admin/api/purge-episodes/${showId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',

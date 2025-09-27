@@ -1,7 +1,7 @@
 """
 Invites module package following Flask blueprint best practices
 
-This package contains all invite management functionality split into focused modules:
+This package contains all invite functionality split into focused modules:
 - main: Core invite processing and public functionality
 - manage: Admin management (list, create, toggle, delete)
 - auth: Authentication initiation (Plex and Discord)
@@ -12,13 +12,19 @@ This package contains all invite management functionality split into focused mod
 
 from flask import Blueprint
 
-# Create the main invites blueprint
-invites_bp = Blueprint("invites", __name__)
+# Public invites blueprint (keeps endpoint name 'invites' for backward-compatible url_for)
+invites_public_bp = Blueprint("invites", __name__)
 
-# Import submodules so their routes are registered to the blueprint
-from . import main
-from . import manage
-from . import auth
-from . import callbacks
-from . import edit
-from . import bulk_operations
+# Admin invites blueprint (separate endpoint name)
+invites_admin_bp = Blueprint("invites_admin", __name__)
+
+# Import submodules so their routes are registered to the appropriate blueprint
+# Public modules
+from . import main  # uses invites_public_bp
+from . import auth  # uses invites_public_bp
+from . import callbacks  # uses invites_public_bp
+
+# Admin modules
+from . import manage  # uses invites_admin_bp
+from . import edit  # uses invites_admin_bp
+from . import bulk_operations  # uses invites_admin_bp

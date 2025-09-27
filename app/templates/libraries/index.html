@@ -220,7 +220,7 @@ document.addEventListener('click', function(e) {
         btnIcon.classList.add('fa-spin');
         
         // Make sync request for individual server using fetch to avoid HTMX content swapping issues
-        fetch(`/api/servers/${serverId}/sync/libraries`, {
+        fetch(`/admin/api/servers/${serverId}/sync/libraries`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

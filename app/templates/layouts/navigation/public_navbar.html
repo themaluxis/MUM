@@ -2,7 +2,7 @@
 <div class="navbar bg-base-200 shadow-md no-print">
     <div class="navbar-start">
         {# Corrected the endpoint name in the url_for call below #}
-        <a href="{{ url_for('auth.app_login') if not request.endpoint or not request.endpoint.startswith('invites.') else url_for('invites.invite_landing_page') }}" class="btn btn-ghost normal-case text-xl">
+        <a href="{{ url_for('auth.admin_login') if not request.endpoint or not request.endpoint.startswith('invites.') else url_for('invites.invite_landing_page') }}" class="btn btn-ghost normal-case text-xl">
             <i class="fa-solid fa-users-gear mr-2"></i> {{ g.app_name or "Multimedia User Manager" }}
         </a>
     </div>

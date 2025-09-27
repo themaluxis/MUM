@@ -68,16 +68,16 @@
                         <div class="flex items-center justify-center space-x-1">
                             {% if current_user.has_permission('edit_invites') %}
                             <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10" title="Edit Invite"
-                                    hx-get="{{ url_for('invites.get_edit_invite_form', invite_id=invite.id) }}"
+                                    hx-get="{{ url_for('invites_admin.get_edit_invite_form', invite_id=invite.id) }}"
                                     hx-target="#edit_invite_modal_content_div"
                                     hx-swap="innerHTML"
                                     onclick="edit_invite_modal.showModal()">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
                             {% endif %}
-                            <button class="btn btn-xs btn-ghost text-info hover:bg-info/10" title="View Usages" hx-get="{{ url_for('invites.view_invite_usages', invite_id=invite.id) }}" hx-target="#usage-modal-content" hx-swap="innerHTML" onclick="usage_modal.showModal(); document.getElementById('usage-modal-content').innerHTML = '<div class=text-center p-8><span class=loading loading-lg loading-spinner></span></div>';"><i class="fa-solid fa-chart-line"></i></button>
+                            <button class="btn btn-xs btn-ghost text-info hover:bg-info/10" title="View Usages" hx-get="{{ url_for('invites_admin.view_invite_usages', invite_id=invite.id) }}" hx-target="#usage-modal-content" hx-swap="innerHTML" onclick="usage_modal.showModal(); document.getElementById('usage-modal-content').innerHTML = '<div class=text-center p-8><span class=loading loading-lg loading-spinner></span></div>';"><i class="fa-solid fa-chart-line"></i></button>
                             {% if current_user.has_permission('delete_invites') %}
-                            <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Delete Invite" hx-confirm="Are you sure you want to delete this invite? Users who have already accepted it will retain access." hx-delete="{{ url_for('invites.delete_invite', invite_id=invite.id) }}" hx-target="#invite-row-{{ invite.id }}" hx-swap="outerHTML swap:0.5s" hx-indicator="this"><i class="fa-solid fa-trash-can htmx-indicator-hide"></i><span class="htmx-indicator loading loading-spinner loading-xs"></span></button>
+                            <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Delete Invite" hx-confirm="Are you sure you want to delete this invite? Users who have already accepted it will retain access." hx-delete="{{ url_for('invites_admin.delete_invite', invite_id=invite.id) }}" hx-target="#invite-row-{{ invite.id }}" hx-swap="outerHTML swap:0.5s" hx-indicator="this"><i class="fa-solid fa-trash-can htmx-indicator-hide"></i><span class="htmx-indicator loading loading-spinner loading-xs"></span></button>
                             {% endif %}
                         </div>
                     </td>
@@ -91,16 +91,16 @@
     {% if invites.pages > 1 %}
     <div class="join my-8 flex justify-center">
         {% set prev_args = request.args.to_dict() %}{% set _ = prev_args.update({'page': invites.prev_num}) %}
-        <a {% if invites.has_prev %} hx-get="{{ url_for('invites.list_invites_partial', **prev_args) }}" hx-target="#invites-list-table-container" hx-swap="innerHTML" hx-push-url="true" {% else %} href="#" disabled {% endif %} class="join-item btn {{ 'btn-disabled' if not invites.has_prev else '' }}"><i class="fa-solid fa-arrow-left"></i></a>
+        <a {% if invites.has_prev %} hx-get="{{ url_for('invites_admin.list_invites', **prev_args) }}" hx-target="#invites-list-table-container" hx-swap="innerHTML" hx-push-url="true" {% else %} href="#" disabled {% endif %} class="join-item btn {{ 'btn-disabled' if not invites.has_prev else '' }}"><i class="fa-solid fa-arrow-left"></i></a>
         {% for page_num in invites.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
             {% if page_num %}
                 {% set page_args = request.args.to_dict() %}{% set _ = page_args.update({'page': page_num}) %}
                 {% if invites.page == page_num %}<button class="join-item btn btn-primary btn-active">{{ page_num }}</button>
-                {% else %}<a hx-get="{{ url_for('invites.list_invites_partial', **page_args) }}" hx-target="#invites-list-table-container" hx-swap="innerHTML" hx-push-url="true" class="join-item btn">{{ page_num }}</a>{% endif %}
+                {% else %}<a hx-get="{{ url_for('invites_admin.list_invites', **page_args) }}" hx-target="#invites-list-table-container" hx-swap="innerHTML" hx-push-url="true" class="join-item btn">{{ page_num }}</a>{% endif %}
             {% else %}<button class="join-item btn btn-disabled">...</button>{% endif %}
         {% endfor %}
         {% set next_args = request.args.to_dict() %}{% set _ = next_args.update({'page': invites.next_num}) %}
-        <a {% if invites.has_next %} hx-get="{{ url_for('invites.list_invites_partial', **next_args) }}" hx-target="#invites-list-table-container" hx-swap="innerHTML" hx-push-url="true" {% else %} href="#" disabled {% endif %} class="join-item btn {{ 'btn-disabled' if not invites.has_next else '' }}"><i class="fa-solid fa-arrow-right"></i></a>
+        <a {% if invites.has_next %} hx-get="{{ url_for('invites_admin.list_invites', **next_args) }}" hx-target="#invites-list-table-container" hx-swap="innerHTML" hx-push-url="true" {% else %} href="#" disabled {% endif %} class="join-item btn {{ 'btn-disabled' if not invites.has_next else '' }}"><i class="fa-solid fa-arrow-right"></i></a>
     </div>
     {% endif %}
 
@@ -108,6 +108,6 @@
     <div class="text-center py-10 bg-base-200 rounded-lg shadow">
         <i class="fa-solid fa-ticket-slash fa-3x text-base-content/30 mb-4"></i>
         <p class="text-xl text-base-content/70">No invites found matching your criteria.</p>
-        {% if request.args.get('filter', 'all') != 'all' or request.args.get('search_path') %}<a href="{{ url_for('invites.list_invites') }}" class="btn btn-sm btn-outline mt-4">Clear Filters</a>{% endif %}
+        {% if request.args.get('filter', 'all') != 'all' or request.args.get('search_path') %}<a href="{{ url_for('invites_admin.list_invites') }}" class="btn btn-sm btn-outline mt-4">Clear Filters</a>{% endif %}
     </div>
 {% endif %}

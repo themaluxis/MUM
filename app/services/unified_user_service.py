@@ -28,6 +28,24 @@ class UnifiedUserService:
         all_removed_details = []
         successful_servers = []
         failed_servers = []
+        libraries_synced = []
+
+        # First, check if any servers need library sync and sync them automatically
+        for server in servers:
+            try:
+                # Check if server has libraries synced
+                library_count = len(server.libraries)
+                if library_count == 0:
+                    current_app.logger.info(f"No libraries found for {server.server_nickname}, syncing libraries first...")
+                    # Sync libraries for this server before syncing users
+                    library_sync_result = MediaServiceManager.sync_server_libraries(server.id)
+                    if library_sync_result.get('success'):
+                        libraries_synced.append(server.server_nickname)
+                        current_app.logger.info(f"Successfully synced libraries for {server.server_nickname}: {library_sync_result.get('added', 0)} libraries added")
+                    else:
+                        current_app.logger.warning(f"Failed to sync libraries for {server.server_nickname}: {library_sync_result.get('message', 'Unknown error')}")
+            except Exception as e:
+                current_app.logger.error(f"Error checking/syncing libraries for {server.server_nickname}: {e}")
 
         for server in servers:
             try:
@@ -94,6 +112,11 @@ class UnifiedUserService:
             all_added_details, all_updated_details, all_removed_details
         )
 
+        # Create a success message that includes library sync information
+        success_message = f"User sync completed successfully"
+        if libraries_synced:
+            success_message += f". Libraries automatically synced for: {', '.join(libraries_synced)}"
+
         return {
             'success': total_errors == 0,
             'added': total_added,
@@ -102,6 +125,9 @@ class UnifiedUserService:
             'errors': total_errors,
             'error_messages': error_messages,
             'servers_synced': len(servers),
+            'libraries_synced': libraries_synced,
+            'libraries_synced_count': len(libraries_synced),
+            'message': success_message,
             'successful_servers': successful_servers,
             'failed_servers': failed_servers,
             'updated_details': all_updated_details,

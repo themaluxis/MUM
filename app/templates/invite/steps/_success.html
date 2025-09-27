@@ -85,7 +85,7 @@
                                 </a>
                             {% endfor %}
                             {% if allow_user_accounts %}
-                                <a href="{{ url_for('auth.app_login') }}" class="btn btn-outline w-full justify-start h-11">
+                                <a href="{{ url_for('auth.user_login') }}" class="btn btn-outline w-full justify-start h-11">
                                     <i class="fa-solid fa-user mr-2"></i>
                                     <span>User Dashboard</span>
                                 </a>
@@ -106,7 +106,7 @@
                             </div>
                         </div>
                         {% if allow_user_accounts %}
-                            <a href="{{ url_for('auth.app_login') }}" class="btn btn-primary w-full h-12">
+                            <a href="{{ url_for('auth.user_login') }}" class="btn btn-primary w-full h-12">
                                 <i class="fa-solid fa-user mr-2"></i>
                                 User Dashboard
                             </a>

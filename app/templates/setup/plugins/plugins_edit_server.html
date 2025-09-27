@@ -8,7 +8,7 @@
         <h2 class="card-title text-2xl mb-4">
             Edit {{ server.server_nickname }}
         </h2>
-        <form method="POST" action="{{ url_for('media_servers.setup_edit_server', plugin_id=server.service_type.value, server_id=server.id) }}">
+        <form method="POST" action="{{ url_for('media_servers_setup.setup_edit_server', plugin_id=server.service_type.value, server_id=server.id) }}">
             {{ form.hidden_tag() }}
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
@@ -73,7 +73,7 @@
             </div>
 
             <div class="card-actions justify-between items-center mt-6">
-                <a href="{{ url_for('media_servers.setup_list_servers', plugin_id=server.service_type.value) }}" class="btn btn-ghost">
+                <a href="{{ url_for('media_servers_setup.setup_list_servers', plugin_id=server.service_type.value) }}" class="btn btn-ghost">
                     <i class="fas fa-arrow-left mr-2"></i>Back to Server List
                 </a>
                 {{ form.submit(class="btn btn-primary", value="Save Changes") }}

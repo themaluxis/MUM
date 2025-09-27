@@ -14,7 +14,7 @@
                 <button onclick="window.history.back();" class="btn btn-outline">
                     <i class="fa-solid fa-arrow-left mr-2"></i> Go Back
                 </button>
-                <a href="{{ url_for('dashboard.index') if current_user and current_user.is_authenticated and g.setup_complete else url_for('auth.app_login') }}" class="btn btn-primary">
+                <a href="{{ url_for('dashboard.index') if current_user and current_user.is_authenticated and g.setup_complete else url_for('auth.admin_login') }}" class="btn btn-primary">
                     <i class="fa-solid fa-home mr-2"></i> Go to Homepage
                 </a>
             </div>

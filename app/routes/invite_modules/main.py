@@ -14,7 +14,7 @@ from app.extensions import db
 from app.utils.helpers import log_event, setup_required
 from app.services.media_service_factory import MediaServiceFactory
 from app.services.media_service_manager import MediaServiceManager
-from . import invites_bp
+from . import invites_public_bp as invites_bp
 
 # Add DISCORD_API_BASE_URL constant
 DISCORD_API_BASE_URL = 'https://discord.com/api/v10'

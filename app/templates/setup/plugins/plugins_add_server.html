@@ -3,7 +3,7 @@
 {% block title %}Add Media Server - {{ g.app_name }} Setup{% endblock %}
 
 {% block setup_content %}
-<div class="card bg-base-100 shadow-xl max-w-4xl mx-auto">
+<div class="card bg-base-200 shadow-xl max-w-4xl mx-auto">
     <div class="card-body">
         <!-- Navigation -->
         <div class="flex items-center mb-8">
@@ -40,7 +40,7 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ url_for('media_servers.add_server_setup', plugin_id=form.service_type.data) }}">
+        <form method="POST" action="{{ url_for('media_servers_setup.add_server_setup', plugin_id=form.service_type.data) }}">
             {{ form.hidden_tag() }}
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             
@@ -56,7 +56,7 @@
                 </h4>
                 
                 <!-- Server Name -->
-                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                <div class="bg-base-100 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-tag text-primary text-sm"></i>
@@ -64,7 +64,7 @@
                             <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
                         </div>
                     </div>
-                    {{ form.name(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.name.errors else "")) }}
+                    {{ form.name(class="input input-bordered w-full h-11 bg-base-200 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.name.errors else "")) }}
                     {% if form.name.errors %}
                         <span class="text-error text-xs mt-1 block">{{ form.name.errors[0] }}</span>
                     {% else %}
@@ -73,7 +73,7 @@
                 </div>
 
                 <!-- Server URL -->
-                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                <div class="bg-base-100 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-link text-secondary text-sm"></i>
@@ -81,7 +81,7 @@
                             <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
                         </div>
                     </div>
-                    {{ form.url(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.url.errors else ""), placeholder="https://your-server.com:32400") }}
+                    {{ form.url(class="input input-bordered w-full h-11 bg-base-200 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.url.errors else ""), placeholder="https://your-server.com:32400") }}
                     {% if form.url.errors %}
                         <span class="text-error text-xs mt-1 block">{{ form.url.errors[0] }}</span>
                     {% else %}
@@ -98,7 +98,7 @@
                 </h4>
                 
                 <!-- API Key -->
-                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                <div class="bg-base-100 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-shield-halved text-warning text-sm"></i>
@@ -106,7 +106,7 @@
                             <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20" id="apiKeyRequiredBadge">Required</span>
                         </div>
                     </div>
-                    {{ form.api_key(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.api_key.errors else "")) }}
+                    {{ form.api_key(class="input input-bordered w-full h-11 bg-base-200 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.api_key.errors else "")) }}
                     {% if form.api_key.errors %}
                         <span class="text-error text-xs mt-1 block">{{ form.api_key.errors[0] }}</span>
                     {% else %}
@@ -123,7 +123,7 @@
                 </h4>
                 
                 <!-- Username -->
-                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                <div class="bg-base-100 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-user text-warning text-sm"></i>
@@ -131,11 +131,11 @@
                             <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
                         </div>
                     </div>
-                    {{ form.username(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                    {{ form.username(class="input input-bordered w-full h-11 bg-base-200 border-base-300 focus:border-primary focus:bg-base-100") }}
                 </div>
 
                 <!-- Password -->
-                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                <div class="bg-base-100 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-lock text-warning text-sm"></i>
@@ -143,7 +143,7 @@
                             <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-400/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/20">Required</span>
                         </div>
                     </div>
-                    {{ form.password(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100") }}
+                    {{ form.password(class="input input-bordered w-full h-11 bg-base-200 border-base-300 focus:border-primary focus:bg-base-100") }}
                 </div>
             </div>
 
@@ -154,7 +154,7 @@
                     Public Access
                 </h4>
                 
-                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
+                <div class="bg-base-100 rounded-lg p-4 border border-base-300 hover:border-base-300/60 transition-colors">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-external-link text-info text-sm"></i>
@@ -162,7 +162,7 @@
                             <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">Optional</span>
                         </div>
                     </div>
-                    {{ form.public_url(class="input input-bordered w-full h-11 bg-base-100 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.public_url.errors else "")) }}
+                    {{ form.public_url(class="input input-bordered w-full h-11 bg-base-200 border-base-300 focus:border-primary focus:bg-base-100 " + ("input-error" if form.public_url.errors else "")) }}
                     {% if form.public_url.errors %}
                         <span class="text-error text-xs mt-1 block">{{ form.public_url.errors[0] }}</span>
                     {% else %}
@@ -178,7 +178,7 @@
                     Server Status
                 </h4>
                 
-                <div class="bg-base-200/30 rounded-lg p-4 border border-base-300">
+                <div class="bg-base-100 rounded-lg p-4 border border-base-300">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <i class="fa-solid fa-power-off text-success text-sm"></i>
@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
         testBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';
         testBtn.disabled = true;
         
-        fetch("{{ url_for('plugin_management.test_connection', plugin_id=form.service_type.data) }}", {
+        fetch("{{ url_for('media_servers_setup.test_connection_setup', plugin_id=form.service_type.data) }}", {
             method: 'POST',
             body: JSON.stringify(formData),
             headers: {

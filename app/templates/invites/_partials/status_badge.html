@@ -3,7 +3,7 @@
 {% if invite.is_active %}
 <button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" title="Disable Invite" 
         hx-confirm="Are you sure you want to disable this invite? It will no longer be usable."
-        hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
+        hx-post="{{ url_for('invites_admin.toggle_invite_status', invite_id=invite.id) }}"
         hx-target="#invite-toggle-buttons-{{ invite.id }}"
         hx-swap="outerHTML"
         hx-indicator="this">
@@ -13,7 +13,7 @@
 {% else %}
 <button class="btn btn-xs btn-ghost text-success hover:bg-success/10" title="Enable Invite"
         hx-confirm="Are you sure you want to enable this invite?"
-        hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
+        hx-post="{{ url_for('invites_admin.toggle_invite_status', invite_id=invite.id) }}"
         hx-target="#invite-toggle-buttons-{{ invite.id }}"
         hx-swap="outerHTML"
         hx-indicator="this">

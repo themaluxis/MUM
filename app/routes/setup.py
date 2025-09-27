@@ -60,15 +60,8 @@ def account_setup():
     form = AccountSetupForm()
     error_message = None # Initialize error_message
 
-    # Check if admin account already exists and redirect if appropriate (only on initial GET load)
-    # This part needs careful handling of DB connection state if tables don't exist yet.
-    if request.method == 'GET' and not request.args.get('submit_type'): # Only for plain GET
-        try:
-            if 'account' in get_completed_steps(): # Relies on get_completed_steps working
-                return redirect(url_for('plugins.setup_plugins'))
-        except Exception as e_check:
-            current_app.logger.warning(f"Error checking completed steps in account_setup GET: {e_check}")
-            # Proceed to render form if check fails, as setup might not be done.
+    # Check if admin account already exists - we'll show completion state in template instead of redirecting
+    # This allows users to navigate back and see that the step is completed
 
     if request.method == 'GET' and request.args.get('submit_type') == 'plex_sso':
         current_app.logger.info("GET /setup/account?submit_type=plex_sso: START")
@@ -302,7 +295,9 @@ def app_config():
         log_message = f"App settings updated: Name='{app_name}', Public URL='{app_base_url}'"
         if app_local_url:
             log_message += f", Local URL='{app_local_url}'"
-        log_event(EventType.SETTING_CHANGE, log_message, admin_id=current_user.id)
+        # Only log event if user is authenticated (during setup, user might not be fully authenticated)
+        if current_user.is_authenticated:
+            log_event(EventType.SETTING_CHANGE, log_message, admin_id=current_user.id)
         flash('Application settings saved.', 'success')
         return redirect(url_for('setup.discord_config'))
         

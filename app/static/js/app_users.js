@@ -7,7 +7,7 @@
 function viewAppUser(username) {
     console.log('Viewing app user:', username);
     // Navigate to the username-based profile page
-    window.location.href = `/user/${encodeURIComponent(username)}`;
+    window.location.href = `/${encodeURIComponent(username)}`;
 }
 
 /**
@@ -18,7 +18,7 @@ function viewAppUser(username) {
 function viewServiceAccount(serverNickname, serverUsername) {
     console.log('Viewing service account:', serverUsername, 'on', serverNickname);
     // Navigate to the service account profile page
-    window.location.href = `/user/${encodeURIComponent(serverNickname)}/${encodeURIComponent(serverUsername)}`;
+    window.location.href = `/${encodeURIComponent(serverNickname)}/${encodeURIComponent(serverUsername)}`;
 }
 
 /**
@@ -32,7 +32,7 @@ function editAppUser(appUserId) {
     showToast('Loading local user edit form...', 'info');
     
     // Make HTMX request to get edit form
-    htmx.ajax('GET', `/users/local/${localUserId}/edit`, {
+    htmx.ajax('GET', `/admin/users/local/${localUserId}/edit`, {
         target: '#localUserEditModalContainer',
         swap: 'innerHTML'
     }).then(() => {
@@ -55,7 +55,7 @@ function viewLinkedAccounts(localUserId) {
     console.log('Viewing linked accounts for local user:', localUserId);
     
     // Make HTMX request to get linked accounts view
-    htmx.ajax('GET', `/users/local/${localUserId}/linked-accounts`, {
+    htmx.ajax('GET', `/admin/users/local/${localUserId}/linked-accounts`, {
         target: '#linkedAccountsModalContainer',
         swap: 'innerHTML'
     }).then(() => {
@@ -86,7 +86,7 @@ function linkServiceAccount(localUserId, serviceUserId) {
     showToast('Linking accounts...', 'info');
     
     // Make HTMX request to link accounts
-    htmx.ajax('POST', `/users/local/${localUserId}/link/${serviceUserId}`, {
+    htmx.ajax('POST', `/admin/users/local/${localUserId}/link/${serviceUserId}`, {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         }
@@ -115,7 +115,7 @@ function unlinkServiceAccount(serviceUserId) {
     showToast('Unlinking account...', 'info');
     
     // Make HTMX request to unlink account
-    htmx.ajax('POST', `/users/service/${serviceUserId}/unlink`, {
+    htmx.ajax('POST', `/admin/users/service/${serviceUserId}/unlink`, {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         }

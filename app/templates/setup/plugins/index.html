@@ -3,7 +3,7 @@
 {% block title %}Select Services - {{ g.app_name }}{% endblock %}
 
 {% block setup_content %}
-<div class="card bg-base-100 shadow-xl max-w-6xl mx-auto">
+<div class="card bg-base-200 shadow-xl max-w-6xl mx-auto">
     <div class="card-body">
         <!-- Clean Header -->
         <div class="mb-4">
@@ -34,7 +34,7 @@
         </div>
 
         <!-- Service Information Dropdown -->
-        <div class="collapse collapse-arrow bg-base-200 mb-6">
+        <div class="collapse collapse-arrow bg-base-100 mb-6">
             <input type="checkbox" /> 
             <div class="collapse-title text-lg font-medium">
                 <i class="fas fa-info-circle mr-2"></i>
@@ -116,12 +116,22 @@
                         <div class="flex items-start gap-2">
                             <i class="fa-solid fa-star text-base-content/60 text-sm w-4 mt-0.5"></i>
                             <div class="flex-1">
-                                <div class="flex flex-wrap gap-1">
+                                <div class="flex flex-wrap gap-1" id="features-{{ plugin.plugin_id }}">
                                     {% for feature in plugin.supported_features[:3] %}
                                         <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">{{ feature.replace('_', ' ').title() }}</span>
                                     {% endfor %}
                                     {% if plugin.supported_features|length > 3 %}
-                                        <span class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20">+{{ plugin.supported_features|length - 3 }} more</span>
+                                        <span class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-400/10 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-400 ring-1 ring-inset ring-purple-600/20 dark:ring-purple-500/20 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-400/20 transition-colors" 
+                                              onclick="expandFeatures('{{ plugin.plugin_id }}', this)" 
+                                              title="Click to show all features">
+                                            +{{ plugin.supported_features|length - 3 }} more
+                                        </span>
+                                        <!-- Hidden features (initially hidden) -->
+                                        <div class="hidden-features-{{ plugin.plugin_id }}" style="display: none;">
+                                            {% for feature in plugin.supported_features[3:] %}
+                                                <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/20">{{ feature.replace('_', ' ').title() }}</span>
+                                            {% endfor %}
+                                        </div>
                                     {% endif %}
                                 </div>
                             </div>
@@ -131,7 +141,7 @@
 
                     <!-- Action Buttons -->
                     <div class="flex items-center justify-end pt-4 border-t border-base-300 mt-auto">
-                        <a href="{{ url_for('media_servers.setup_list_servers', plugin_id=plugin.plugin_id) }}" 
+                        <a href="{{ url_for('media_servers_setup.setup_list_servers', plugin_id=plugin.plugin_id) }}" 
                            class="btn btn-primary btn-sm gap-1">
                             <i class="fa-solid fa-cog"></i>
                             Configure
@@ -156,5 +166,30 @@
         </div>
     </div>
 </div>
+
+<script>
+function expandFeatures(pluginId, moreButton) {
+    // Get the hidden features container
+    const hiddenFeaturesContainer = document.querySelector('.hidden-features-' + pluginId);
+    const featuresContainer = document.getElementById('features-' + pluginId);
+    
+    if (hiddenFeaturesContainer && featuresContainer) {
+        // Show the hidden features
+        hiddenFeaturesContainer.style.display = 'contents';
+        
+        // Move the hidden features into the main container before the "+X more" button
+        const hiddenSpans = hiddenFeaturesContainer.querySelectorAll('span');
+        hiddenSpans.forEach(span => {
+            featuresContainer.insertBefore(span, moreButton);
+        });
+        
+        // Hide the "+X more" button
+        moreButton.style.display = 'none';
+        
+        // Remove the now-empty hidden container
+        hiddenFeaturesContainer.remove();
+    }
+}
+</script>
 
 {% endblock %}

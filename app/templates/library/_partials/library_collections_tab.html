@@ -23,7 +23,7 @@
                     <!-- Poster Container -->
                     <div class="relative aspect-[2/3] bg-base-200 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                         {% if collection.thumb %}
-                            <img src="/api/media/plex/images/proxy?path={{ collection.thumb.lstrip('/') }}" 
+                            <img src="/admin/api/media/plex/images/proxy?path={{ collection.thumb.lstrip('/') }}" 
                                  alt="{{ collection.title }}"
                                  class="w-full h-full object-cover"
                                  loading="lazy"

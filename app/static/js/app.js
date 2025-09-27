@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Session Count Badge Monitoring ---
     function updateSessionBadges() {
         // Check if navbar stream badge is enabled first
-        fetch('/api/settings/navbar-stream-badge-status')
+        fetch('/admin/api/settings/navbar-stream-badge-status')
             .then(response => response.json())
             .then(statusData => {
                 const desktopBadge = document.getElementById('streaming-badge-desktop');
@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
                 // Fetch session count
-                fetch('/api/streaming/sessions/count', {
+                fetch('/admin/api/streaming/sessions/count', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -316,14 +316,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // Set up periodic updates - check if navbar stream badge is enabled
     
     // Check if navbar stream badge is enabled
-    fetch('/api/settings/navbar-stream-badge-status')
+    fetch('/admin/api/settings/navbar-stream-badge-status')
         .then(response => response.json())
         .then(data => {
             if (data.enabled) {
                 setInterval(updateSessionBadges, 5000); // 5 seconds for responsive navbar
             } else {
                 // Get the configured session monitoring interval
-                fetch('/api/settings/session-monitoring-interval')
+                fetch('/admin/api/settings/session-monitoring-interval')
                     .then(response => response.json())
                     .then(intervalData => {
                         const intervalSeconds = intervalData.interval || 30;

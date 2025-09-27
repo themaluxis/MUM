@@ -16,12 +16,12 @@
                 </label>
                 <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-300 rounded-box w-40">
                     {% set cards_args = request.args.to_dict() %}{% do cards_args.update({'view': 'cards'}) %}
-                    <li><a href="{{ url_for('invites.list_invites', **cards_args) }}"
+                    <li><a href="{{ url_for('invites_admin.list_invites', **cards_args) }}"
                             class="{{ 'font-bold bg-base-100/50' if current_view == 'cards' else '' }}">
                             <i class="fa-solid fa-grip-vertical fa-fw mr-2"></i> Card View</a>
                     </li>
                     {% set table_args = request.args.to_dict() %}{% do table_args.update({'view': 'table'}) %}
-                    <li><a href="{{ url_for('invites.list_invites', **table_args) }}"
+                    <li><a href="{{ url_for('invites_admin.list_invites', **table_args) }}"
                             class="{{ 'font-bold bg-base-100/50' if current_view == 'table' else '' }}">
                             <i class="fa-solid fa-table-list fa-fw mr-2"></i> Table View</a>
                     </li>
@@ -30,7 +30,7 @@
         </div>
     </div>
 
-    <form method="GET" action="{{ url_for('invites.list_invites') }}" class="mb-6 p-4 bg-base-200 rounded-lg shadow" id="inviteFilterForm">
+    <form method="GET" action="{{ url_for('invites_admin.list_invites') }}" class="mb-6 p-4 bg-base-200 rounded-lg shadow" id="inviteFilterForm">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end"> {# Increased grid cols for per_page #}
             <div class="form-control">
                 <label class="label"><span class="label-text">Filter by Status</span></label>
@@ -85,7 +85,7 @@
 
     {# --- MODIFIED: Main HTMX container for list content --- #}
     <div id="invites-list-container" 
-         hx-get="{{ url_for('invites.list_invites', **request.args.to_dict()) }}" 
+         hx-get="{{ url_for('invites_admin.list_invites', **request.args.to_dict()) }}" 
          hx-trigger="load, refreshInvitesList from:body"
          hx-swap="innerHTML">
         <div class="text-center p-8"><span class="loading loading-lg loading-spinner"></span><p>Loading invites...</p></div>
@@ -118,7 +118,7 @@
         <!-- Content -->
         <div class="p-6"> 
         <form id="createInviteForm" method="POST"
-              hx-post="{{ url_for('invites.create_invite') }}"
+              hx-post="{{ url_for('invites_admin.create_invite') }}"
               hx-target="#create-invite-form-fields-wrapper"
               hx-swap="innerHTML"
               hx-on::after-request="
@@ -390,7 +390,7 @@ function initializeInviteSelection() {
                 selectedIds.forEach(id => formData.append('invite_ids', id));
 
                 // Send delete request
-                fetch('{{ url_for("invites.delete_multiple") }}', {
+                fetch('{{ url_for("invites_admin.delete_multiple") }}', {
                     method: 'POST',
                     body: formData,
                     headers: {
@@ -443,7 +443,7 @@ function initializeInviteSelection() {
                 }
 
                 // Send toggle request
-                fetch('{{ url_for("invites.toggle_multiple") }}', {
+                fetch('{{ url_for("invites_admin.toggle_multiple") }}', {
                     method: 'POST',
                     body: formData,
                     headers: {

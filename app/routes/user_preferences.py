@@ -6,7 +6,7 @@ from app.models import UserPreferences
 
 user_preferences_bp = Blueprint('user_preferences', __name__)
 
-@user_preferences_bp.route('/settings/timezone', methods=['POST'])
+@user_preferences_bp.route('/timezone', methods=['POST'])
 @login_required
 def set_timezone():
     form = TimezonePreferenceForm()

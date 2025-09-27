@@ -12,10 +12,10 @@ from app.forms import InviteCreateForm
 from app.extensions import db
 from app.utils.helpers import setup_required, permission_required, log_event
 from app.services.media_service_manager import MediaServiceManager
-from . import invites_bp
+from . import invites_admin_bp as invites_bp
 import json
 
-@invites_bp.route('/invites') 
+@invites_bp.route('/') 
 @login_required
 @setup_required
 @permission_required('manage_invites')
@@ -158,7 +158,7 @@ def list_invites():
     
     return result
 
-@invites_bp.route('/invites/create', methods=['POST'])
+@invites_bp.route('/create', methods=['POST'])
 @login_required
 @setup_required
 @permission_required('create_invites')
@@ -462,7 +462,7 @@ def create_invite():
                 response.headers['HX-Trigger-After-Swap'] = json.dumps(trigger_payload)
                 return response
             flash(f"Invite link created: {invite_url}", toast_category) 
-            return redirect(url_for('invites.list_invites'))
+            return redirect(url_for('invites_admin.list_invites'))
         except Exception as e:
             db.session.rollback(); current_app.logger.error(f"Error creating invite in DB: {e}", exc_info=True)
             toast_message_text = f"Error creating invite: {str(e)[:100]}"; toast_category = "danger"
@@ -470,7 +470,7 @@ def create_invite():
                 response = make_response("Error saving invite to database.", 500) 
                 response.headers['HX-Trigger-After-Swap'] = json.dumps({"showToastEvent": {"message": toast_message_text, "category": toast_category}})
                 return response
-            flash(toast_message_text, toast_category); return redirect(url_for('invites.list_invites'))
+            flash(toast_message_text, toast_category); return redirect(url_for('invites_admin.list_invites'))
     else: 
         if request.headers.get('HX-Request'):
             grouped_servers = {}
@@ -482,9 +482,9 @@ def create_invite():
             return render_template('invites/_partials/modals/create_invite_modal.html', form=form, grouped_servers=grouped_servers, available_libraries=available_libraries, discord_oauth_enabled=discord_oauth_enabled, global_force_sso=global_force_sso, global_require_guild=global_require_guild), 422
         for field, errors_list in form.errors.items():
             for error in errors_list: flash(f"Error in {getattr(form, field).label.text}: {error}", "danger")
-        return redirect(url_for('invites.list_invites'))
+        return redirect(url_for('invites_admin.list_invites'))
 
-@invites_bp.route('/invites/toggle-status/<int:invite_id>', methods=['POST'])
+@invites_bp.route('/toggle-status/<int:invite_id>', methods=['POST'])
 @login_required
 @setup_required
 @permission_required('edit_invites')
@@ -549,7 +549,7 @@ def toggle_invite_status(invite_id):
         current_app.logger.error(f"Error toggling invite status {invite_id}: {e}")
         return f'<div class="alert alert-error"><span>Error updating invite status: {e}</span></div>', 500
 
-@invites_bp.route('/invites/delete/<int:invite_id>', methods=['DELETE'])
+@invites_bp.route('/delete/<int:invite_id>', methods=['DELETE'])
 @login_required
 @setup_required
 @permission_required('delete_invites')
@@ -601,7 +601,7 @@ def delete_invite(invite_id):
         
         return make_response("", 200, headers) # Still 200, toast will show error
 
-@invites_bp.route('/invites/usages/<int:invite_id>', methods=['GET'])
+@invites_bp.route('/usages/<int:invite_id>', methods=['GET'])
 @login_required
 @setup_required
 def view_invite_usages(invite_id):

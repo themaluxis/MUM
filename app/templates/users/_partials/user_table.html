@@ -309,7 +309,16 @@
                 </td>
                 <td data-col="roles">
                     {% if user.is_home_user %}<span class="badge badge-primary badge-sm whitespace-nowrap" title="Plex Home User"><i class="fa-solid fa-home"></i>Home</span>{% endif %}
-                    {% if user.shares_back %}<span class="badge badge-secondary badge-sm mt-1 whitespace-nowrap" title="Shares Libraries Back"><i class="fa-solid fa-share"></i>Shares Back</span>{% endif %}
+                    {% if user.shares_back %}
+                        <span class="badge badge-secondary badge-sm mt-1 whitespace-nowrap" title="Shares Libraries Back"><i class="fa-solid fa-share"></i>Shares Back</span>
+                        {% if user.raw_data and user.raw_data.get('plex_user_obj_attrs') and user.raw_data.plex_user_obj_attrs.get('servers') %}
+                            {% for server in user.raw_data.plex_user_obj_attrs.servers %}
+                                {% if not server.owned %}
+                                    <span class="badge badge-accent badge-sm mt-1 ml-1 whitespace-nowrap" title="Shared Server: {{ server.name }}"><i class="fa-solid fa-server"></i>{{ server.name }}</span>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    {% endif %}
                     {% if user.discord_user_id %}<span class="badge badge-info badge-sm mt-1 whitespace-nowrap" title="Discord: {{ user.discord_username or 'Linked' }}"><i class="fa-brands fa-discord"></i>Discord</span>{% endif %}
                     {% if user.is_purge_whitelisted %}
                         <span class="badge badge-accent badge-sm mb-1 whitespace-nowrap" title="This user is immune to inactivity purges.">

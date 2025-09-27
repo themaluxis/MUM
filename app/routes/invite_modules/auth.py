@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 from app.models import Invite, Setting, EventType
 from app.utils.helpers import setup_required, log_event
 from app.utils.timeout_helper import get_api_timeout
-from . import invites_bp
+from . import invites_public_bp as invites_bp
 import requests
 
 @invites_bp.route('/plex_auth/<int:invite_id>')

@@ -307,7 +307,7 @@ document.addEventListener('click', function(e) {
         btn.disabled = true;
         
         // Make sync request
-        fetch(`/api/sync-series-issues/${seriesId}`, {
+        fetch(`/admin/api/sync-series-issues/${seriesId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -355,7 +355,7 @@ document.addEventListener('click', function(e) {
         btn.disabled = true;
         
         // Make purge request
-        fetch(`/api/purge-series-issues/${seriesId}`, {
+        fetch(`/admin/api/purge-series-issues/${seriesId}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',

@@ -7,7 +7,7 @@ from flask_login import login_required, current_user
 from app.models import Invite, EventType
 from app.extensions import db
 from app.utils.helpers import setup_required, permission_required, log_event
-from . import invites_bp
+from . import invites_admin_bp as invites_bp
 
 @invites_bp.route("/delete_multiple", methods=["POST"])
 @login_required

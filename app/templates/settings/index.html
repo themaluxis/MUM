@@ -627,7 +627,7 @@ function reloadPlugins() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Reloading...';
     btn.disabled = true;
     
-    fetch('/api/plugins/reload')
+    fetch('/admin/api/plugins/reload')
         .then(response => response.json())
         .then(data => {
             if (data.success) {

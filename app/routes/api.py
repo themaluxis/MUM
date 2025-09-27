@@ -343,9 +343,17 @@ def get_active_streams_count():
 @login_required
 def get_server_libraries(server_id):
     """Get libraries for a specific server from database (fast)"""
+    current_app.logger.info(f"API: get_server_libraries called for server_id={server_id}")
     server = MediaServiceManager.get_server_by_id(server_id)
     if not server:
-        return jsonify({'error': 'Server not found'}), 404
+        # Log available servers for debugging
+        all_servers = MediaServiceManager.get_all_servers()
+        available_server_ids = [s.id for s in all_servers]
+        current_app.logger.error(f"API: Server {server_id} not found. Available server IDs: {available_server_ids}")
+        return jsonify({
+            'error': f'Server {server_id} not found',
+            'available_server_ids': available_server_ids
+        }), 404
     
     try:
         from app.models_media_services import MediaLibrary

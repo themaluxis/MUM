@@ -477,13 +477,17 @@
             librariesContainer.innerHTML = `<div class="text-center py-4"><span class="loading loading-spinner loading-sm"></span> ${loadingText}</div>`;
             
             // Use refresh endpoint if forceRefresh is true, otherwise use fast database endpoint
-            const endpoint = forceRefresh ? `/api/servers/${serverId}/libraries/refresh` : `/api/servers/${serverId}/libraries`;
+            const endpoint = forceRefresh ? `/admin/api/servers/${serverId}/libraries/refresh` : `/admin/api/servers/${serverId}/libraries`;
             const method = forceRefresh ? 'POST' : 'GET';
             
             fetch(endpoint, { method })
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        return response.json().then(errorData => {
+                            throw new Error(`HTTP ${response.status}: ${errorData.error || response.statusText}`);
+                        }).catch(() => {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        });
                     }
                     return response.json();
                 })

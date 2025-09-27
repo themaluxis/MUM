@@ -10,7 +10,7 @@
 </div>
 
 <form id="editInviteForm-{{ invite.id }}"
-      hx-post="{{ url_for('invites.update_invite', invite_id=invite.id) }}"
+      hx-post="{{ url_for('invites_admin.update_invite', invite_id=invite.id) }}"
       hx-target="#edit_invite_modal_content_div"
       hx-swap="innerHTML"
       hx-on::after-request="if(event.detail.successful && event.detail.xhr.status !== 422) { document.getElementById('edit_invite_modal').close(); }"
@@ -383,7 +383,7 @@
         refreshBtn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
         refreshBtn.disabled = true;
         
-        fetch(`/api/servers/${serverId}/libraries/refresh`, { method: 'POST' })
+        fetch(`/admin/api/servers/${serverId}/libraries/refresh`, { method: 'POST' })
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);

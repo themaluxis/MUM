@@ -216,14 +216,14 @@
             <div class="card-actions justify-end mt-auto pt-3 border-t border-base-300/90" onclick="event.stopPropagation();">
                 {% if current_user.has_permission('edit_invites') %}
                 <button class="btn btn-xs btn-ghost text-primary hover:bg-primary/10" title="Edit Invite"
-                        hx-get="{{ url_for('invites.get_edit_invite_form', invite_id=invite.id) }}"
+                        hx-get="{{ url_for('invites_admin.get_edit_invite_form', invite_id=invite.id) }}"
                         hx-target="#edit_invite_modal_content_div"
                         hx-swap="innerHTML"
                         onclick="edit_invite_modal.showModal()">
                     <i class="fa-solid fa-pen-to-square"></i>
                 </button>
                 {% endif %}
-                <button class="btn btn-xs btn-ghost text-info hover:bg-info/10" title="View Usages" hx-get="{{ url_for('invites.view_invite_usages', invite_id=invite.id) }}" hx-target="#usage-modal-content" hx-swap="innerHTML" onclick="usage_modal.showModal(); document.getElementById('usage-modal-content').innerHTML = '<div class=text-center p-8><span class=loading loading-lg loading-spinner></span></div>';">
+                <button class="btn btn-xs btn-ghost text-info hover:bg-info/10" title="View Usages" hx-get="{{ url_for('invites_admin.view_invite_usages', invite_id=invite.id) }}" hx-target="#usage-modal-content" hx-swap="innerHTML" onclick="usage_modal.showModal(); document.getElementById('usage-modal-content').innerHTML = '<div class=text-center p-8><span class=loading loading-lg loading-spinner></span></div>';">
                     <i class="fa-solid fa-chart-line"></i>
                 </button>
                 {% if current_user.has_permission('edit_invites') %}
@@ -231,7 +231,7 @@
                 {% if invite.is_active %}
                 <button class="btn btn-xs btn-ghost text-warning hover:bg-warning/10" title="Disable Invite" 
                         hx-confirm="Are you sure you want to disable this invite? It will no longer be usable."
-                        hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
+                        hx-post="{{ url_for('invites_admin.toggle_invite_status', invite_id=invite.id) }}"
                         hx-target="#invite-toggle-buttons-{{ invite.id }}"
                         hx-swap="outerHTML"
                         hx-indicator="this">
@@ -241,7 +241,7 @@
                 {% else %}
                 <button class="btn btn-xs btn-ghost text-success hover:bg-success/10" title="Enable Invite"
                         hx-confirm="Are you sure you want to enable this invite?"
-                        hx-post="{{ url_for('invites.toggle_invite_status', invite_id=invite.id) }}"
+                        hx-post="{{ url_for('invites_admin.toggle_invite_status', invite_id=invite.id) }}"
                         hx-target="#invite-toggle-buttons-{{ invite.id }}"
                         hx-swap="outerHTML"
                         hx-indicator="this">
@@ -252,7 +252,7 @@
                 </span>
                 {% endif %}
                 {% if current_user.has_permission('delete_invites') %}
-                <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Delete Invite" hx-confirm="Are you sure you want to delete this invite?" hx-delete="{{ url_for('invites.delete_invite', invite_id=invite.id) }}" hx-target="#invite-row-{{ invite.id }}" hx-swap="outerHTML" hx-indicator="this">
+                <button class="btn btn-xs btn-ghost text-error hover:bg-error/10" title="Delete Invite" hx-confirm="Are you sure you want to delete this invite?" hx-delete="{{ url_for('invites_admin.delete_invite', invite_id=invite.id) }}" hx-target="#invite-row-{{ invite.id }}" hx-swap="outerHTML" hx-indicator="this">
                     <i class="fa-solid fa-trash-can htmx-indicator-hide"></i>
                     <span class="htmx-indicator loading loading-spinner loading-xs"></span>
                 </button>
@@ -267,7 +267,7 @@
         <i class="fa-solid fa-ticket-slash fa-3x text-base-content/30 mb-4"></i>
         <p class="text-xl text-base-content/70">No invites found matching your criteria.</p>
         {% if request.args.get('filter', 'all') != 'all' or request.args.get('search_path') %}
-            <a href="{{ url_for('invites.list_invites') }}" class="btn btn-sm btn-outline mt-4">Clear Filters</a>
+            <a href="{{ url_for('invites_admin.list_invites') }}" class="btn btn-sm btn-outline mt-4">Clear Filters</a>
         {% endif %}
     </div>
 {% endif %}

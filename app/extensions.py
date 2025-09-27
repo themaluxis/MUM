@@ -17,12 +17,13 @@ migrate = Migrate()
 
 # Login Manager
 login_manager = LoginManager()
-# Specifies the endpoint for the login page.
-# Users who are not logged in and try to access a protected page will be redirected here.
-login_manager.login_view = 'auth.app_login' # Default for admin, but both admin and user login should work
-login_manager.login_message_category = 'info' # catégorie de message flash pour la connexion
+# Users who are not logged in and try to access a protected page will be redirected by the unauthorized_handler below
+login_manager.login_view = 'auth.admin_login'  # Fallback if handler fails
+login_manager.login_message_category = 'info'
 login_manager.needs_refresh_message_category = "info"
 # login_manager.session_protection = "strong" # Can help prevent session fixation
+
+# Custom unauthorized handler will be attached in app/__init__.py to properly route to admin or user login pages
 
 # CSRF Protection
 csrf = CSRFProtect()

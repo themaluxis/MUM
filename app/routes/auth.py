@@ -24,9 +24,47 @@ def is_safe_url(target):
     host_url = urlsplit(request.host_url); redirect_url = urlsplit(urljoin(request.host_url, target))
     return redirect_url.scheme in ('http', 'https') and host_url.netloc == redirect_url.netloc
 
-@bp.route('/login', methods=['GET', 'POST'])
+@bp.route('/auth/login', methods=['GET', 'POST'])
 def app_login():
+    """Legacy login endpoint - redirects to admin or user login based on situation"""
     if current_user.is_authenticated and getattr(g, 'setup_complete', False):
+        # If already logged in, redirect to the appropriate dashboard
+        if isinstance(current_user, Owner):
+            return redirect(url_for('dashboard.index'))
+        else:
+            return redirect(url_for('user.index'))
+    
+    # Check if we're in setup mode
+    try:
+        if not Owner.query.first():
+            flash('App setup not complete. Please set up an owner account.', 'warning')
+            return redirect(url_for('setup.account_setup'))
+    except Exception as e_db:
+        current_app.logger.warning(f"Could not query Owner in login: {e_db}")
+    
+    # Check if user accounts are enabled
+    allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+    
+    # Determine where to redirect based on the URL the user was trying to access
+    next_page = request.args.get('next')
+    
+    # If the target URL is related to admin, redirect to admin login
+    if next_page and any(admin_area in next_page for admin_area in ['/admin/', '/admin?', '/admin#']):
+        return redirect(url_for('auth.admin_login', next=next_page))
+    
+    # If user accounts are enabled and there's no specific admin next URL, default to user login
+    if allow_user_accounts:
+        return redirect(url_for('auth.user_login', next=next_page))
+    
+    # If user accounts are not enabled, redirect to admin login
+    return redirect(url_for('auth.admin_login', next=next_page))
+
+
+@bp.route('/admin', methods=['GET', 'POST'], endpoint='admin_login')
+@bp.route('/admin/login', methods=['GET', 'POST'], endpoint='admin_login2')
+def admin_login():
+    """Admin-specific login endpoint"""
+    if current_user.is_authenticated and isinstance(current_user, Owner) and getattr(g, 'setup_complete', False):
         return redirect(url_for('dashboard.index'))
     
     # Check if owner account exists for the setup redirect
@@ -35,13 +73,13 @@ def app_login():
             flash('App setup not complete. Please set up an owner account.', 'warning')
             return redirect(url_for('setup.account_setup'))
     except Exception as e_db:
-        current_app.logger.warning(f"Could not query Owner in login: {e_db}")
+        current_app.logger.warning(f"Could not query Owner in admin login: {e_db}")
         # Allow rendering the login page even if DB check fails, it will likely fail on submit anyway
     
-    # Check if user accounts are enabled
+    # Check if user accounts are enabled (for displaying the link to user login)
     allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
     
-    # The form is always prepared now.
+    # Prepare the login form
     form = LoginForm()
 
     if form.validate_on_submit():
@@ -49,7 +87,7 @@ def app_login():
         input_username = (form.username.data or '').strip()
         input_password = (form.password.data or '')
         
-        # First, try to find an owner by username
+        # For admin login, only try to find an Owner account
         owner = Owner.query.filter_by(username=input_username).first()
         
         if owner and owner.check_password(input_password):
@@ -85,44 +123,84 @@ def app_login():
             if not next_page or not is_safe_url(next_page):
                 next_page = url_for('dashboard.index')
             return redirect(next_page)
+        else:
+            # Admin login failed
+            log_event(EventType.ADMIN_LOGIN_FAIL, f"Failed admin login attempt for username '{input_username}'.")
+            flash('Invalid admin username or password.', 'danger')
             
-        # If owner login failed, try user login (if user accounts are enabled)
-        elif allow_user_accounts:
-            # First try to find a UserAppAccess account
-            try:
-                from sqlalchemy import func
-                user_app_access = UserAppAccess.query.filter(func.lower(UserAppAccess.username) == func.lower(input_username)).first()
-            except Exception:
-                user_app_access = UserAppAccess.query.filter_by(username=input_username).first()
-            
-            # Also try email for UserAppAccess
-            if not user_app_access and input_username:
-                try:
-                    user_app_access = UserAppAccess.query.filter(func.lower(UserAppAccess.email) == func.lower(input_username)).first()
-                except Exception:
-                    user_app_access = UserAppAccess.query.filter_by(email=input_username).first()
-            
-            if user_app_access and user_app_access.check_password(input_password):
-                # UserAppAccess login successful
-                login_user(user_app_access, remember=True)
-                user_app_access.last_login_at = datetime.utcnow()
-                user_app_access.updated_at = datetime.utcnow()
-                db.session.commit()
-                
-                log_event(EventType.ADMIN_LOGIN_SUCCESS, f"App user '{user_app_access.username}' logged in.")
-                
-                next_page = request.args.get('next')
-                if not next_page or not is_safe_url(next_page):
-                    next_page = url_for('user.index')
-                return redirect(next_page)
-            
+    # Render the admin login template
+    return render_template('auth/login_admin.html', title="Admin Login", form=form, allow_user_accounts=allow_user_accounts)
+
+
+@bp.route('/', methods=['GET', 'POST'], endpoint='user_login')
+def user_login():
+    """User-specific login endpoint"""
+    # If user accounts are not enabled, redirect to admin login
+    allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+    if not allow_user_accounts:
+        return redirect(url_for('auth.admin_login'))
         
-        # If owner and app user login failed
-        log_event(EventType.ADMIN_LOGIN_FAIL, f"Failed login attempt for username '{input_username}'.")
-        flash('Invalid username or password.', 'danger')
+    if current_user.is_authenticated:
+        if isinstance(current_user, Owner):
+            # Admin user should be at admin dashboard
+            return redirect(url_for('dashboard.index'))
+        else:
+            # Regular user at user dashboard
+            return redirect(url_for('user.index'))
+    
+    # Check if we're in setup mode
+    try:
+        if not Owner.query.first():
+            flash('App setup not complete. Please set up an owner account.', 'warning')
+            return redirect(url_for('setup.account_setup'))
+    except Exception as e_db:
+        current_app.logger.warning(f"Could not query Owner in user login: {e_db}")
+    
+    # Prepare the login form
+    form = UserLoginForm() if hasattr(UserLoginForm, 'username') else LoginForm()
+
+    if form.validate_on_submit():
+        # Normalize inputs
+        input_username = (form.username.data or '').strip()
+        input_password = (form.password.data or '')
+        
+        # For user login, only try to find a UserAppAccess account
+        user_app_access = None
+        
+        # First try username
+        try:
+            from sqlalchemy import func
+            user_app_access = UserAppAccess.query.filter(func.lower(UserAppAccess.username) == func.lower(input_username)).first()
+        except Exception:
+            user_app_access = UserAppAccess.query.filter_by(username=input_username).first()
+        
+        # Then try email
+        if not user_app_access and input_username:
+            try:
+                user_app_access = UserAppAccess.query.filter(func.lower(UserAppAccess.email) == func.lower(input_username)).first()
+            except Exception:
+                user_app_access = UserAppAccess.query.filter_by(email=input_username).first()
+        
+        if user_app_access and user_app_access.check_password(input_password):
+            # UserAppAccess login successful
+            login_user(user_app_access, remember=True)
+            user_app_access.last_login_at = datetime.utcnow()
+            user_app_access.updated_at = datetime.utcnow()
+            db.session.commit()
             
-    # Always render the login page with both options enabled.
-    return render_template('auth/login.html', title="Login", form=form, allow_user_accounts=allow_user_accounts)
+            log_event(EventType.ADMIN_LOGIN_SUCCESS, f"App user '{user_app_access.username}' logged in.")
+            
+            next_page = request.args.get('next')
+            if not next_page or not is_safe_url(next_page):
+                next_page = url_for('user.index')
+            return redirect(next_page)
+        else:
+            # User login failed
+            log_event(EventType.ADMIN_LOGIN_FAIL, f"Failed user login attempt for username '{input_username}'.")
+            flash('Invalid username or password.', 'danger')
+    
+    # Render the user login template
+    return render_template('auth/login_user.html', title="User Login", form=form)
 
 @bp.route('/plex_sso_admin', methods=['POST'])
 def plex_sso_login_admin():
@@ -329,6 +407,9 @@ def plex_sso_callback_admin():
 @bp.route('/logout')
 @login_required
 def logout():
+    # Store user type before logout to determine redirect
+    is_admin = isinstance(current_user, Owner)
+    
     # Handle Owner and UserAppAccess objects only
     if isinstance(current_user, Owner):
         # Owner
@@ -345,7 +426,18 @@ def logout():
     
     logout_user()
     flash('You have been logged out.', 'success')
-    return redirect(url_for('auth.app_login'))
+    
+    # Redirect to appropriate login page based on user type
+    if is_admin:
+        return redirect(url_for('auth.admin_login'))
+    else:
+        # Check if user accounts are enabled
+        allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+        if allow_user_accounts:
+            return redirect(url_for('auth.user_login'))
+        else:
+            # If user accounts are disabled, redirect to admin login
+            return redirect(url_for('auth.admin_login'))
 
 @bp.route('/logout_setup')
 def logout_setup():

@@ -127,6 +127,41 @@ def create_app(config_name=None):
     csrf.init_app(app)
     htmx.init_app(app)
     babel.init_app(app, locale_selector=get_locale_for_babel)
+    
+    # Define custom unauthorized handler to route to correct login page based on requested endpoint
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        # Get the endpoint that was being requested
+        requested_endpoint = request.endpoint
+        next_url = request.full_path if request.full_path != '/' else None
+        
+        # Get the path being requested
+        requested_path = request.path
+        
+        # If the path or endpoint is related to admin area, redirect to admin login
+        admin_path_prefixes = ['/admin/', '/admin?', '/admin#']
+        admin_endpoint_prefixes = [
+            'dashboard.', 'settings.', 'plugin_management.', 'admin_management.',
+            'role_management.', 'users.', 'invites_admin.', 'media_servers_admin.',
+            'plugins.', 'streaming.', 'libraries.'
+        ]
+        
+        is_admin_path = any(requested_path.startswith(prefix) for prefix in admin_path_prefixes)
+        is_admin_endpoint = requested_endpoint and any(
+            requested_endpoint.startswith(prefix) for prefix in admin_endpoint_prefixes
+        )
+        
+        if is_admin_path or is_admin_endpoint:
+            return redirect(url_for('auth.admin_login', next=next_url))
+        
+        # If user accounts are enabled and not an admin endpoint, route to user login
+        allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
+        if allow_user_accounts:
+            # For user portal endpoints or any other non-admin endpoint
+            return redirect(url_for('auth.user_login', next=next_url))
+        
+        # Default fallback to admin login
+        return redirect(url_for('auth.admin_login', next=next_url))
 
     with app.app_context():
         initialize_settings_from_db(app)
@@ -446,11 +481,11 @@ def create_app(config_name=None):
                     'plugins.reload_plugins', 'plugins.install_plugin', 'plugins.uninstall_plugin',
                     'auth.app_login', 'auth.logout', 'static', 'api.health',
                     # Plugin management endpoints for server configuration
-                    'plugin_management.index', 'plugin_management.configure', 'plugin_management.edit_server', 'plugin_management.add_server',
+                    'plugin_management.configure', 'plugin_management.edit_server', 'plugin_management.add_server',
                     'plugin_management.disable_server', 'plugin_management.enable_server', 'plugin_management.delete_server',
-                    # Media server setup endpoints
-                    'media_servers.setup_list_servers', 'media_servers.add_server_setup', 'media_servers.setup_edit_server',
                     'plugin_management.test_connection',
+                    # Media server setup endpoints
+                    'media_servers_setup.setup_list_servers', 'media_servers_setup.add_server_setup', 'media_servers_setup.setup_edit_server', 'media_servers_setup.test_connection_setup', 'media_servers_setup.delete_server_setup',
                     # Setup endpoints - needed when no admin exists yet
                     'setup.account_setup', 'setup.create_admin', 'setup.app_config', 'setup.servers', 'setup.add_server', 'setup.edit_server', 'setup.plugins'
                 ]
@@ -462,46 +497,51 @@ def create_app(config_name=None):
                 # Plugin redirect logging removed for cleaner logs
                 
                 if should_redirect:
-                    current_app.logger.info(f"Init.py - before_request_tasks(): No plugins enabled, blocking access to '{request.endpoint}', redirecting to plugins settings.")
-                    return redirect(url_for('plugin_management.index'))
+                    # Prevent redirect loop - don't redirect if we're already on the plugin management page
+                    if request.endpoint != 'plugin_management.index':
+                        current_app.logger.info(f"Init.py - before_request_tasks(): No plugins enabled, blocking access to '{request.endpoint}', redirecting to plugins settings.")
+                        return redirect(url_for('plugin_management.index'))
         except Exception as e_plugin_check:
             current_app.logger.error(f"Init.py - before_request_tasks(): DB error during plugin validation: {e_plugin_check}", exc_info=True)
 
 
     # Register blueprints
+    # Authentication blueprint - register without url_prefix to enable root-level routes
     from .routes.auth import bp as auth_bp
-    app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(auth_bp)
     from .routes.setup import bp as setup_bp
     app.register_blueprint(setup_bp, url_prefix='/setup')
     from .routes.dashboard import bp as dashboard_bp
-    app.register_blueprint(dashboard_bp) # Root blueprint
+    app.register_blueprint(dashboard_bp, url_prefix='/admin') # Admin dashboard now under /admin
     from .routes.settings import bp as settings_bp
-    app.register_blueprint(settings_bp, url_prefix='/settings')
+    app.register_blueprint(settings_bp, url_prefix='/admin/settings')
     from .routes.plugin_management import bp as plugin_management_bp
-    app.register_blueprint(plugin_management_bp, url_prefix='/settings/plugins')
+    app.register_blueprint(plugin_management_bp, url_prefix='/admin/settings/plugins')
     from .routes.admin_management import bp as admin_management_bp
-    app.register_blueprint(admin_management_bp, url_prefix='/settings/admins')
+    app.register_blueprint(admin_management_bp, url_prefix='/admin/settings/admins')
     from .routes.role_management import bp as role_management_bp
-    app.register_blueprint(role_management_bp, url_prefix='/settings/roles')
+    app.register_blueprint(role_management_bp, url_prefix='/admin/settings/roles')
     from .routes.users import bp as users_bp
-    app.register_blueprint(users_bp, url_prefix='/users')
-    from .routes.invites import bp as invites_bp
-    app.register_blueprint(invites_bp) # url_prefix='/invites' is handled in invites.py itself for public link
+    app.register_blueprint(users_bp, url_prefix='/admin/users')
+    from .routes.invites import bp_public as invites_public_bp, bp_admin as invites_admin_bp
+    app.register_blueprint(invites_public_bp)
+    app.register_blueprint(invites_admin_bp, url_prefix='/admin/invites')
     from .routes.api import bp as api_bp
-    app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(api_bp, url_prefix='/admin/api')
     from .routes.user import bp as user_bp
-    app.register_blueprint(user_bp, url_prefix='/user')
+    app.register_blueprint(user_bp)
     # Media servers - needed for setup routes
-    from .routes.media_servers import bp as media_servers_bp
-    app.register_blueprint(media_servers_bp)
+    from .routes.media_servers import bp_setup as media_servers_setup_bp, bp_admin as media_servers_admin_bp
+    app.register_blueprint(media_servers_setup_bp)  # Setup routes stay at /setup/plugins/...
+    app.register_blueprint(media_servers_admin_bp, url_prefix='/admin')  # Admin routes at /admin/servers/...
     from .routes.plugins import bp as plugins_bp
     app.register_blueprint(plugins_bp, url_prefix='/admin')
     from .routes.user_preferences import user_preferences_bp
-    app.register_blueprint(user_preferences_bp, url_prefix='/user/preferences')
+    app.register_blueprint(user_preferences_bp, url_prefix='/settings/preferences')
     from .routes.streaming import bp as streaming_bp
-    app.register_blueprint(streaming_bp)
+    app.register_blueprint(streaming_bp, url_prefix='/admin')
     from .routes.libraries import bp as libraries_bp
-    app.register_blueprint(libraries_bp)
+    app.register_blueprint(libraries_bp, url_prefix='/admin')
     
 
     register_error_handlers(app)

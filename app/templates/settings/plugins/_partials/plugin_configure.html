@@ -445,7 +445,7 @@ function syncLibraries(serverId) {
     button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Syncing...';
     button.disabled = true;
     
-    fetch(`/api/servers/${serverId}/sync/libraries`, {
+    fetch(`/admin/api/servers/${serverId}/sync/libraries`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -476,7 +476,7 @@ function syncUsers(serverId) {
     button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Syncing...';
     button.disabled = true;
     
-    fetch(`/api/servers/${serverId}/sync/users`, {
+    fetch(`/admin/api/servers/${serverId}/sync/users`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

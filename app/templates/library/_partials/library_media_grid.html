@@ -392,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btnIcon.classList.add('fa-spin');
             
             // Make sync request using HTMX to handle modal responses properly
-            htmx.ajax('POST', `/api/libraries/${libraryId}/sync`, {
+            htmx.ajax('POST', `/admin/api/libraries/${libraryId}/sync`, {
                 target: '#library_content_sync_results_modal',
                 swap: 'innerHTML',
                 headers: {
@@ -451,7 +451,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btnIcon.classList.add('fa-spinner');
             
             // Make purge request
-            fetch(`/api/libraries/${libraryId}/purge`, {
+            fetch(`/admin/api/libraries/${libraryId}/purge`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
