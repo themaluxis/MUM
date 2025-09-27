@@ -402,57 +402,77 @@
                         Create Local Account
                     </h4>
                     
-                    <div class="bg-info/10 rounded-lg p-4 border border-info/30 mb-4">
-                        <div class="flex items-start gap-3">
-                            <i class="fa-solid fa-info-circle text-info text-lg mt-0.5"></i>
+                    {% if allow_user_accounts %}
+                        <div class="bg-info/10 rounded-lg p-4 border border-info/30 mb-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fa-solid fa-info-circle text-info text-lg mt-0.5"></i>
+                                <div>
+                                    <h5 class="font-medium text-base-content mb-1">Merge Service Users</h5>
+                                    <p class="text-sm text-base-content/80">
+                                        This will create a new local account and link all selected service users to it. 
+                                        The selected users must be service users (not already linked to local accounts).
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
                             <div>
-                                <h5 class="font-medium text-base-content mb-1">Merge Service Users</h5>
-                                <p class="text-sm text-base-content/80">
-                                    This will create a new local account and link all selected service users to it. 
-                                    The selected users must be service users (not already linked to local accounts).
-                                </p>
+                                <label class="label">
+                                    <span class="label-text font-medium">Username</span>
+                                </label>
+                                <input type="text" name="merge_username" id="merge_username" 
+                                       class="input input-bordered w-full" 
+                                       placeholder="Enter username"
+                                       pattern="[a-zA-Z0-9_-]+"
+                                       title="Username can only contain letters, numbers, underscores, and hyphens">
+                                <div class="label">
+                                    <span class="label-text-alt text-base-content/60">3-50 characters, letters, numbers, _, - only</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="label">
+                                    <span class="label-text font-medium">Password</span>
+                                </label>
+                                <input type="password" name="merge_password" id="merge_password" 
+                                       class="input input-bordered w-full" 
+                                       placeholder="Enter password"
+                                       minlength="8">
+                                <div class="label">
+                                    <span class="label-text-alt text-base-content/60">Minimum 8 characters</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="label">
+                                    <span class="label-text font-medium">Confirm Password</span>
+                                </label>
+                                <input type="password" name="merge_confirm_password" id="merge_confirm_password" 
+                                       class="input input-bordered w-full" 
+                                       placeholder="Confirm password"
+                                       minlength="8">
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <div>
-                            <label class="label">
-                                <span class="label-text font-medium">Username</span>
-                            </label>
-                            <input type="text" name="merge_username" id="merge_username" 
-                                   class="input input-bordered w-full" 
-                                   placeholder="Enter username"
-                                   pattern="[a-zA-Z0-9_-]+"
-                                   title="Username can only contain letters, numbers, underscores, and hyphens">
-                            <div class="label">
-                                <span class="label-text-alt text-base-content/60">3-50 characters, letters, numbers, _, - only</span>
+                    {% else %}
+                        <div class="bg-warning/10 rounded-lg p-4 border border-warning/30">
+                            <div class="flex items-start gap-3">
+                                <i class="fa-solid fa-exclamation-triangle text-warning text-lg mt-0.5"></i>
+                                <div>
+                                    <h5 class="font-medium text-base-content mb-2">User Accounts Feature Disabled</h5>
+                                    <p class="text-sm text-base-content/80 mb-4">
+                                        The user accounts feature is currently disabled. To merge service users into a local account, 
+                                        you need to enable the user accounts feature first.
+                                    </p>
+                                    <a href="{{ url_for('settings.user_accounts') }}" 
+                                       class="btn btn-sm btn-warning">
+                                        <i class="fa-solid fa-cog mr-2"></i>
+                                        Enable User Accounts Feature
+                                    </a>
+                                </div>
                             </div>
                         </div>
-                        
-                        <div>
-                            <label class="label">
-                                <span class="label-text font-medium">Password</span>
-                            </label>
-                            <input type="password" name="merge_password" id="merge_password" 
-                                   class="input input-bordered w-full" 
-                                   placeholder="Enter password"
-                                   minlength="8">
-                            <div class="label">
-                                <span class="label-text-alt text-base-content/60">Minimum 8 characters</span>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label class="label">
-                                <span class="label-text font-medium">Confirm Password</span>
-                            </label>
-                            <input type="password" name="merge_confirm_password" id="merge_confirm_password" 
-                                   class="input input-bordered w-full" 
-                                   placeholder="Confirm password"
-                                   minlength="8">
-                        </div>
-                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Delete Confirmation Section -->
@@ -1972,7 +1992,7 @@ function showDeleteLocalUserModal(userUuid, username, linkedAccountsCount) {
     if (linkedAccountsCount > 0) {
         linkedAccountsSection.style.display = 'block';
         // Load linked accounts via HTMX
-        htmx.ajax('GET', `/users/delete-local/${userUuid}/accounts`, {
+        htmx.ajax('GET', `/admin/users/delete-local/${userUuid}/accounts`, {
             target: '#linked_accounts_list',
             swap: 'innerHTML'
         });
@@ -2015,7 +2035,7 @@ function executeLocalUserDeletion() {
     deleteBtn.disabled = true;
     
     // Make the deletion request
-    fetch(`/users/delete-local/${userUuid}`, {
+    fetch(`/admin/users/delete-local/${userUuid}`, {
         method: 'DELETE',
         headers: {
             'Content-Type': 'application/json',
