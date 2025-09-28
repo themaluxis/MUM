@@ -4,8 +4,8 @@
 from flask import render_template, request, current_app, session, make_response, redirect, url_for, flash 
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func, desc
-from app.models import UserAppAccess, Setting, EventType, Owner
-from app.models_media_services import ServiceType, MediaStreamHistory, UserMediaAccess
+from app.models import User, UserType, Setting, EventType
+from app.models_media_services import ServiceType, MediaStreamHistory
 from app.forms import MassUserEditForm, UserEditForm
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
@@ -27,7 +27,7 @@ from datetime import datetime, timezone, timedelta
 def list_users():
     """Main user listing functionality - handles both local and service users"""
     # Redirect regular users away from admin pages
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_users'):
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('view_users'):
         flash('You do not have permission to access the users management page.', 'danger')
         return redirect(url_for('user.index'))
     
@@ -93,20 +93,20 @@ def list_users():
     
     # Load actual users from database
     if user_type_filter in ['all', 'local']:
-        # Query local users (UserAppAccess records)
+        # Query local users
         current_app.logger.info("=== QUERYING LOCAL USERS ===")
-        app_user_query = UserAppAccess.query
+        app_user_query = User.query.filter_by(userType=UserType.LOCAL)
         
         # Build search filters for local users
         local_search_filters = []
         if search_username:
-            local_search_filters.append(UserAppAccess.username.ilike(f"%{search_username}%"))
+            local_search_filters.append(User.localUsername.ilike(f"%{search_username}%"))
         if search_email:
-            local_search_filters.append(UserAppAccess.email.ilike(f"%{search_email}%"))
+            local_search_filters.append(User.discord_email.ilike(f"%{search_email}%"))
         if search_notes:
-            local_search_filters.append(UserAppAccess.notes.ilike(f"%{search_notes}%"))
+            local_search_filters.append(User.notes.ilike(f"%{search_notes}%"))
         if search_term:
-            local_search_filters.append(or_(UserAppAccess.username.ilike(f"%{search_term}%"), UserAppAccess.email.ilike(f"%{search_term}%")))
+            local_search_filters.append(or_(User.localUsername.ilike(f"%{search_term}%"), User.discord_email.ilike(f"%{search_term}%")))
         
         if local_search_filters:
             app_user_query = app_user_query.filter(or_(*local_search_filters))
@@ -115,22 +115,22 @@ def list_users():
         current_app.logger.info(f"Found {len(app_users)} local users")
     
     if user_type_filter in ['all', 'service']:
-        # Query service users - standalone UserMediaAccess records
+        # Query service users - standalone service user records
         current_app.logger.info("=== QUERYING SERVICE USERS ===")
-        all_access_query = UserMediaAccess.query
+        all_access_query = User.query.filter_by(userType=UserType.SERVICE)
         
         # Build search filters for service users
         search_filters = []
         if search_username:
-            search_filters.append(UserMediaAccess.external_username.ilike(f"%{search_username}%"))
+            search_filters.append(User.external_username.ilike(f"%{search_username}%"))
         if search_email:
-            search_filters.append(UserMediaAccess.external_email.ilike(f"%{search_email}%"))
+            search_filters.append(User.external_email.ilike(f"%{search_email}%"))
         if search_notes:
-            search_filters.append(UserMediaAccess.notes.ilike(f"%{search_notes}%"))
+            search_filters.append(User.notes.ilike(f"%{search_notes}%"))
         if search_term:
             search_filters.append(or_(
-                UserMediaAccess.external_username.ilike(f"%{search_term}%"), 
-                UserMediaAccess.external_email.ilike(f"%{search_term}%")
+                User.external_username.ilike(f"%{search_term}%"), 
+                User.external_email.ilike(f"%{search_term}%")
             ))
         
         if search_filters:
@@ -141,20 +141,20 @@ def list_users():
         if server_filter_id != 'all':
             try:
                 server_filter_id_int = int(server_filter_id)
-                all_access_query = all_access_query.filter(UserMediaAccess.server_id == server_filter_id_int)
+                all_access_query = all_access_query.filter(User.server_id == server_filter_id_int)
             except ValueError:
                 current_app.logger.warning(f"Invalid server_id received: {server_filter_id}")
 
         all_access_records = all_access_query.all()
         
-        # Convert UserMediaAccess records to user-like format for display
+        # Convert service user records to user-like format for display
         for access in all_access_records:
             # Create a mock user object with necessary attributes
             class MockUser:
                 def __init__(self, access):
                     self.uuid = access.uuid
                     self.id = access.id
-                    self.username = access.external_username or 'Unknown'
+                    self.localUsername = access.external_username or 'Unknown'
                     self.email = access.external_email
                     self.notes = access.notes
                     self.created_at = access.created_at
@@ -171,6 +171,9 @@ def list_users():
                     self.plex_join_date = access.service_join_date or access.created_at
                     self.avatar_url = None
                     self.last_streamed_at = None
+                    # Add template compatibility attributes
+                    self.server = access.server
+                    self.external_username = access.external_username
                 
                 def get_display_name(self):
                     return self._access_record.external_username or 'Unknown'
@@ -199,13 +202,18 @@ def list_users():
         
         # Set plex_join_date for local users - use the earliest service join date or created_at
         earliest_join_date = app_user.created_at
-        for media_access in app_user.media_accesses:
-            if media_access.service_join_date and (not earliest_join_date or media_access.service_join_date < earliest_join_date):
-                earliest_join_date = media_access.service_join_date
+        # Get linked service users for this local user
+        linked_service_users = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=app_user.uuid).all()
+        for service_user in linked_service_users:
+            if service_user.service_join_date and (not earliest_join_date or service_user.service_join_date < earliest_join_date):
+                earliest_join_date = service_user.service_join_date
         app_user.plex_join_date = earliest_join_date
         
+        # Attach linked service users to the user object for template access
+        app_user.linked_service_users = linked_service_users
+        
         all_users.append(app_user)
-        current_app.logger.debug(f"Local user {app_user.username} (UUID: {app_user.uuid}) added to list")
+        current_app.logger.debug(f"Local user {app_user.localUsername} (UUID: {app_user.uuid}) added to list")
     
     # Add service users with a type indicator  
     for service_user in service_users:
@@ -221,7 +229,7 @@ def list_users():
         # Sort combined results immediately for non-streaming sorts
         reverse_sort = 'desc' in sort_by_param
         if 'username' in sort_by_param:
-            all_users.sort(key=lambda u: getattr(u, 'username', '').lower(), reverse=reverse_sort)
+            all_users.sort(key=lambda u: getattr(u, 'localUsername', '').lower(), reverse=reverse_sort)
         elif 'created_at' in sort_by_param:
             all_users.sort(key=lambda u: getattr(u, 'created_at', datetime.min.replace(tzinfo=timezone.utc)) or datetime.min.replace(tzinfo=timezone.utc), reverse=reverse_sort)
         elif 'service_join_date' in sort_by_param:
@@ -273,7 +281,7 @@ def list_users():
     sort_direction = 'desc' if len(sort_parts) > 1 and sort_parts[1] == 'desc' else 'asc'
 
     # Get Owner with plex_uuid for filtering (AppUsers don't have plex_uuid)
-    owner = Owner.query.filter(Owner.plex_uuid.isnot(None)).first()
+    owner = User.query.filter_by(userType=UserType.OWNER).filter(User.plex_uuid.isnot(None)).first()
     admin_accounts = [owner] if owner else []
     admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts}
     
@@ -307,16 +315,13 @@ def list_users():
         from sqlalchemy import desc
         # Query for the most recent stream for each user to get their last known IP
         recent_streams = db.session.query(MediaStreamHistory).filter(
-            or_(
-                MediaStreamHistory.user_app_access_uuid.in_(all_user_uuids_for_ips),
-                MediaStreamHistory.user_media_access_uuid.in_(all_user_uuids_for_ips)
-            )
+            MediaStreamHistory.user_uuid.in_(all_user_uuids_for_ips)
         ).order_by(MediaStreamHistory.started_at.desc()).all()
         
         # Group by user and take the most recent IP for each
         seen_users = set()
         for stream in recent_streams:
-            user_uuid = stream.user_app_access_uuid or stream.user_media_access_uuid
+            user_uuid = stream.user_uuid
             if user_uuid and user_uuid not in seen_users and stream.ip_address:
                 last_known_ips_from_streams[user_uuid] = stream.ip_address
                 seen_users.add(user_uuid)
@@ -352,10 +357,10 @@ def list_users():
         # Get access records based on user type
         if hasattr(user, '_user_type'):
             if user._user_type == 'local':
-                # Local user - get all their UserMediaAccess records
-                access_records = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id == user.id).all()
+                # Local user - get all their service user records
+                access_records = User.query.filter_by(userType=UserType.SERVICE).filter(User.linkedUserId == user.uuid).all()
             elif user._user_type == 'service':
-                # Service user - get their specific UserMediaAccess record
+                # Service user - get their specific service user record
                 access_records = [user._access_record]
             else:
                 access_records = []
@@ -449,16 +454,13 @@ def list_users():
         from sqlalchemy import desc
         # Get the most recent stream for each user from MediaStreamHistory table
         last_streams = db.session.query(MediaStreamHistory).filter(
-            or_(
-                MediaStreamHistory.user_app_access_uuid.in_(all_user_uuids_for_last_played),
-                MediaStreamHistory.user_media_access_uuid.in_(all_user_uuids_for_last_played)
-            )
+            MediaStreamHistory.user_uuid.in_(all_user_uuids_for_last_played)
         ).order_by(MediaStreamHistory.started_at.desc()).all()
         
         # Group by user UUID and take the first (most recent) for each user
         seen_users = set()
         for stream in last_streams:
-            user_uuid = stream.user_app_access_uuid or stream.user_media_access_uuid
+            user_uuid = stream.user_uuid
             if user_uuid and user_uuid not in seen_users:
                 # Find the user by UUID
                 user_for_stream = next((u for u in users_on_page if hasattr(u, '_user_type') and u.uuid == user_uuid), None)
@@ -609,17 +611,17 @@ def get_quick_edit_form(user_uuid):
     actual_id = user_obj.id
     
     if user_type == "user_app_access":
-        # Local user - get UserAppAccess record
-        user = UserAppAccess.query.get_or_404(actual_id)
+        # Local user - get local user record
+        user = User.query.filter_by(id=actual_id, userType=UserType.LOCAL).first_or_404()
     elif user_type == "user_media_access":
-        # Service user - get UserMediaAccess record and create a compatible object
-        access = UserMediaAccess.query.get_or_404(actual_id)
+        # Service user - get service user record and create a compatible object
+        access = User.query.filter_by(id=actual_id, userType=UserType.SERVICE).first_or_404()
         
         # Create a mock user object that's compatible with the form
         class MockUser:
             def __init__(self, access):
                 self.id = actual_id  # Use actual ID for form processing
-                self.username = access.external_username or 'Unknown'
+                self.localUsername = access.external_username or 'Unknown'
                 self.email = access.external_email
                 self.notes = access.notes
                 self.created_at = access.created_at
@@ -630,9 +632,12 @@ def get_quick_edit_form(user_uuid):
                 self.is_purge_whitelisted = False  # Service users don't have this
                 self._access_record = access
                 self._is_service_user = True
+                # Add template compatibility attributes
+                self.server = access.server
+                self.external_username = access.external_username
             
             def get_display_name(self):
-                return self.username or 'Unknown'
+                return self.localUsername or 'Unknown'
         
         user = MockUser(access)
     else:
@@ -642,10 +647,10 @@ def get_quick_edit_form(user_uuid):
 
     # Populate dynamic choices - only show libraries from servers this user has access to
     if user_type == "user_app_access":
-        # Local user - get all their UserMediaAccess records
-        user_access_records = UserMediaAccess.query.filter_by(user_app_access_id=actual_id).all()
+        # Local user - get all their service user records
+        user_access_records = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=actual_id).all()
     elif user_type == "user_media_access":
-        # Service user - get their specific UserMediaAccess record
+        # Service user - get their specific service user record
         user_access_records = [user._access_record]
     
     available_libraries = {}
@@ -749,7 +754,7 @@ def get_quick_edit_form(user_uuid):
         form.libraries.data = matched_libraries
         current_app.logger.info(f"KAVITA QUICK EDIT: Set form.libraries.data to: {form.libraries.data}")
     
-    # Get allow_downloads and allow_4k_transcode from UserMediaAccess records
+    # Get allow_downloads and allow_4k_transcode from service user records
     # Use the first access record's values, or default to False if no access records
     if user_access_records:
         first_access = user_access_records[0]

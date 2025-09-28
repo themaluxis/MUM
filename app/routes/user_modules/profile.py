@@ -1,11 +1,10 @@
-# File: app/routes/user_modules/profile.py
 """User profile viewing and management functionality"""
 
 from flask import render_template, redirect, url_for, flash, request, current_app, abort, make_response
 from flask_login import login_required, current_user
 from datetime import datetime, timezone, timedelta
-from app.models import UserAppAccess, Owner, EventType
-from app.models_media_services import UserMediaAccess, MediaStreamHistory, ServiceType
+from app.models import User, UserType, EventType
+from app.models_media_services import MediaStreamHistory, ServiceType
 from app.utils.helpers import permission_required, log_event
 from app.extensions import db
 from app.services.media_service_factory import MediaServiceFactory
@@ -20,272 +19,160 @@ import json
 @user_bp.route('/profile')
 @login_required
 def profile():
-    """User profile page - handles both self-profile and admin viewing other users"""
+    """Redirect to user profile based on current user type"""
     
-    # Check if this is an admin viewing another user's profile
-    username = request.args.get('username')
+    if current_user.userType == UserType.OWNER:
+        # Owner should see the first local user's profile or create one
+        first_local_user = User.query.filter_by(userType=UserType.LOCAL).first()
+        if first_local_user:
+            return redirect(url_for('user.view_app_user', username=first_local_user.localUsername))
+        else:
+            flash('No local user account found.', 'warning')
+            return redirect(url_for('admin_management.list_admins'))
     
-    if username:
-        # Only Owners can view other users' profiles
-        if not isinstance(current_user, Owner):
-            flash('Access denied. You do not have permission to view user profiles.', 'danger')
-            return redirect(url_for('dashboard.index'))
-        
-        # This is Owner viewing another user - redirect to proper route
-        # You mentioned it should go to /user/plex/username, so let's redirect there
-        return redirect(url_for('user.view_plex_user', username=username, 
-                               back=request.args.get('back', 'users'),
-                               back_view=request.args.get('back_view', 'cards')))
+    elif current_user.userType == UserType.LOCAL:
+        # Regular user sees their own profile
+        return redirect(url_for('user.view_app_user', username=current_user.localUsername))
     
     else:
-        # User viewing their own profile
-        # Ensure this is an AppUser (local user account)
-        if not isinstance(current_user, UserAppAccess):
-            flash('Access denied. Please log in with a valid user account.', 'danger')
-            return redirect(url_for('auth.app_login'))
-    
-    # Get the active tab from the URL query, default to 'profile'
-    tab = request.args.get('tab', 'profile')
-    
-    # Get linked service accounts if any
-    linked_accounts = []
+        # Service users shouldn't access this endpoint directly
+        flash('Service users cannot access user profiles directly.', 'error')
+        return redirect(url_for('auth.app_login'))
 
 
 @user_bp.route('/<username>')
 @login_required
 @permission_required('view_user')
 def view_app_user(username):
-    """Admin view of a specific app user profile by username"""
+    """View local user account profile by username"""
+    from app.models_media_services import MediaServer
+    
     # URL decode the username to handle special characters
     try:
         username = urllib.parse.unquote(username)
     except Exception as e:
-        current_app.logger.warning(f"Error decoding username parameter: {e}")
+        current_app.logger.warning(f"Error decoding username: {e}")
         abort(400)
     
-    # Validate username
-    if not username:
-        abort(400)
+    # Find the local user
+    user = User.get_by_local_username(username)
+    if not user:
+        abort(404)
     
-    # Check for potential conflicts with server nicknames
-    from app.models_media_services import MediaServer
-    server_conflict = MediaServer.query.filter_by(server_nickname=username).first()
-    if server_conflict:
-        current_app.logger.warning(f"Potential conflict: app username '{username}' matches server nickname")
-    
-    user_app_access = UserAppAccess.query.filter_by(username=username).first_or_404()
-    
-    # Get the active tab from the URL query, default to 'profile'
+    # Get the active tab from the URL query parameter
     tab = request.args.get('tab', 'profile')
     
-    # Get linked media access accounts
-    linked_accounts = user_app_access.media_accesses
+    # Get streaming stats and history for the user
+    stream_stats = user_service.get_user_stream_stats(user.uuid)
+    last_ip_map = user_service.get_bulk_last_known_ips([user.uuid])
+    last_ip = last_ip_map.get(str(user.uuid))
+    user.stream_stats = stream_stats
+    user.total_plays = stream_stats.get('global', {}).get('all_time_plays', 0)
+    user.total_duration = stream_stats.get('global', {}).get('all_time_duration_seconds', 0)
+    user.last_known_ip = last_ip if last_ip else 'N/A'
     
-    # Create context variables that the template expects (for local users)
-    user_service_types = {}
-    user_server_names = {}
+    # Get streaming history for the history tab
+    page = request.args.get('page', 1, type=int)
+    stream_history_pagination = None
     
-    # For local users, collect service types from their linked accounts
-    if linked_accounts:
-        service_types = []
-        server_names = []
-        for access in linked_accounts:
-            if access.server:
-                if access.server.service_type not in service_types:
-                    service_types.append(access.server.service_type)
-                if access.server.server_nickname not in server_names:
-                    server_names.append(access.server.server_nickname)
-        
-        user_service_types[user_app_access.id] = service_types
-        user_server_names[user_app_access.id] = server_names
-    
-    # Add stream stats for local users
-    from app.services import user_service
-    try:
-        # Create prefixed user ID for service calls
-        # Use UUID for user identification
-        user_uuid = user_app_access.uuid
-        stream_stats = user_service.get_user_stream_stats(user_uuid)
-        last_ip_map = user_service.get_bulk_last_known_ips([user_uuid])
-        
-        # Attach stats to the user object
-        user_app_access.stream_stats = stream_stats
-        user_app_access.total_plays = stream_stats.get('global', {}).get('all_time_plays', 0)
-        
-        # Ensure total_duration is a number for the format_duration filter
-        duration_value = stream_stats.get('global', {}).get('all_time_duration_seconds', 0)
-        if isinstance(duration_value, str):
-            try:
-                user_app_access.total_duration = int(duration_value)
-            except (ValueError, TypeError):
-                user_app_access.total_duration = 0
-        else:
-            user_app_access.total_duration = duration_value or 0
-            
-        user_app_access.last_known_ip = last_ip_map.get(str(user_uuid), 'N/A')
-        
-        # Populate last_streamed_at field for the profile display
-        current_app.logger.debug(f"LAST_STREAMED: Populating last_streamed_at for app user {user_app_access.uuid}")
-        last_stream = MediaStreamHistory.query.filter_by(user_app_access_uuid=user_app_access.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
-        user_app_access.last_streamed_at = last_stream.started_at if last_stream else None
-        current_app.logger.debug(f"LAST_STREAMED: Set user_app_access.last_streamed_at = {user_app_access.last_streamed_at}")
-    except Exception as e:
-        current_app.logger.error(f"Error getting stream stats for local user {user_app_access.id}: {e}")
-        # Provide empty stats as fallback
-        user_app_access.stream_stats = {'global': {}, 'players': []}
-        user_app_access.total_plays = 0
-        user_app_access.total_duration = 0
-        user_app_access.last_known_ip = 'N/A'
-    
-    # Create a form object for the settings tab
-    from app.forms import UserEditForm
-    form = UserEditForm()
-    
-    # Get aggregated streaming history for history tab
-    streaming_history = []
     if tab == 'history':
-        # Get filter parameters
-        service_filter = request.args.get('service', 'all')
-        days_filter = int(request.args.get('days', 30))
+        stream_history_pagination = MediaStreamHistory.query.filter_by(user_uuid=user.uuid)\
+            .order_by(MediaStreamHistory.started_at.desc())\
+            .paginate(page=page, per_page=15, error_out=False)
         
-        # Calculate date range
-        end_date = datetime.now(timezone.utc)
-        start_date = end_date - timedelta(days=days_filter)
-        
-        # Get streaming history for this local user
-        history_query = MediaStreamHistory.query.filter(
-            MediaStreamHistory.user_app_access_uuid == user_app_access.uuid,
-            MediaStreamHistory.started_at >= start_date,
-            MediaStreamHistory.started_at <= end_date
-        )
-        
-        # Apply service filter if specified
-        if service_filter != 'all':
-            # Join with UserMediaAccess and MediaServer to filter by service type
-            history_query = history_query.join(
-                UserMediaAccess, 
-                MediaStreamHistory.user_media_access_uuid == UserMediaAccess.uuid
-            ).join(
-                UserMediaAccess.server
-            ).filter(
-                UserMediaAccess.server.has(service_type=ServiceType(service_filter))
-            )
-        
-        # Order by most recent first and limit to 100 entries
-        streaming_history = history_query.order_by(
-            MediaStreamHistory.started_at.desc()
-        ).limit(100).all()
-        
-        # Enhance history entries with service account info
-        for entry in streaming_history:
-            current_app.logger.debug(f"LOCAL HISTORY: Processing entry - user_media_access_uuid: {entry.user_media_access_uuid}, server_id: {getattr(entry, 'server_id', 'N/A')}")
-            
-            if entry.user_media_access_uuid:
-                # Get the service account that was used for this stream
-                service_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
-                if service_access:
-                    entry.service_account = service_access
-                    entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
-                    entry.server_name = service_access.server.server_nickname if service_access.server else 'Unknown Server'
-                    entry.service_username = service_access.external_username or 'Unknown'
-                    current_app.logger.debug(f"LOCAL HISTORY: Found service account - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
-                else:
-                    current_app.logger.warning(f"DEBUG LOCAL HISTORY: No service account found for user_media_access_uuid: {entry.user_media_access_uuid}")
-                    entry.service_account = None
-                    entry.service_type = 'unknown'
-                    entry.server_name = 'Unknown Server'
-                    entry.service_username = 'Unknown'
-            elif hasattr(entry, 'server_id') and entry.server_id:
-                # Try to find service account by server_id for this local user
-                current_app.logger.debug(f"LOCAL HISTORY: No user_media_access_uuid, trying server_id: {entry.server_id}")
-                service_access = UserMediaAccess.query.filter_by(
-                    user_app_access_id=user_app_access.id,
-                    server_id=entry.server_id
-                ).first()
-                if service_access:
-                    entry.service_account = service_access
-                    entry.service_type = service_access.server.service_type.value if service_access.server else 'unknown'
-                    entry.server_name = service_access.server.server_nickname if service_access.server else 'Unknown Server'
-                    entry.service_username = service_access.external_username or 'Unknown'
-                    current_app.logger.debug(f"LOCAL HISTORY: Found service account by server_id - type: {entry.service_type}, server: {entry.server_name}, username: {entry.service_username}")
-                else:
-                    current_app.logger.warning(f"DEBUG LOCAL HISTORY: No service account found for server_id: {entry.server_id}")
-                    entry.service_account = None
-                    entry.service_type = 'unknown'
-                    entry.server_name = 'Unknown Server'
-                    entry.service_username = 'Unknown'
-            else:
-                current_app.logger.warning(f"DEBUG LOCAL HISTORY: No user_media_access_uuid or server_id available")
-                entry.service_account = None
-                entry.service_type = 'unknown'
-                entry.server_name = 'Unknown Server'
-                entry.service_username = 'Unknown'
+        # Enhance history records with MediaItem database IDs for clickable links
+        enhance_history_records_with_media_ids(stream_history_pagination.items)
+    
+    # Get linked service accounts
+    linked_service_users = User.query.filter_by(userType=UserType.SERVICE, linkedUserId=user.uuid).all()
+    
+    # Get user service types and server names for service-aware display
+    user_service_types = {user.uuid: []}
+    user_server_names = {user.uuid: []}
+    
+    for service_user in linked_service_users:
+        if hasattr(service_user, 'server') and service_user.server:
+            if service_user.server.service_type not in user_service_types[user.uuid]:
+                user_service_types[user.uuid].append(service_user.server.service_type)
+            if service_user.server.server_nickname not in user_server_names[user.uuid]:
+                user_server_names[user.uuid].append(service_user.server.server_nickname)
+    
+    # Context variables for template
+    user_sorted_libraries = {}
+    
+    # For HTMX requests on history tab, return just the content
+    if request.headers.get('HX-Request') and tab == 'history':
+        return render_template('user/_partials/profile_tabs/history_tab_content.html', 
+                             user=user, 
+                             history_logs=stream_history_pagination,
+                             user_service_types=user_service_types,
+                             user_server_names=user_server_names)
     
     return render_template(
         'user/index.html',
-        title=f"App User Profile: {user_app_access.get_display_name()}",
-        user=user_app_access,
+        title=f"User Profile: {user.get_display_name()}",
+        user=user,
+        user_sorted_libraries=user_sorted_libraries,
+        history_logs=stream_history_pagination,
         active_tab=tab,
-        is_local_user=True,
-        linked_accounts=linked_accounts,
+        is_admin=check_if_user_is_admin(user),
+        is_service_user=False,
+        stream_stats=stream_stats,
         user_service_types=user_service_types,
         user_server_names=user_server_names,
-        form=form,
-        streaming_history=streaming_history,
-        service_filter=request.args.get('service', 'all'),
-        days_filter=int(request.args.get('days', 30)),
+        linked_service_users=linked_service_users,
+        current_user=current_user,
         now_utc=datetime.now(timezone.utc)
     )
 
+
 class MockServiceUser:
-    """Mock user class for service account viewing"""
-    def __init__(self, access):
-        self.id = access.id
-        self.uuid = access.uuid
-        self.username = access.external_username
-        self.email = access.external_email
-        self.notes = access.notes
-        self.created_at = access.created_at
-        self.last_login_at = access.last_activity_at
-        self.media_accesses = [access]
-        self.access_expires_at = access.access_expires_at
-        self.discord_user_id = access.discord_user_id
-        self.is_active = access.is_active
-        self._is_service_user = True
-        self._access_record = access
-        
-        # Process avatar URL using the same logic as library stats
-        self.avatar_url = self._get_avatar_url(access)
+    """Mock user object that behaves like a User for service accounts"""
     
-    def _get_avatar_url(self, access):
-        """Process avatar URL using the same logic as library stats chart"""
-        avatar_url = None
+    def __init__(self, access_record):
+        self._access_record = access_record
+        # Map UserMediaAccess fields to User-like attributes
+        self.id = access_record.id
+        self.uuid = access_record.uuid
+        self.userType = UserType.SERVICE
+        self.created_at = access_record.created_at
+        self.updated_at = access_record.updated_at
+        self.notes = getattr(access_record, 'notes', None)
+        self.is_discord_bot_whitelisted = access_record.is_discord_bot_whitelisted
+        self.is_purge_whitelisted = access_record.is_purge_whitelisted
+        self.allow_4k_transcode = access_record.allow_4k_transcode
+        self.access_expires_at = access_record.access_expires_at
         
-        # First check for external avatar URL
-        if access.external_avatar_url:
-            avatar_url = access.external_avatar_url
-        elif access.server.service_type.value.lower() == 'plex':
-            # For Plex, check multiple possible locations for the thumb URL
-            thumb_url = None
-            
-            # First try service_settings
-            if access.service_settings and access.service_settings.get('thumb'):
-                thumb_url = access.service_settings['thumb']
-            # Then try raw_data from the user sync
-            elif access.user_raw_data and access.user_raw_data.get('thumb'):
-                thumb_url = access.user_raw_data['thumb']
-            # Also check nested raw data structure
-            elif (access.user_raw_data and 
-                  access.user_raw_data.get('plex_user_obj_attrs') and 
-                  access.user_raw_data['plex_user_obj_attrs'].get('thumb')):
-                thumb_url = access.user_raw_data['plex_user_obj_attrs']['thumb']
-            
-            if thumb_url:
-                # Check if it's already a full URL (plex.tv avatars) or needs proxy
-                if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
-                    avatar_url = thumb_url
-                else:
-                    avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
+        # Set service user flag for template logic
+        self._is_service_user = True
+        self._user_type = 'service'
+        
+        # Attributes for template display
+        self.username = access_record.external_username
+        self.discord_username = None  # Service users don't have Discord usernames
+        self.discord_email = None     # Service users don't have Discord emails
+        self.server = access_record.server
+        
+    def get_avatar_url(self):
+        """Get avatar URL for service user"""
+        access = self._access_record
+        avatar_url = "/static/img/favicon.ico"  # Default
+        
+        if access.server.service_type.value.lower() == 'plex':
+            # For Plex, construct the avatar URL using the server's URL and the user's thumb
+            if access.external_user_avatar:
+                # Remove '/library/metadata/' prefix if present and construct full URL
+                thumb_path = access.external_user_avatar
+                if thumb_path.startswith('/library/metadata/'):
+                    # Remove the prefix, we'll construct the full URL
+                    thumb_path = thumb_path.replace('/library/metadata/', '')
+                server_url = access.server.server_url.rstrip('/')
+                avatar_url = f"{server_url}/photo/:/transcode?width=150&height=150&minSize=1&upscale=1&url=/library/metadata/{thumb_path}"
+        
+        elif access.server.service_type.value.lower() == 'emby':
+            # For Emby, use the external_user_id to get avatar  
+            if access.external_user_id:
+                avatar_url = f"/api/media/emby/users/avatar?user_id={access.external_user_id}"
         
         elif access.server.service_type.value.lower() == 'jellyfin':
             # For Jellyfin, use the external_user_id to get avatar
@@ -298,787 +185,6 @@ class MockServiceUser:
         return self._access_record.external_username or 'Unknown'
 
 
-@user_bp.route('/<server_nickname>/<server_username>', methods=['GET', 'POST'])
-@login_required
-@permission_required('view_user')
-def view_service_account(server_nickname, server_username):
-    """View service account profile by server nickname and username"""
-    from app.models_media_services import MediaServer
-    
-    # URL decode the parameters to handle special characters
-    try:
-        server_nickname = urllib.parse.unquote(server_nickname)
-        server_username = urllib.parse.unquote(server_username)
-    except Exception as e:
-        current_app.logger.warning(f"Error decoding URL parameters: {e}")
-        abort(400)
-    
-    # Validate parameters
-    if not server_nickname or not server_username:
-        abort(400)
-    
-    # Check for potential username conflicts with app users
-    # If server_nickname matches an app user username, this could be ambiguous
-    user_conflict = UserAppAccess.query.filter_by(username=server_nickname).first()
-    if user_conflict:
-        current_app.logger.warning(f"Potential conflict: server nickname '{server_nickname}' matches app user username")
-    
-    # Find the server by nickname (name)
-    server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
-    
-    # Find the service account by server and username
-    # Look for UserMediaAccess record directly (handles both standalone and linked users)
-    access = UserMediaAccess.query.filter_by(
-        server_id=server.id,
-        external_username=server_username
-    ).first()
-    
-    if not access:
-        current_app.logger.warning(f"Service account not found: {server_username} on {server_nickname}")
-        abort(404)
-    
-    # Create a mock user object for the template
-    class MockServiceUser:
-        def __init__(self, access):
-            self.id = access.id
-            self.uuid = access.uuid
-            self.username = access.external_username
-            self.email = access.external_email
-            self.notes = access.notes
-            self.created_at = access.created_at
-            self.last_login_at = access.last_activity_at
-            self.media_accesses = [access]
-            self.access_expires_at = access.access_expires_at
-            self.discord_user_id = access.discord_user_id
-            self.is_active = access.is_active
-            self._is_service_user = True
-            self._access_record = access
-            
-            # Process avatar URL using the same logic as library stats
-            self.avatar_url = self._get_avatar_url(access)
-        
-        def _get_avatar_url(self, access):
-            """Process avatar URL using the same logic as library stats chart"""
-            avatar_url = None
-            
-            # First check for external avatar URL
-            if access.external_avatar_url:
-                avatar_url = access.external_avatar_url
-            elif access.server.service_type.value.lower() == 'plex':
-                # For Plex, check multiple possible locations for the thumb URL
-                thumb_url = None
-                
-                # First try service_settings
-                if access.service_settings and access.service_settings.get('thumb'):
-                    thumb_url = access.service_settings['thumb']
-                # Then try raw_data from the user sync
-                elif access.user_raw_data and access.user_raw_data.get('thumb'):
-                    thumb_url = access.user_raw_data['thumb']
-                # Also check nested raw data structure
-                elif (access.user_raw_data and 
-                      access.user_raw_data.get('plex_user_obj_attrs') and 
-                      access.user_raw_data['plex_user_obj_attrs'].get('thumb')):
-                    thumb_url = access.user_raw_data['plex_user_obj_attrs']['thumb']
-                
-                if thumb_url:
-                    # Check if it's already a full URL (plex.tv avatars) or needs proxy
-                    if thumb_url.startswith('https://plex.tv/') or thumb_url.startswith('http://plex.tv/'):
-                        avatar_url = thumb_url
-                    else:
-                        avatar_url = f"/api/media/plex/images/proxy?path={thumb_url.lstrip('/')}"
-            
-            elif access.server.service_type.value.lower() == 'jellyfin':
-                # For Jellyfin, use the external_user_id to get avatar
-                if access.external_user_id:
-                    avatar_url = f"/api/media/jellyfin/users/avatar?user_id={access.external_user_id}"
-            
-            return avatar_url
-        
-        def get_display_name(self):
-            return self._access_record.external_username or 'Unknown'
-    
-    user = MockServiceUser(access)
-    # Set the user type for template logic
-    user._user_type = 'service'
-    
-    # Check if this UserMediaAccess is linked to a UserAppAccess account
-    linked_user_app_access = None
-    if access.user_app_access_id:
-        linked_user_app_access = UserAppAccess.query.get(access.user_app_access_id)
-    
-    # Get the active tab from the URL query. Default to 'profile' for GET, 'settings' for POST context.
-    tab = request.args.get('tab', 'settings' if request.method == 'POST' else 'profile')
-    
-    # Correctly instantiate the form:
-    # On POST, it's populated from request.form.
-    # On GET, it's populated from the user object.
-    form = UserEditForm(request.form if request.method == 'POST' else None, obj=user)
-    
-    # Populate dynamic choices for the form - only show libraries from servers this user has access to
-    # For standalone service users, we only have the single access record
-    user_access_records = [access]
-    
-    available_libraries = {}
-    # current_app.logger.debug(f"KAVITA FORM: Building available libraries for user {user.id}")
-    
-    for access in user_access_records:
-        try:
-            service = MediaServiceFactory.create_service_from_db(access.server)
-            # current_app.logger.debug(f"KAVITA FORM: Processing server {access.server.server_nickname} (type: {access.server.service_type.value})")
-            # current_app.logger.debug(f"KAVITA FORM: User access record allowed_library_ids: {access.allowed_library_ids}")
-            
-            if service:
-                server_libraries = service.get_libraries()
-                # current_app.logger.debug(f"KAVITA FORM: Server libraries from API: {[{lib.get('id'): lib.get('name')} for lib in server_libraries]}")
-                
-                for lib in server_libraries:
-                    lib_id = lib.get('external_id') or lib.get('id')
-                    lib_name = lib.get('name', 'Unknown')
-                    if lib_id:
-                        # For Kavita, create compound IDs to match the format used in user access records
-                        if access.server.service_type.value == 'kavita':
-                            compound_lib_id = f"{lib_id}_{lib_name}"
-                            available_libraries[compound_lib_id] = lib_name
-                            current_app.logger.debug(f"KAVITA FORM: Added Kavita library: {compound_lib_id} -> {lib_name}")
-                        else:
-                            available_libraries[str(lib_id)] = lib_name
-                            # current_app.logger.debug(f"KAVITA FORM: Added non-Kavita library: {lib_id} -> {lib_name}")
-        except Exception as e:
-            current_app.logger.error(f"Error getting libraries from {access.server.server_nickname}: {e}")
-    
-    # current_app.logger.debug(f"KAVITA FORM: Final available_libraries: {available_libraries}")
-    form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
-    # current_app.logger.debug(f"KAVITA FORM: Form choices set to: {form.libraries.choices}")
-
-    # Handle form submission for the settings tab
-    if form.validate_on_submit(): # This handles (if request.method == 'POST' and form.validate())
-        try:
-            # Updated expiration logic to handle DateField calendar picker
-            access_expiration_changed = False
-            
-            if form.clear_access_expiration.data:
-                if user.access_expires_at is not None:
-                    user.access_expires_at = None
-                    access_expiration_changed = True
-            elif form.access_expiration.data:
-                # WTForms gives a date object. Combine with max time to set expiry to end of day.
-                new_expiry_datetime = datetime.combine(form.access_expiration.data, datetime.max.time())
-                # Only update if the date is actually different
-                if user.access_expires_at is None or user.access_expires_at.date() != new_expiry_datetime.date():
-                    user.access_expires_at = new_expiry_datetime
-                    access_expiration_changed = True
-            
-            # Get current library IDs from UserMediaAccess records
-            current_library_ids = []
-            for access in user_access_records:
-                current_library_ids.extend(access.allowed_library_ids or [])
-            
-            original_library_ids = set(current_library_ids)
-            new_library_ids_from_form = set(form.libraries.data or [])
-            libraries_changed = (original_library_ids != new_library_ids_from_form)
-
-            # Update user fields directly (not library-related)
-            # For service users, save notes to the access record
-            access.notes = form.notes.data
-            user.is_discord_bot_whitelisted = form.is_discord_bot_whitelisted.data
-            user.is_purge_whitelisted = form.is_purge_whitelisted.data
-            user.allow_4k_transcode = form.allow_4k_transcode.data
-            
-            # Update library access in UserMediaAccess records if changed
-            if libraries_changed:
-                for access in user_access_records:
-                    try:
-                        # Get the service for this server
-                        service = MediaServiceFactory.create_service_from_db(access.server)
-                        if service:
-                            # Get libraries available on this server
-                            server_libraries = service.get_libraries()
-                            server_lib_ids = [lib.get('external_id') or lib.get('id') for lib in server_libraries]
-                            
-                            # Filter the new library IDs to only include ones available on this server
-                            new_libs_for_this_server = []
-                            for lib_id in new_library_ids_from_form:
-                                if access.server.service_type.value == 'kavita':
-                                    # For Kavita, extract the numeric ID from compound format (e.g., "1_Comics" -> "1")
-                                    if '_' in str(lib_id):
-                                        numeric_id = str(lib_id).split('_')[0]
-                                        if numeric_id in [str(sid) for sid in server_lib_ids]:
-                                            new_libs_for_this_server.append(numeric_id)
-                                    elif str(lib_id) in [str(sid) for sid in server_lib_ids]:
-                                        new_libs_for_this_server.append(str(lib_id))
-                                else:
-                                    # For other services, use direct matching
-                                    if lib_id in server_lib_ids:
-                                        new_libs_for_this_server.append(lib_id)
-                            
-                            # Special handling for Jellyfin: if all libraries are selected, use '*' wildcard
-                            if (access.server.service_type == ServiceType.JELLYFIN and 
-                                set(new_libs_for_this_server) == set(server_lib_ids) and 
-                                len(server_lib_ids) > 0):
-                                new_libs_for_this_server = ['*']
-                            
-                            # Update the access record
-                            access.allowed_library_ids = new_libs_for_this_server
-                            access.updated_at = datetime.utcnow()
-                            
-                            # Update the media service if it supports user access updates
-                            if hasattr(service, 'update_user_access'):
-                                # Use the external_user_id from UserMediaAccess for all services
-                                user_identifier = access.external_user_id
-                                if user_identifier:
-                                    service.update_user_access(user_identifier, new_libs_for_this_server)
-                    except Exception as e:
-                        current_app.logger.error(f"Error updating library access for server {access.server.server_nickname}: {e}")
-                
-                log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' library access updated", user_id=user.id, admin_id=current_user.id)
-            
-            user.updated_at = datetime.utcnow()
-            
-            if access_expiration_changed:
-                if user.access_expires_at is None:
-                    log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' access expiration cleared.", user_id=user.id, admin_id=current_user.id)
-                else:
-                    log_event(EventType.SETTING_CHANGE, f"User '{user.get_display_name()}' access expiration set to {user.access_expires_at.strftime('%Y-%m-%d')}.", user_id=user.id, admin_id=current_user.id)
-            
-            # This commit saves all changes from user_service and the expiration date
-            db.session.commit()
-            
-            if request.headers.get('HX-Request'):
-                # Re-fetch access data to ensure the form is populated with the freshest data after save
-                # Note: user is a MockServiceUser, so user.id is actually access.id (UserMediaAccess)
-                updated_access = UserMediaAccess.query.get_or_404(user.id)
-                # Recreate the mock user with updated data
-                user = MockServiceUser(updated_access)
-                # Set the user type for template logic
-                user._user_type = 'service'
-                form_after_save = UserEditForm(obj=user)
-                
-                # Re-populate the dynamic choices and data for the re-rendered form
-                form_after_save.libraries.choices = list(available_libraries.items())
-                
-                # Get current library IDs from UserMediaAccess records for the re-rendered form
-                current_library_ids_after_save = []
-                # For service users, we only have one access record (the one we just updated)
-                current_library_ids_after_save.extend(updated_access.allowed_library_ids or [])
-                
-                # Handle special case for Jellyfin users with '*' (all libraries access)
-                if current_library_ids_after_save == ['*']:
-                    # If user has "All Libraries" access, check all available library checkboxes
-                    form_after_save.libraries.data = list(available_libraries.keys())
-                else:
-                    # Apply the same matching logic as the quick edit form
-                    matched_libraries = []
-                    for lib_id in current_library_ids_after_save:
-                        lib_id_str = str(lib_id)
-                        # Direct match first
-                        if lib_id_str in available_libraries:
-                            matched_libraries.append(lib_id_str)
-                        else:
-                            # For Kavita, try multiple matching strategies
-                            found_match = False
-                            
-                            # Strategy 1: Extract numeric part from stored compound ID and match against available numeric parts
-                            if '_' in lib_id_str:
-                                stored_numeric = lib_id_str.split('_')[0]
-                                stored_name = lib_id_str.split('_', 1)[1] if '_' in lib_id_str else ''
-                                
-                                for avail_lib_id in available_libraries.keys():
-                                    if '_' in avail_lib_id:
-                                        avail_numeric = avail_lib_id.split('_')[0]
-                                        avail_name = avail_lib_id.split('_', 1)[1]
-                                        
-                                        # Match by name (case insensitive) since numeric IDs might not match
-                                        if stored_name.lower() == avail_name.lower():
-                                            matched_libraries.append(avail_lib_id)
-                                            found_match = True
-                                            break
-                            
-                            # Strategy 2: If stored ID is simple numeric, match against available compound IDs
-                            if not found_match:
-                                for avail_lib_id in available_libraries.keys():
-                                    if '_' in avail_lib_id:
-                                        # Extract numeric part from compound ID (e.g., "2_Books" -> "2")
-                                        numeric_part = avail_lib_id.split('_')[0]
-                                        if numeric_part == lib_id_str:
-                                            matched_libraries.append(avail_lib_id)
-                                            found_match = True
-                                            break
-                                    elif avail_lib_id == lib_id_str:
-                                        matched_libraries.append(avail_lib_id)
-                                        found_match = True
-                                        break
-                    
-                    form_after_save.libraries.data = matched_libraries
-
-                # OOB-SWAP LOGIC
-                # 1. Render the updated form for the modal (the primary target)
-                # Build user_server_names for the template
-                user_server_names_for_modal = {}
-                user_server_names_for_modal[user.uuid] = []
-                for access in user_access_records:
-                    if access.server.server_nickname not in user_server_names_for_modal[user.uuid]:
-                        user_server_names_for_modal[user.uuid].append(access.server.server_nickname)
-                
-                # Calculate form action for the reloaded form
-                user_servers = user_server_names_for_modal.get(user.uuid, [])
-                if user_servers:
-                    server_name = user_servers[0]
-                    username = user.get_display_name()
-                    form_action_for_reload = url_for('user.view_service_account', 
-                                                   server_nickname=server_name, 
-                                                   server_username=username, 
-                                                   tab='settings')
-                else:
-                    form_action_for_reload = '#'
-                
-                # Generate the user-sorted library list for display consistency with the original template
-                user_sorted_libraries_for_template = []
-                for lib_id in form_after_save.libraries.data:
-                    if lib_id in available_libraries:
-                        user_sorted_libraries_for_template.append({
-                            'id': lib_id,
-                            'name': available_libraries[lib_id]
-                        })
-                
-                modal_html = render_template('user/_partials/modals/settings_quick_edit_modal.html', 
-                                           form=form_after_save, 
-                                           user=user, 
-                                           user_server_names=user_server_names_for_modal,
-                                           form_action_override=form_action_for_reload)
-
-                # 2. Render the updated user card for the OOB swap
-                # We need the same context that the main user list uses for a card
-                
-                # Get all user access records for proper library display
-                # For service users, we only have one access record
-                all_user_access_records = [updated_access]
-                user_sorted_libraries = {}
-                user_service_types = {}
-                user_server_names = {}
-                
-                # Collect library IDs from all access records
-                all_library_ids = []
-                user_service_types[user.uuid] = []
-                user_server_names[user.uuid] = []
-                
-                for access in all_user_access_records:
-                    all_library_ids.extend(access.allowed_library_ids or [])
-                    # Track service types
-                    if access.server.service_type not in user_service_types[user.uuid]:
-                        user_service_types[user.uuid].append(access.server.service_type)
-                    # Track server names
-                    if access.server.server_nickname not in user_server_names[user.uuid]:
-                        user_server_names[user.uuid].append(access.server.server_nickname)
-                
-                # Handle special case for Jellyfin users with '*' (all libraries access)
-                if all_library_ids == ['*']:
-                    lib_names = ['All Libraries']
-                else:
-                    # Check if this user has library_names available (for services like Kavita)
-                    if hasattr(user, 'library_names') and user.library_names:
-                        # Use library_names from the user object
-                        lib_names = user.library_names
-                    else:
-                        # Fallback to looking up in available_libraries
-                        lib_names = []
-                        for lib_id in all_library_ids:
-                            lib_id_str = str(lib_id)
-                            if '_' in lib_id_str and lib_id_str.split('_', 1)[0].isdigit():
-                                # This looks like a Kavita compound ID (e.g., "0_Comics"), extract the name
-                                lib_name = lib_id_str.split('_', 1)[1]
-                                lib_names.append(lib_name)
-                            else:
-                                # Need to map simple numeric ID to library name
-                                found_name = None
-                                # Direct lookup first
-                                if lib_id_str in available_libraries:
-                                    found_name = available_libraries[lib_id_str]
-                                else:
-                                    # For Kavita, try to find the compound ID that matches this simple ID
-                                    for avail_lib_id, avail_lib_name in available_libraries.items():
-                                        if '_' in avail_lib_id:
-                                            # Extract numeric part from compound ID (e.g., "2_Books" -> "2")
-                                            numeric_part = avail_lib_id.split('_')[0]
-                                            if numeric_part == lib_id_str:
-                                                found_name = avail_lib_name
-                                                break
-                                        elif avail_lib_id == lib_id_str:
-                                            found_name = avail_lib_name
-                                            break
-                                
-                                lib_names.append(found_name or f'Unknown Lib {lib_id}')
-                user_sorted_libraries[user.uuid] = sorted(lib_names, key=str.lower)
-                
-                # Get Owner with plex_uuid for filtering (AppUsers don't have plex_uuid)
-                owner = Owner.query.filter(Owner.plex_uuid.isnot(None)).first()
-                admin_accounts = [owner] if owner else []
-                admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts if admin.plex_uuid}
-
-                card_html = render_template(
-                    'users/_partials/user_cards/_service_user_card.html',
-                    user=user,
-                    user_sorted_libraries=user_sorted_libraries,
-                    user_service_types=user_service_types,
-                    user_server_names=user_server_names,
-                    admins_by_uuid=admins_by_uuid,
-                    current_user=current_user 
-                )
-                
-                # 3. Add the oob-swap attribute to the card's root div
-                card_html_oob = card_html.replace(f'id="user-card-{user.uuid}"', f'id="user-card-{user.uuid}" hx-swap-oob="true"')
-                current_app.logger.info(f"OOB SWAP DEBUG: Generated OOB swap for user-card-{user.uuid}")
-                current_app.logger.info(f"OOB SWAP DEBUG: Card HTML contains OOB attribute: {'hx-swap-oob' in card_html_oob}")
-
-                # 4. Combine the modal and card HTML for the response
-                final_html = modal_html + card_html_oob
-                current_app.logger.info(f"OOB SWAP DEBUG: Final HTML length: {len(final_html)} chars")
-
-                # Create the toast message payload
-                toast_payload = {
-                    "showToastEvent": {
-                        "message": f"User '{user.get_display_name()}' updated successfully.",
-                        "category": "success"
-                    }
-                }
-                
-                # Create the response and add the HX-Trigger header
-                response = make_response(final_html)
-                response.headers['HX-Trigger'] = json.dumps(toast_payload)
-                return response
-            else:
-                # Fallback for standard form submissions - redirect to service account route
-                flash(f"User '{user.get_display_name()}' updated successfully.", "success")
-                back_param = request.args.get('back')
-                back_view_param = request.args.get('back_view')
-                redirect_params = {'server_nickname': server_nickname, 'server_username': server_username, 'tab': 'settings'}
-                if back_param:
-                    redirect_params['back'] = back_param
-                if back_view_param:
-                    redirect_params['back_view'] = back_view_param
-                return redirect(url_for('user.view_service_account', **redirect_params))
-            
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f"Error updating user {user.get_display_name()}: {e}", exc_info=True)
-            flash(f"Error updating user: {e}", "danger")
-
-    if request.method == 'POST' and form.errors:
-        if request.headers.get('HX-Request'):
-            # Generate user_sorted_libraries for error response
-            user_sorted_libraries_for_error = []
-            current_library_ids = []
-            for access_record in user_access_records:
-                current_library_ids.extend(access_record.allowed_library_ids or [])
-            
-            for lib_id in current_library_ids:
-                lib_id_str = str(lib_id)
-                if lib_id_str in available_libraries:
-                    user_sorted_libraries_for_error.append({
-                        'id': lib_id_str,
-                        'name': available_libraries[lib_id_str]
-                    })
-            
-            return render_template('user/_partials/profile_tabs/settings_tab.html', 
-                                 form=form, 
-                                 user=user), 422
-
-    if request.method == 'GET':
-        # Get current library IDs from UserMediaAccess records (same as quick edit form)
-        current_library_ids = []
-        for access in user_access_records:
-            current_library_ids.extend(access.allowed_library_ids or [])
-        
-        # current_app.logger.debug(f"KAVITA FORM: Current library IDs from access records: {current_library_ids}")
-        # current_app.logger.debug(f"KAVITA FORM: Available library keys: {list(available_libraries.keys())}")
-        
-        # Handle special case for Jellyfin users with '*' (all libraries access)
-        if current_library_ids == ['*']:
-            # If user has "All Libraries" access, check all available library checkboxes
-            form.libraries.data = list(available_libraries.keys())
-            current_app.logger.debug(f"KAVITA FORM: Jellyfin wildcard case - setting form data to: {form.libraries.data}")
-        else:
-            # For Kavita users, ensure we're using the compound IDs that match the available_libraries keys
-            validated_library_ids = []
-            for lib_id in current_library_ids:
-                # current_app.logger.debug(f"KAVITA FORM: Processing library ID: {lib_id}")
-                if str(lib_id) in available_libraries:
-                    validated_library_ids.append(str(lib_id))
-                    # current_app.logger.debug(f"KAVITA FORM: Direct match found for: {lib_id}")
-                else:
-                    # current_app.logger.debug(f"KAVITA FORM: No direct match for {lib_id}, searching for compound ID...")
-                    # This might be a legacy ID format, try to find a matching compound ID
-                    found_match = False
-                    for available_id in available_libraries.keys():
-                        if '_' in available_id and available_id.startswith(f"{lib_id}_"):
-                            validated_library_ids.append(available_id)
-                            # current_app.logger.debug(f"KAVITA FORM: Found compound match: {lib_id} -> {available_id}")
-                            found_match = True
-                            break
-                    
-                    # If no compound match, try matching by library name (for Kavita ID changes)
-                    if not found_match and '_' in str(lib_id):
-                        stored_lib_name = str(lib_id).split('_', 1)[1]  # Extract name from stored ID
-                        current_app.logger.debug(f"KAVITA FORM: Trying name match for: {stored_lib_name}")
-                        for available_id, available_name in available_libraries.items():
-                            if available_name == stored_lib_name:
-                                validated_library_ids.append(available_id)
-                                current_app.logger.debug(f"KAVITA FORM: Found name match: {lib_id} -> {available_id} (name: {stored_lib_name})")
-                                found_match = True
-                                break
-                    
-                    if not found_match:
-                        current_app.logger.warning(f"DEBUG KAVITA FORM: No match found for library ID: {lib_id}")
-            
-            form.libraries.data = list(set(validated_library_ids))  # Remove duplicates
-            # current_app.logger.debug(f"KAVITA FORM: Final form.libraries.data: {form.libraries.data}")
-        # Remove the old access_expires_in_days logic since we're now using DateField
-        # The form will automatically populate access_expires_at from the user object via obj=user
-
-    # Use UUID for user_service calls
-    current_app.logger.debug(f"STATS: Getting stats for {user.uuid}")
-    current_app.logger.debug(f"STATS: User type check - _is_service_user: {getattr(user, '_is_service_user', 'N/A')}")
-    
-    stream_stats = user_service.get_user_stream_stats(user.uuid)
-    current_app.logger.debug(f"STATS: Raw stream_stats returned: {stream_stats}")
-    
-    last_ip_map = user_service.get_bulk_last_known_ips([user.uuid])
-    current_app.logger.debug(f"STATS: Last IP map: {last_ip_map}")
-    
-    last_ip = last_ip_map.get(str(user.uuid))
-    user.stream_stats = stream_stats
-    user.total_plays = stream_stats.get('global', {}).get('all_time_plays', 0)
-    user.total_duration = stream_stats.get('global', {}).get('all_time_duration_seconds', 0)
-    user.last_known_ip = last_ip if last_ip else 'N/A'
-    
-    # Populate last_streamed_at field for the profile display
-    current_app.logger.debug(f"LAST_STREAMED: Populating last_streamed_at for user {user.uuid}")
-    last_stream = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
-    user.last_streamed_at = last_stream.started_at if last_stream else None
-    current_app.logger.debug(f"LAST_STREAMED: Set user.last_streamed_at = {user.last_streamed_at}")
-    
-    current_app.logger.debug(f"STATS: Final stats - plays: {user.total_plays}, duration: {user.total_duration}, IP: {user.last_known_ip}")
-    
-    # Additional debugging - check what's actually in the database for this user
-    db_records = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).count()
-    current_app.logger.debug(f"STATS: Direct DB check - MediaStreamHistory records for user_media_access_uuid={user.uuid}: {db_records}")
-    
-    # Check if user_service is looking in the right place
-    current_app.logger.debug(f"STATS: Checking user_service logic for user UUID: {user.uuid}")
-    
-    stream_history_pagination = None
-    kavita_reading_stats = None
-    kavita_reading_history = None
-    
-    if tab == 'history':
-        page = request.args.get('page', 1, type=int)
-        
-        # Check if this is a Kavita user and get reading data
-        is_kavita_user = False
-        kavita_user_id = None
-        
-        current_app.logger.debug(f"KAVITA HISTORY: Checking user {user.id} for Kavita access")
-        current_app.logger.debug(f"KAVITA HISTORY: User access records: {[(access.server.server_nickname, access.server.service_type.value, access.external_user_id) for access in user_access_records]}")
-        
-        for access in user_access_records:
-            if access.server.service_type.value == 'kavita':
-                is_kavita_user = True
-                kavita_user_id = access.external_user_id
-                current_app.logger.debug(f"KAVITA HISTORY: Found Kavita user! Server: {access.server.server_nickname}, External User ID: {kavita_user_id}")
-                break
-        
-        current_app.logger.debug(f"KAVITA HISTORY: Is Kavita user: {is_kavita_user}, User ID: {kavita_user_id}")
-        
-        if is_kavita_user and kavita_user_id:
-            # Get Kavita reading data
-            try:
-                kavita_server = None
-                for access in user_access_records:
-                    if access.server.service_type.value == 'kavita':
-                        kavita_server = access.server
-                        break
-                
-                if kavita_server:
-                    service = MediaServiceFactory.create_service_from_db(kavita_server)
-                    if service:
-                        kavita_reading_stats = service.get_user_reading_stats(kavita_user_id)
-                        kavita_reading_history = service.get_user_reading_history(kavita_user_id)
-                        current_app.logger.debug(f"KAVITA HISTORY: Stats: {kavita_reading_stats}")
-                        current_app.logger.debug(f"KAVITA HISTORY: History: {kavita_reading_history}")
-            except Exception as e:
-                current_app.logger.error(f"Error fetching Kavita reading data: {e}")
-        
-        if not is_kavita_user:
-            # For non-Kavita users, use regular stream history
-            # Check if this is a service user (MockServiceUser) or a regular UserAppAccess
-            current_app.logger.debug(f"HISTORY: Processing history for user ID {user.id}, username: {getattr(user, 'username', 'N/A')}")
-            current_app.logger.debug(f"HISTORY: User type: {type(user).__name__}")
-            current_app.logger.debug(f"HISTORY: Has _is_service_user: {hasattr(user, '_is_service_user')}")
-            current_app.logger.debug(f"HISTORY: _is_service_user value: {getattr(user, '_is_service_user', 'N/A')}")
-            
-            if hasattr(user, '_is_service_user') and user._is_service_user:
-                # This is a service user - we need to filter by user_media_access_uuid to get only this service's history
-                # For linked service accounts, history is stored with both user_app_access_uuid AND user_media_access_uuid
-                current_app.logger.debug(f"HISTORY: Service user - querying MediaStreamHistory with user_media_access_uuid={user.uuid}")
-                current_app.logger.debug(f"HISTORY: Access record details - server: {access.server.server_nickname}, service_type: {access.server.service_type.value}, external_username: {access.external_username}")
-                stream_history_pagination = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid)\
-                    .order_by(MediaStreamHistory.started_at.desc())\
-                    .paginate(page=page, per_page=15, error_out=False)
-                current_app.logger.debug(f"HISTORY: Found {stream_history_pagination.total} history records for service user")
-                
-                # Enhance history records with MediaItem database IDs for clickable links
-                enhance_history_records_with_media_ids(stream_history_pagination.items)
-                
-                # Additional debugging - show sample records
-                if stream_history_pagination.items:
-                    current_app.logger.debug(f"HISTORY: Sample records:")
-                    for i, record in enumerate(stream_history_pagination.items[:3]):
-                        current_app.logger.debug(f"HISTORY: Record {i+1}: {record.media_title} at {record.started_at} (user_media_access_uuid: {record.user_media_access_uuid}, user_app_access_uuid: {record.user_app_access_uuid})")
-            else:
-                # This is a regular UserAppAccess - query by user_app_access_id
-                current_app.logger.debug(f"HISTORY: Regular UserAppAccess - querying MediaStreamHistory with user_app_access_uuid={user.uuid}")
-                stream_history_pagination = MediaStreamHistory.query.filter_by(user_app_access_uuid=user.uuid)\
-                    .order_by(MediaStreamHistory.started_at.desc())\
-                    .paginate(page=page, per_page=15, error_out=False)
-                current_app.logger.debug(f"HISTORY: Found {stream_history_pagination.total} history records for regular user")
-                
-                # Enhance history records with MediaItem database IDs for clickable links
-                enhance_history_records_with_media_ids(stream_history_pagination.items)
-            
-            # Additional debugging - check what's actually in the database
-            total_records = MediaStreamHistory.query.count()
-            records_with_user_media_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_media_access_uuid.isnot(None)).count()
-            records_with_user_app_access = MediaStreamHistory.query.filter(MediaStreamHistory.user_app_access_uuid.isnot(None)).count()
-            current_app.logger.debug(f"HISTORY: Total MediaStreamHistory records: {total_records}")
-            current_app.logger.debug(f"HISTORY: Records with user_media_access_uuid: {records_with_user_media_access}")
-            current_app.logger.debug(f"HISTORY: Records with user_app_access_uuid: {records_with_user_app_access}")
-            
-            # Check specifically for this user's records
-            if hasattr(user, '_is_service_user') and user._is_service_user:
-                specific_records = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).all()
-                current_app.logger.debug(f"HISTORY: Specific records for user_media_access_uuid {user.uuid}: {len(specific_records)}")
-                for record in specific_records:
-                    current_app.logger.debug(f"HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
-                
-                # Check if this user is linked to a local account and if so, what other user_media_access_uuids exist for that local account
-                if access.user_app_access_id:
-                    current_app.logger.debug(f"HISTORY: This service account is linked to local user_app_access_id: {access.user_app_access_id}")
-                    # Find all UserMediaAccess records for this local user
-                    all_user_accesses = UserMediaAccess.query.filter_by(user_app_access_id=access.user_app_access_id).all()
-                    current_app.logger.debug(f"HISTORY: All UserMediaAccess records for local user:")
-                    for ua in all_user_accesses:
-                        current_app.logger.debug(f"HISTORY: - UserMediaAccess ID {ua.id}: {ua.server.server_nickname} ({ua.server.service_type.value}) - {ua.external_username}")
-                        # Check how many history records exist for each
-                        count = MediaStreamHistory.query.filter_by(user_media_access_uuid=ua.uuid).count()
-                        current_app.logger.debug(f"HISTORY:   -> Has {count} streaming history records")
-            else:
-                specific_records = MediaStreamHistory.query.filter_by(user_app_access_uuid=user.uuid).all()
-                current_app.logger.debug(f"HISTORY: Specific records for user_app_access_uuid {user.uuid}: {len(specific_records)}")
-                for record in specific_records:
-                    current_app.logger.debug(f"HISTORY: Record ID {record.id}: {record.media_title} at {record.started_at}")
-            
-    # Get user service types and server names for service-aware display
-    user_service_types = {}
-    user_server_names = {}
-    # For standalone service users, we already have the access records from above
-    # Use UUID as key to match template expectations
-    user_service_types[user.uuid] = []
-    user_server_names[user.uuid] = []
-    for access_record in user_access_records:
-        if access_record.server.service_type not in user_service_types[user.uuid]:
-            user_service_types[user.uuid].append(access_record.server.service_type)
-        if access_record.server.server_nickname not in user_server_names[user.uuid]:
-            user_server_names[user.uuid].append(access_record.server.server_nickname)
-
-    if request.headers.get('HX-Request') and tab == 'history':
-        # UUID is already available on user objects for the delete function
-            
-        return render_template('user/_partials/profile_tabs/history_tab_content.html', 
-                             user=user, 
-                             history_logs=stream_history_pagination,
-                             kavita_reading_stats=kavita_reading_stats,
-                             kavita_reading_history=kavita_reading_history,
-                             user_service_types=user_service_types,
-                             user_server_names=user_server_names)
-        
-    # Get user sorted libraries for template (needed for settings tab)
-    user_sorted_libraries = []
-    current_library_ids = access.allowed_library_ids or []
-    
-    # Handle special case for Jellyfin users with '*' (all libraries access)
-    if current_library_ids == ['*']:
-        # If user has "All Libraries" access, show all available libraries
-        for lib_id, lib_name in available_libraries.items():
-            user_sorted_libraries.append({
-                'id': lib_id,
-                'name': lib_name
-            })
-    else:
-        # Apply the same matching logic as the form handling
-        for lib_id in current_library_ids:
-            lib_id_str = str(lib_id)
-            # Direct match first
-            if lib_id_str in available_libraries:
-                user_sorted_libraries.append({
-                    'id': lib_id_str,
-                    'name': available_libraries[lib_id_str]
-                })
-            else:
-                # For Kavita, try multiple matching strategies
-                found_match = False
-                
-                # Strategy 1: Extract numeric part from stored compound ID and match against available numeric parts
-                if '_' in lib_id_str:
-                    stored_numeric = lib_id_str.split('_')[0]
-                    stored_name = lib_id_str.split('_', 1)[1] if '_' in lib_id_str else ''
-                    
-                    for avail_lib_id in available_libraries.keys():
-                        if '_' in avail_lib_id:
-                            avail_numeric = avail_lib_id.split('_')[0]
-                            avail_name = avail_lib_id.split('_', 1)[1]
-                            
-                            # Match by name (case insensitive) since numeric IDs might not match
-                            if stored_name.lower() == avail_name.lower():
-                                user_sorted_libraries.append({
-                                    'id': avail_lib_id,
-                                    'name': available_libraries[avail_lib_id]
-                                })
-                                found_match = True
-                                break
-                
-                # Strategy 2: If stored ID is simple numeric, match against available compound IDs
-                if not found_match:
-                    for avail_lib_id in available_libraries.keys():
-                        if '_' in avail_lib_id:
-                            # Extract numeric part from compound ID (e.g., "2_Books" -> "2")
-                            numeric_part = avail_lib_id.split('_')[0]
-                            if numeric_part == lib_id_str:
-                                user_sorted_libraries.append({
-                                    'id': avail_lib_id,
-                                    'name': available_libraries[avail_lib_id]
-                                })
-                                found_match = True
-                                break
-
-    return render_template(
-        'user/index.html',
-        title=f"User Profile: {user.get_display_name()}",
-        user=user,
-        form=form,
-        user_sorted_libraries=user_sorted_libraries,
-        history_logs=stream_history_pagination,
-        kavita_reading_stats=kavita_reading_stats,
-        kavita_reading_history=kavita_reading_history,
-        active_tab=tab,
-        is_admin=check_if_user_is_admin(user),
-        is_service_user=True,
-        server=server,
-        stream_stats=stream_stats,
-        user_service_types=user_service_types,
-        user_server_names=user_server_names,
-        linked_user_app_access=linked_user_app_access,
-        current_user=current_user,
-        form_action_override=url_for('user.view_service_account',
-                                   server_nickname=server_nickname,
-                                   server_username=server_username),
-        now_utc=datetime.now(timezone.utc)
-    )
+# ROUTE REMOVED: This route conflicted with admin route at /admin/user/<server_nickname>/<server_username>
+# Service user profiles are now only accessible via the admin route to maintain proper access control
+# The admin route now includes all the rich data that was previously only available here

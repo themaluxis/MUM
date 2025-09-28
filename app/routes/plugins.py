@@ -7,7 +7,7 @@ from app.models_plugins import Plugin, PluginStatus, PluginType
 from app.services.plugin_manager import plugin_manager
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
-from app.models import EventType
+from app.models import User, UserType, EventType
 import json
 from app.routes.setup import get_completed_steps
 

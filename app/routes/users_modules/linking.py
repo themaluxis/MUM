@@ -3,8 +3,7 @@
 
 from flask import render_template, request, current_app, make_response
 from flask_login import login_required, current_user
-from app.models import UserAppAccess, EventType
-from app.models_media_services import UserMediaAccess
+from app.models import User, UserType, EventType
 from app.extensions import db
 from app.utils.helpers import log_event, permission_required
 from . import users_bp
@@ -16,12 +15,12 @@ import json
 @permission_required('edit_user')
 def get_local_user_edit_form(local_user_id):
     """Get edit form for local user"""
-    local_user = UserAppAccess.query.get_or_404(local_user_id)
+    local_user = User.query.filter_by(userType=UserType.LOCAL).get_or_404(local_user_id)
     
     # For now, return a simple form - this can be expanded later
     return f"""
     <div class="modal-box">
-        <h3 class="font-bold text-lg">Edit Local User: {local_user.username}</h3>
+        <h3 class="font-bold text-lg">Edit Local User: {local_user.localUsername}</h3>
         <p class="py-4">Local user editing functionality coming soon...</p>
         <div class="modal-action">
             <button class="btn" onclick="this.closest('dialog').close()">Close</button>
@@ -35,11 +34,11 @@ def get_local_user_edit_form(local_user_id):
 @permission_required('view_users')
 def get_linked_accounts(local_user_id):
     """Get linked accounts view for local user"""
-    local_user = UserAppAccess.query.get_or_404(local_user_id)
+    local_user = User.query.filter_by(userType=UserType.LOCAL).get_or_404(local_user_id)
     
     linked_accounts_html = ""
     # Get linked UserMediaAccess records for this local user
-    linked_accounts = UserMediaAccess.query.filter_by(user_app_access_id=local_user_id).all()
+    linked_accounts = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=local_user_id).all()
     
     for access in linked_accounts:
         # Get service badge info based on server type
@@ -168,7 +167,7 @@ def get_linked_accounts(local_user_id):
                 </div>
                 <div>
                     <h3 class="text-xl font-semibold text-base-content">Linked Accounts</h3>
-                    <p class="text-sm text-base-content/60">{local_user.username} • {len(linked_accounts)} connected service accounts</p>
+                    <p class="text-sm text-base-content/60">{local_user.localUsername} • {len(linked_accounts)} connected service accounts</p>
                 </div>
             </div>
             <form method="dialog">
@@ -220,22 +219,22 @@ def get_linked_accounts(local_user_id):
 @permission_required('edit_user')
 def link_service_to_local(local_user_id, service_user_id):
     """Link a service account to a local user"""
-    local_user = UserAppAccess.query.get_or_404(local_user_id)
+    local_user = User.query.filter_by(userType=UserType.LOCAL).get_or_404(local_user_id)
     
     # Get the UserMediaAccess record by ID
-    service_access = UserMediaAccess.query.get_or_404(service_user_id)
+    service_access = User.query.filter_by(userType=UserType.SERVICE).get_or_404(service_user_id)
     
     try:
         # Check if service account is already linked to another local user
-        if service_access.user_app_access_id and service_access.user_app_access_id != local_user_id:
+        if service_access.linkedUserId and service_access.linkedUserId != local_user_id:
             return make_response("Service account is already linked to another local user", 400)
         
         # Link the accounts
-        service_access.user_app_access_id = local_user_id
+        service_access.linkedUserId = local_user_id
         db.session.commit()
         
         log_event(EventType.SETTING_CHANGE, 
-                  f"Service account '{service_access.external_username}' linked to local user '{local_user.username}'",
+                  f"Service account '{service_access.external_username}' linked to local user '{local_user.localUsername}'",
                   admin_id=current_user.id)
         
         return make_response("", 200)
@@ -250,15 +249,15 @@ def link_service_to_local(local_user_id, service_user_id):
 @permission_required('edit_user')
 def unlink_service_from_local(service_user_id):
     """Unlink a service account from its local user"""
-    service_access = UserMediaAccess.query.get_or_404(service_user_id)
+    service_access = User.query.filter_by(userType=UserType.SERVICE).get_or_404(service_user_id)
     
     try:
         old_local_user = service_access.user_app_access
-        service_access.user_app_access_id = None
+        service_access.linkedUserId = None
         db.session.commit()
         
         log_event(EventType.SETTING_CHANGE, 
-                  f"Service account '{service_access.external_username}' unlinked from local user '{old_local_user.username if old_local_user else 'Unknown'}'",
+                  f"Service account '{service_access.external_username}' unlinked from local user '{old_local_user.localUsername if old_local_user else 'Unknown'}'",
                   admin_id=current_user.id)
         
         return make_response("", 200)

@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from flask import render_template, redirect, url_for, flash, request, current_app, g, make_response
 from flask_login import login_required, current_user
-from app.models import Invite, Setting, EventType, UserAppAccess
+from app.models import User, UserType, Invite, Setting, EventType
 from app.models_media_services import MediaServer
 from app.forms import InviteCreateForm
 from app.extensions import db
@@ -21,7 +21,7 @@ import json
 @permission_required('manage_invites')
 def list_invites():
     # Redirect local users away from admin pages
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_invites'):
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('manage_invites'):
         flash('You do not have permission to access the invites management page.', 'danger')
         return redirect(url_for('user.index'))
     
@@ -605,7 +605,7 @@ def delete_invite(invite_id):
 @login_required
 @setup_required
 def view_invite_usages(invite_id):
-    from app.models import InviteUsage
+    from app.models import User, UserType, InviteUsage
     invite = Invite.query.get_or_404(invite_id)
     usages = InviteUsage.query.filter_by(invite_id=invite.id).order_by(InviteUsage.used_at.desc()).all()
     return render_template('invites/_partials/modals/usage_modal.html', invite=invite, usages=usages)

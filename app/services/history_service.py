@@ -1,6 +1,6 @@
 # File: app/services/history_service.py
 from flask import current_app
-from app.models import HistoryLog, EventType
+from app.models import User, UserType, HistoryLog, EventType
 from app.extensions import db
 from app.utils.helpers import log_event # For logging the clear action itself
 

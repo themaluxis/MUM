@@ -1,7 +1,7 @@
 """Statistics and analytics functionality for libraries"""
 
 from flask import current_app
-from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory, UserMediaAccess
+from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory
 from app.extensions import db
 from datetime import datetime, timezone, timedelta
 
@@ -66,7 +66,7 @@ def get_advanced_library_statistics(library, days=30):
         # Calculate advanced metrics
         stats = {
             'total_streams': len(library_streams),
-            'unique_users': len(set(stream.user_app_access_uuid for stream in library_streams if stream.user_app_access_uuid)),
+            'unique_users': len(set(stream.user_uuid for stream in library_streams if stream.user_uuid)),
             'total_duration': sum(stream.duration_seconds or 0 for stream in library_streams),
             'average_session_length': 0,
             'peak_hours': {},
@@ -176,7 +176,7 @@ def get_library_user_engagement_metrics(library, days=30):
         
         # Get user engagement data
         user_metrics = db.session.query(
-            MediaStreamHistory.user_app_access_uuid,
+            MediaStreamHistory.user_uuid,
             db.func.count(MediaStreamHistory.id).label('session_count'),
             db.func.sum(MediaStreamHistory.duration_seconds).label('total_watch_time'),
             db.func.avg(MediaStreamHistory.duration_seconds).label('avg_session_length'),
@@ -187,19 +187,18 @@ def get_library_user_engagement_metrics(library, days=30):
             MediaStreamHistory.library_name == library.name,
             MediaStreamHistory.started_at >= start_date,
             MediaStreamHistory.started_at <= end_date,
-            MediaStreamHistory.user_app_access_uuid.isnot(None)
-        ).group_by(MediaStreamHistory.user_app_access_uuid).all()
+            MediaStreamHistory.user_uuid.isnot(None)
+        ).group_by(MediaStreamHistory.user_uuid).all()
         
         # Process metrics
         engagement_data = []
         for metric in user_metrics:
             # Get user info
-            from app.models import UserAppAccess
-            user = UserAppAccess.query.filter_by(uuid=metric.user_app_access_uuid).first()
+            user = User.query.filter_by(uuid=metric.user_uuid).first()
             
             engagement_data.append({
-                'user_uuid': metric.user_app_access_uuid,
-                'username': user.username if user else 'Unknown User',
+                'user_uuid': metric.user_uuid,
+                'username': user.localUsername if user else 'Unknown User',
                 'session_count': metric.session_count,
                 'total_watch_time': metric.total_watch_time or 0,
                 'avg_session_length': metric.avg_session_length or 0,
@@ -266,7 +265,7 @@ def get_content_performance_metrics(library, days=30):
             MediaStreamHistory.media_title,
             MediaStreamHistory.media_type,
             db.func.count(MediaStreamHistory.id).label('total_streams'),
-            db.func.count(db.func.distinct(MediaStreamHistory.user_app_access_uuid)).label('unique_viewers'),
+            db.func.count(db.func.distinct(MediaStreamHistory.user_uuid)).label('unique_viewers'),
             db.func.sum(MediaStreamHistory.duration_seconds).label('total_watch_time'),
             db.func.avg(MediaStreamHistory.duration_seconds).label('avg_watch_time'),
             db.func.max(MediaStreamHistory.started_at).label('last_watched')

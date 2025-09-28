@@ -15,18 +15,17 @@ from .helpers import _generate_streaming_chart_data
 def index():
     """User dashboard/index page for regular user accounts - accessible at /user/dashboard"""
     # Ensure this is a regular user, not an owner
-    from app.models import Owner
-    if isinstance(current_user, Owner):
+    from app.models import User, UserType
+    if current_user.userType == UserType.OWNER:
         return redirect(url_for('dashboard.index'))
     
-    # Ensure this is an AppUser (local user account)
-    from app.models import UserAppAccess
-    if not isinstance(current_user, UserAppAccess):
+    # Ensure this is a LOCAL user account
+    if current_user.userType != UserType.LOCAL:
         flash('Access denied. Please log in with a valid user account.', 'danger')
         return redirect(url_for('auth.app_login'))
     
     # Get application name for welcome message
-    from app.models import Setting
+    from app.models import User, UserType, Setting
     app_name = Setting.get('APP_NAME', 'MUM')
     
     # Get date range from query parameter

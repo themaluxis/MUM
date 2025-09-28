@@ -9,7 +9,7 @@ from app.utils.helpers import log_event, setup_required, permission_required
 from app.extensions import csrf
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
-from app.models import EventType
+from app.models import User, UserType, EventType
 
 # Create a blueprint for setup routes (no prefix - will be handled in app/__init__.py)
 bp = Blueprint('media_servers_setup', __name__)
@@ -180,7 +180,7 @@ def test_connection_setup(plugin_id):
         temp_server.server_nickname = server_name or 'Test Server'
         temp_server.url = server_url  # Correct field name is 'url', not 'server_url'
         temp_server.api_key = api_key
-        temp_server.username = username
+        temp_server.localUsername = username
         temp_server.password = password
         temp_server.public_url = public_url
         temp_server.service_type = ServiceType(plugin_id)

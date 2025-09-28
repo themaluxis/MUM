@@ -242,15 +242,15 @@
                 {% endif %}
                 
                 {# Linked Account Badge - Show for service users that have a linked local account #}
-                {% if user._user_type is defined and user._user_type == 'service' and user._access_record and user._access_record.user_app_access_id %}
-                    {% set linked_user = user._access_record.user_app_access %}
+                {% if user._user_type is defined and user._user_type == 'service' and user._access_record and user._access_record.linkedUserId %}
+                    {% set linked_user = user._access_record.get_linked_parent() %}
                     {% if linked_user %}
-                        <a href="{{ url_for('user.view_app_user', username=linked_user.username, back='users', back_view='cards') }}" 
+                        <a href="{{ url_for('user.view_app_user', username=linked_user.localUsername, back='users', back_view='cards') }}" 
                            class="inline-flex items-center rounded-md px-2 py-1 bg-primary/10 text-primary ring-primary/20 hover:bg-primary/20 text-xs font-medium ring-1 ring-inset gap-1 mt-1 cursor-pointer transition-colors" 
-                           title="View linked local account: {{ linked_user.username }}"
+                           title="View linked local account: {{ linked_user.localUsername }}"
                            onclick="event.stopPropagation();">
                             <i class="fa-solid fa-link w-3 h-3"></i>
-                            {{ linked_user.username }}
+                            {{ linked_user.localUsername }}
                         </a>
                     {% endif %}
                 {% endif %}
@@ -258,7 +258,7 @@
         </div>
         
         <div class="text-xs space-y-1 mb-3">
-            {# For UserAppAccess, show the primary email #}
+            {# For local users, show the primary email #}
             <div class="user-email-section">
                 <p class="text-xs text-base-content/70 truncate" title="{{ user.email or 'No E-mail address' }}"><i class="fa-solid fa-at fa-fw mr-1 text-info"></i> Email: {{ user.email or 'No E-mail address' }}</p>
             </div>
@@ -388,15 +388,15 @@
                 </a>
             {% else %}
                 <!-- User profile link -->
-                {# All users are now UserAppAccess, so use consistent profile link #}
+                {# All users are now unified User model, so use consistent profile link #}
                 {% if user._user_type == 'service' %}
-                    {# Service user - route to /user/{server_nickname}/{username} #}
-                    <a href="{{ url_for('user.view_service_account', server_nickname=user._access_record.server.server_nickname, server_username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                    {# Service user - route to /admin/user/{server_nickname}/{username} #}
+                    <a href="{{ url_for('admin_user.view_service_user', server_nickname=user.server.server_nickname, server_username=user.external_username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
                         <i class="fa-solid fa-user"></i>
                     </a>
                 {% else %}
-                    {# Local user - route to /user/{username} #}
-                    <a href="{{ url_for('user.view_app_user', username=user.username, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
+                    {# Local user - route to /admin/user/{username} #}
+                    <a href="{{ url_for('admin_user.view_local_user', username=user.localUsername, back='users', back_view='cards') }}" title="User Profile" class="btn btn-xs btn-ghost text-info hover:bg-info/10">
                         <i class="fa-solid fa-user"></i>
                     </a>
                 {% endif %}

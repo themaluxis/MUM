@@ -3,8 +3,8 @@ from flask import current_app
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import func, case, or_
-from app.models import UserAppAccess, EventType
-from app.models_media_services import ServiceType, MediaServer, UserMediaAccess, MediaStreamHistory
+from app.models import User, UserType, EventType
+from app.models_media_services import ServiceType, MediaServer, MediaStreamHistory
 from app.extensions import db
 from app.utils.helpers import log_event, format_duration
 from app.services.media_service_manager import MediaServiceManager
@@ -33,16 +33,15 @@ def sync_users_from_plex():
         # Return a structure indicating failure for the route to handle
         return {'added': [], 'updated': [], 'removed': [], 'errors': 1, 'error_messages': ["Failed to retrieve users from Plex service."]}
 
-    # Get all UserAppAccess records and their media accesses
-    mum_users_all = UserAppAccess.query.all()
+    # Get all LOCAL users and their linked service users
+    mum_users_all = User.query.filter_by(userType=UserType.LOCAL).all()
     
-    # Get Plex user mappings from UserMediaAccess instead of ServiceAccount
-    from app.models_media_services import UserMediaAccess, ServiceType
+    # Get Plex user mappings from unified User model
     plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
     if plex_server:
-        plex_accesses = UserMediaAccess.query.filter_by(server_id=plex_server.id).all()
-        mum_users_map_by_plex_id = {access.external_user_id: access.service_account for access in plex_accesses if access.external_user_id}
-        mum_users_map_by_plex_uuid = {access.external_user_alt_id: access.service_account for access in plex_accesses if access.external_user_alt_id}
+        plex_accesses = User.query.filter_by(userType=UserType.SERVICE, server_id=plex_server.id).all()
+        mum_users_map_by_plex_id = {access.external_user_id: access for access in plex_accesses if access.external_user_id}
+        mum_users_map_by_plex_uuid = {access.external_user_alt_id: access for access in plex_accesses if access.external_user_alt_id}
     else:
         mum_users_map_by_plex_id = {}
         mum_users_map_by_plex_uuid = {}
@@ -93,9 +92,9 @@ def sync_users_from_plex():
             # if plex_uuid_from_sync and mum_user.plex_uuid != plex_uuid_from_sync:
             #     changes_for_this_user.append(f"Plex UUID updated from {mum_user.plex_uuid} to {plex_uuid_from_sync}")
             #     mum_user.plex_uuid = plex_uuid_from_sync
-            if mum_user.username != plex_username_from_sync:
-                changes_for_this_user.append(f"Username changed from '{mum_user.username}' to '{plex_username_from_sync}'")
-                mum_user.username = plex_username_from_sync
+            if mum_user.localUsername != plex_username_from_sync:
+                changes_for_this_user.append(f"Username changed from '{mum_user.localUsername}' to '{plex_username_from_sync}'")
+                mum_user.localUsername = plex_username_from_sync
             if mum_user.plex_email != plex_email_from_sync:
                 changes_for_this_user.append(f"Email updated") # Don't log old/new email for privacy
                 mum_user.plex_email = plex_email_from_sync
@@ -124,12 +123,17 @@ def sync_users_from_plex():
         else: # New user
             try:
                 # Note: ServiceAccount model doesn't have plex_user_id or plex_uuid fields
-                new_user_obj = User( # Renamed to avoid conflict with User model
-                    # plex_user_id=plex_id, plex_uuid=plex_uuid_from_sync, 
-                    username=plex_username_from_sync, plex_email=plex_email_from_sync,
-                    plex_thumb_url=plex_thumb_from_sync, allowed_library_ids=new_library_ids_from_plex_list, 
-                    is_home_user=is_home_user_from_sync, shares_back=shares_back_from_sync,
-                    is_plex_friend=is_friend_from_sync, last_synced_with_plex=datetime.utcnow()
+                new_user_obj = User( # Create service user for Plex
+                    userType=UserType.SERVICE,
+                    server_id=plex_server.id,  # Assuming plex_server is available in context
+                    external_user_id=plex_id,
+                    external_username=plex_username_from_sync,
+                    external_email=plex_email_from_sync,
+                    external_avatar_url=plex_thumb_from_sync,
+                    allowed_library_ids=new_library_ids_from_plex_list, 
+                    is_home_user=is_home_user_from_sync,
+                    shares_back=shares_back_from_sync,
+                    last_activity_at=datetime.utcnow()
                 )
                 db.session.add(new_user_obj)
                 added_users_details.append({'username': plex_username_from_sync, 'plex_id': plex_id})
@@ -144,7 +148,7 @@ def sync_users_from_plex():
                 current_app.logger.error(msg, exc_info=True)
                 error_count += 1; error_messages.append(msg)
 
-    # Check for users to remove based on UserMediaAccess data
+    # Check for users to remove based on service user data
     if plex_server:
         for access in plex_accesses:
             mum_user_obj = access.service_account
@@ -218,8 +222,8 @@ def update_user_details(user_id, notes=None, new_library_ids=None,
         user = user_obj
     elif user_type == "user_media_access":
         # For user_media_access, get the associated UserAppAccess if it exists
-        if user_obj.user_app_access_id:
-            user = UserAppAccess.query.get_or_404(user_obj.user_app_access_id)
+        if user_obj.userType == UserType.SERVICE and user_obj.linkedUserId:
+            user = User.query.filter_by(uuid=user_obj.linkedUserId, userType=UserType.LOCAL).first()
         else:
             raise Exception(f"Cannot update details for standalone service user {user_id}")
     else:
@@ -279,7 +283,7 @@ def update_user_details(user_id, notes=None, new_library_ids=None,
         try:
             current_app.logger.info(f"[DEBUG-USER_SVC] Preparing to call plex_service.update_user_access for user '{user.get_display_name()}'. State to send -> library_ids_to_share: {user.allowed_library_ids}, allow_sync: {user.allow_downloads}")
             # **THE FIX**: We now pass the user's complete, final desired library and download state to the service.
-            # Get Plex user ID from UserMediaAccess
+            # Get Plex user ID from service user
             plex_access = user.get_server_access(plex_server_id)
             plex_user_id = plex_access.external_user_id if plex_access else None
             
@@ -318,7 +322,7 @@ def delete_user_from_mum_and_plex(user_id, admin_id: int = None):
     elif user_type == "user_media_access":
         media_access = user_obj
         username = media_access.external_username or f"Service User {user_obj.id}"
-        user = None  # No UserAppAccess for standalone users
+        user = None  # No local user for standalone service users
     else:
         raise Exception(f"Invalid user type: {user_type}")
     
@@ -326,25 +330,27 @@ def delete_user_from_mum_and_plex(user_id, admin_id: int = None):
     service_type = None
     user_service_id = None
     
-    # Check if user has Plex access via UserMediaAccess
-    from app.models_media_services import UserMediaAccess, ServiceType
+    # Check if user has Plex access via service user
+    from app.models_media_services import ServiceType
     
     if user_type == "user_app_access" and user:
         # Local user - check their media accesses
-        plex_access = UserMediaAccess.query.filter_by(
-            user_app_access_id=user.id,
+        plex_access = User.query.filter_by(
+            linkedUserId=user.uuid,
+            userType=UserType.SERVICE,
             server_id=MediaServer.query.filter_by(service_type=ServiceType.PLEX).first().id if MediaServer.query.filter_by(service_type=ServiceType.PLEX).first() else None
         ).first()
         
         if plex_access and plex_access.external_user_id:
             service_type = ServiceType.PLEX
             user_service_id = plex_access.external_user_id
-        # Check for other service types via UserMediaAccess
+        # Check for other service types via linked service users
         if not service_type:
-            for access in user.media_accesses:
-                if access.server and access.external_user_id:
-                    service_type = access.server.service_type
-                    user_service_id = access.external_user_id
+            linked_service_users = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=user.uuid).all()
+            for service_user in linked_service_users:
+                if service_user.server and service_user.external_user_id:
+                    service_type = service_user.server.service_type
+                    user_service_id = service_user.external_user_id
                     break
     else:
         # Standalone service user - use the media_access directly
@@ -387,10 +393,10 @@ def delete_user_from_mum_and_plex(user_id, admin_id: int = None):
         
         # Delete from MUM database
         if user_type == "user_app_access" and user:
-            # Delete UserAppAccess (cascades to UserMediaAccess)
+            # Delete local user (cascades to linked service users)
             db.session.delete(user)
         else:
-            # Delete standalone UserMediaAccess
+            # Delete standalone service user
             db.session.delete(media_access)
         
         db.session.commit()
@@ -425,12 +431,12 @@ def mass_update_user_libraries(user_ids: list, new_library_ids: list, admin_id: 
             user_obj, user_type = get_user_by_uuid(str(user_id))
             if user_obj and user_type == "user_app_access":
                 local_user_ids.append(user_obj.id)
-            # Note: mass library updates only apply to local users with UserAppAccess
+            # Note: mass library updates only apply to local users
         except Exception as e:
             current_app.logger.error(f"Mass Update Error: Invalid user UUID {user_id}: {e}")
             error_count += 1
     
-    users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
+    users_to_update = User.query.filter_by(userType=UserType.LOCAL).filter(User.id.in_(local_user_ids)).all()
     db_library_value_to_set = list(new_library_ids) if new_library_ids is not None else [] # Ensure it's a list for DB
     plex_servers = MediaServiceManager.get_servers_by_type(ServiceType.PLEX)
     if not plex_servers:
@@ -446,7 +452,7 @@ def mass_update_user_libraries(user_ids: list, new_library_ids: list, admin_id: 
             needs_plex_update = (set(current_mum_libs) != set(db_library_value_to_set))
             
             if needs_plex_update:
-                # Get Plex user ID from UserMediaAccess
+                # Get Plex user ID from service user
                 plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
                 if plex_server:
                     plex_access = user.get_server_access(plex_server.id)
@@ -475,7 +481,6 @@ def mass_update_user_libraries(user_ids: list, new_library_ids: list, admin_id: 
     return processed_count, error_count
 
 def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict, admin_id: int = None):
-    from app.models_media_services import UserMediaAccess
 
     processed_count = 0
     error_count = 0
@@ -494,7 +499,7 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
             current_app.logger.error(f"Mass Update by Server Error: Invalid user UUID {user_id}: {e}")
             error_count += 1
     
-    users_to_update = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
+    users_to_update = User.query.filter_by(userType=UserType.LOCAL).filter(User.id.in_(local_user_ids)).all()
     user_map = {user.id: user for user in users_to_update}
 
     for server_id, new_library_ids in updates_by_server.items():
@@ -511,17 +516,17 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
             continue
 
         # Find which of the selected users have access to this server
-        access_records = UserMediaAccess.query.filter(UserMediaAccess.server_id == server_id, UserMediaAccess.user_app_access_id.in_(user_ids)).all()
+        access_records = User.query.filter_by(userType=UserType.SERVICE).filter(User.server_id == server_id, User.linkedUserId.in_(user_ids)).all()
         
         for access in access_records:
-            user = user_map.get(access.user_app_access_id)
+            user = user_map.get(access.linkedUserId)
             if not user:
                 continue
 
             try:
                 # This is a simplified update. The service method might need to be more generic.
                 if hasattr(service, 'update_user_access'):
-                    # Get the appropriate user ID from UserMediaAccess for this server
+                    # Get the appropriate user ID from service user for this server
                     access = user.get_server_access(server.id)
                     service_user_id = access.external_user_id if access else None
                     
@@ -530,7 +535,7 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
                     else:
                         current_app.logger.warning(f"Cannot update user access - no external_user_id found for {user.get_display_name()} on {server.server_nickname}")
                 
-                # Update the UserMediaAccess record
+                # Update the service user record
                 access.allowed_library_ids = new_library_ids
                 user.updated_at = datetime.utcnow()
                 processed_count += 1
@@ -551,7 +556,7 @@ def mass_update_user_libraries_by_server(user_ids: list, updates_by_server: dict
 
 
 def mass_update_bot_whitelist(user_uuids: list, should_whitelist: bool, admin_id: int = None):
-    """Mass update bot whitelist for service users (UserMediaAccess)"""
+    """Mass update bot whitelist for service users"""
     from app.utils.helpers import get_user_by_uuid
     updated_count = 0
     
@@ -571,7 +576,7 @@ def mass_update_bot_whitelist(user_uuids: list, should_whitelist: bool, admin_id
     return updated_count
 
 def mass_update_purge_whitelist(user_uuids: list, should_whitelist: bool, admin_id: int = None):
-    """Mass update purge whitelist for service users (UserMediaAccess)"""
+    """Mass update purge whitelist for service users"""
     from app.utils.helpers import get_user_by_uuid
     updated_count = 0
     
@@ -595,7 +600,6 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
     usernames_for_log_detail = []
     
     # Import required models
-    from app.models_media_services import UserMediaAccess
     from app.utils.helpers import get_user_by_uuid
     
     # Convert UUIDs to actual user IDs and separate by type
@@ -615,17 +619,17 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
     
     current_app.logger.info(f"Mass Delete: Processing {len(local_user_ids)} local users and {len(standalone_user_ids)} standalone users")
     
-    # Delete UserAppAccess users (local users)
+    # Delete local users
     if local_user_ids:
-        users_to_delete = UserAppAccess.query.filter(UserAppAccess.id.in_(local_user_ids)).all()
+        users_to_delete = User.query.filter_by(userType=UserType.LOCAL).filter(User.id.in_(local_user_ids)).all()
         
         for user in users_to_delete:
             username_for_log = user.get_display_name()
             user_deleted_successfully = False
             
             try:
-                # Get all UserMediaAccess records for this user to delete from all services
-                user_accesses = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
+                # Get all service user records for this user to delete from all services
+                user_accesses = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=user.uuid).all()
                 
                 # Try to delete from external services first, but don't fail if they're unavailable
                 for access in user_accesses:
@@ -643,15 +647,15 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
                             current_app.logger.error(f"Failed to delete user {username_for_log} from {server.service_type.value} server {server.server_nickname}: {e}")
                             # Continue with deletion from MUM even if server deletion fails
                 
-                # Delete the UserAppAccess from MUM (this will cascade to UserMediaAccess records)
+                # Delete the local user from MUM (this will cascade to linked service user records)
                 db.session.delete(user)
                 user_deleted_successfully = True
                 processed_count += 1
                 usernames_for_log_detail.append(username_for_log)
-                current_app.logger.info(f"Marked UserAppAccess {username_for_log} for deletion from MUM")
+                current_app.logger.info(f"Marked local user {username_for_log} for deletion from MUM")
                 
             except Exception as e:
-                current_app.logger.error(f"Mass Delete Error: UserAppAccess {username_for_log} (ID: {user.id}): {e}")
+                current_app.logger.error(f"Mass Delete Error: Local user {username_for_log} (ID: {user.id}): {e}")
                 error_count += 1
                 # If there was an error, try to rollback any partial changes for this user
                 if not user_deleted_successfully:
@@ -661,17 +665,17 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
                     except Exception as rollback_error:
                         current_app.logger.error(f"Error during rollback for user {username_for_log}: {rollback_error}")
     
-    # Delete standalone UserMediaAccess users (service users)
+    # Delete standalone service users
     if standalone_user_ids:
         for standalone_user_id in standalone_user_ids:
             access_deleted_successfully = False
             username_for_log = 'Unknown'
             
             try:
-                # Get the UserMediaAccess record directly using the actual ID
-                access = UserMediaAccess.query.filter(
-                    UserMediaAccess.id == standalone_user_id,
-                    UserMediaAccess.user_app_access_id.is_(None)
+                # Get the service user record directly using the actual ID
+                access = User.query.filter_by(userType=UserType.SERVICE).filter(
+                    User.id == standalone_user_id,
+                    User.linkedUserId.is_(None)
                 ).first()
                 
                 if access:
@@ -691,12 +695,12 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
                             current_app.logger.error(f"Failed to delete standalone user {username_for_log} from {server.service_type.value} server {server.server_nickname}: {e}")
                             # Continue with deletion from MUM even if server deletion fails
                     
-                    # Delete the standalone UserMediaAccess record
+                    # Delete the standalone service user record
                     db.session.delete(access)
                     access_deleted_successfully = True
                     processed_count += 1
                     usernames_for_log_detail.append(username_for_log)
-                    current_app.logger.info(f"Marked standalone UserMediaAccess {username_for_log} for deletion from MUM")
+                    current_app.logger.info(f"Marked standalone service user {username_for_log} for deletion from MUM")
                 else:
                     current_app.logger.warning(f"Standalone user with ID {standalone_user_id} not found")
                     error_count += 1
@@ -737,9 +741,9 @@ def mass_delete_users(user_ids: list, admin_id: int = None):
     return processed_count, error_count
 
 def update_user_last_streamed(plex_user_id_or_uuid, last_streamed_at_datetime: datetime):
-    # Find user via UserMediaAccess using Plex ID or UUID
+    # Find user via service user using Plex ID or UUID
     user = None
-    from app.models_media_services import UserMediaAccess, ServiceType
+    from app.models_media_services import ServiceType
     
     plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
     if not plex_server:
@@ -748,7 +752,7 @@ def update_user_last_streamed(plex_user_id_or_uuid, last_streamed_at_datetime: d
     
     if isinstance(plex_user_id_or_uuid, int) or (isinstance(plex_user_id_or_uuid, str) and plex_user_id_or_uuid.isdigit()):
         # Look up by Plex user ID
-        access = UserMediaAccess.query.filter_by(
+        access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
             server_id=plex_server.id,
             external_user_id=str(plex_user_id_or_uuid)
         ).first()
@@ -756,7 +760,7 @@ def update_user_last_streamed(plex_user_id_or_uuid, last_streamed_at_datetime: d
             user = access.service_account
     elif isinstance(plex_user_id_or_uuid, str):
         # Look up by Plex UUID
-        access = UserMediaAccess.query.filter_by(
+        access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
             server_id=plex_server.id,
             external_user_alt_id=plex_user_id_or_uuid
         ).first()
@@ -809,8 +813,8 @@ def update_user_last_streamed_by_id(user_id, last_streamed_at_datetime: datetime
         user = user_obj
     elif user_type == "user_media_access":
         # For user_media_access, get the associated UserAppAccess if it exists
-        if user_obj.user_app_access_id:
-            user = UserAppAccess.query.get(user_obj.user_app_access_id)
+        if user_obj.linkedUserId:
+            user = User.query.filter_by(userType=UserType.LOCAL).get(user_obj.linkedUserId)
         else:
             current_app.logger.warning(f"User_Service.py - update_user_last_streamed_by_id(): Cannot update last streamed for standalone service user {user_id}")
             return False
@@ -859,10 +863,9 @@ def purge_inactive_users(user_ids_to_purge: list[int], admin_id: int, inactive_d
     purged_count = 0
     error_count = 0
     
-    # Query UserMediaAccess (service users) instead of UserAppAccess
-    from app.models_media_services import UserMediaAccess
-    users_to_process = UserMediaAccess.query.filter(
-        UserMediaAccess.id.in_(final_ids_to_delete)
+    # Query service users instead of local users
+    users_to_process = User.query.filter_by(userType=UserType.SERVICE).filter(
+        User.id.in_(final_ids_to_delete)
     ).all()
 
     for user in users_to_process:
@@ -883,7 +886,7 @@ def purge_inactive_users(user_ids_to_purge: list[int], admin_id: int, inactive_d
                     current_app.logger.error(f"Failed to delete service user {username} from {server.service_type.value} server {server.server_nickname}: {e}")
                     # Continue with deletion from MUM even if server deletion fails
             
-            # Delete the UserMediaAccess record from MUM
+            # Delete the service user record from MUM
             db.session.delete(user)
             purged_count += 1
             current_app.logger.info(f"Purged service user {username} (ID: {user.id})")
@@ -922,17 +925,16 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
 
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=inactive_days_threshold)
     
-    # Base query for UserMediaAccess (service users) - both standalone and linked
-    from app.models_media_services import UserMediaAccess
-    query = UserMediaAccess.query
+    # Base query for service users - both standalone and linked
+    query = User.query.filter_by(userType=UserType.SERVICE)
 
     # Apply filters based on the checkboxes
     if exclude_whitelisted: 
-        query = query.filter(UserMediaAccess.is_purge_whitelisted != True)
+        query = query.filter(User.is_purge_whitelisted != True)
     
     if exclude_sharers:
         # Filter out users who share back their servers (if this field exists)
-        query = query.filter(UserMediaAccess.shares_back != True)
+        query = query.filter(User.shares_back != True)
         
     eligible_users_list = []
     potential_users = query.all()
@@ -940,9 +942,9 @@ def get_users_eligible_for_purge(inactive_days_threshold: int, exclude_sharers: 
     for user in potential_users:
         is_eligible_for_purge = False
         
-        # Check MediaStreamHistory for service users using user_media_access_uuid
+        # Check MediaStreamHistory for service users using user_uuid
         from app.models_media_services import MediaStreamHistory
-        last_stream = MediaStreamHistory.query.filter_by(user_media_access_uuid=user.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
+        last_stream = MediaStreamHistory.query.filter_by(user_uuid=user.uuid).order_by(MediaStreamHistory.started_at.desc()).first()
         last_streamed_at = last_stream.started_at if last_stream else None
         
         if last_streamed_at is None:
@@ -1017,16 +1019,9 @@ def get_user_stream_stats(user_id):
         current_app.logger.error(f"User not found in get_user_stream_stats: {user_id}")
         return {'global': {}, 'players': []}
     
-    # Build query filter based on user type
-    if user_type == "user_app_access":
-        filter_condition = MediaStreamHistory.user_app_access_uuid == user_obj.uuid
-        current_app.logger.debug(f"STATS SERVICE: UUID lookup successful for {user_id} -> user_app_access_uuid: {user_obj.uuid}")
-    elif user_type == "user_media_access":
-        filter_condition = MediaStreamHistory.user_media_access_uuid == user_obj.uuid
-        current_app.logger.debug(f"STATS SERVICE: UUID lookup successful for {user_id} -> user_media_access_uuid: {user_obj.uuid}")
-    else:
-        current_app.logger.error(f"Invalid user type {user_type} for user ID: {user_id}")
-        return {'global': {}, 'players': []}
+    # Build query filter using unified user_uuid column
+    filter_condition = MediaStreamHistory.user_uuid == user_obj.uuid
+    current_app.logger.debug(f"STATS SERVICE: UUID lookup successful for {user_id} -> user_uuid: {user_obj.uuid}")
 
     # --- Global Stats ---
     # Perform all aggregations in a single query for efficiency
@@ -1069,7 +1064,7 @@ def get_bulk_user_stream_stats(user_ids: list[int]) -> dict:
     """
     Efficiently gets total plays and duration for a list of user IDs.
     Returns a dictionary mapping user_id to its stats.
-    Handles both local users (UserAppAccess) and service users (UserMediaAccess).
+    Handles both local users and service users.
     """
     if not user_ids:
         return {}
@@ -1097,28 +1092,17 @@ def get_bulk_user_stream_stats(user_ids: list[int]) -> dict:
     
     stats_results = {}
     
-    # Query for local users (UserAppAccess)
-    if app_access_uuids:
-        app_results = db.session.query(
-            MediaStreamHistory.user_app_access_uuid,
+    # Query for local users
+    # Query for all users using unified user_uuid field
+    all_user_uuids = app_access_uuids + media_access_uuids
+    if all_user_uuids:
+        results = db.session.query(
+            MediaStreamHistory.user_uuid,
             func.count(MediaStreamHistory.id).label('total_plays'),
             func.sum(MediaStreamHistory.duration_seconds).label('total_duration')
-        ).filter(MediaStreamHistory.user_app_access_uuid.in_(app_access_uuids)).group_by(MediaStreamHistory.user_app_access_uuid).all()
+        ).filter(MediaStreamHistory.user_uuid.in_(all_user_uuids)).group_by(MediaStreamHistory.user_uuid).all()
         
-        for user_uuid, plays, duration in app_results:
-            user_id = uuid_to_user_id.get(user_uuid)
-            if user_id:
-                stats_results[user_id] = {'play_count': plays, 'total_duration': duration or 0}
-    
-    # Query for service users (UserMediaAccess)
-    if media_access_uuids:
-        media_results = db.session.query(
-            MediaStreamHistory.user_media_access_uuid,
-            func.count(MediaStreamHistory.id).label('total_plays'),
-            func.sum(MediaStreamHistory.duration_seconds).label('total_duration')
-        ).filter(MediaStreamHistory.user_media_access_uuid.in_(media_access_uuids)).group_by(MediaStreamHistory.user_media_access_uuid).all()
-        
-        for user_uuid, plays, duration in media_results:
+        for user_uuid, plays, duration in results:
             user_id = uuid_to_user_id.get(user_uuid)
             if user_id:
                 stats_results[user_id] = {'play_count': plays, 'total_duration': duration or 0}
@@ -1129,7 +1113,7 @@ def get_bulk_last_known_ips(user_ids: list) -> dict:
     """
     Efficiently gets the most recent IP address for a list of user IDs.
     Returns a dictionary mapping user_id to the last known IP address.
-    Supports both UserAppAccess and UserMediaAccess users.
+    Supports both local users and service users.
     """
     if not user_ids:
         return {}
@@ -1154,38 +1138,21 @@ def get_bulk_last_known_ips(user_ids: list) -> dict:
     
     user_id_to_ip = {}
     
-    # Handle UserAppAccess users
-    if app_access_uuids:
-        subquery_app = db.session.query(
-            MediaStreamHistory.user_app_access_uuid,
+    # Handle all users using unified user_uuid field
+    all_user_uuids = app_access_uuids + media_access_uuids
+    if all_user_uuids:
+        subquery = db.session.query(
+            MediaStreamHistory.user_uuid,
             MediaStreamHistory.ip_address,
             func.row_number().over(
-                partition_by=MediaStreamHistory.user_app_access_uuid,
+                partition_by=MediaStreamHistory.user_uuid,
                 order_by=MediaStreamHistory.started_at.desc()
             ).label('rn')
-        ).filter(MediaStreamHistory.user_app_access_uuid.in_(app_access_uuids)).filter(MediaStreamHistory.ip_address.isnot(None)).subquery()
+        ).filter(MediaStreamHistory.user_uuid.in_(all_user_uuids)).filter(MediaStreamHistory.ip_address.isnot(None)).subquery()
 
-        results_app = db.session.query(subquery_app.c.user_app_access_uuid, subquery_app.c.ip_address).filter(subquery_app.c.rn == 1).all()
+        results = db.session.query(subquery.c.user_uuid, subquery.c.ip_address).filter(subquery.c.rn == 1).all()
         
-        for result_uuid, ip_address in results_app:
-            user_id = uuid_to_user_id.get(result_uuid)
-            if user_id:
-                user_id_to_ip[user_id] = ip_address
-    
-    # Handle UserMediaAccess users
-    if media_access_uuids:
-        subquery_media = db.session.query(
-            MediaStreamHistory.user_media_access_uuid,
-            MediaStreamHistory.ip_address,
-            func.row_number().over(
-                partition_by=MediaStreamHistory.user_media_access_uuid,
-                order_by=MediaStreamHistory.started_at.desc()
-            ).label('rn')
-        ).filter(MediaStreamHistory.user_media_access_uuid.in_(media_access_uuids)).filter(MediaStreamHistory.ip_address.isnot(None)).subquery()
-
-        results_media = db.session.query(subquery_media.c.user_media_access_uuid, subquery_media.c.ip_address).filter(subquery_media.c.rn == 1).all()
-        
-        for result_uuid, ip_address in results_media:
+        for result_uuid, ip_address in results:
             user_id = uuid_to_user_id.get(result_uuid)
             if user_id:
                 user_id_to_ip[user_id] = ip_address
@@ -1193,7 +1160,7 @@ def get_bulk_last_known_ips(user_ids: list) -> dict:
     return user_id_to_ip
 
 def mass_extend_access(user_uuids: list, days_to_extend: int, admin_id: int = None):
-    """Mass extend access for service users (UserMediaAccess)"""
+    """Mass extend access for service users"""
     from app.utils.helpers import get_user_by_uuid
     from datetime import datetime, timedelta
     processed_count = 0
@@ -1220,7 +1187,7 @@ def mass_extend_access(user_uuids: list, days_to_extend: int, admin_id: int = No
     return processed_count, error_count
 
 def mass_set_expiration(user_uuids: list, new_expiration_date, admin_id: int = None):
-    """Mass set expiration date for service users (UserMediaAccess)"""
+    """Mass set expiration date for service users"""
     from app.utils.helpers import get_user_by_uuid
     processed_count = 0
     error_count = 0
@@ -1243,7 +1210,7 @@ def mass_set_expiration(user_uuids: list, new_expiration_date, admin_id: int = N
     return processed_count, error_count
 
 def mass_clear_expiration(user_uuids: list, admin_id: int = None):
-    """Mass clear expiration date for service users (UserMediaAccess)"""
+    """Mass clear expiration date for service users"""
     from app.utils.helpers import get_user_by_uuid
     processed_count = 0
     error_count = 0
@@ -1268,11 +1235,10 @@ def mass_clear_expiration(user_uuids: list, admin_id: int = None):
 def merge_service_users_into_local_account(user_uuids: list, username: str, password: str, admin_id: int = None):
     """
     Merge multiple service users into a new local account.
-    Creates a new UserAppAccess record and links the service users to it.
+    Creates a new local user record and links the service users to it.
     """
     from app.utils.helpers import get_user_by_uuid
     from werkzeug.security import generate_password_hash
-    from app.models_media_services import UserMediaAccess
     
     processed_count = 0
     error_count = 0
@@ -1289,12 +1255,12 @@ def merge_service_users_into_local_account(user_uuids: list, username: str, pass
                 user_obj, user_type = get_user_by_uuid(uuid_str)
                 if user_obj and user_type == "user_media_access":
                     # Check if this service user is already linked to a local account
-                    if user_obj.user_app_access_id:
+                    if user_obj.linkedUserId:
                         # Get the linked local account info for better error message
-                        linked_account = UserAppAccess.query.get(user_obj.user_app_access_id)
-                        linked_username = linked_account.username if linked_account else "Unknown"
+                        linked_account = User.query.filter_by(userType=UserType.LOCAL).get(user_obj.linkedUserId)
+                        linked_username = linked_account.localUsername if linked_account else "Unknown"
                         already_linked_users.append(f"{user_obj.external_username or 'Unknown'} (linked to {linked_username})")
-                        current_app.logger.warning(f"Service user {uuid_str} is already linked to local account {user_obj.user_app_access_id}")
+                        current_app.logger.warning(f"Service user {uuid_str} is already linked to local account {user_obj.linkedUserId}")
                         error_count += 1
                         continue
                     service_users.append(user_obj)
@@ -1331,20 +1297,22 @@ def merge_service_users_into_local_account(user_uuids: list, username: str, pass
                 warning_parts.append(f"{len(invalid_users)} invalid users")
             current_app.logger.warning(f"Merge operation proceeding with {len(service_users)} valid users. Skipped: {', '.join(warning_parts)}")
         
-        # Create the new local user account
-        new_local_user = UserAppAccess(
-            username=username,
-            password_hash=generate_password_hash(password, method='pbkdf2:sha256'),
-            email=None,  # Will be set from first service user if available
+        # Create the new local user account using unified model structure
+        new_local_user = User(
+            userType=UserType.LOCAL,
+            localUsername=username,
             is_active=True,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
         
+        # Set password using the model's method
+        new_local_user.set_password(password)
+        
         # Set email from the first service user that has one
         for service_user in service_users:
             if service_user.external_email:
-                new_local_user.email = service_user.external_email
+                new_local_user.discord_email = service_user.external_email
                 break
         
         db.session.add(new_local_user)
@@ -1354,7 +1322,7 @@ def merge_service_users_into_local_account(user_uuids: list, username: str, pass
         # Link all service users to the new local account
         for service_user in service_users:
             try:
-                service_user.user_app_access_id = new_local_user.id
+                service_user.linkedUserId = new_local_user.uuid
                 processed_count += 1
                 current_app.logger.info(f"Linked service user {service_user.external_username} to new local account {username}")
             except Exception as e:

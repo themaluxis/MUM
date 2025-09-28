@@ -4,8 +4,8 @@
 from flask import render_template, redirect, url_for, flash, request, current_app, make_response, abort
 from flask_login import login_required, current_user
 from datetime import datetime
-from app.models import UserAppAccess, Owner, EventType
-from app.models_media_services import UserMediaAccess
+from app.models import User, UserType, EventType
+from app.models_media_services import MediaServer
 from app.extensions import db
 from app.utils.helpers import permission_required, log_event
 from . import user_bp
@@ -18,16 +18,16 @@ import json
 def account():
     """User account management page - similar to admin account page"""
     # Ensure this is a regular user, not an owner
-    if isinstance(current_user, Owner):
+    if current_user.userType == UserType.OWNER:
         return redirect(url_for('dashboard.account'))
     
-    # Ensure this is a UserAppAccess (user account)
-    if not isinstance(current_user, UserAppAccess):
+    # Ensure this is a local user account
+    if not current_user.userType == UserType.LOCAL:
         flash('Access denied. Please log in with a valid user account.', 'danger')
         return redirect(url_for('auth.app_login'))
     
     from app.forms import ChangePasswordForm, TimezonePreferenceForm
-    from app.models import UserPreferences
+    from app.models import User, UserType, UserPreferences
     
     # Initialize forms
     change_password_form = ChangePasswordForm()
@@ -91,7 +91,7 @@ def reset_app_user_password(username):
     if not username:
         abort(400)
     
-    user_app_access = UserAppAccess.query.filter_by(username=username).first_or_404()
+    user_app_access = User.query.filter_by(userType=UserType.LOCAL).filter_by(username=username).first_or_404()
     
     from app.forms import UserResetPasswordForm
     form = UserResetPasswordForm()
@@ -147,28 +147,34 @@ def reset_password(username=None, server_nickname=None, server_username=None):
         if server_conflict:
             current_app.logger.warning(f"Potential conflict: app username '{username}' matches server nickname")
         
-        user_app_access = UserAppAccess.query.filter_by(username=username).first_or_404()
+        user_app_access = User.get_by_local_username(username)
+        if not user_app_access or user_app_access.userType != UserType.LOCAL:
+            abort(404)
     
     elif server_nickname and server_username:
         # This is for service users linked to local accounts
         from app.models_media_services import MediaServer
         
         # Check for potential username conflicts with app users
-        user_conflict = UserAppAccess.query.filter_by(username=server_nickname).first()
+        user_conflict = User.get_by_local_username(server_nickname)
         if user_conflict:
             current_app.logger.warning(f"Potential conflict: server nickname '{server_nickname}' matches app user username")
         
         server = MediaServer.query.filter_by(server_nickname=server_nickname).first_or_404()
         
         # Find the service account by server and username
-        access = UserMediaAccess.query.filter_by(
+        access = User.query.filter_by(
+            userType=UserType.SERVICE,
             server_id=server.id,
             external_username=server_username
         ).first_or_404()
         
         # Get the linked local user if exists
-        if access.user_app_access_id:
-            user_app_access = UserAppAccess.query.get_or_404(access.user_app_access_id)
+        if access.linkedUserId:
+            user_app_access = User.query.filter_by(
+                uuid=access.linkedUserId,
+                userType=UserType.LOCAL
+            ).first_or_404()
         else:
             flash('This service account is not linked to a local user account and cannot have its password reset.', 'warning')
             return redirect(request.referrer or url_for('users.list_users'))

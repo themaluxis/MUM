@@ -2,8 +2,8 @@ from flask import Blueprint, render_template, current_app, request
 from flask_login import login_required
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
-from app.models import UserAppAccess, Invite, HistoryLog
-from app.models_media_services import MediaStreamHistory, UserMediaAccess
+from app.models import User, UserType, Invite, HistoryLog
+from app.models_media_services import MediaStreamHistory
 from app.extensions import db
 from app.utils.helpers import setup_required, permission_required, format_duration
 from app.services.media_service_factory import MediaServiceFactory
@@ -71,7 +71,7 @@ def _generate_watch_statistics_data(days=7, service_filters=None):
         func.count(MediaStreamHistory.id).label('total_plays'),
         func.sum(func.coalesce(MediaStreamHistory.duration_seconds, MediaStreamHistory.view_offset_at_end_seconds, 60)).label('total_duration'),
         func.count(func.distinct(MediaStreamHistory.media_title)).label('unique_titles'),
-        func.count(func.distinct(func.coalesce(MediaStreamHistory.user_app_access_uuid, MediaStreamHistory.user_media_access_uuid))).label('unique_users')
+        func.count(func.distinct(MediaStreamHistory.user_uuid)).label('unique_users')
     ).first()
     
     # 5. Most Concurrent Streams (approximate - count max streams per day)
@@ -138,8 +138,7 @@ def _generate_top_users_data(days=7, limit=5):
     
     # Query to get top users by total watch time
     user_stats = db.session.query(
-        MediaStreamHistory.user_app_access_uuid,
-        MediaStreamHistory.user_media_access_uuid,
+        MediaStreamHistory.user_uuid,
         func.count(MediaStreamHistory.id).label('stream_count'),
         func.sum(
             func.coalesce(
@@ -152,8 +151,7 @@ def _generate_top_users_data(days=7, limit=5):
         MediaStreamHistory.started_at >= start_date,
         MediaStreamHistory.started_at <= end_date
     ).group_by(
-        MediaStreamHistory.user_app_access_uuid,
-        MediaStreamHistory.user_media_access_uuid
+        MediaStreamHistory.user_uuid
     ).order_by(
         func.sum(
             func.coalesce(
@@ -170,28 +168,26 @@ def _generate_top_users_data(days=7, limit=5):
         user_avatar = None
         service_info = []
         
-        # Get user info - could be from UserAppAccess (linked) or UserMediaAccess (standalone)
-        if stat.user_app_access_uuid:
-            user_app_access = UserAppAccess.query.filter_by(uuid=stat.user_app_access_uuid).first()
-            if user_app_access:
-                user_display_name = user_app_access.get_display_name()
+        # Get user info using unified user_uuid
+        user = User.query.filter_by(uuid=stat.user_uuid).first()
+        if user:
+            user_display_name = user.get_display_name()
+            user_avatar = user.get_avatar()
+            
+            if user.userType == UserType.LOCAL:
                 # Get all services this user has access to
-                for media_access in user_app_access.media_accesses:
-                    if media_access.server:
+                linked_service_users = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=user.uuid).all()
+                for service_user in linked_service_users:
+                    if service_user.server:
                         service_info.append({
-                            'type': media_access.server.service_type.value,
-                            'name': media_access.server.server_nickname
+                            'type': service_user.server.service_type.value,
+                            'name': service_user.server.server_nickname
                         })
-        elif stat.user_media_access_uuid:
-            user_media_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
-            if user_media_access:
-                user_display_name = user_media_access.get_display_name()
-                user_avatar = user_media_access.get_avatar_url()
-                if user_media_access.server:
-                    service_info.append({
-                        'type': user_media_access.server.service_type.value,
-                        'name': user_media_access.server.server_nickname
-                    })
+            elif user.userType == UserType.SERVICE and user.server:
+                service_info.append({
+                    'type': user.server.service_type.value,
+                    'name': user.server.server_nickname
+                })
         
         # Remove duplicates from service_info
         unique_services = []
@@ -218,11 +214,8 @@ def _generate_top_users_data(days=7, limit=5):
             MediaStreamHistory.started_at <= end_date
         )
         
-        # Add user filter based on which UUID is present
-        if stat.user_app_access_uuid:
-            category_query = category_query.filter(MediaStreamHistory.user_app_access_uuid == stat.user_app_access_uuid)
-        elif stat.user_media_access_uuid:
-            category_query = category_query.filter(MediaStreamHistory.user_media_access_uuid == stat.user_media_access_uuid)
+        # Add user filter using unified user_uuid
+        category_query = category_query.filter(MediaStreamHistory.user_uuid == stat.user_uuid)
         
         category_stats = category_query.group_by(MediaStreamHistory.media_type).all()
         
@@ -274,11 +267,9 @@ def _generate_top_users_data(days=7, limit=5):
         # Get primary server info for linking
         primary_server_nickname = None
         primary_server_username = None
-        if stat.user_media_access_uuid:
-            user_media_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
-            if user_media_access and user_media_access.server:
-                primary_server_nickname = user_media_access.server.server_nickname
-                primary_server_username = user_media_access.external_username
+        if user and user.userType == UserType.SERVICE and user.server:
+            primary_server_nickname = user.server.server_nickname
+            primary_server_username = user.external_username
         
         top_users.append({
             'display_name': user_display_name,
@@ -362,10 +353,10 @@ def _generate_admin_streaming_chart_data(days=7):
         
         # Get service type from the server
         service_type = 'unknown'
-        if entry.user_media_access_uuid:
-            service_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
-            if service_access and service_access.server:
-                service_type = service_access.server.service_type.value
+        if entry.user_uuid:
+            user = User.query.filter_by(uuid=entry.user_uuid).first()
+            if user and user.server:
+                service_type = user.server.service_type.value
         
         # Get duration in minutes
         duration_minutes = 0
@@ -468,14 +459,13 @@ def index():
     
     current_app.logger.debug("Dashboard: Fetching total users count (local + service users)")
     
-    # Count local users (UserAppAccess)
-    local_users_count = UserAppAccess.query.count()
+    # Count local users (userType=LOCAL)
+    local_users_count = User.query.filter_by(userType=UserType.LOCAL).count()
     current_app.logger.debug(f"Dashboard: Local users: {local_users_count}")
     
-    # Count ALL service users (UserMediaAccess records - both standalone AND linked)
-    # This matches the /users page logic which shows each UserMediaAccess as a separate card
-    from app.models_media_services import UserMediaAccess
-    all_service_users_count = UserMediaAccess.query.count()
+    # Count ALL service users (userType=SERVICE records - both standalone AND linked)
+    # This matches the /users page logic which shows each service user as a separate card
+    all_service_users_count = User.query.filter_by(userType=UserType.SERVICE).count()
     current_app.logger.debug(f"Dashboard: All service users (standalone + linked): {all_service_users_count}")
     
     # Total managed users (matches /users page logic exactly)

@@ -26,11 +26,14 @@ def get_libraries_from_database(servers):
 
 
 def _get_local_user_avatar_url(app_user):
-    """Get avatar URL for local users by checking their linked media access accounts"""
-    from app.models_media_services import UserMediaAccess
+    """Get avatar URL for local users by checking their linked service accounts"""
+    from app.models import User, UserType
     
-    # Get all media access records for this local user
-    access_records = UserMediaAccess.query.filter_by(user_app_access_id=app_user.id).all()
+    # Get all service users linked to this local user
+    access_records = User.query.filter_by(
+        userType=UserType.SERVICE,
+        linkedUserId=app_user.uuid
+    ).all()
     
     for access in access_records:
         # First check for external avatar URL
@@ -72,7 +75,7 @@ class MassEditMockUser:
     """Mock user class for mass edit operations"""
     def __init__(self, user_uuid, username, email, is_active, role_name, role_id, libraries_access):
         self.uuid = user_uuid
-        self.username = username
+        self.localUsername = username
         self.email = email
         self.is_active = is_active
         self.role_name = role_name

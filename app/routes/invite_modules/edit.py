@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from flask import render_template, request, current_app, flash, make_response
 from flask_login import login_required, current_user
-from app.models import Invite, Setting, EventType
+from app.models import User, UserType, Invite, Setting, EventType
 from app.forms import InviteEditForm
 from app.extensions import db
 from app.utils.helpers import setup_required, calculate_expiry_date, log_event, permission_required

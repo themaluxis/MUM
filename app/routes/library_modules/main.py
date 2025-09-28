@@ -15,8 +15,7 @@ from . import libraries_bp
 def index():
     """Display libraries from stored database data instead of live API calls"""
     # Redirect AppUsers without admin permissions away from admin pages
-    from app.models import UserAppAccess
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_libraries'):
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('view_libraries'):
         flash('You do not have permission to access the libraries management page.', 'danger')
         return redirect(url_for('user.index'))
     

@@ -1,7 +1,7 @@
 import os
 import logging
 from app import create_app, db
-from app.models import Setting, Owner # Import models that might be needed for initial checks or commands
+from app.models import Setting, User # Import models that might be needed for initial checks or commands
 from flask_migrate import Migrate
 
 # Custom colored logging formatter

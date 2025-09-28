@@ -72,7 +72,8 @@ class MediaServer(db.Model):
     
     # Relationships
     libraries = db.relationship('MediaLibrary', back_populates='server', cascade="all, delete-orphan")
-    user_accesses = db.relationship('UserMediaAccess', back_populates='server', cascade="all, delete-orphan")
+    # users relationship now points to unified User model
+    users = db.relationship('User', foreign_keys='User.server_id', back_populates='server')
     
     def __repr__(self):
         return f'<MediaServer {self.server_nickname} ({self.service_type.value})>'
@@ -147,232 +148,8 @@ class MediaLibrary(db.Model):
     def __repr__(self):
         return f'<MediaLibrary {self.name} on {self.server.server_nickname}>'
 
-class UserMediaAccess(db.Model):
-    """Represents a user's access to a specific media server"""
-    __tablename__ = 'user_media_access'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
-    
-    # Updated foreign key to UserAppAccess (nullable to support standalone server users)
-    user_app_access_id = db.Column(db.Integer, db.ForeignKey('user_app_access.id'), nullable=True, index=True)
-    server_id = db.Column(db.Integer, db.ForeignKey('media_servers.id'), nullable=False, index=True)
-    
-    # Service-specific user identity
-    external_user_id = db.Column(db.String(255), nullable=True, index=True)  # For Plex: plex_user_id, For Jellyfin: jellyfin_user_id
-    external_user_alt_id = db.Column(db.String(255), nullable=True)  # For Plex: plex_uuid (SSO UUID)
-    external_username = db.Column(db.String(255), nullable=True)
-    external_email = db.Column(db.String(255), nullable=True)
-    
-    # Overseerr integration
-    overseerr_user_id = db.Column(db.Integer, nullable=True, index=True)  # Overseerr user ID for request management
-    
-    # Access permissions
-    allowed_library_ids = db.Column(MutableList.as_mutable(JSONEncodedDict), default=list)
-    allow_downloads = db.Column(db.Boolean, default=False, nullable=False)
-    allow_4k_transcode = db.Column(db.Boolean, default=True, nullable=False)
-    
-    # Service-specific settings stored as JSON
-    service_settings = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)
-    
-    # Status tracking
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    last_activity_at = db.Column(db.DateTime, nullable=True)
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Fields moved from ServiceAccount
-    notes = db.Column(db.Text, nullable=True)  # Admin notes about this service account
-    external_avatar_url = db.Column(db.String(512), nullable=True)  # Service-specific avatar
-    used_invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True, index=True)  # Which invite created this access
-    service_join_date = db.Column(db.DateTime, nullable=True, index=True)  # When they joined this service
-    
-    # Per-service whitelist settings
-    is_discord_bot_whitelisted = db.Column(db.Boolean, default=False, nullable=False)  # Per-service bot whitelist
-    is_purge_whitelisted = db.Column(db.Boolean, default=False, nullable=False)  # Per-service purge whitelist
-    
-    # Service-specific user status (primarily for Plex)
-    is_home_user = db.Column(db.Boolean, default=False, nullable=False)  # Plex Home User status
-    shares_back = db.Column(db.Boolean, default=False, nullable=False)  # User shares libraries back to admin
-    
-    # Service-specific Discord linking (can be different per service)
-    discord_user_id = db.Column(db.String(255), nullable=True)  # Service-specific Discord linking
-    discord_username = db.Column(db.String(255), nullable=True)  # Service-specific Discord username
-    
-    # Service-specific expiration (can override global expiration)
-    access_expires_at = db.Column(db.DateTime, nullable=True, index=True)  # Service-specific expiration
-    
-    # New raw data fields
-    user_raw_data = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)  # JSON for /users page "i" button modal
-    stream_raw_data = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)  # JSON for streaming-related raw data
-    
-    # Relationships
-    user_app_access = db.relationship('UserAppAccess', back_populates='media_accesses')
-    server = db.relationship('MediaServer', back_populates='user_accesses')
-    invite = db.relationship('Invite', backref='user_media_accesses_created')
-    
-    # Unique constraints:
-    # 1. For linked users: user_app_access_id + server_id must be unique
-    # 2. For standalone users: external_user_id + server_id must be unique
-    __table_args__ = (
-        db.UniqueConstraint('user_app_access_id', 'server_id', name='_user_app_access_server_uc'),
-        db.UniqueConstraint('external_user_id', 'server_id', name='_external_user_server_uc'),
-    )
-    
-    def __repr__(self):
-        username = self.external_username or self.user_app_access.username if self.user_app_access else 'Unknown'
-        server_name = self.server.server_nickname if self.server else 'Unknown Server'
-        return f'<UserMediaAccess {username} on {server_name}>'
-    
-    def get_display_name(self):
-        """Get the best display name for this user on this service"""
-        return self.external_username or (self.user_app_access.username if self.user_app_access else 'Unknown User')
-    
-    def get_service_email(self):
-        """Get the service-specific email"""
-        return self.external_email or (self.user_app_access.email if self.user_app_access else None)
-    
-    def get_avatar_url(self):
-        """Get the service-specific avatar URL"""
-        return self.external_avatar_url
-    
-    def is_expired(self):
-        """Check if this service access is expired"""
-        from datetime import datetime, timezone
-        
-        # Check service-specific expiration first
-        if self.access_expires_at:
-            return datetime.now(timezone.utc) > self.access_expires_at.replace(tzinfo=timezone.utc)
-        
-        # Check global expiration if no service-specific expiration
-        if self.user_app_access and self.user_app_access.access_expires_at:
-            return datetime.now(timezone.utc) > self.user_app_access.access_expires_at.replace(tzinfo=timezone.utc)
-        
-        return False
-    
-    def get_effective_expiration(self):
-        """Get the effective expiration date (service-specific takes precedence over global)"""
-        return self.access_expires_at or (self.user_app_access.access_expires_at if self.user_app_access else None)
-    
-    def get_service_type(self):
-        """Get the service type for this access"""
-        return self.server.service_type.value if self.server else 'unknown'
-    
-    def has_library_access(self, library_id):
-        """Check if user has access to a specific library"""
-        if not self.allowed_library_ids:
-            return False
-        return str(library_id) in [str(lib_id) for lib_id in self.allowed_library_ids]
-    
-    def get_raw_data(self, data_type='user'):
-        """Get raw data for this service access"""
-        if data_type == 'user':
-            return self.user_raw_data or {}
-        elif data_type == 'stream':
-            return self.stream_raw_data or {}
-        return {}
-    
-    def set_raw_data(self, data_type, data):
-        """Set raw data for this service access"""
-        if data_type == 'user':
-            self.user_raw_data = data or {}
-        elif data_type == 'stream':
-            self.stream_raw_data = data or {}
-    
-    @classmethod
-    def get_overseerr_user_id(cls, server_id: int, plex_user_id: str):
-        """Get the Overseerr user ID for a given Plex user"""
-        user_access = cls.query.filter_by(
-            server_id=server_id,
-            external_user_id=plex_user_id,
-            is_active=True
-        ).first()
-        
-        return user_access.overseerr_user_id if user_access else None
-    
-    @classmethod
-    def link_single_user(cls, server_id: int, plex_user_id: str, plex_username: str, plex_email: str = None):
-        """Attempt to link a single Plex user to Overseerr on-demand"""
-        from app.services.overseerr_service import OverseerrService
-        from app.models_media_services import MediaServer
-        from app.extensions import db
-        from datetime import datetime
-        
-        try:
-            # Get the server to access Overseerr
-            server = MediaServer.query.get(server_id)
-            if not server or not server.overseerr_enabled or not server.overseerr_url or not server.overseerr_api_key:
-                return False, None, "Overseerr not properly configured for this server"
-            
-            # Get the user's media access record
-            user_access = cls.query.filter_by(
-                server_id=server_id,
-                external_user_id=plex_user_id
-            ).first()
-            
-            if not user_access:
-                return False, None, "User access record not found"
-            
-            # Check if user is already linked
-            if user_access.overseerr_user_id:
-                return True, user_access.overseerr_user_id, "User already linked"
-            
-            # Try to find the user in Overseerr
-            overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
-            success, overseerr_user, message = overseerr.get_user_by_plex_username(plex_username)
-            
-            if not success:
-                return False, None, f"Failed to check Overseerr: {message}"
-            
-            if not overseerr_user:
-                return False, None, "User not found in Overseerr"
-            
-            # User found! Update the user access record
-            overseerr_user_id = overseerr_user.get('id')
-            user_access.overseerr_user_id = overseerr_user_id
-            user_access.updated_at = datetime.utcnow()
-            
-            db.session.commit()
-            overseerr_username = overseerr_user.get('username', overseerr_user.get('email', 'Unknown'))
-            return True, overseerr_user_id, f"Successfully linked to Overseerr user: {overseerr_username}"
-            
-        except Exception as e:
-            db.session.rollback()
-            return False, None, f"Error linking user: {str(e)}"
-    
-    @classmethod
-    def sync_overseerr_users(cls, server_id: int, linked_users: list):
-        """Sync the Overseerr user links for a server"""
-        try:
-            # Update existing user access records with Overseerr user IDs
-            for user_data in linked_users:
-                plex_user_id = user_data.get('plex_id')
-                overseerr_user_id = user_data.get('overseerr_user_id')
-                is_linked = user_data.get('is_linked', False)
-                
-                if not plex_user_id:
-                    continue
-                
-                # Find the user access record
-                user_access = cls.query.filter_by(
-                    server_id=server_id,
-                    external_user_id=plex_user_id
-                ).first()
-                
-                if user_access:
-                    # Update with Overseerr user ID if linked
-                    user_access.overseerr_user_id = overseerr_user_id if is_linked else None
-                    user_access.updated_at = datetime.utcnow()
-            
-            db.session.commit()
-            linked_count = sum(1 for user in linked_users if user.get('is_linked', False))
-            return True, f"Synced {linked_count} of {len(linked_users)} Overseerr user links"
-            
-        except Exception as e:
-            db.session.rollback()
-            return False, f"Error syncing Overseerr user links: {str(e)}"
+# UserMediaAccess class removed - replaced by User model with userType='service'
+# All functionality moved to unified User model in app/models.py
 
 class MediaItem(db.Model):
     """Store individual media items from libraries for faster access and search"""
@@ -500,9 +277,8 @@ class MediaStreamHistory(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     
-    # Relationships - Support both UserAppAccess (linked) and UserMediaAccess (standalone) using UUIDs
-    user_app_access_uuid = db.Column(db.String(36), db.ForeignKey('user_app_access.uuid'), nullable=True, index=True)
-    user_media_access_uuid = db.Column(db.String(36), db.ForeignKey('user_media_access.uuid'), nullable=True, index=True)
+    # Unified user reference (replaces user_app_access_uuid and user_media_access_uuid)
+    user_uuid = db.Column(db.String(36), db.ForeignKey('users.uuid'), nullable=True, index=True)
     server_id = db.Column(db.Integer, db.ForeignKey('media_servers.id'), nullable=False, index=True)
     
     # Session Details
@@ -536,24 +312,19 @@ class MediaStreamHistory(db.Model):
     # Service-specific data stored as JSON
     service_data = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)
     
-    # Relationships - Updated to support both UserAppAccess and UserMediaAccess using UUIDs
-    user_app_access = db.relationship('UserAppAccess', foreign_keys=[user_app_access_uuid], backref=db.backref('media_stream_history', lazy='dynamic', cascade="all, delete-orphan"))
-    user_media_access = db.relationship('UserMediaAccess', foreign_keys=[user_media_access_uuid], backref=db.backref('media_stream_history', lazy='dynamic', cascade="all, delete-orphan"))
+    # Relationships - Unified user relationship
+    user = db.relationship('User', foreign_keys=[user_uuid], 
+                          backref=db.backref('stream_history', lazy='dynamic'))
     server = db.relationship('MediaServer', backref=db.backref('stream_history', lazy='dynamic'))
     
     def __repr__(self):
-        username = self.user_app_access.get_display_name() if self.user_app_access else 'Unknown User'
+        username = self.user.get_display_name() if self.user else 'Unknown User'
         server_name = self.server.server_nickname if self.server else 'Unknown Server'
         return f'<MediaStreamHistory {self.id} by {username} on {server_name}>'
     
     def get_user_display_name(self):
         """Get the display name of the user who streamed this content"""
-        if self.user_app_access:
-            return self.user_app_access.get_display_name()
-        elif self.user_media_access:
-            return self.user_media_access.get_display_name()
-        else:
-            return 'Unknown User'
+        return self.user.get_display_name() if self.user else 'Unknown User'
     
     def get_server_name(self):
         """Get the name of the server where this was streamed"""

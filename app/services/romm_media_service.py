@@ -24,18 +24,18 @@ class RommMediaService(BaseMediaService):
         self.session = requests.Session()
         self.session.timeout = 30
         # RomM uses username/password authentication
-        self.username = server_config.get('username')
+        self.localUsername = server_config.get('username')
         self.password = server_config.get('password')
         
     def _setup_auth_headers(self) -> bool:
         """Setup authentication headers for RomM API requests"""
         try:
-            if not self.username or not self.password:
+            if not self.localUsername or not self.password:
                 self.log_error("Username and password are required for RomM authentication")
                 return False
             
             # RomM uses Basic auth with base64 encoded username:password
-            auth_string = f"{self.username}:{self.password}"
+            auth_string = f"{self.localUsername}:{self.password}"
             encoded_auth = base64.b64encode(auth_string.encode()).decode()
             self.session.headers.update({
                 'Authorization': f'Basic {encoded_auth}',
@@ -50,7 +50,7 @@ class RommMediaService(BaseMediaService):
     
     def _get_auth_header(self, username: str = None, password: str = None) -> str:
         """Get Basic auth header for operations"""
-        user = username or self.username
+        user = username or self.localUsername
         pwd = password or self.password
         if not user or not pwd:
             return ""

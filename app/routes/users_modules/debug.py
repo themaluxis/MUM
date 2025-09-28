@@ -3,8 +3,6 @@
 
 from flask import render_template, request, current_app
 from flask_login import login_required, current_user
-from app.models import UserAppAccess
-from app.models_media_services import UserMediaAccess
 from app.utils.helpers import permission_required
 from . import users_bp
 
@@ -25,7 +23,7 @@ def get_user_debug_info(user_uuid):
     
     if user_type == "user_app_access":
         # This is a local UserAppAccess user
-        user = UserAppAccess.query.get(actual_id)
+        user = User.query.filter_by(userType=UserType.LOCAL).get(actual_id)
     
         if not user:
             return f"<p class='text-error'>Local user with ID {actual_id} not found</p>"
@@ -35,8 +33,8 @@ def get_user_debug_info(user_uuid):
     
     elif user_type == "user_media_access":
         # This is a standalone service user, get the UserMediaAccess record
-        access = UserMediaAccess.query.filter(
-            UserMediaAccess.id == actual_id
+        access = User.query.filter_by(userType=UserType.SERVICE).filter(
+            User.id == actual_id
         ).first()
         
         if not access:
@@ -46,7 +44,7 @@ def get_user_debug_info(user_uuid):
         class MockUser:
             def __init__(self, access, user_id):
                 self.id = user_id  # Keep the prefixed ID for display
-                self.username = access.external_username or 'Unknown'
+                self.localUsername = access.external_username or 'Unknown'
                 self.email = access.external_email
                 self.notes = access.notes
                 self.created_at = access.created_at
@@ -57,6 +55,9 @@ def get_user_debug_info(user_uuid):
                 self.is_active = access.is_active
                 self._is_standalone = True
                 self._access_record = access
+                # Add template compatibility attributes
+                self.server = access.server
+                self.external_username = access.external_username
             
             def get_display_name(self):
                 return self._access_record.external_username or 'Unknown'
@@ -77,8 +78,8 @@ def get_user_debug_info(user_uuid):
             # For standalone users, the access record is stored in _access_record
             user_accesses = [user._access_record]
         else:
-            # For regular users, query by user_app_access_id using actual_id
-            user_accesses = UserMediaAccess.query.filter_by(user_app_access_id=actual_id).all()
+            # For regular users, query by linkedUserId using actual_id
+            user_accesses = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=actual_id).all()
         
         has_service_data = False
         for access in user_accesses:
@@ -96,8 +97,8 @@ def get_user_debug_info(user_uuid):
             # For standalone users, use the access record we already have
             user_access = [user._access_record]
         else:
-            # For regular users, query by user_app_access_id
-            user_access = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
+            # For regular users, query by linkedUserId
+            user_access = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=user.uuid).all()
         current_app.logger.info(f"User has access to {len(user_access)} servers:")
         for access in user_access:
             current_app.logger.info(f"  - Server: {access.server.server_nickname} (Type: {access.server.service_type.value})")

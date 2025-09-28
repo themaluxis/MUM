@@ -8,7 +8,7 @@ import uuid
 from flask import current_app
 from plexapi.myplex import MyPlexPinLogin
 from plexapi.exceptions import PlexApiException, BadRequest
-from app.models import Setting
+from app.models import User, UserType, Setting
 
 
 def get_plex_client_headers(client_identifier_suffix="MUM"):

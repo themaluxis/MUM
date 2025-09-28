@@ -4,8 +4,8 @@ from flask import (
     flash, request, current_app, make_response
 )
 from flask_login import login_required, current_user
-from app.models import Owner, UserAppAccess, Role, EventType
-from app.forms import UserAppAccessCreateForm, UserAppAccessEditForm, UserAppAccessResetPasswordForm
+from app.models import User, UserType, Role, EventType
+from app.forms import UserCreateForm, LocalUserEditForm, UserResetPasswordForm
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required, any_permission_required
 import json
@@ -16,14 +16,14 @@ bp = Blueprint('admin_management', __name__)
 @login_required
 @any_permission_required(['create_admin', 'edit_admin', 'delete_admin'])
 def index():
-    # Get Owner and UserAppAccess with admin roles
-    owner = Owner.query.first()
-    user_app_accesses = UserAppAccess.query.order_by(UserAppAccess.id).all()
+    # Get Owner and LOCAL users with admin roles
+    owner = User.get_owner()
+    local_users = User.query.filter_by(userType=UserType.LOCAL).order_by(User.id).all()
     return render_template(
         'settings/index.html',
         title="Manage Users",
         owner=owner,
-        app_users=user_app_accesses,
+        app_users=local_users,
         active_tab='admins'
     )
 
@@ -31,18 +31,18 @@ def index():
 @login_required
 @permission_required('create_admin')
 def create():
-    form = UserAppAccessCreateForm()
+    form = UserCreateForm()
     if form.validate_on_submit():
-        new_user = UserAppAccess(
+        new_user = User.create_local_user(
             username=form.username.data,
-            force_password_change=True,
-            roles=[] # New users start with no explicit permissions/roles
+            password=form.password.data,
+            email=form.email.data
         )
-        new_user.set_password(form.password.data)
+        new_user.force_password_change = True
         db.session.add(new_user)
         db.session.commit()
         
-        toast = {"showToastEvent": {"message": f"User '{new_user.username}' created.", "category": "success"}}
+        toast = {"showToastEvent": {"message": f"User '{new_user.localUsername}' created.", "category": "success"}}
         response = make_response("", 204) # No Content
         response.headers['HX-Trigger'] = json.dumps({"refreshAdminList": True, **toast})
         return response
@@ -54,7 +54,7 @@ def create():
 @login_required
 @permission_required('create_admin')
 def create_form():
-    form = UserAppAccessCreateForm()
+    form = UserCreateForm()
     return render_template('settings/admins/_partials/create_admin_modal.html', form=form)
 
 @bp.route('/delete/<int:admin_id>', methods=['POST'])
@@ -67,24 +67,24 @@ def delete(admin_id):
         return redirect(url_for('admin_management.index'))
     
     # Check if this is the Owner (cannot be deleted)
-    if isinstance(current_user, Owner) and admin_id == current_user.id:
+    if current_user.userType == UserType.OWNER and admin_id == current_user.id:
         flash("The Owner account cannot be deleted.", "danger")
         return redirect(url_for('admin_management.index'))
     
-    user_to_delete = UserAppAccess.query.get_or_404(admin_id)
+    user_to_delete = User.query.filter_by(id=admin_id, userType=UserType.LOCAL).first_or_404()
     db.session.delete(user_to_delete)
     db.session.commit()
-    flash(f"User '{user_to_delete.username}' has been deleted.", "success")
+    flash(f"User '{user_to_delete.localUsername}' has been deleted.", "success")
     return redirect(url_for('admin_management.index'))
 
 @bp.route('/edit/<int:admin_id>', methods=['GET', 'POST'])
 @login_required
 @permission_required('edit_admin')
 def edit(admin_id):
-    user = UserAppAccess.query.get_or_404(admin_id)
+    user = User.query.filter_by(userType=UserType.LOCAL).get_or_404(admin_id)
 
     # Prevent editing Owner account through this interface
-    if isinstance(current_user, Owner) and admin_id == current_user.id:
+    if current_user.userType == UserType.OWNER and admin_id == current_user.id:
         flash("The Owner account should be managed through the 'My Account' page.", "warning")
         return redirect(url_for('admin_management.index'))
     
@@ -92,13 +92,13 @@ def edit(admin_id):
         flash("To manage your own account, please use the 'My Account' page.", "info")
         return redirect(url_for('dashboard.account'))
         
-    form = UserAppAccessEditForm(obj=user)
+    form = LocalUserEditForm(obj=user)
     form.roles.choices = [(r.id, r.name) for r in Role.query.order_by('name')]
 
     if form.validate_on_submit():
         user.roles = Role.query.filter(Role.id.in_(form.roles.data)).all()
         db.session.commit()
-        flash(f"Roles for '{user.username}' updated.", "success")
+        flash(f"Roles for '{user.localUsername}' updated.", "success")
         return redirect(url_for('admin_management.index'))
         
     if request.method == 'GET':
@@ -116,17 +116,17 @@ def edit(admin_id):
 @login_required
 @permission_required('edit_admin')
 def reset_password(admin_id):
-    user = UserAppAccess.query.get_or_404(admin_id)
+    user = User.query.filter_by(userType=UserType.LOCAL).get_or_404(admin_id)
     if admin_id == current_user.id:
         flash("You cannot reset your own password through this interface.", "danger")
         return redirect(url_for('admin_management.edit', admin_id=admin_id))
     
     # Prevent resetting Owner password through this interface
-    if isinstance(current_user, Owner) and admin_id == current_user.id:
+    if current_user.userType == UserType.OWNER and admin_id == current_user.id:
         flash("Owner password should be reset through the 'My Account' page.", "danger")
         return redirect(url_for('admin_management.edit', admin_id=admin_id))
     
-    form = UserAppAccessResetPasswordForm()
+    form = UserResetPasswordForm()
 
     if request.method == 'POST':
         if form.validate_on_submit():
@@ -134,7 +134,7 @@ def reset_password(admin_id):
             user.force_password_change = True # Force change on next login
             db.session.commit()
             
-            log_event(EventType.ADMIN_PASSWORD_CHANGE, f"Password was reset for user '{user.username}'.", admin_id=current_user.id)
+            log_event(EventType.ADMIN_PASSWORD_CHANGE, f"Password was reset for user '{user.localUsername}'.", admin_id=current_user.id)
             toast = {"showToastEvent": {"message": "Password has been reset.", "category": "success"}}
             response = make_response("", 204)
             response.headers['HX-Trigger'] = json.dumps(toast)

@@ -1,8 +1,8 @@
 # File: app/services/media_service_manager.py
 from typing import List, Dict, Any, Optional
 from flask import current_app
-from app.models_media_services import MediaServer, MediaLibrary, UserMediaAccess, ServiceType
-from app.models import UserAppAccess, Setting
+from app.models_media_services import MediaServer, MediaLibrary, ServiceType
+from app.models import User, UserType, Setting
 from app.services.media_service_factory import MediaServiceFactory
 from app.extensions import db
 from datetime import datetime
@@ -206,11 +206,12 @@ class MediaServiceManager:
             for user_data in users_data:
                 user = MediaServiceManager._find_or_create_user(user_data, server)
                 
-                # Check if UserMediaAccess already exists for this server user
+                # Check if service user already exists for this server user
                 access = None
                 external_user_id = user_data.get('id')
                 if external_user_id:
-                    access = UserMediaAccess.query.filter_by(
+                    access = User.query.filter_by(
+                        userType=UserType.SERVICE,
                         server_id=server_id,
                         external_user_id=external_user_id
                     ).first()
@@ -219,22 +220,23 @@ class MediaServiceManager:
                 if not access and server.service_type == ServiceType.PLEX:
                     uuid = user_data.get('uuid')
                     if uuid:
-                        access = UserMediaAccess.query.filter_by(
+                        access = User.query.filter_by(
+                            userType=UserType.SERVICE,
                             server_id=server_id,
                             external_user_alt_id=uuid
                         ).first()
                 
                 if not access:
-                    # Check if there's already a UserMediaAccess for this linked user on this server
+                    # Check if there's already a service user for this linked user on this server
                     # This can happen when a user was created via invite but then we sync again
                     if user:
-                        existing_linked_access = UserMediaAccess.query.filter_by(
-                            user_app_access_id=user.id,
+                        existing_linked_access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
+                            linkedUserId=user.id,
                             server_id=server_id
                         ).first()
                         
                         if existing_linked_access:
-                            current_app.logger.info(f"Found existing UserMediaAccess for linked user {user.get_display_name()} on server {server.server_nickname}")
+                            current_app.logger.info(f"Found existing service user for linked user {user.get_display_name()} on server {server.server_nickname}")
                             access = existing_linked_access
                             # Update the existing record with fresh data
                             access.external_user_id = user_data.get('id')
@@ -281,28 +283,29 @@ class MediaServiceManager:
                                         current_app.logger.warning(f"Failed to set join date for Kavita user {user_data.get('username')}: {e}")
                             
                             updated_count += 1
-                            current_app.logger.info(f"Updated existing linked UserMediaAccess for {user.get_display_name()}")
+                            current_app.logger.info(f"Updated existing linked service user for {user.get_display_name()}")
                             continue  # Skip the creation logic below
                     
-                    # Create new UserMediaAccess record
+                    # Create new service user record
                     # Prepare fields based on server type
                     external_user_alt_id = None
                     if server.service_type == ServiceType.PLEX:
                         external_user_alt_id = user_data.get('uuid')  # Store Plex UUID in alt_id
                     
-                    # Store service-specific raw data in UserMediaAccess
+                    # Store service-specific raw data in service user
                     user_raw_data = user_data.get('raw_data') or {}
                     current_app.logger.info(f"AudioBookshelf sync - Creating new user {user_data.get('username')} raw_data: {type(user_raw_data)} with {len(str(user_raw_data))} chars")
                     
-                    access = UserMediaAccess(
-                        user_app_access_id=user.id if user else None,  # May be None for standalone server users
+                    access = User(
+                        userType=UserType.SERVICE,  # CRITICAL: Set userType for unified model
+                        linkedUserId=user.id if user else None,  # May be None for standalone server users
                         server_id=server_id,
                         external_user_id=user_data.get('id'),  # For Plex: plex_user_id ; 
                         external_user_alt_id=external_user_alt_id,  # For Plex: plex_uuid
                         external_username=user_data.get('username'),
                         external_email=user_data.get('email'),
                         allowed_library_ids=user_data.get('library_ids', []),
-                        user_raw_data=user_raw_data,  # Store raw data here instead of UserAppAccess
+                        user_raw_data=user_raw_data,  # Store raw data here instead of local user
                         is_active=True,
                         # Add the missing status fields
                         is_home_user=user_data.get('is_home_user', False),
@@ -341,7 +344,7 @@ class MediaServiceManager:
                     db.session.add(access)
                     added_count += 1
                     
-                    # Use external_username for display since there might not be a linked UserAppAccess
+                    # Use external_username for display since there might not be a linked local user
                     display_name = user.get_display_name() if user else user_data.get('username', 'Unknown')
                     added_details.append({
                         'username': display_name,
@@ -369,7 +372,7 @@ class MediaServiceManager:
                         # For services like Kavita where username is the primary identifier,
                         # also update the user's username to keep them in sync
                         if server.service_type.value in ['kavita', 'jellyfin', 'emby', 'audiobookshelf', 'komga', 'romm']:
-                            user.username = user_data.get('username')
+                            user.localUsername = user_data.get('username')
                     if access.external_email != user_data.get('email'):
                         changes.append(f"Email changed from '{access.external_email}' to '{user_data.get('email')}'")
                         access.external_email = user_data.get('email')
@@ -444,7 +447,7 @@ class MediaServiceManager:
                     
                     if changes:
                         updated_count += 1
-                        # Use external_username for display since there might not be a linked UserAppAccess
+                        # Use external_username for display since there might not be a linked local user
                         display_name = user.get_display_name() if user else access.external_username or 'Unknown'
                         updated_details.append({
                             'username': display_name, 
@@ -458,10 +461,13 @@ class MediaServiceManager:
             # Process removals - only if we successfully got user data and it's not empty
             # This prevents accidental deletion when server is offline or experiencing issues
             if users_data and external_user_ids_from_service:
-                access_records_to_check = UserMediaAccess.query.filter_by(server_id=server_id).all()
+                access_records_to_check = User.query.filter_by(userType=UserType.SERVICE).filter_by(server_id=server_id).all()
                 for access in access_records_to_check:
                     if str(access.external_user_id) not in external_user_ids_from_service:
-                        user_to_check = access.user_app_access
+                        # In unified model, get linked user via linkedUserId
+                        user_to_check = None
+                        if access.linkedUserId:
+                            user_to_check = User.query.filter_by(userType=UserType.LOCAL).get(access.linkedUserId)
                         display_name = user_to_check.get_display_name() if user_to_check else access.external_username or 'Unknown'
                         current_app.logger.info(f"Removing user access: {display_name} from server {server.server_nickname}")
                         
@@ -476,12 +482,12 @@ class MediaServiceManager:
                         db.session.delete(access)
                         removed_count += 1
                         
-                        # Only delete the UserAppAccess if:
-                        # 1. There is a linked UserAppAccess (user_to_check is not None)
+                        # Only delete the local user if:
+                        # 1. There is a linked local user (user_to_check is not None)
                         # 2. They have NO other server access
                         if user_to_check:
                             # Use a fresh query to get accurate count after the deletion above
-                            remaining_access_count = UserMediaAccess.query.filter_by(user_app_access_id=access.user_app_access_id).count()
+                            remaining_access_count = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=access.linkedUserId).count()
                             if remaining_access_count == 0:
                                 current_app.logger.info(f"User {user_to_check.get_display_name()} has no remaining server access, deleting user completely")
                                 db.session.delete(user_to_check)
@@ -511,75 +517,80 @@ class MediaServiceManager:
             return {'success': False, 'message': f'Sync failed: {str(e)}'}
     
     @staticmethod
-    def _find_or_create_user(user_data: Dict[str, Any], server: MediaServer) -> Optional[UserAppAccess]:
-        """Find existing UserAppAccess that should be linked to this server user.
+    def _find_or_create_user(user_data: Dict[str, Any], server: MediaServer) -> Optional[User]:
+        """Find existing local user that should be linked to this server user.
         
-        IMPORTANT: This method should NOT create new UserAppAccess records.
-        UserAppAccess records should only be created when users manually create 
+        IMPORTANT: This method should NOT create new local user records.
+        Local user records should only be created when users manually create 
         accounts via /settings/user_accounts. This method only finds existing ones.
         """
-        from app.models_media_services import UserMediaAccess
         
         username = user_data.get('username')
         email = user_data.get('email')
         external_user_id = str(user_data.get('id')) if user_data.get('id') else None
         
-        # Try to find existing UserAppAccess by checking if they already have access to this specific server
+        # Try to find existing local user by checking if they already have access to this specific server
         user = None
         
         # First, check if this user already exists for this specific server
         if external_user_id:
-            existing_access = UserMediaAccess.query.filter_by(
+            existing_access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
                 server_id=server.id,
                 external_user_id=external_user_id
             ).first()
             if existing_access:
-                user = existing_access.user_app_access
+                # In unified model, get linked user via linkedUserId
+                user = None
+                if existing_access.linkedUserId:
+                    user = User.query.filter_by(userType=UserType.LOCAL, id=existing_access.linkedUserId).first()
                 current_app.logger.debug(f"Found existing user via server access: {user.get_display_name() if user else 'None'}")
         
-        # For Plex, also try to match by UUID via UserMediaAccess
+        # For Plex, also try to match by UUID via service user
         if not user and server.service_type == ServiceType.PLEX:
             uuid = user_data.get('uuid')
             if uuid:
-                # Look for existing UserMediaAccess with this Plex UUID
-                access = UserMediaAccess.query.filter_by(
+                # Look for existing service user with this Plex UUID
+                access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
                     server_id=server.id,
                     external_user_alt_id=uuid
                 ).first()
                 if access:
-                    user = access.user_app_access
+                    # In unified model, get linked user via linkedUserId
+                    user = None
+                    if access.linkedUserId:
+                        user = User.query.filter_by(userType=UserType.LOCAL).get(access.linkedUserId)
                     if user:
                         current_app.logger.debug(f"Found existing Plex user via UUID: {user.get_display_name()}")
                     else:
-                        current_app.logger.debug(f"Found access record with Plex UUID {uuid} but no linked UserAppAccess")
+                        current_app.logger.debug(f"Found access record with Plex UUID {uuid} but no linked local user")
                 else:
                     current_app.logger.debug(f"No existing user found with Plex UUID: {uuid}")
         
-        # If no existing UserAppAccess found, try to find one by username or email
+        # If no existing local user found, try to find one by username or email
         # This allows linking server users to existing MUM accounts
         if not user:
             # Try to find by username first
             if username:
-                user = UserAppAccess.query.filter_by(username=username).first()
+                user = User.get_by_local_username(username)
                 if user:
-                    current_app.logger.info(f"Found existing UserAppAccess by username: {username}")
+                    current_app.logger.info(f"Found existing local user by username: {username}")
             
             # If not found by username, try by email
             if not user and email:
-                user = UserAppAccess.query.filter_by(email=email).first()
+                user = User.query.filter_by(userType=UserType.LOCAL).filter_by(email=email).first()
                 if user:
-                    current_app.logger.info(f"Found existing UserAppAccess by email: {email}")
+                    current_app.logger.info(f"Found existing local user by email: {email}")
         
-        # If still no UserAppAccess found, this server user will be standalone
+        # If still no local user found, this server user will be standalone
         # (not linked to any MUM account)
         if not user:
-            current_app.logger.info(f"No existing UserAppAccess found for server user '{username}' (email: {email}). "
+            current_app.logger.info(f"No existing local user found for server user '{username}' (email: {email}). "
                                   f"This user will exist only as server access without MUM account.")
             return None
         
         # Update existing user with server data if found
         if user:
-            current_app.logger.info(f"Updating existing UserAppAccess '{user.get_display_name()}' with server data")
+            current_app.logger.info(f"Updating existing local user '{user.get_display_name()}' with server data")
             
             # Update raw data based on server type
             if server.service_type == ServiceType.PLEX and user_data.get('raw_data'):

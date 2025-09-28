@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app.utils.helpers import setup_required, permission_required
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
-from app.models import Setting
+from app.models import User, UserType, Setting
 
 bp = Blueprint('streaming', __name__)
 
@@ -13,8 +13,7 @@ bp = Blueprint('streaming', __name__)
 @permission_required('view_streaming')
 def index():
     # Redirect UserAppAccess without admin permissions away from admin pages
-    from app.models import UserAppAccess
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_streaming'):
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('view_streaming'):
         flash('You do not have permission to access the streaming monitoring page.', 'danger')
         return redirect(url_for('user.index'))
     
@@ -46,8 +45,7 @@ def index():
 @permission_required('view_streaming')
 def sessions_partial():
     # Redirect UserAppAccess without admin permissions away from admin pages
-    from app.models import UserAppAccess
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_streaming'):
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('view_streaming'):
         flash('You do not have permission to access the streaming monitoring page.', 'danger')
         return redirect(url_for('user.index'))
     

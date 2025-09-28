@@ -4,7 +4,7 @@ from flask import (
     flash, request, current_app, make_response
 )
 from flask_login import login_required, current_user
-from app.models import Owner, UserAppAccess, Role
+from app.models import User, UserType, Role
 from app.forms import RoleEditForm, RoleCreateForm, RoleMemberForm
 from app.extensions import db
 from app.utils.helpers import setup_required, permission_required, any_permission_required
@@ -139,10 +139,10 @@ def edit(role_id):
     form.permissions.choices = all_permission_choices
     
     # Populate choices for the 'Add Members' modal form
-    users_not_in_role = UserAppAccess.query.filter(
-        ~UserAppAccess.roles.any(id=role.id)
-    ).order_by(UserAppAccess.username).all()
-    member_form.admins_to_add.choices = [(u.id, u.username) for u in users_not_in_role]
+    users_not_in_role = User.query.filter_by(userType=UserType.LOCAL).filter(
+        ~User.roles.any(id=role.id)
+    ).order_by(User.localUsername).all()
+    member_form.admins_to_add.choices = [(u.id, u.localUsername) for u in users_not_in_role]
 
     # Handle form submissions from different tabs
     if request.method == 'POST':
@@ -163,7 +163,7 @@ def edit(role_id):
             return redirect(url_for('role_management.edit', role_id=role_id, tab='permissions'))
             
         elif 'submit_add_members' in request.form and member_form.validate_on_submit():
-            users_to_add = UserAppAccess.query.filter(UserAppAccess.id.in_(member_form.admins_to_add.data)).all()
+            users_to_add = User.query.filter_by(userType=UserType.LOCAL).filter(User.id.in_(member_form.admins_to_add.data)).all()
             if users_to_add:
                 for user in users_to_add:
                     if user not in role.user_app_access:
@@ -207,11 +207,11 @@ def edit(role_id):
 @permission_required('edit_role')
 def remove_member(role_id, admin_id):
     role = Role.query.get_or_404(role_id)
-    user = UserAppAccess.query.get_or_404(admin_id)
+    user = User.query.filter_by(userType=UserType.LOCAL).get_or_404(admin_id)
     if user in role.user_app_access:
         role.user_app_access.remove(user)
         db.session.commit()
-        flash(f"Removed '{user.username}' from role '{role.name}'.", "success")
+        flash(f"Removed '{user.localUsername}' from role '{role.name}'.", "success")
     # Redirect back to the members tab
     return redirect(url_for('role_management.edit', role_id=role.id, tab='members'))
 
@@ -222,7 +222,7 @@ def delete(role_id):
     role = Role.query.get_or_404(role_id)
 
     # Prevent deletion if current user is assigned to this role (unless Owner)
-    if isinstance(current_user, UserAppAccess) and current_user in role.user_app_access:
+    if current_user.userType == UserType.LOCAL and current_user in role.user_app_access:
         flash("You cannot delete a role you are currently assigned to.", "danger")
         return redirect(url_for('role_management.index'))
     

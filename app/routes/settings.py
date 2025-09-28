@@ -6,8 +6,8 @@ from flask import (
 import requests
 from flask_login import login_required, current_user, logout_user 
 import secrets
-from app.models import UserAppAccess, Invite, HistoryLog, Setting, EventType, SettingValueType, Owner, Role, UserPreferences
-from app.models_media_services import MediaServer 
+from app.models import User, UserType, Invite, HistoryLog, Setting, EventType, SettingValueType, Role, UserPreferences
+from app.models_media_services import MediaServer
 from app.forms import (
     GeneralSettingsForm, DiscordConfigForm, SetPasswordForm, ChangePasswordForm, TimezonePreferenceForm, AdvancedSettingsForm
 )
@@ -24,7 +24,7 @@ bp = Blueprint('settings', __name__)
 @setup_required
 def index():
     # Redirect AppUsers without admin permissions away from admin pages
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_general_settings'):
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('manage_general_settings'):
         flash('You do not have permission to access the settings page.', 'danger')
         return redirect(url_for('user.index'))
     
@@ -41,7 +41,7 @@ def index():
     ]
 
     # Owner can see everything, default to general.
-    if isinstance(current_user, Owner):
+    if current_user.userType == UserType.OWNER:
         return redirect(url_for('settings.general'))
 
     # Find the first settings page the user has permission to view.
@@ -59,7 +59,7 @@ def index():
 @permission_required('manage_general_settings')
 def general():
     # Redirect AppUsers without admin permissions away from admin pages
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_general_settings'):
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('manage_general_settings'):
         flash('You do not have permission to access the general settings page.', 'danger')
         return redirect(url_for('user.index'))
     form = GeneralSettingsForm()
@@ -105,7 +105,7 @@ def general():
 @permission_required('manage_general_settings')
 def user_accounts():
     # Redirect AppUsers without admin permissions away from admin pages
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_general_settings'):
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('manage_general_settings'):
         flash('You do not have permission to access the user accounts settings page.', 'danger')
         return redirect(url_for('user.index'))
     from app.forms import UserAccountsSettingsForm
@@ -166,7 +166,7 @@ def account():
     # --- Handle "Set Initial Password" Form Submission (moved from general) ---
     elif 'submit_set_password' in request.form and set_password_form.validate_on_submit():
         user = current_user
-        user.username = set_password_form.username.data
+        user.localUsername = set_password_form.localUsername.data
         user.set_password(set_password_form.password.data)
         user.is_plex_sso_only = False
         db.session.commit()
@@ -193,9 +193,8 @@ def account():
 @setup_required
 @permission_required('manage_discord_settings')
 def discord():
-    # Redirect UserAppAccess without admin permissions away from admin pages
-    from app.models import UserAppAccess
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_discord_settings'):
+    # Redirect local users without admin permissions away from admin pages
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('manage_discord_settings'):
         flash('You do not have permission to access the Discord settings page.', 'danger')
         return redirect(url_for('user.index'))
     form = DiscordConfigForm(request.form if request.method == 'POST' else None)
@@ -341,9 +340,8 @@ def discord():
 @setup_required
 @permission_required('manage_advanced_settings')
 def advanced():
-    # Redirect UserAppAccess without admin permissions away from admin pages
-    from app.models import UserAppAccess
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('manage_advanced_settings'):
+    # Redirect local users without admin permissions away from admin pages
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('manage_advanced_settings'):
         flash('You do not have permission to access the advanced settings page.', 'danger')
         return redirect(url_for('user.index'))
     
@@ -420,15 +418,15 @@ def _get_history_logs_query():
         except KeyError: flash(f"Invalid event type filter: {event_type_filter}", "warning") # Flash won't show on partial
     if related_user_filter:
         from sqlalchemy import or_ 
-        query = query.join(Owner, Owner.id == HistoryLog.admin_id, isouter=True) \
-                     .join(Owner, Owner.id == HistoryLog.owner_id, isouter=True) \
-                     .join(UserAppAccess, UserAppAccess.id == HistoryLog.user_app_access_id, isouter=True) \
+        query = query.join(Owner, User.id == HistoryLog.admin_id, isouter=True) \
+                     .join(Owner, User.id == HistoryLog.owner_id, isouter=True) \
+                     .join(User, User.id == HistoryLog.linkedUserId, isouter=True) \
                      .filter(or_(
-                         Owner.username.ilike(f"%{related_user_filter}%"), 
-                         Owner.plex_username.ilike(f"%{related_user_filter}%"), 
-                         UserAppAccess.username.ilike(f"%{related_user_filter}%"), 
+                         User.localUsername.ilike(f"%{related_user_filter}%"), 
+                         User.plex_username.ilike(f"%{related_user_filter}%"), 
+                         User.localUsername.ilike(f"%{related_user_filter}%"), 
                          HistoryLog.owner_id.cast(db.String).ilike(f"%{related_user_filter}%"), 
-                         HistoryLog.user_app_access_id.cast(db.String).ilike(f"%{related_user_filter}%")
+                         HistoryLog.linkedUserId.cast(db.String).ilike(f"%{related_user_filter}%")
                      ))
     return query
 
@@ -504,8 +502,8 @@ def clear_logs():
 @setup_required
 @permission_required('view_logs') # Renamed permission
 def logs():
-    # Redirect AppUsers without admin permissions away from admin pages
-    if isinstance(current_user, UserAppAccess) and not current_user.has_permission('view_logs'):
+    # Redirect local users without admin permissions away from admin pages
+    if current_user.userType == UserType.LOCAL and not current_user.has_permission('view_logs'):
         flash('You do not have permission to access the logs page.', 'danger')
         return redirect(url_for('user.index'))
     # This route now just renders the main settings layout.
@@ -585,7 +583,7 @@ def update_streaming_settings():
         Setting.set('ENABLE_NAVBAR_STREAM_BADGE', 'true' if enable_navbar_stream_badge else 'false')
         Setting.set('SESSION_MONITORING_INTERVAL_SECONDS', str(interval_value))
         
-        current_app.logger.info(f"Streaming settings updated by {current_user.username}: "
+        current_app.logger.info(f"Streaming settings updated by {current_user.localUsername}: "
                                f"navbar_badge={enable_navbar_stream_badge}, "
                                f"interval={interval_value}")
         
@@ -682,8 +680,8 @@ def api_debug_execute():
                 headers['Authorization'] = f'Bearer {server.api_key}'
         
         # Add basic auth if username/password provided
-        if server.username and server.password:
-            auth = (server.username, server.password)
+        if server.localUsername and server.password:
+            auth = (server.localUsername, server.password)
             
         # Execute the request
         timeout = 30

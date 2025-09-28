@@ -6,7 +6,7 @@ from app.utils.timezone_utils import utcnow
 from sqlalchemy.types import TypeDecorator, TEXT
 from sqlalchemy.ext.mutable import MutableDict
 from app.extensions import db
-from app.models import JSONEncodedDict
+from app.extensions import JSONEncodedDict
 
 class PluginStatus(enum.Enum):
     DISABLED = "disabled"

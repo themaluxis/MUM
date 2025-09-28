@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from app.utils.timezone_utils import utcnow
 from urllib.parse import urlencode, quote as url_quote, urlparse, parse_qs, urlunparse 
 from flask_login import current_user
-from app.models import Invite, Setting, EventType, UserAppAccess
+from app.models import User, UserType, Invite, Setting, EventType
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required
 from app.services.media_service_factory import MediaServiceFactory
@@ -121,7 +121,7 @@ def process_invite_form(invite_path_or_token):
             if account_form.validate_on_submit():
                 # Store account creation data in session for later use
                 session[f'invite_{invite.id}_user_account_data'] = {
-                    'username': account_form.username.data,
+                    'username': account_form.localUsername.data,
                     'email': account_form.email.data,
                     'password': account_form.password.data
                 }
@@ -139,7 +139,7 @@ def process_invite_form(invite_path_or_token):
                 session[f'invite_{invite.id}_user_account_created'] = True
                 
                 flash("Account information saved! Please continue with the authentication steps.", "success")
-                current_app.logger.info(f"User account data stored in session for invite {invite.id}, username: {account_form.username.data}")
+                current_app.logger.info(f"User account data stored in session for invite {invite.id}, username: {account_form.localUsername.data}")
                 current_app.logger.info(f"Cross-server preferences: same_username={use_same_username}, same_password={use_same_password}")
                     
             else:
@@ -182,7 +182,7 @@ def process_invite_form(invite_path_or_token):
                 if user_account_data and allow_user_accounts:
                     try:
                         # Create the local user account now
-                        user_app_access = UserAppAccess(
+                        user_app_access = User(
                             username=user_account_data['username'],
                             email=user_account_data['email'],
                             created_at=utcnow(),
@@ -201,7 +201,7 @@ def process_invite_form(invite_path_or_token):
                         flash("Error creating your account. Please try again.", "error")
                         return redirect(url_for('invites.process_invite_form', invite_path_or_token=invite_path_or_token))
                 
-                current_app.logger.debug(f"Invite acceptance - User app access: {user_app_access.username if user_app_access else 'None'}")
+                current_app.logger.debug(f"Invite acceptance - User app access: {user_app_access.localUsername if user_app_access else 'None'}")
                 current_app.logger.debug(f"Invite acceptance - Session keys: {list(session.keys())}")
                 
                 success, result_object_or_message = invite_service.accept_invite_and_grant_access(
@@ -227,7 +227,7 @@ def process_invite_form(invite_path_or_token):
                     for server in invite.servers:
                         session.pop(f'invite_{invite.id}_server_{server.id}_completed', None)
                     
-                    username = user_app_access.username if user_app_access else (already_authenticated_plex_user_info.get('username') if already_authenticated_plex_user_info else 'User')
+                    username = user_app_access.localUsername if user_app_access else (already_authenticated_plex_user_info.get('username') if already_authenticated_plex_user_info else 'User')
                     flash(f"Welcome, {username}! All accounts have been created and linked successfully.", "success")
                     return redirect(url_for('invites.invite_success', username=username))
                 else: 

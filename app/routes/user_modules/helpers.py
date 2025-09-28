@@ -4,8 +4,8 @@
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from flask import current_app
-from app.models_media_services import MediaStreamHistory, UserMediaAccess
-from app.models import UserAppAccess, Owner
+from app.models_media_services import MediaStreamHistory
+from app.models import User, UserType
 from app.extensions import db
 from app.utils.helpers import format_duration
 import calendar
@@ -23,7 +23,7 @@ def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
     if days == -1:  # All time
         # Get the earliest stream date for this user
         earliest_stream = MediaStreamHistory.query.filter(
-            MediaStreamHistory.user_app_access_uuid == user.uuid
+            MediaStreamHistory.user_uuid == user.uuid
         ).order_by(MediaStreamHistory.started_at.asc()).first()
         
         if earliest_stream:
@@ -36,16 +36,14 @@ def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
         start_date = end_date - timedelta(days=days-1)
     
     # Get streaming history for this user
-    current_app.logger.info(f"CHART DATA DEBUG: Querying MediaStreamHistory for user_app_access_uuid={user.uuid}")
+    current_app.logger.info(f"CHART DATA DEBUG: Querying MediaStreamHistory for user_uuid={user.uuid}")
     current_app.logger.info(f"CHART DATA DEBUG: Date range: {start_date} to {end_date}")
     
-    # For local users, we need to include both:
-    # 1. Direct history (user_app_access_uuid)
-    # 2. Linked service account history (user_media_access_uuid from linked accounts)
-    if isinstance(user, UserAppAccess):
+    # For local users, we need to include both local and linked service account history
+    if user.userType == UserType.LOCAL:
         # Get all linked service accounts for this local user
-        linked_service_accounts = UserMediaAccess.query.filter_by(
-            user_app_access_id=user.id
+        linked_service_accounts = User.query.filter_by(userType=UserType.SERVICE).filter_by(
+            linkedUserId=user.uuid
         ).all()
         
         current_app.logger.info(f"CHART DATA DEBUG: Found {len(linked_service_accounts)} linked service accounts")
@@ -55,25 +53,23 @@ def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
         # Build query to include both direct and linked account history
         if linked_service_accounts:
             linked_uuids = [sa.uuid for sa in linked_service_accounts]
+            all_user_uuids = [user.uuid] + linked_uuids
             history_query = MediaStreamHistory.query.filter(
-                db.or_(
-                    MediaStreamHistory.user_app_access_uuid == user.uuid,
-                    MediaStreamHistory.user_media_access_uuid.in_(linked_uuids)
-                ),
+                MediaStreamHistory.user_uuid.in_(all_user_uuids),
                 MediaStreamHistory.started_at >= start_date,
                 MediaStreamHistory.started_at <= end_date
             )
         else:
             # No linked accounts, use direct history only
             history_query = MediaStreamHistory.query.filter(
-                MediaStreamHistory.user_app_access_uuid == user.uuid,
+                MediaStreamHistory.user_uuid == user.uuid,
                 MediaStreamHistory.started_at >= start_date,
                 MediaStreamHistory.started_at <= end_date
             )
     else:
-        # For service users, use the original query
+        # For service users, use the unified user_uuid
         history_query = MediaStreamHistory.query.filter(
-            MediaStreamHistory.user_app_access_uuid == user.uuid,
+            MediaStreamHistory.user_uuid == user.uuid,
             MediaStreamHistory.started_at >= start_date,
             MediaStreamHistory.started_at <= end_date
         )
@@ -88,8 +84,7 @@ def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
         for i, record in enumerate(streaming_history[:3]):
             current_app.logger.info(f"CHART DATA DEBUG: Record {i+1}: {record.media_title} at {record.started_at}")
             current_app.logger.info(f"CHART DATA DEBUG:   - Duration: {record.duration_seconds}s, Media Type: {record.media_type}")
-            current_app.logger.info(f"CHART DATA DEBUG:   - User Media Access UUID: {record.user_media_access_uuid}")
-            current_app.logger.info(f"CHART DATA DEBUG:   - User App Access UUID: {record.user_app_access_uuid}")
+            current_app.logger.info(f"CHART DATA DEBUG:   - User UUID: {record.user_uuid}")
     
     if not streaming_history:
         current_app.logger.info("CHART DATA DEBUG: No streaming history found, returning empty chart data")
@@ -163,18 +158,18 @@ def _generate_streaming_chart_data(user, days=30, group_by='library_type'):
         
         # Get service type from the server
         service_type = 'unknown'
-        if entry.user_media_access_uuid:
-            service_access = UserMediaAccess.query.filter_by(uuid=entry.user_media_access_uuid).first()
-            if service_access and service_access.server:
-                service_type = service_access.server.service_type.value
+        if entry.user_uuid:
+            user_access = User.query.filter_by(uuid=entry.user_uuid).first()
+            if user_access and user_access.server:
+                service_type = user_access.server.service_type.value
                 if i < 5:  # Only log first 5 records to avoid spam
-                    current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - Found service: {service_type} ({service_access.server.server_nickname})")
+                    current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - Found service: {service_type} ({user_access.server.server_nickname})")
             else:
                 if i < 5:
-                    current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No service access found for user_media_access_uuid: {entry.user_media_access_uuid}")
+                    current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No service found for user_uuid: {entry.user_uuid}")
         else:
             if i < 5:
-                current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No user_media_access_uuid")
+                current_app.logger.info(f"CHART DATA DEBUG: Record {i+1} - No user_uuid")
         
         # Determine grouping category based on group_by parameter
         if group_by == 'library_name':
@@ -491,23 +486,23 @@ def enhance_history_records_with_media_ids(history_records):
 
 
 def check_if_user_is_admin(user):
-    """Check if a UserAppAccess user is an admin by looking up their access in UserMediaAccess"""
-    if not isinstance(user, UserAppAccess):
+    """Check if a local user is an admin by looking up their linked service accounts"""
+    if not user.userType == UserType.LOCAL:
         return False
     
-    # Get the user's UserMediaAccess records for Plex servers
+    # Get the user's linked service accounts for Plex servers
     from app.models_media_services import MediaServer, ServiceType
     plex_servers = MediaServer.query.filter_by(service_type=ServiceType.PLEX).all()
     
     for plex_server in plex_servers:
-        access = UserMediaAccess.query.filter_by(
-            user_app_access_uuid=user.uuid,
+        access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
+            linkedUserId=user.uuid,
             server_id=plex_server.id
         ).first()
         
         if access and access.external_user_alt_id:  # external_user_alt_id is the plex_uuid
             # Check if this plex_uuid belongs to an Owner
-            owner = Owner.query.filter_by(plex_uuid=access.external_user_alt_id).first()
+            owner = User.query.filter_by(userType=UserType.OWNER).filter_by(plex_uuid=access.external_user_alt_id).first()
             if owner:
                 return True
     
@@ -540,7 +535,7 @@ def get_libraries_from_database(servers):
 def _get_local_user_avatar_url(app_user):
     """Get avatar URL for local users by checking their linked media access accounts"""
     # Get all media access records for this local user
-    access_records = UserMediaAccess.query.filter_by(user_app_access_id=app_user.id).all()
+    access_records = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=app_user.uuid).all()
     
     for access in access_records:
         # First check for external avatar URL
@@ -582,7 +577,7 @@ class MassEditMockUser:
     """Mock user class for mass edit operations"""
     def __init__(self, user_uuid, username, email, is_active, role_name, role_id, libraries_access):
         self.uuid = user_uuid
-        self.username = username
+        self.localUsername = username
         self.email = email
         self.is_active = is_active
         self.role_name = role_name

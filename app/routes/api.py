@@ -3,7 +3,7 @@ from flask import Blueprint, request, current_app, render_template, Response, ab
 from flask_login import login_required, current_user
 import requests
 import json
-from app.models import EventType, Invite, Setting
+from app.models import User, UserType, EventType, Invite, Setting
 from app.utils.helpers import log_event, permission_required
 from app.utils.timeout_helper import get_api_timeout
 from app.extensions import csrf, db
@@ -425,9 +425,8 @@ def test_new_server():
     """Test connection to a new server"""
     # Allow during setup, but require auth after setup is complete
     if not current_user.is_authenticated:
-        from app.models import Owner
         try:
-            admin_exists = Owner.query.first() is not None
+            admin_exists = User.get_owner() is not None
             if admin_exists:
                 return jsonify({'success': False, 'message': 'Authentication required'}), 401
         except:

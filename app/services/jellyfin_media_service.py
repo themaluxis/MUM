@@ -422,7 +422,6 @@ class JellyfinMediaService(BaseMediaService):
     
     def get_formatted_sessions(self) -> List[Dict[str, Any]]:
         """Get active Jellyfin sessions formatted for display"""
-        from app.models import UserAppAccess
         from flask import url_for
         import json
         
@@ -432,14 +431,19 @@ class JellyfinMediaService(BaseMediaService):
         
         # Get user mapping for Jellyfin users
         jellyfin_usernames = {session.get('UserName') for session in raw_sessions if session.get('UserName')}
-        # Get UserAppAccess via UserMediaAccess for Jellyfin usernames
-        from app.models_media_services import UserMediaAccess
+        # Get local user via service user for Jellyfin usernames
         if jellyfin_usernames:
-            jellyfin_accesses = UserMediaAccess.query.filter(
-                UserMediaAccess.server_id == self.server_id,
-                UserMediaAccess.external_username.in_(list(jellyfin_usernames))
+            jellyfin_accesses = User.query.filter_by(userType=UserType.SERVICE).filter(
+                User.server_id == self.server_id,
+                User.external_username.in_(list(jellyfin_usernames))
             ).all()
-            mum_users_map_by_username = {access.external_username: access.user_app_access for access in jellyfin_accesses}
+            # Create mapping of username to linked local user (if exists)
+            mum_users_map_by_username = {}
+            for access in jellyfin_accesses:
+                if access.linkedUserId:
+                    linked_user = User.query.filter_by(userType=UserType.LOCAL, uuid=access.linkedUserId).first()
+                    if linked_user:
+                        mum_users_map_by_username[access.external_username] = linked_user
         else:
             mum_users_map_by_username = {}
         

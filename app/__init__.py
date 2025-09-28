@@ -18,7 +18,7 @@ from .extensions import (
     babel, 
     htmx
 )
-from .models import UserAppAccess, Owner, Setting, EventType
+from .models import User, UserType, Setting, EventType
 from .utils import helpers 
 
 def get_locale_for_babel():
@@ -279,42 +279,43 @@ def create_app(config_name=None):
 
     @login_manager.user_loader
     def load_user(user_id):
-        # Clean user loader - supports Owner and UserAppAccess with UUID-based identification
+        # Updated user loader for unified User model with userType:uuid format
         try:
             with app.app_context():
-                # Try UUID format first for UserAppAccess
-                try:
-                    from app.utils.helpers import get_user_by_uuid
-                    user_obj, user_type = get_user_by_uuid(str(user_id))
-                    if user_obj and user_type == 'user_app_access':
-                        return user_obj
-                except Exception:
-                    pass  # Not a valid UUID, try other formats
-                
-                # Check if it's a prefixed format for Owner or legacy support
+                # Handle the new format: "userType:uuid"
                 if ':' in str(user_id):
-                    user_type, actual_id = str(user_id).split(':', 1)
-                    actual_id = int(actual_id)
+                    user_type_str, user_uuid = str(user_id).split(':', 1)
                     
-                    if user_type == 'owner':
-                        return Owner.query.get(actual_id)
-                    elif user_type in ['user_app_access', 'app', 'service']:
-                        # Legacy support - convert to UUID lookup if possible
-                        user_app_access = UserAppAccess.query.get(actual_id)
-                        return user_app_access
-                else:
-                    # Fallback: try as numeric ID for Owner first, then UserAppAccess
-                    try:
-                        actual_id = int(user_id)
-                        owner = Owner.query.get(actual_id)
-                        if owner:
-                            return owner
-                        
-                        user_app_access = UserAppAccess.query.get(actual_id)
-                        if user_app_access:
-                            return user_app_access
-                    except ValueError:
-                        pass  # Not a numeric ID
+                    # Map userType strings to UserType enum values
+                    type_mapping = {
+                        'owner': UserType.OWNER,
+                        'local': UserType.LOCAL, 
+                        'service': UserType.SERVICE
+                    }
+                    
+                    user_type_enum = type_mapping.get(user_type_str.lower())
+                    if user_type_enum:
+                        # Look up user by UUID and userType
+                        user = User.query.filter_by(uuid=user_uuid, userType=user_type_enum).first()
+                        return user
+                
+                # Fallback: try as direct UUID lookup (for backward compatibility)
+                try:
+                    user = User.query.filter_by(uuid=str(user_id)).first()
+                    if user:
+                        return user
+                except Exception:
+                    pass
+                
+                # Legacy fallback: try as numeric ID
+                try:
+                    actual_id = int(user_id)
+                    # Try to find by ID in the unified User table
+                    user = User.query.get(actual_id)
+                    if user:
+                        return user
+                except ValueError:
+                    pass  # Not a numeric ID
                 
                 return None
         except Exception as e_load_user:
@@ -377,7 +378,7 @@ def create_app(config_name=None):
                 # Check if Owner exists
                 owner_present = False
                 try:
-                    owner_present = Owner.query.first() is not None
+                    owner_present = User.get_owner() is not None
                 except Exception as e:
                     current_app.logger.debug(f"Error checking owner presence: {e}")
                     owner_present = False
@@ -442,7 +443,7 @@ def create_app(config_name=None):
                 # Check if Owner exists for setup redirection
                 owner_exists = False
                 try:
-                    owner_exists = Owner.query.first() is not None
+                    owner_exists = User.get_owner() is not None
                 except Exception as e:
                     current_app.logger.debug(f"Error checking owner for redirect: {e}")
                     owner_exists = False
@@ -523,6 +524,8 @@ def create_app(config_name=None):
     app.register_blueprint(role_management_bp, url_prefix='/admin/settings/roles')
     from .routes.users import bp as users_bp
     app.register_blueprint(users_bp, url_prefix='/admin/users')
+    from .routes.admin_user import admin_user_bp
+    app.register_blueprint(admin_user_bp, url_prefix='/admin/user')
     from .routes.invites import bp_public as invites_public_bp, bp_admin as invites_admin_bp
     app.register_blueprint(invites_public_bp)
     app.register_blueprint(invites_admin_bp, url_prefix='/admin/invites')
@@ -557,7 +560,7 @@ def create_app(config_name=None):
             return "N/A"
         
         from flask_login import current_user
-        from app.models import UserPreferences
+        from app.models import User, UserType, UserPreferences
         
         if not current_user.is_authenticated:
             # Fallback to UTC if no user

@@ -2,13 +2,13 @@
 from typing import List, Dict, Any, Optional
 from flask import current_app
 from datetime import datetime, timedelta
-from app.models import Invite, UserAppAccess, Setting
-from app.models_media_services import MediaServer, UserMediaAccess
+from app.models import Invite, User, UserType, Setting
+from app.models_media_services import MediaServer
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
 from app.extensions import db
 from app.utils.helpers import log_event
-from app.models import EventType
+from app.models import User, UserType, EventType
 
 class UnifiedInviteService:
     """Service for managing invites across all media services"""
@@ -128,8 +128,8 @@ class UnifiedInviteService:
                     else:
                         external_user_id = None
                     
-                    # Create or update UserMediaAccess
-                    access = UserMediaAccess.query.filter_by(
+                    # Create or update service user
+                    access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
                         service_account_id=user.id,
                         server_id=server_id
                     ).first()
@@ -140,7 +140,7 @@ class UnifiedInviteService:
                         if server.service_type == ServiceType.PLEX and user_data.get('plex_uuid'):
                             external_user_alt_id = user_data.get('plex_uuid')
                         
-                        access = UserMediaAccess(
+                        access = User(
                             service_account_id=user.id,
                             server_id=server_id,
                             external_user_id=external_user_id,
@@ -223,12 +223,12 @@ class UnifiedInviteService:
         # Try to find existing user
         user = None
         
-        # Try by Plex UUID first via UserMediaAccess
+        # Try by Plex UUID first via service user
         if plex_uuid:
-            from app.models_media_services import UserMediaAccess, ServiceType, MediaServer
+            from app.models_media_services import ServiceType, MediaServer
             plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
             if plex_server:
-                access = UserMediaAccess.query.filter_by(
+                access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
                     server_id=plex_server.id,
                     external_user_alt_id=plex_uuid
                 ).first()
@@ -241,15 +241,15 @@ class UnifiedInviteService:
         
         # Try by Discord user ID
         if not user and discord_user_id:
-            user = UserAppAccess.query.filter_by(discord_user_id=discord_user_id).first()
+            user = User.query.filter_by(userType=UserType.LOCAL).filter_by(discord_user_id=discord_user_id).first()
         
         # Try by primary username
         if not user and username:
-            user = UserAppAccess.query.filter_by(username=username).first()
+            user = User.get_by_local_username(username)
         
         # Try by primary email
         if not user and email:
-            user = UserAppAccess.query.filter_by(email=email).first()
+            user = User.query.filter_by(userType=UserType.LOCAL).filter_by(email=email).first()
         
         if not user:
             # Create new user
@@ -261,8 +261,8 @@ class UnifiedInviteService:
             
             # Set service-specific fields
             if plex_uuid:
-                # Plex UUID is now stored in UserMediaAccess.external_user_alt_id
-                user.username = username
+                # Plex UUID is now stored in User.external_user_alt_id
+                user.localUsername = username
                 user.plex_email = email
                 user.plex_thumb_url = user_data.get('plex_thumb_url')
             

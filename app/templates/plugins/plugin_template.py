@@ -28,10 +28,10 @@ class MyServiceMediaService(BaseMediaService):
             # Most services use Bearer token or API key in headers
             headers['Authorization'] = f'Bearer {self.api_key}'
             # Or: headers['X-API-Key'] = self.api_key
-        elif self.username and self.password:
+        elif self.localUsername and self.password:
             # Some services use basic auth
             import base64
-            credentials = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
+            credentials = base64.b64encode(f"{self.localUsername}:{self.password}".encode()).decode()
             headers['Authorization'] = f'Basic {credentials}'
         
         return headers

@@ -18,7 +18,7 @@ log_event_mum, user_service_for_bot, plex_service_for_bot = None, None, None
 
 try:
     from app import create_app as create_flask_app 
-    from app.models import UserAppAccess as MUM_User, Setting as MUM_Setting, EventType as MUM_EventType, SettingValueType as MUM_SettingValueType
+    from app.models import User as MUM_User, Setting as MUM_Setting, EventType as MUM_EventType, SettingValueType as MUM_SettingValueType
     from app.extensions import db as mum_db_session # Using the db session from extensions
     from app.utils.helpers import log_event as mum_log_event_func
     from app.services import user_service as mum_user_service_module

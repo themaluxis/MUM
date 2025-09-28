@@ -30,10 +30,10 @@
     </div>
 
     <!-- Linked Accounts Summary -->
-    {% if user.media_accesses %}
+    {% if user.linked_service_users %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-        {% for media_access in user.media_accesses %}
-            {% set service_type = media_access.get_service_type() %}
+        {% for service_user in user.linked_service_users %}
+            {% set service_type = service_user.get_service_type() %}
             <div class="bg-base-100 rounded-xl border border-base-300/60 p-4">
                 <div class="flex items-center gap-3">
                     <!-- Service Icon -->

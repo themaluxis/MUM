@@ -5,7 +5,7 @@ Authentication-related invite functionality - Plex and Discord auth initiation
 import uuid
 from flask import redirect, url_for, flash, request, current_app, session
 from urllib.parse import urlencode
-from app.models import Invite, Setting, EventType
+from app.models import User, UserType, Invite, Setting, EventType
 from app.utils.helpers import setup_required, log_event
 from app.utils.timeout_helper import get_api_timeout
 from . import invites_public_bp as invites_bp

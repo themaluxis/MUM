@@ -14,7 +14,7 @@ class BaseMediaService(ABC):
         self.name = server_config.get('name')
         self.url = server_config.get('url')
         self.api_key = server_config.get('api_key')
-        self.username = server_config.get('username')
+        self.localUsername = server_config.get('username')
         self.password = server_config.get('password')
         self.config = server_config.get('config', {})
         

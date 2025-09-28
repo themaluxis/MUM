@@ -3,7 +3,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, IntegerField, TextAreaField, HiddenField, DateField, EmailField
 from wtforms.validators import DataRequired, EqualTo, Length, Optional, URL, NumberRange, Regexp, ValidationError, Email
 from wtforms import SelectMultipleField
-from app.models import Setting, Owner # For custom validator if checking existing secrets
+from app.models import Setting, UserType, User, UserType # For custom validator if checking existing secrets
 from wtforms.widgets import ListWidget, CheckboxInput # <--- ADDED THIS IMPORT
 import urllib.parse 
 from flask_login import current_user
@@ -312,8 +312,7 @@ class SetPasswordForm(FlaskForm):
     submit_set_password = SubmitField('Set Username & Password')
 
     def validate_username(self, field):
-        from app.models import Owner
-        if Owner.query.filter_by(username=field.data).first():
+        if User.get_by_local_username(field.data):
             raise ValidationError('Username already exists. Choose a different one.')
 
 class ChangePasswordForm(FlaskForm):
@@ -332,8 +331,7 @@ class AdminCreateForm(FlaskForm):
     submit = SubmitField('Create Admin')
 
     def validate_username(self, field):
-        from app.models import Owner
-        if Owner.query.filter_by(username=field.data).first():
+        if User.get_by_local_username(field.data):
             raise ValidationError('Username already exists. Choose a different one.')
 
 class AdminEditForm(FlaskForm):
@@ -344,7 +342,7 @@ class AdminEditForm(FlaskForm):
     
     def __init__(self, *args, **kwargs):
         super(AdminEditForm, self).__init__(*args, **kwargs)
-        from app.models import Role
+        from app.models import User, UserType, Role
         self.roles.choices = [(role.id, role.name) for role in Role.query.all()]
     
     submit = SubmitField('Save Changes')
@@ -530,16 +528,13 @@ class UserAccountCreationForm(FlaskForm):
     submit = SubmitField('Create Account')
 
     def validate_username(self, field):
-        # Check if username already exists in UserAppAccess table
-        from app.models import UserAppAccess
-        existing_user = UserAppAccess.query.filter_by(username=field.data).first()
-        if existing_user:
+        # Check if username already exists
+        if User.get_by_local_username(field.data):
             raise ValidationError('Username already exists. Please choose a different one.')
 
     def validate_email(self, field):
-        # Check if email already exists in UserAppAccess table
-        from app.models import UserAppAccess
-        existing_user = UserAppAccess.query.filter_by(email=field.data).first()
+        # Check if email already exists in User table
+        existing_user = User.query.filter_by(discord_email=field.data).first()
         if existing_user:
             raise ValidationError('Email already registered. Please use a different email address.')
 
@@ -597,32 +592,33 @@ class UserLoginForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired()], render_kw={"placeholder": "Password"})
     submit = SubmitField('Sign In')
 
-# UserAppAccess forms for admin management
-class UserAppAccessCreateForm(FlaskForm):
+# User forms for admin management (unified)
+class UserCreateForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     email = EmailField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    userType = SelectField('User Type', choices=[('local', 'Local User'), ('owner', 'Owner')], validators=[DataRequired()])
     submit = SubmitField('Create User Account')
 
     def validate_username(self, field):
-        from app.models import UserAppAccess
-        existing_user = UserAppAccess.query.filter_by(username=field.data).first()
-        if existing_user:
+        if User.get_by_local_username(field.data):
             raise ValidationError('Username already exists. Choose a different one.')
 
     def validate_email(self, field):
-        from app.models import UserAppAccess
-        existing_user = UserAppAccess.query.filter_by(email=field.data).first()
+        existing_user = User.query.filter_by(discord_email=field.data).first()
         if existing_user:
             raise ValidationError('Email already exists. Choose a different one.')
 
-class UserAppAccessEditForm(FlaskForm):
+class LocalUserEditForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     email = EmailField('Email', validators=[DataRequired(), Email()])
+    userType = SelectField('User Type', choices=[('local', 'Local User'), ('owner', 'Owner')], validators=[DataRequired()])
+    is_active = BooleanField('Active')
+    roles = SelectMultipleField('Roles', coerce=int, validators=[Optional()])
     submit = SubmitField('Update User Account')
 
-class UserAppAccessResetPasswordForm(FlaskForm):
+class UserResetPasswordForm(FlaskForm):
     password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
     confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Reset Password')
@@ -646,8 +642,6 @@ class MergeIntoLocalAccountForm(FlaskForm):
     submit = SubmitField('Create Local Account')
 
     def validate_username(self, field):
-        # Check if username already exists in UserAppAccess table
-        from app.models import UserAppAccess
-        existing_user = UserAppAccess.query.filter_by(username=field.data).first()
-        if existing_user:
+        # Check if username already exists
+        if User.get_by_local_username(field.data):
             raise ValidationError('Username already exists. Please choose a different one.')

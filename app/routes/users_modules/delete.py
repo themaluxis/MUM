@@ -3,7 +3,7 @@
 
 from flask import render_template, request, current_app, make_response
 from flask_login import login_required, current_user
-from app.models import UserAppAccess, EventType
+from app.models import User, UserType, EventType
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
 from app.services.unified_user_service import UnifiedUserService
@@ -24,13 +24,12 @@ def get_linked_accounts_list(user_uuid):
     if not user_obj or user_type != "user_app_access":
         return '<div class="text-center p-4 text-error">Local user not found.</div>'
     
-    user = UserAppAccess.query.get(user_obj.id)
+    user = User.query.filter_by(userType=UserType.LOCAL).get(user_obj.id)
     if not user:
         return '<div class="text-center p-4 text-error">Local user not found.</div>'
     
     # Get linked service accounts
-    from app.models_media_services import UserMediaAccess
-    linked_accounts = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
+    linked_accounts = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=user.uuid).all()
     
     if not linked_accounts:
         return '<div class="text-center p-4 text-base-content/60">No linked service accounts found.</div>'
@@ -89,7 +88,7 @@ def delete_local_user(user_uuid):
     if not user_obj or user_type != "user_app_access":
         return make_response("Local user not found", 404)
     
-    user = UserAppAccess.query.get(user_obj.id)
+    user = User.query.filter_by(userType=UserType.LOCAL).get(user_obj.id)
     if not user:
         return make_response("Local user not found", 404)
     
@@ -100,12 +99,11 @@ def delete_local_user(user_uuid):
     except:
         deletion_type = 'unlink_only'  # Default to safer option
     
-    username = user.username
+    username = user.localUsername
     
     try:
         # Get linked service accounts before deletion
-        from app.models_media_services import UserMediaAccess
-        linked_accounts = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
+        linked_accounts = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=user.uuid).all()
         linked_count = len(linked_accounts)
         
         if deletion_type == 'delete_all':
@@ -119,7 +117,7 @@ def delete_local_user(user_uuid):
             
             # Unlink all service accounts (convert to standalone)
             for access in linked_accounts:
-                access.user_app_access_id = None
+                access.linkedUserId = None
                 current_app.logger.debug(f"Unlinked service account: {access.external_username} on {access.server.server_nickname}")
             
             # Delete the local user
@@ -167,7 +165,7 @@ def delete_user(user_uuid):
     
     if user_type == "user_app_access":
         # This is a local UserAppAccess user
-        user = UserAppAccess.query.get(actual_id)
+        user = User.query.filter_by(userType=UserType.LOCAL).get(actual_id)
     
         if not user:
             toast = {
@@ -213,9 +211,8 @@ def delete_user(user_uuid):
     
     elif user_type == "user_media_access":
         # This is a standalone service user
-        from app.models_media_services import UserMediaAccess
-        access = UserMediaAccess.query.filter(
-            UserMediaAccess.id == actual_id
+        access = User.query.filter_by(userType=UserType.SERVICE).filter(
+            User.id == actual_id
         ).first()
         
         if not access:
@@ -286,7 +283,7 @@ def delete_user(user_uuid):
 @permission_required('delete_user')
 def delete_app_user(username):
     """Delete an app user by username"""
-    user = UserAppAccess.query.filter_by(username=username).first()
+    user = User.get_by_local_username(username)
     
     if not user:
         toast = {

@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app.forms import TimezonePreferenceForm
-from app.models import UserPreferences
+from app.models import User, UserType, UserPreferences
 
 user_preferences_bp = Blueprint('user_preferences', __name__)
 

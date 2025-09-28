@@ -4,7 +4,7 @@ from flask import (
     flash, request, current_app, make_response
 )
 from flask_login import login_required, current_user
-from app.models import Setting, EventType
+from app.models import User, UserType, Setting, EventType
 from app.forms import PluginSettingsForm
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
@@ -75,7 +75,7 @@ def index():
 @permission_required('manage_plugins')
 def configure(plugin_id):
     from app.models_plugins import Plugin
-    from app.models_media_services import MediaServer, ServiceType, UserMediaAccess
+    from app.models_media_services import MediaServer, ServiceType
     from app.services.media_service_factory import MediaServiceFactory
 
     plugin = Plugin.query.filter_by(plugin_id=plugin_id).first_or_404()
@@ -90,7 +90,7 @@ def configure(plugin_id):
     
     servers_with_details = []
     for server in servers:
-        member_count = UserMediaAccess.query.filter_by(server_id=server.id).count()
+        member_count = User.query.filter_by(userType=UserType.SERVICE).filter_by(server_id=server.id).count()
         server_details = {
             'server': server,
             'member_count': member_count,
@@ -171,7 +171,7 @@ def edit_server(plugin_id, server_id):
             
             # Only update username/password for services that use them
             if hasattr(form, 'username') and form.username:
-                server.username = form.username.data
+                server.localUsername = form.username.data
             if hasattr(form, 'password') and form.password and form.password.data:  # Only update password if provided
                 server.password = form.password.data
                 
@@ -251,8 +251,7 @@ def add_server(plugin_id):
             # If this is a Plex server with Overseerr enabled, sync the user links from the test
             if (plugin_id == 'plex' and new_server.overseerr_enabled and 
                 hasattr(request, 'overseerr_linked_users')):
-                from app.models_media_services import UserMediaAccess
-                success, message = UserMediaAccess.sync_overseerr_users(
+                success, message = User.sync_overseerr_users(
                     new_server.id, 
                     request.overseerr_linked_users
                 )

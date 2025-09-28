@@ -30,9 +30,9 @@
                     </h2>
                     
                     {% set user_servers = [] %}
-                    {% for media_access in user.media_accesses %}
-                        {% if media_access.server and media_access.is_active %}
-                            {% set _ = user_servers.append(media_access.server) %}
+                    {% for service_user in user.linked_service_users %}
+                        {% if service_user.server and service_user.is_active %}
+                            {% set _ = user_servers.append(service_user.server) %}
                         {% endif %}
                     {% endfor %}
                     
@@ -99,7 +99,7 @@
                     <div class="space-y-3">
                         <div>
                             <div class="text-sm text-base-content/60">Username</div>
-                            <div class="font-medium">{{ user.username }}</div>
+                            <div class="font-medium">{{ user.localUsername }}</div>
                         </div>
                         
                         {% if user.email %}

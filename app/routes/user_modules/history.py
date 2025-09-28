@@ -4,8 +4,8 @@
 from flask import render_template, redirect, url_for, flash, request, current_app, make_response, abort
 from flask_login import login_required, current_user
 from datetime import datetime, timezone, timedelta
-from app.models import UserAppAccess, EventType
-from app.models_media_services import UserMediaAccess, MediaStreamHistory
+from app.models import User, UserType, EventType
+from app.models_media_services import MediaStreamHistory
 from app.extensions import db
 from app.utils.helpers import permission_required, log_event
 from . import user_bp
@@ -22,7 +22,7 @@ def delete_stream_history(username=None, server_nickname=None, server_username=N
     # Determine if this is a local user or service user based on parameters
     if username and not server_nickname and not server_username:
         # Local user route
-        user = UserAppAccess.query.filter_by(username=urllib.parse.unquote(username)).first()
+        user = User.query.filter_by(userType=UserType.LOCAL).filter_by(username=urllib.parse.unquote(username)).first()
         if not user:
             current_app.logger.error(f"Local user not found: {username}")
             return make_response("<!-- error -->", 400)
@@ -36,7 +36,7 @@ def delete_stream_history(username=None, server_nickname=None, server_username=N
             current_app.logger.error(f"Server not found: {server_nickname}")
             return make_response("<!-- error -->", 400)
         
-        access = UserMediaAccess.query.filter_by(
+        access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
             server_id=server.id,
             external_username=urllib.parse.unquote(server_username)
         ).first()
@@ -66,16 +66,17 @@ def delete_stream_history(username=None, server_nickname=None, server_username=N
         if user_type == "user_app_access":
             # Delete history for local user (both direct and linked account history)
             query = MediaStreamHistory.query.filter(
-                MediaStreamHistory.user_app_access_uuid == user.uuid
+                MediaStreamHistory.user_uuid == user.uuid
             )
             
-            # Also include linked account history
-            linked_query = MediaStreamHistory.query.join(
-                UserMediaAccess, 
-                MediaStreamHistory.user_media_access_uuid == UserMediaAccess.uuid
-            ).filter(
-                UserMediaAccess.user_app_access_id == actual_id
-            )
+            # Also include linked account history (service accounts linked to this local user)
+            linked_service_users = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=user.uuid).all()
+            linked_uuids = [sa.uuid for sa in linked_service_users]
+            
+            if linked_uuids:
+                linked_query = MediaStreamHistory.query.filter(MediaStreamHistory.user_uuid.in_(linked_uuids))
+            else:
+                linked_query = MediaStreamHistory.query.filter(MediaStreamHistory.user_uuid == None)  # Empty query
             
             if date_threshold:
                 query = query.filter(MediaStreamHistory.started_at <= date_threshold)
@@ -95,7 +96,7 @@ def delete_stream_history(username=None, server_nickname=None, server_username=N
         else:  # user_media_access
             # Delete history for service user only
             query = MediaStreamHistory.query.filter(
-                MediaStreamHistory.user_media_access_uuid == access.uuid
+                MediaStreamHistory.user_uuid == access.uuid
             )
             
             if date_threshold:

@@ -74,7 +74,7 @@ def format_datetime_user(dt: Optional[datetime], include_time: bool = True) -> s
         return "N/A"
 
     from flask_login import current_user
-    from app.models import UserPreferences
+    from app.models import User, UserType, UserPreferences
 
     if not current_user.is_authenticated:
         return format_datetime(dt)

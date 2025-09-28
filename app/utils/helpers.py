@@ -99,8 +99,8 @@ def log_event(event_type, message: str, details: dict = None, # Removed type hin
         )
 
         if admin_id is None and current_user and current_user.is_authenticated and hasattr(current_user, 'id'):
-            from app.models import Owner # Local import
-            if isinstance(current_user, Owner):
+            from app.models import UserType
+            if current_user.userType == UserType.OWNER:
                 log_entry.admin_id = current_user.id
         elif admin_id: # Ensure explicitly passed admin_id is used
              log_entry.admin_id = admin_id
@@ -224,14 +224,14 @@ def permission_required(permission_name):
                 return redirect(url_for('auth.app_login'))
             
             # Import user types locally to avoid circular imports
-            from app.models import Owner, UserAppAccess
+            from app.models import User, UserType
             
             # Owner always has all permissions
-            if isinstance(current_user, Owner):
+            if current_user.userType == UserType.OWNER:
                 return f(*args, **kwargs)
             
-            # Check permissions for UserAppAccess (role-based)
-            if isinstance(current_user, UserAppAccess):
+            # Check permissions for LOCAL users (role-based)
+            if current_user.userType == UserType.LOCAL:
                 if current_user.has_permission(permission_name):
                     return f(*args, **kwargs)
             
@@ -253,14 +253,13 @@ def any_permission_required(permissions):
                 return redirect(url_for('auth.app_login'))
             
             # Import user types locally to avoid circular imports
-            from app.models import Owner, UserAppAccess
             
             # Owner always has all permissions
-            if isinstance(current_user, Owner):
+            if current_user.userType == UserType.OWNER:
                 return f(*args, **kwargs)
             
-            # Check if UserAppAccess has ANY of the permissions in the list
-            if isinstance(current_user, UserAppAccess):
+            # Check if local user has ANY of the permissions in the list
+            if current_user.userType == UserType.LOCAL:
                 for perm in permissions:
                     if current_user.has_permission(perm):
                         return f(*args, **kwargs)
@@ -289,18 +288,17 @@ def get_text_color_for_bg(hex_color):
 
 def get_user_by_uuid(user_uuid):
     """Get user (either type) by uuid"""
-    from app.models import UserAppAccess
-    from app.models_media_services import UserMediaAccess
     
-    # Try UserMediaAccess first
-    user = UserMediaAccess.query.filter_by(uuid=user_uuid).first()
+    # Find user in unified User table
+    from app.models import User, UserType
+    user = User.query.filter_by(uuid=user_uuid).first()
     if user:
-        return user, 'user_media_access'
-    
-    # Try UserAppAccess
-    user = UserAppAccess.query.filter_by(uuid=user_uuid).first()
-    if user:
-        return user, 'user_app_access'
+        if user.userType == UserType.SERVICE:
+            return user, "user_media_access"  # Keep legacy type name for compatibility
+        elif user.userType == UserType.LOCAL:
+            return user, "user_app_access"   # Keep legacy type name for compatibility
+        elif user.userType == UserType.OWNER:
+            return user, "owner"
     
     return None, None
     
@@ -403,18 +401,17 @@ def super_admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # Import user types locally to avoid circular imports
-        from app.models import Owner, UserAppAccess
         
         if not current_user.is_authenticated:
             flash("You do not have permission to access this page.", "danger")
             return redirect(url_for('dashboard.index'))
         
         # For Owner, check if ID is 1
-        if isinstance(current_user, Owner):
+        if current_user.userType == UserType.OWNER:
             if current_user.id == 1:
                 return f(*args, **kwargs)
-        # For UserAppAccess, check if ID is 1 (super admin local user)
-        elif isinstance(current_user, UserAppAccess):
+        # For local users, check if ID is 1 (super admin local user)
+        elif current_user.userType == UserType.LOCAL:
             if current_user.id == 1:
                 return f(*args, **kwargs)
         
@@ -435,12 +432,11 @@ def get_user_profile_url(user, **kwargs):
         str: The appropriate URL for the user's profile
     """
     from flask import url_for
-    from app.models import UserAppAccess
     import urllib.parse
     
-    if isinstance(user, UserAppAccess):
+    if user.userType == UserType.LOCAL:
         # URL encode the username to handle special characters
-        encoded_username = urllib.parse.quote(user.username, safe='')
+        encoded_username = urllib.parse.quote(user.localUsername, safe='')
         return url_for('user.view_app_user', username=encoded_username, **kwargs)
     else:
         # Service Account - need to determine server and username
@@ -467,10 +463,9 @@ def get_primary_server_for_user(service_account):
     Returns:
         tuple: (server_name, username) or None if no server found
     """
-    from app.models_media_services import UserMediaAccess
     
     # Get the first server this user has access to
-    user_access = UserMediaAccess.query.filter_by(service_account_id=service_account.id).first()
+    user_access = User.query.filter_by(userType=UserType.SERVICE).filter_by(service_account_id=service_account.id).first()
     if not user_access:
         return None
     
@@ -494,10 +489,9 @@ def extract_username_for_server(service_account, server):
     Returns:
         str: The username to use for this server
     """
-    from app.models_media_services import UserMediaAccess
     
-    # First, try to get the clean username from UserMediaAccess
-    user_access = UserMediaAccess.query.filter_by(
+    # First, try to get the clean username from service user
+    user_access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
         service_account_id=service_account.id,
         server_id=server.id
     ).first()
@@ -506,7 +500,7 @@ def extract_username_for_server(service_account, server):
         return user_access.external_username
     
     # Fallback to service account username (now universal for all services)
-    username = service_account.username
+    username = service_account.localUsername
     if '@' in username:
         # Handle any remaining legacy data with @service suffix
         return username.split('@')[0]
@@ -523,9 +517,8 @@ def get_user_type_display(user):
     Returns:
         str: Display string like "App User" or "Plex User"
     """
-    from app.models import UserAppAccess
     
-    if isinstance(user, UserAppAccess):
+    if user.userType == UserType.LOCAL:
         return "App User"
     else:
         # Service Account - determine service type
@@ -541,21 +534,19 @@ def get_user_servers_and_types(user):
     Get server names and service types for a user.
     
     Args:
-        user: UserAppAccess instance or MockUser instance
+        user: User instance (local user) or MockUser instance
         
     Returns:
         tuple: (server_names_list, service_types_list)
     """
-    from app.models_media_services import UserMediaAccess
-    from app.models import UserAppAccess
     
-    # Handle UserAppAccess (local users)
-    if isinstance(user, UserAppAccess):
-        user_access_records = UserMediaAccess.query.filter_by(user_app_access_id=user.id).all()
+    # Handle local users
+    if user.userType == UserType.LOCAL:
+        user_access_records = User.query.filter_by(userType=UserType.SERVICE).filter_by(linkedUserId=user.uuid).all()
     # Handle MockUser or service users (check for _user_type attribute)
     elif hasattr(user, '_user_type') and user._user_type == 'service':
         # This is a standalone service user - get their direct access record
-        user_access_records = UserMediaAccess.query.filter_by(id=user.id, user_app_access_id=None).all()
+        user_access_records = User.query.filter_by(userType=UserType.SERVICE).filter_by(id=user.id, linkedUserId=None).all()
     else:
         # Unknown user type or no access records
         return ([], [])
@@ -614,18 +605,17 @@ def validate_username_for_routing(username, user_type='app'):
     
     elif user_type == 'server':
         # Check if server nickname conflicts with existing app usernames
-        from app.models import UserAppAccess
-        app_user_conflict = UserAppAccess.query.filter_by(username=username).first()
+        from app.models import User, UserType
+        app_user_conflict = User.get_by_local_username(username)
         if app_user_conflict:
             result['conflicts'].append(f"Server nickname '{username}' conflicts with existing app user username")
             result['valid'] = False
     
     # Check for case sensitivity issues
     if user_type == 'app':
-        from app.models import UserAppAccess
-        case_conflicts = UserAppAccess.query.filter(UserAppAccess.username.ilike(username)).filter(UserAppAccess.username != username).all()
+        case_conflicts = User.query.filter_by(userType=UserType.LOCAL).filter(User.localUsername.ilike(username)).filter(User.localUsername != username).all()
         if case_conflicts:
-            conflicting_usernames = [user.username for user in case_conflicts]
+            conflicting_usernames = [user.localUsername for user in case_conflicts]
             result['warnings'].append(f"Similar usernames exist with different case: {', '.join(conflicting_usernames)}")
     
     return result
@@ -657,7 +647,6 @@ def resolve_user_route_conflict(path_segment):
     Returns:
         dict: {'type': 'app_user'|'server'|'ambiguous'|'none', 'user': user_obj, 'server': server_obj}
     """
-    from app.models import UserAppAccess
     from app.models_media_services import MediaServer
     import urllib.parse
     
@@ -674,7 +663,7 @@ def resolve_user_route_conflict(path_segment):
     }
     
     # Check for app user
-    app_user = UserAppAccess.query.filter_by(username=decoded_segment).first()
+    app_user = User.get_by_local_username(decoded_segment)
     
     # Check for server
     server = MediaServer.query.filter_by(server_nickname=decoded_segment).first()

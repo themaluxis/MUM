@@ -3,8 +3,7 @@
 
 from flask import request, current_app
 from flask_login import login_required, current_user
-from app.models import UserAppAccess, EventType
-from app.models_media_services import UserMediaAccess
+from app.models import User, UserType, EventType
 from app.extensions import db
 from app.utils.helpers import log_event, permission_required
 from . import users_bp
@@ -18,8 +17,8 @@ def get_available_service_users():
     """Get list of service users that are not linked to any local account"""
     try:
         # Get all standalone service users (not linked to any local account)
-        standalone_users = UserMediaAccess.query.filter(
-            UserMediaAccess.user_app_access_id.is_(None)
+        standalone_users = User.query.filter_by(userType=UserType.SERVICE).filter(
+            User.linkedUserId.is_(None)
         ).all()
         
         users_data = []
@@ -136,26 +135,26 @@ def link_service_user():
             return {'success': False, 'message': 'Missing required parameters'}, 400
         
         # Get the local user
-        local_user = UserAppAccess.query.filter_by(uuid=local_user_uuid).first()
+        local_user = User.query.filter_by(userType=UserType.LOCAL).filter_by(uuid=local_user_uuid).first()
         if not local_user:
             return {'success': False, 'message': 'Local user not found'}, 404
         
         # Get the service user
-        service_user = UserMediaAccess.query.get(service_user_id)
+        service_user = User.query.filter_by(userType=UserType.SERVICE).get(service_user_id)
         if not service_user:
             return {'success': False, 'message': 'Service user not found'}, 404
         
         # Check if service user is already linked
-        if service_user.user_app_access_id:
+        if service_user.linkedUserId:
             return {'success': False, 'message': 'Service user is already linked to another account'}, 400
         
         # Link the accounts
-        service_user.user_app_access_id = local_user.id
+        service_user.linkedUserId = local_user.id
         db.session.commit()
         
         # Log the event
         log_event(EventType.SETTING_CHANGE, 
-                  f"Service account '{service_user.external_username}' linked to local user '{local_user.username}'",
+                  f"Service account '{service_user.external_username}' linked to local user '{local_user.localUsername}'",
                   admin_id=current_user.id)
         
         return {'success': True, 'message': 'User linked successfully'}
@@ -186,7 +185,7 @@ def link_service_users():
             return {'success': False, 'message': 'Missing required parameters'}, 400
         
         # Get the local user
-        local_user = UserAppAccess.query.filter_by(uuid=local_user_uuid).first()
+        local_user = User.query.filter_by(userType=UserType.LOCAL).filter_by(uuid=local_user_uuid).first()
         if not local_user:
             return {'success': False, 'message': 'Local user not found'}, 404
         
@@ -196,27 +195,27 @@ def link_service_users():
         
         for service_user_id in service_user_ids:
             # Get the service user
-            service_user = UserMediaAccess.query.get(service_user_id)
+            service_user = User.query.filter_by(userType=UserType.SERVICE).get(service_user_id)
             if not service_user:
                 not_found.append(service_user_id)
                 current_app.logger.debug(f"Service user {service_user_id} not found")
                 continue
             
-            current_app.logger.debug(f"Service user {service_user_id}: external_username={service_user.external_username}, user_app_access_id={service_user.user_app_access_id}, server_id={service_user.server_id}")
+            current_app.logger.debug(f"Service user {service_user_id}: external_username={service_user.external_username}, linkedUserId={service_user.linkedUserId}, server_id={service_user.server_id}")
             
             # Check if service user is already linked
-            if service_user.user_app_access_id:
-                linked_to_user = UserAppAccess.query.get(service_user.user_app_access_id)
-                linked_to_username = linked_to_user.username if linked_to_user else "Unknown User"
-                current_app.logger.debug(f"Service user {service_user_id} is already linked to user_app_access_id={service_user.user_app_access_id} (username: {linked_to_username})")
+            if service_user.linkedUserId:
+                linked_to_user = User.query.filter_by(userType=UserType.LOCAL).get(service_user.linkedUserId)
+                linked_to_username = linked_to_user.localUsername if linked_to_user else "Unknown User"
+                current_app.logger.debug(f"Service user {service_user_id} is already linked to linkedUserId={service_user.linkedUserId} (username: {linked_to_username})")
                 already_linked.append(f"{service_user.external_username or f'ID:{service_user_id}'} (linked to {linked_to_username})")
                 continue
             
             current_app.logger.debug(f"Service user {service_user_id} is not linked, checking for server conflicts...")
             
             # Check if local user already has an account on this server
-            existing_account = UserMediaAccess.query.filter_by(
-                user_app_access_id=local_user.id,
+            existing_account = User.query.filter_by(userType=UserType.SERVICE).filter_by(
+                linkedUserId=local_user.id,
                 server_id=service_user.server_id
             ).first()
             
@@ -229,7 +228,7 @@ def link_service_users():
             current_app.logger.debug(f"No conflicts found, linking service user {service_user_id} to local user {local_user.id}")
             
             # Link the account
-            service_user.user_app_access_id = local_user.id
+            service_user.linkedUserId = local_user.id
             linked_users.append(service_user.external_username or f"ID:{service_user_id}")
             current_app.logger.debug(f"Successfully linked service user {service_user_id}")
         
@@ -239,7 +238,7 @@ def link_service_users():
         # Log the event
         if linked_users:
             log_event(EventType.SETTING_CHANGE, 
-                      f"Service accounts {', '.join(linked_users)} linked to local user '{local_user.username}'",
+                      f"Service accounts {', '.join(linked_users)} linked to local user '{local_user.localUsername}'",
                       admin_id=current_user.id)
         
         # Prepare response message

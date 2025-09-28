@@ -1,8 +1,8 @@
 # File: app/services/task_service.py
 from flask import current_app
 from app.extensions import scheduler 
-from app.models import Setting, EventType, UserAppAccess
-from app.models_media_services import ServiceType, MediaStreamHistory, UserMediaAccess
+from app.models import Setting, EventType, User, UserType
+from app.models_media_services import ServiceType, MediaStreamHistory
 from app.utils.helpers import log_event
 from . import user_service # user_service is needed for deleting users
 from app.services.media_service_manager import MediaServiceManager
@@ -109,29 +109,32 @@ def monitor_media_sessions_task():
                     # Jellyfin session - look up by username
                     jellyfin_username = session.get('UserName')
                     if jellyfin_username:
-                        # Find UserMediaAccess for Jellyfin username on the correct server
+                        # Find service user for Jellyfin username on the correct server
                         jellyfin_server = MediaServer.query.filter_by(service_type=ServiceType.JELLYFIN).first()
                         if jellyfin_server:
-                            user_media_access = UserMediaAccess.query.filter_by(
+                            user_media_access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
                                 server_id=jellyfin_server.id,
                                 external_username=jellyfin_username
                             ).first()
                             if user_media_access:
-                                # Check if it's linked to a UserAppAccess account
-                                current_app.logger.debug(f"LINKED: Found UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id})")
-                                current_app.logger.debug(f"LINKED: user_app_access_id = {user_media_access.user_app_access_id}")
+                                # Check if it's linked to a local user account
+                                current_app.logger.debug(f"LINKED: Found service user for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id})")
+                                current_app.logger.debug(f"LINKED: linkedUserId = {user_media_access.linkedUserId}")
                                 current_app.logger.debug(f"LINKED: external_username = {user_media_access.external_username}")
                                 current_app.logger.debug(f"LINKED: server = {user_media_access.server.server_nickname}")
                                 
-                                mum_user = user_media_access.user_app_access
-                                current_app.logger.debug(f"LINKED: user_app_access relationship = {mum_user}")
+                                # In unified model, get linked user via linkedUserId
+                                mum_user = None
+                                if user_media_access.linkedUserId:
+                                    mum_user = User.query.filter_by(userType=UserType.LOCAL).get(user_media_access.linkedUserId)
+                                current_app.logger.debug(f"LINKED: linked user = {mum_user}")
                                 
                                 if not mum_user:
-                                    current_app.logger.info(f"Found standalone UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}). Processing as standalone user.")
+                                    current_app.logger.info(f"Found standalone service user for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}). Processing as standalone user.")
                                 else:
-                                    current_app.logger.info(f"Found linked UserMediaAccess for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}) linked to UserAppAccess (ID: {mum_user.id}, username: {mum_user.username}). Processing as linked user.")
+                                    current_app.logger.info(f"Found linked service user for Jellyfin username '{jellyfin_username}' (ID: {user_media_access.id}) linked to local user (ID: {mum_user.id}, username: {mum_user.localUsername}). Processing as linked user.")
                             else:
-                                current_app.logger.warning(f"No UserMediaAccess found for Jellyfin username '{jellyfin_username}' on server '{jellyfin_server.server_nickname}'. Skipping session.")
+                                current_app.logger.warning(f"No service user found for Jellyfin username '{jellyfin_username}' on server '{jellyfin_server.server_nickname}'. Skipping session.")
                                 continue
                         else:
                             current_app.logger.warning(f"No Jellyfin server configured. Skipping session {session_key}.")
@@ -140,7 +143,7 @@ def monitor_media_sessions_task():
                         current_app.logger.warning(f"Jellyfin session {session_key} is missing UserName. Skipping.")
                         continue
                 else:
-                    # Plex session - look up by user ID via UserMediaAccess
+                    # Plex session - look up by user ID via service user
                     user_id_from_session = None
                     
                     # Try different ways to get user ID from Plex session
@@ -156,29 +159,32 @@ def monitor_media_sessions_task():
                         continue
                     
                     if user_id_from_session:
-                        # Look up user by external_user_id in UserMediaAccess for Plex server
+                        # Look up user by external_user_id in service user for Plex server
                         plex_server = MediaServer.query.filter_by(service_type=ServiceType.PLEX).first()
                         if plex_server:
-                            user_media_access = UserMediaAccess.query.filter_by(
+                            user_media_access = User.query.filter_by(userType=UserType.SERVICE).filter_by(
                                 server_id=plex_server.id,
                                 external_user_id=str(user_id_from_session)
                             ).first()
                             if user_media_access:
-                                # Check if it's linked to a UserAppAccess account
-                                current_app.logger.debug(f"LINKED: Found UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id})")
-                                current_app.logger.debug(f"LINKED: user_app_access_id = {user_media_access.user_app_access_id}")
+                                # Check if it's linked to a local user account
+                                current_app.logger.debug(f"LINKED: Found service user for Plex User ID {user_id_from_session} (ID: {user_media_access.id})")
+                                current_app.logger.debug(f"LINKED: linkedUserId = {user_media_access.linkedUserId}")
                                 current_app.logger.debug(f"LINKED: external_username = {user_media_access.external_username}")
                                 current_app.logger.debug(f"LINKED: server = {user_media_access.server.server_nickname}")
                                 
-                                mum_user = user_media_access.user_app_access
-                                current_app.logger.debug(f"LINKED: user_app_access relationship = {mum_user}")
+                                # In unified model, get linked user via linkedUserId
+                                mum_user = None
+                                if user_media_access.linkedUserId:
+                                    mum_user = User.query.filter_by(userType=UserType.LOCAL).get(user_media_access.linkedUserId)
+                                current_app.logger.debug(f"LINKED: linked user = {mum_user}")
                                 
                                 if not mum_user:
-                                    current_app.logger.info(f"Found standalone UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id}). Processing as standalone user.")
+                                    current_app.logger.info(f"Found standalone service user for Plex User ID {user_id_from_session} (ID: {user_media_access.id}). Processing as standalone user.")
                                 else:
-                                    current_app.logger.info(f"Found linked UserMediaAccess for Plex User ID {user_id_from_session} (ID: {user_media_access.id}) linked to UserAppAccess (ID: {mum_user.id}, username: {mum_user.username}). Processing as linked user.")
+                                    current_app.logger.info(f"Found linked service user for Plex User ID {user_id_from_session} (ID: {user_media_access.id}) linked to local user (ID: {mum_user.id}, username: {mum_user.localUsername}). Processing as linked user.")
                             else:
-                                current_app.logger.warning(f"Could not find UserMediaAccess for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
+                                current_app.logger.warning(f"Could not find service user for Plex User ID {user_id_from_session} from session {session_key}. Skipping.")
                                 continue
                         else:
                             current_app.logger.warning(f"No Plex server configured. Skipping session {session_key}.")
@@ -279,12 +285,12 @@ def monitor_media_sessions_task():
                     
                     if mum_user:
                         current_app.logger.debug(f"Creating new MediaStreamHistory record for linked user session {session_key}")
-                        current_app.logger.debug(f"Linked User: {mum_user.username} (ID: {mum_user.id})")
-                        user_display_name = mum_user.username
+                        current_app.logger.debug(f"Linked User: {mum_user.localUsername} (ID: {mum_user.id})")
+                        user_display_name = mum_user.localUsername
                         user_id = mum_user.id
                     else:
                         current_app.logger.debug(f"Creating new MediaStreamHistory record for standalone user session {session_key}")
-                        current_app.logger.debug(f"Standalone User: {user_media_access.get_display_name()} (UserMediaAccess ID: {user_media_access.id})")
+                        current_app.logger.debug(f"Standalone User: {user_media_access.get_display_name()} (Service User ID: {user_media_access.id})")
                         user_display_name = user_media_access.get_display_name()
                         user_id = user_media_access.id
                     
@@ -293,8 +299,7 @@ def monitor_media_sessions_task():
                     current_app.logger.debug(f"Platform: {platform}, Player: {player_title}")
                     
                     new_history_record = MediaStreamHistory(
-                        user_app_access_uuid=mum_user.uuid if mum_user else None,
-                        user_media_access_uuid=user_media_access.uuid,  # Always set this to identify which service account was used
+                        user_uuid=user_media_access.uuid,  # Use unified user_uuid field
                         server_id=current_server.id,
                         session_key=str(session_key),
                         rating_key=rating_key,
@@ -353,12 +358,12 @@ def monitor_media_sessions_task():
 
                 # Update the user's last activity/streamed time
                 if mum_user:
-                    # For linked users, update the UserAppAccess last_streamed_at
-                    current_app.logger.debug(f"Updating last_streamed_at for linked user {mum_user.username} (ID: {mum_user.id})")
+                    # For linked users, update the local user last_streamed_at
+                    current_app.logger.debug(f"Updating last_streamed_at for linked user {mum_user.localUsername} (ID: {mum_user.id})")
                     user_service.update_user_last_streamed_by_id(mum_user.id, now_utc)
                 else:
-                    # For standalone users, update the UserMediaAccess last_activity_at
-                    current_app.logger.debug(f"Updating last_activity_at for standalone user {user_media_access.get_display_name()} (UserMediaAccess ID: {user_media_access.id})")
+                    # For standalone users, update the service user last_activity_at
+                    current_app.logger.debug(f"Updating last_activity_at for standalone user {user_media_access.get_display_name()} (Service User ID: {user_media_access.id})")
                     user_media_access.last_activity_at = now_utc
                     db.session.add(user_media_access)
 
@@ -380,9 +385,10 @@ def check_user_access_expirations_task():
     with scheduler.app.app_context():
         # Check for expired users
         now_naive = datetime.utcnow()
-        expired_users = UserAppAccess.query.filter(
-            UserAppAccess.access_expires_at.isnot(None), 
-            UserAppAccess.access_expires_at <= now_naive
+        expired_users = User.query.filter(
+            User.userType == UserType.LOCAL,
+            User.access_expires_at.isnot(None), 
+            User.access_expires_at <= now_naive
         ).all()
 
         if not expired_users:
@@ -392,8 +398,7 @@ def check_user_access_expirations_task():
         
         system_admin_id = None
         try:
-            from app.models import Owner
-            admin = Owner.query.first()
+            admin = User.get_owner()
             if admin:
                 system_admin_id = admin.id
             pass

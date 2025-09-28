@@ -12,7 +12,7 @@ from flask import current_app
 from app.services.base_media_service import BaseMediaService
 from app.models_media_services import ServiceType
 from app.utils.timeout_helper import get_api_timeout
-from app.models import Setting, EventType
+from app.models import User, UserType, Setting, EventType
 from app.utils.helpers import log_event
 
 class PlexMediaService(BaseMediaService):
@@ -512,7 +512,7 @@ class PlexMediaService(BaseMediaService):
                         plex_user_uuid_str = None
 
                 if not plex_user_uuid_str:
-                    self.log_warning(f"Could not parse alphanumeric UUID for user '{plex_user_obj.username}' (ID: {plex_user_id_int}). They will be matched by integer ID only.")
+                    self.log_warning(f"Could not parse alphanumeric UUID for user '{plex_user_obj.localUsername}' (ID: {plex_user_id_int}). They will be matched by integer ID only.")
 
                 user_share_details = detailed_shares_by_userid.get(plex_user_id_int)
                 accepted_at_val = user_share_details.get('acceptedAt') if user_share_details else None
@@ -760,7 +760,7 @@ class PlexMediaService(BaseMediaService):
 
     def get_formatted_sessions(self) -> List[Dict[str, Any]]:
         """Get active Plex sessions formatted for display"""
-        from app.models import UserAppAccess
+        from app.models import User, UserType
         from flask import url_for
         import re
         
@@ -768,31 +768,32 @@ class PlexMediaService(BaseMediaService):
         if not raw_sessions:
             return []
         
-        # Get user mapping for Plex users via UserMediaAccess
+        # Get user mapping for Plex users via service users
         user_ids_in_session = {int(session.user.id) for session in raw_sessions if hasattr(session, 'user') and session.user and hasattr(session.user, 'id')}
         
-        # Get users from UserMediaAccess for this Plex server
-        from app.models_media_services import UserMediaAccess
+        # Get users from service users for this Plex server
         if user_ids_in_session:
             user_id_strings = [str(uid) for uid in user_ids_in_session]
-            plex_accesses = UserMediaAccess.query.filter(
-                UserMediaAccess.server_id == self.server_id,
-                UserMediaAccess.external_user_id.in_(user_id_strings)
+            plex_accesses = User.query.filter_by(userType=UserType.SERVICE).filter(
+                User.server_id == self.server_id,
+                User.external_user_id.in_(user_id_strings)
             ).all()
             # Create mapping for both linked and standalone users
             mum_users_map_by_plex_id = {}
             for access in plex_accesses:
                 if access.external_user_id:
                     plex_id = int(access.external_user_id)
-                    if access.user_app_access:
-                        # Linked user - use the UserAppAccess record
-                        mum_users_map_by_plex_id[plex_id] = access.user_app_access
+                    if access.linkedUserId:
+                        # Linked user - get the local user record
+                        linked_user = User.query.filter_by(userType=UserType.LOCAL, uuid=access.linkedUserId).first()
+                        if linked_user:
+                            mum_users_map_by_plex_id[plex_id] = linked_user
                     else:
                         # Standalone user - create a mock user object with negative ID
                         class MockStandaloneUser:
                             def __init__(self, access_record):
                                 self.id = -(access_record.id + 1000000)  # Negative ID for standalone users
-                                self.username = access_record.external_username or 'Unknown'
+                                self.localUsername = access_record.external_username or 'Unknown'
                                 self._access_record = access_record
                         
                         mum_users_map_by_plex_id[plex_id] = MockStandaloneUser(access)

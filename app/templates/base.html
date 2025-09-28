@@ -33,7 +33,7 @@
     <div class="drawer">
         <input id="main-sidebar-drawer-toggle" type="checkbox" class="drawer-toggle" />
         <div class="drawer-content flex flex-col min-h-screen">
-            {% if current_user.__class__.__name__ == 'UserAppAccess' and current_user.password_hash %}
+            {% if current_user.userType.value == 'local' and current_user.password_hash %}
                 {% include 'layouts/navigation/user_navbar.html' %}
             {% else %}
                 {% include 'layouts/navigation/admin_navbar.html' %}

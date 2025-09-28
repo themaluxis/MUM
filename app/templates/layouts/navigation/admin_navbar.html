@@ -33,15 +33,11 @@
         <div class="dropdown dropdown-end">
             <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                 <div class="w-8 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                    {% if current_user.get_avatar and current_user.get_avatar() %}
-                        <img src="{{ current_user.get_avatar() }}" alt="{{ current_user.get_display_name() }} avatar" />
-                    {% else %}
-                        <div class="avatar placeholder">
-                            <div class="bg-primary text-primary-content rounded-full w-8 flex items-center justify-center">
-                                <span class="text-lg font-bold">{{ current_user.get_display_name()[0]|upper if current_user.get_display_name() else 'A' }}</span>
-                            </div>
+                    <div class="avatar placeholder">
+                        <div class="bg-primary text-primary-content rounded-full w-8 flex items-center justify-center">
+                            <span class="text-lg font-bold">{{ current_user.get_display_name()[0]|upper if current_user.get_display_name() else 'A' }}</span>
                         </div>
-                    {% endif %}
+                    </div>
                 </div>
             </label>
             <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[50] p-2 shadow bg-base-100 rounded-box w-52">

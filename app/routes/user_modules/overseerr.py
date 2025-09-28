@@ -3,8 +3,7 @@
 
 from flask import render_template, current_app
 from flask_login import login_required, current_user
-from app.models import UserAppAccess
-from app.models_media_services import UserMediaAccess, MediaServer
+from app.models_media_services import MediaServer
 from . import user_bp
 import urllib.parse
 
@@ -46,10 +45,10 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
             current_app.logger.info(f"OVERSEERR DEBUG: After unquote - server_nickname={server_nickname}, server_username={server_username}")
             
             # Find the UserMediaAccess record for this service user
-            media_access = UserMediaAccess.query.join(MediaServer).filter(
+            media_access = User.query.filter_by(userType=UserType.SERVICE).join(MediaServer).filter(
                 MediaServer.server_nickname == server_nickname,
-                UserMediaAccess.external_username == server_username,
-                UserMediaAccess.server_id == server_id
+                User.external_username == server_username,
+                User.server_id == server_id
             ).first()
             
             current_app.logger.info(f"OVERSEERR DEBUG: Found media_access: {media_access}")
@@ -87,14 +86,14 @@ def get_overseerr_requests(server_id, server_nickname=None, server_username=None
                                  debug_info={'plex_user_id': plex_user_id, 'plex_username': plex_username})
         
         # Try to get the Overseerr user ID from user media access
-        overseerr_user_id = UserMediaAccess.get_overseerr_user_id(server_id, plex_user_id)
+        overseerr_user_id = User.get_overseerr_user_id(server_id, plex_user_id)
         current_app.logger.info(f"OVERSEERR DEBUG: Existing link check - overseerr_user_id={overseerr_user_id}")
         
         # If not linked, attempt lazy linking
         if not overseerr_user_id:
             current_app.logger.info(f"OVERSEERR DEBUG: No existing link found, attempting lazy link for Plex user {plex_username} (ID: {plex_user_id}) on server {server_id}")
             
-            link_success, linked_overseerr_user_id, link_message = UserMediaAccess.link_single_user(
+            link_success, linked_overseerr_user_id, link_message = User.link_single_user(
                 server_id, plex_user_id, plex_username, plex_email
             )
             

@@ -21,9 +21,9 @@ class KomgaMediaService(BaseMediaService):
                 'X-API-Key': self.api_key,
                 'Content-Type': 'application/json'
             }
-        elif self.username and self.password:
+        elif self.localUsername and self.password:
             # Komga also supports basic auth as fallback
-            credentials = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
+            credentials = base64.b64encode(f"{self.localUsername}:{self.password}".encode()).decode()
             return {
                 'Authorization': f'Basic {credentials}',
                 'Content-Type': 'application/json'

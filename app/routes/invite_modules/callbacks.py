@@ -7,7 +7,7 @@ from flask import redirect, url_for, flash, request, current_app, session
 from markupsafe import Markup
 from plexapi.myplex import MyPlexAccount
 from plexapi.exceptions import PlexApiException
-from app.models import Invite, Setting, EventType
+from app.models import User, UserType, Invite, Setting, EventType
 from app.utils.helpers import setup_required, log_event
 from app.utils.timeout_helper import get_api_timeout
 from app.services.media_service_factory import MediaServiceFactory
@@ -125,23 +125,22 @@ def plex_oauth_callback():
                         existing_server_name = plex_server.server_nickname
                         
                         # Check if this Plex user is already linked to a local account
-                        from app.models_media_services import UserMediaAccess
                         from sqlalchemy import or_
                         
-                        existing_access = UserMediaAccess.query.filter(
-                            UserMediaAccess.server_id == plex_server.id,
+                        existing_access = User.query.filter_by(userType=UserType.SERVICE).filter(
+                            User.server_id == plex_server.id,
                             or_(
-                                UserMediaAccess.external_user_id == str(plex_account.uuid),
-                                UserMediaAccess.external_user_alt_id == str(plex_account.uuid),
-                                UserMediaAccess.external_user_id == str(plex_account.id),
-                                UserMediaAccess.external_user_alt_id == str(plex_account.id)
+                                User.external_user_id == str(plex_account.uuid),
+                                User.external_user_alt_id == str(plex_account.uuid),
+                                User.external_user_id == str(plex_account.id),
+                                User.external_user_alt_id == str(plex_account.id)
                             )
                         ).first()
                         
-                        if existing_access and existing_access.user_app_access_id and existing_access.user_app_access:
+                        if existing_access and existing_access.linkedUserId and existing_access.user_app_access:
                             existing_local_account = existing_access.user_app_access
                         
-                        current_app.logger.info(f"Plex user {plex_account.username} already exists in {existing_server_name}")
+                        current_app.logger.info(f"Plex user {plex_account.localUsername} already exists in {existing_server_name}")
                         break
                 
                 if plex_user_already_exists:
@@ -159,29 +158,29 @@ def plex_oauth_callback():
                 session[f'invite_{invite.id}_plex_conflict'] = {
                     'type': 'already_linked',
                     'server_name': existing_server_name,
-                    'linked_username': existing_local_account.username,
-                    'plex_username': plex_account.username,
+                    'linked_username': existing_local_account.localUsername,
+                    'plex_username': plex_account.localUsername,
                     'plex_email': plex_account.email
                 }
-                current_app.logger.info(f"Plex user {plex_account.username} is already linked to local account {existing_local_account.username}")
+                current_app.logger.info(f"Plex user {plex_account.localUsername} is already linked to local account {existing_local_account.localUsername}")
             elif allow_user_accounts:
                 # Plex user exists but not linked - offer to link
                 session[f'invite_{invite.id}_plex_conflict'] = {
                     'type': 'can_link',
                     'server_name': existing_server_name,
-                    'plex_username': plex_account.username,
+                    'plex_username': plex_account.localUsername,
                     'plex_email': plex_account.email
                 }
-                current_app.logger.info(f"Plex user {plex_account.username} exists but not linked - offering to link")
+                current_app.logger.info(f"Plex user {plex_account.localUsername} exists but not linked - offering to link")
             else:
                 # Plex user exists but no local accounts feature
                 session[f'invite_{invite.id}_plex_conflict'] = {
                     'type': 'already_exists_no_linking',
                     'server_name': existing_server_name,
-                    'plex_username': plex_account.username,
+                    'plex_username': plex_account.localUsername,
                     'plex_email': plex_account.email
                 }
-                current_app.logger.info(f"Plex user {plex_account.username} already exists and no local account linking available")
+                current_app.logger.info(f"Plex user {plex_account.localUsername} already exists and no local account linking available")
         else:
             # Plex user is new - proceed normally
             session[f'invite_{invite.id}_plex_user'] = {
@@ -191,8 +190,8 @@ def plex_oauth_callback():
                 'email': getattr(plex_account, 'email', None), 
                 'thumb': getattr(plex_account, 'thumb', None)
             }
-            log_event(EventType.INVITE_USED_SUCCESS_PLEX, f"Plex auth success for {plex_account.username} on invite {invite.id}.", invite_id=invite.id)
-            current_app.logger.info(f"New Plex user {plex_account.username} - proceeding with invite")
+            log_event(EventType.INVITE_USED_SUCCESS_PLEX, f"Plex auth success for {plex_account.localUsername} on invite {invite.id}.", invite_id=invite.id)
+            current_app.logger.info(f"New Plex user {plex_account.localUsername} - proceeding with invite")
 
     except PlexApiException as e_plex:
         flash(f'Plex API error: {str(e_plex)}', 'danger')

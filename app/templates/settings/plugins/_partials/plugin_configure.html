@@ -502,7 +502,7 @@ function syncUsers(serverId) {
 
 function deleteServer(serverId, serverName) {
     document.getElementById('serverName').textContent = serverName;
-    document.getElementById('deleteForm').action = `/settings/plugins/{{ plugin.plugin_id }}/${serverId}/delete`;
+    document.getElementById('deleteForm').action = `/admin/settings/plugins/{{ plugin.plugin_id }}/${serverId}/delete`;
     document.getElementById('deleteModal').classList.add('modal-open');
 }
 

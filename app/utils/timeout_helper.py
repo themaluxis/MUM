@@ -2,7 +2,7 @@
 Centralized timeout management utility
 """
 from flask import current_app
-from app.models import Setting
+from app.models import User, UserType, Setting
 
 def get_api_timeout() -> int:
     """

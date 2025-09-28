@@ -14,9 +14,9 @@ from flask import current_app
 from sqlalchemy import Table, Column, Integer, ForeignKey
 from app.models_media_services import MediaServer
 
-# Many-to-many relationship table for user app access and roles
+# Many-to-many relationship table for users and roles
 app_user_roles = db.Table('app_user_roles',
-    db.Column('app_user_id', db.Integer, db.ForeignKey('user_app_access.id'), primary_key=True),
+    db.Column('app_user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
     db.Column('role_id', db.Integer, db.ForeignKey('roles.id'), primary_key=True)
 )
 
@@ -74,25 +74,69 @@ class Role(db.Model):
     def __repr__(self):
         return f'<Role {self.name}>'
 
-class Owner(db.Model, UserMixin):
-    """Single app owner with ultimate permissions"""
-    __tablename__ = 'owners'
+class UserType(enum.Enum):
+    """User type enumeration for the unified User model"""
+    OWNER = "owner"      # Single app owner with ultimate permissions (replaces Owner)
+    LOCAL = "local"      # Local accounts that can login (replaces UserAppAccess)
+    SERVICE = "service"  # Service-specific accounts (replaces UserMediaAccess)
+
+class User(db.Model, UserMixin):
+    """
+    Unified User model that replaces Owner, UserAppAccess, and UserMediaAccess
     
-    # Should always be ID 1 - only one owner allowed
+    This single table handles all three user types with appropriate nullable fields
+    and validation based on userType.
+    """
+    __tablename__ = 'users'
+    
+    # Core Identity Fields
     id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()), index=True)
+    userType = db.Column(db.Enum(UserType), nullable=False, index=True)
     
-    # Core account info
-    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    password_hash = db.Column(db.String(256), nullable=False)
+    # Linking Field - Points to UUID of a LOCAL user for SERVICE users
+    linkedUserId = db.Column(db.String(36), db.ForeignKey('users.uuid'), nullable=True, index=True)
     
-    # Plex integration (optional)
-    plex_uuid = db.Column(db.String(255), unique=True, nullable=True)
-    plex_username = db.Column(db.String(255), nullable=True)
-    plex_thumb = db.Column(db.String(512), nullable=True)
+    # Server Relationship (only for SERVICE users)
+    server_id = db.Column(db.Integer, db.ForeignKey('media_servers.id'), nullable=True, index=True)
     
-    # Discord integration (optional)
-    discord_user_id = db.Column(db.String(255), unique=True, nullable=True)
+    # External Service Identity (only for SERVICE users)
+    external_user_id = db.Column(db.String(255), nullable=True, index=True)
+    external_user_alt_id = db.Column(db.String(255), nullable=True)
+    external_username = db.Column(db.String(255), nullable=True)
+    external_email = db.Column(db.String(120), nullable=True)
+    
+    # Service Access Permissions (only for SERVICE users)
+    allowed_library_ids = db.Column(MutableList.as_mutable(JSONEncodedDict), default=list)
+    allow_downloads = db.Column(db.Boolean, default=False, nullable=False)
+    allow_4k_transcode = db.Column(db.Boolean, default=True, nullable=False)
+    service_settings = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)
+    
+    # Status & Activity
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    last_activity_at = db.Column(db.DateTime, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=utcnow)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    
+    # Additional Info
+    notes = db.Column(db.Text, nullable=True)
+    external_avatar_url = db.Column(db.String(512), nullable=True)
+    used_invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True, index=True)
+    service_join_date = db.Column(db.DateTime, nullable=True, index=True)
+    
+    # Whitelist Settings
+    is_discord_bot_whitelisted = db.Column(db.Boolean, default=False, nullable=False)
+    is_purge_whitelisted = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Service-Specific Status (primarily for Plex)
+    is_home_user = db.Column(db.Boolean, default=False, nullable=False)
+    shares_back = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Discord Integration (can be global or service-specific)
+    discord_user_id = db.Column(db.String(255), nullable=True, index=True)
     discord_username = db.Column(db.String(255), nullable=True)
     discord_avatar_hash = db.Column(db.String(255), nullable=True)
     discord_access_token = db.Column(db.String(255), nullable=True)
@@ -101,61 +145,276 @@ class Owner(db.Model, UserMixin):
     discord_email = db.Column(db.String(255), nullable=True)
     discord_email_verified = db.Column(db.Boolean, nullable=True)
     
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=utcnow)
-    last_login_at = db.Column(db.DateTime, nullable=True)
+    # Access Expiration
+    access_expires_at = db.Column(db.DateTime, nullable=True, index=True)
     
-    # Owner preferences
+    # Raw Data Storage
+    user_raw_data = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)
+    stream_raw_data = db.Column(MutableDict.as_mutable(JSONEncodedDict), default=dict)
+    
+    # Overseerr Integration
+    overseerr_user_id = db.Column(db.Integer, nullable=True, index=True)
+    
+    # Local Account Fields (only for LOCAL and OWNER users)
+    localUsername = db.Column(db.String(255), nullable=True, index=True)
+    password_hash = db.Column(db.String(256), nullable=True)
+    email = db.Column(db.String(255), nullable=True, index=True)  # General email field for all user types
+    
+    # Owner-Specific Fields (only for OWNER users)
     preferred_user_list_view = db.Column(db.String(10), default='cards', nullable=False)
     force_password_change = db.Column(db.Boolean, default=False, nullable=False)
     
-    def __repr__(self):
-        return f'<Owner {self.username}>'
+    # Plex Integration (for OWNER users)
+    plex_uuid = db.Column(db.String(255), nullable=True)
+    plex_username = db.Column(db.String(255), nullable=True)
+    plex_thumb = db.Column(db.String(512), nullable=True)
     
+    # Relationships
+    linked_parent = db.relationship('User', remote_side=[uuid], backref='linked_children')
+    roles = db.relationship('Role', secondary='app_user_roles', lazy='subquery',
+                            backref=db.backref('users', lazy=True))
+    server = db.relationship('MediaServer', foreign_keys=[server_id], back_populates='users')
+    
+    def __repr__(self):
+        if self.userType == UserType.OWNER:
+            return f'<User(OWNER) {self.localUsername}>'
+        elif self.userType == UserType.LOCAL:
+            return f'<User(LOCAL) {self.localUsername}>'
+        elif self.userType == UserType.SERVICE:
+            server_name = self.server.server_nickname if self.server else 'Unknown'
+            return f'<User(SERVICE) {self.external_username} on {server_name}>'
+        return f'<User {self.uuid}>'
+    
+    # Authentication Methods
     def set_password(self, password):
-        """Set password hash for owner account"""
-        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
+        """Set password hash (only for LOCAL and OWNER users)"""
+        if self.userType in [UserType.LOCAL, UserType.OWNER]:
+            self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
     
     def check_password(self, password):
-        """Check password for owner account"""
-        return check_password_hash(self.password_hash, password) if self.password_hash else False
+        """Check password (only for LOCAL and OWNER users)"""
+        if self.userType in [UserType.LOCAL, UserType.OWNER] and self.password_hash:
+            return check_password_hash(self.password_hash, password)
+        return False
     
+    # Display Methods
     def get_display_name(self):
-        """Get the display name for the owner"""
-        return self.username or self.plex_username or self.email or 'Owner'
+        """Get the best display name for this user"""
+        if self.userType == UserType.OWNER:
+            return self.localUsername or self.plex_username or 'Owner'
+        elif self.userType == UserType.LOCAL:
+            return self.localUsername or 'Local User'
+        elif self.userType == UserType.SERVICE:
+            return self.external_username or 'Service User'
+        return 'Unknown User'
     
-    def get_avatar(self):
-        """Get the avatar URL for the owner"""
-        return self.plex_thumb
+    def get_avatar(self, fallback='/static/img/default_avatar.png'):
+        """Get the avatar URL for this user"""
+        if self.userType == UserType.OWNER and self.plex_thumb:
+            return self.plex_thumb
+        elif self.userType == UserType.SERVICE and self.external_avatar_url:
+            return self.external_avatar_url
+        return fallback
     
+    def get_email(self):
+        """Get the email for this user"""
+        if self.userType == UserType.OWNER:
+            return self.discord_email
+        elif self.userType == UserType.LOCAL:
+            return self.discord_email
+        elif self.userType == UserType.SERVICE:
+            return self.external_email or self.discord_email
+        return None
+    
+    # Permission Methods
     def has_permission(self, permission_name):
-        """Owner always has all permissions"""
-        return True
+        """Check if user has a specific permission"""
+        if self.userType == UserType.OWNER:
+            return True  # Owners have all permissions
+        elif self.userType == UserType.LOCAL:
+            # Check role-based permissions for local users
+            for role in self.roles:
+                if permission_name in (role.permissions or []):
+                    return True
+            return False
+        elif self.userType == UserType.SERVICE:
+            return False  # Service users have no app permissions
+        return False
     
+    # Service-Specific Methods
+    def get_service_type(self):
+        """Get the service type (only for SERVICE users)"""
+        if self.userType == UserType.SERVICE and self.server:
+            return self.server.service_type.value
+        return None
+    
+    def has_library_access(self, library_id):
+        """Check if user has access to a specific library (only for SERVICE users)"""
+        if self.userType == UserType.SERVICE and self.allowed_library_ids:
+            return str(library_id) in [str(lib_id) for lib_id in self.allowed_library_ids]
+        return False
+    
+    def is_expired(self):
+        """Check if user access is expired"""
+        if self.access_expires_at:
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+            expires = self.access_expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            return now > expires
+        return False
+    
+    # Linking Methods
+    def get_linked_users(self):
+        """Get all users linked to this user (only for LOCAL users)"""
+        if self.userType == UserType.LOCAL:
+            return User.query.filter_by(linkedUserId=self.uuid, userType=UserType.SERVICE).all()
+        return []
+    
+    def get_linked_parent(self):
+        """Get the parent local user (only for SERVICE users)"""
+        if self.userType == UserType.SERVICE and self.linkedUserId:
+            return User.query.filter_by(uuid=self.linkedUserId, userType=UserType.LOCAL).first()
+        return None
+    
+    def link_to_local_user(self, local_user_uuid):
+        """Link this service user to a local user"""
+        if self.userType == UserType.SERVICE:
+            self.linkedUserId = local_user_uuid
+    
+    def unlink_from_local_user(self):
+        """Unlink this service user from its local user"""
+        if self.userType == UserType.SERVICE:
+            self.linkedUserId = None
+    
+    # Flask-Login Methods
     def get_id(self):
         """Return user ID with type prefix for Flask-Login"""
-        return f"owner:{self.id}"
+        return f"{self.userType.value}:{self.uuid}"
     
-    @staticmethod
-    def get_owner():
-        """Get the single owner account (should always be ID 1)"""
-        return Owner.query.first()
+    @property
+    def is_authenticated(self):
+        """Check if user is authenticated"""
+        return self.userType in [UserType.OWNER, UserType.LOCAL]
     
-    @staticmethod
-    def create_owner(username, email, password):
-        """Create the owner account (should only be called once during setup)"""
-        if Owner.query.first():
-            raise ValueError("Owner account already exists")
+    @property
+    def is_anonymous(self):
+        """Check if user is anonymous"""
+        return False
+    
+    # Compatibility Methods for existing code
+    def get_media_accesses_by_service_type(self):
+        """Get linked service users grouped by service type (for LOCAL users)"""
+        if self.userType == UserType.LOCAL:
+            linked_users = self.get_linked_users()
+            accesses_by_type = {}
+            for user in linked_users:
+                if user.server:
+                    service_type = user.server.service_type.value
+                    if service_type not in accesses_by_type:
+                        accesses_by_type[service_type] = []
+                    accesses_by_type[service_type].append(user)
+            return accesses_by_type
+        return {}
+    
+    def get_all_servers(self):
+        """Get all media servers this user has access to"""
+        if self.userType == UserType.LOCAL:
+            linked_users = self.get_linked_users()
+            return [user.server for user in linked_users if user.server and user.is_active]
+        elif self.userType == UserType.SERVICE:
+            return [self.server] if self.server and self.is_active else []
+        return []
+    
+    def has_access_to_server(self, server_id):
+        """Check if user has access to a specific media server"""
+        if self.userType == UserType.LOCAL:
+            linked_users = self.get_linked_users()
+            return any(user.server_id == server_id and user.is_active for user in linked_users)
+        elif self.userType == UserType.SERVICE:
+            return self.server_id == server_id and self.is_active
+        return False
+    
+    def get_server_access(self, server_id):
+        """Get User object for a specific server"""
+        if self.userType == UserType.LOCAL:
+            linked_users = self.get_linked_users()
+            return next((user for user in linked_users if user.server_id == server_id), None)
+        elif self.userType == UserType.SERVICE and self.server_id == server_id:
+            return self
+        return None
+    
+    # Class Methods for User Management
+    @classmethod
+    def create_owner(cls, username, password, email=None):
+        """Create the single owner user"""
+        if cls.query.filter_by(userType=UserType.OWNER).first():
+            raise ValueError("Owner user already exists")
         
-        owner = Owner(
-            username=username,
-            email=email
+        owner = cls(
+            userType=UserType.OWNER,
+            localUsername=username,
+            discord_email=email
         )
         owner.set_password(password)
-        db.session.add(owner)
-        db.session.commit()
         return owner
     
+    @classmethod
+    def create_local_user(cls, username, password, email=None):
+        """Create a new local user"""
+        user = cls(
+            userType=UserType.LOCAL,
+            localUsername=username,
+            discord_email=email
+        )
+        user.set_password(password)
+        return user
+    
+    @classmethod
+    def create_service_user(cls, server_id, external_user_id, external_username=None, linked_user_uuid=None):
+        """Create a new service user"""
+        user = cls(
+            userType=UserType.SERVICE,
+            server_id=server_id,
+            external_user_id=external_user_id,
+            external_username=external_username,
+            linkedUserId=linked_user_uuid
+        )
+        return user
+    
+    @classmethod
+    def get_owner(cls):
+        """Get the single owner user"""
+        return cls.query.filter_by(userType=UserType.OWNER).first()
+    
+    @classmethod
+    def get_by_local_username(cls, username):
+        """Get user by local username (OWNER or LOCAL users)"""
+        return cls.query.filter(
+            cls.localUsername == username,
+            cls.userType.in_([UserType.OWNER, UserType.LOCAL])
+        ).first()
+    
+    @classmethod
+    def get_by_external_id(cls, server_id, external_user_id):
+        """Get service user by external ID"""
+        return cls.query.filter_by(
+            userType=UserType.SERVICE,
+            server_id=server_id,
+            external_user_id=external_user_id
+        ).first()
+    
+    @classmethod
+    def get_linked_users_for_local(cls, local_user_uuid):
+        """Get all service users linked to a local user"""
+        return cls.query.filter_by(
+            userType=UserType.SERVICE,
+            linkedUserId=local_user_uuid
+        ).all()
+
+# Legacy aliases removed - use unified User model directly
+
 class Setting(db.Model): # ... (Setting model remains the same structure, new keys will be added via UI/code) ...
     __tablename__ = 'settings'; id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(100), unique=True, nullable=False, index=True)
@@ -213,108 +472,7 @@ class Setting(db.Model): # ... (Setting model remains the same structure, new ke
 # AdminAccount model removed - replaced by Owner and AppUser models
 
 
-class UserAppAccess(db.Model, UserMixin):
-    """User app access accounts for MUM login and management"""
-    __tablename__ = 'user_app_access'
-    id = db.Column(db.Integer, primary_key=True)
-    uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
-    
-    # Core account info
-    username = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(255), unique=True, nullable=True, index=True)
-    password_hash = db.Column(db.String(256), nullable=True)
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=utcnow)
-    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
-    last_login_at = db.Column(db.DateTime, nullable=True)
-    
-    # Account status
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    
-    # Additional info
-    notes = db.Column(db.Text, nullable=True)
-    # avatar_url removed - UserAppAccess will never have avatars
-    
-    # Invite relationship
-    used_invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True)
-    invite = db.relationship('Invite', backref='user_app_access_created')
-    
-    # Global expiration (across all services)
-    access_expires_at = db.Column(db.DateTime, nullable=True, index=True)
-    
-    # Global Discord integration
-    discord_user_id = db.Column(db.String(255), unique=True, nullable=True, index=True)
-    discord_username = db.Column(db.String(255), nullable=True)
-    discord_avatar_hash = db.Column(db.String(255), nullable=True)
-    discord_access_token = db.Column(db.String(255), nullable=True)
-    discord_refresh_token = db.Column(db.String(255), nullable=True)
-    discord_token_expires_at = db.Column(db.DateTime, nullable=True)
-    discord_email = db.Column(db.String(255), nullable=True)
-    discord_email_verified = db.Column(db.Boolean, nullable=True)
-    
-    # Role relationship (updated to reference new table name)
-    roles = db.relationship('Role', secondary=app_user_roles, lazy='subquery',
-                            backref=db.backref('user_app_access', lazy=True))
-    
-    # User media access (reverse relationship to UserMediaAccess)
-    media_accesses = db.relationship('UserMediaAccess', back_populates='user_app_access', cascade="all, delete-orphan")
-    
-    
-    def __repr__(self):
-        return f'<UserAppAccess {self.username}>'
-    
-    def set_password(self, password):
-        """Set password hash for user app access account"""
-        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
-    
-    def check_password(self, password):
-        """Check password for user app access account"""
-        return check_password_hash(self.password_hash, password) if self.password_hash else False
-    
-    def has_permission(self, permission_name):
-        """Check if user has a specific permission through their roles"""
-        # Check if any of the user's roles contain the required permission
-        for role in self.roles:
-            if permission_name in (role.permissions or []):
-                return True
-        return False
-    
-    def get_avatar(self, fallback='/static/img/default_avatar.png'):
-        """UserAppAccess never has avatars - always return fallback"""
-        return fallback
-    
-    def get_display_name(self):
-        """Get the best display name for this user"""
-        return self.username or self.email or 'Unknown User'
-    
-    def get_id(self):
-        """Return user ID with type prefix for Flask-Login"""
-        return f"user_app_access:{self.id}"
-    
-    def get_media_accesses_by_service_type(self):
-        """Get media accesses grouped by service type"""
-        from app.models_media_services import UserMediaAccess
-        
-        accesses_by_type = {}
-        for access in self.media_accesses:
-            service_type = access.server.service_type.value if access.server else 'unknown'
-            if service_type not in accesses_by_type:
-                accesses_by_type[service_type] = []
-            accesses_by_type[service_type].append(access)
-        return accesses_by_type
-    
-    def get_all_servers(self):
-        """Get all media servers this user has access to"""
-        return [access.server for access in self.media_accesses if access.server and access.is_active]
-    
-    def has_access_to_server(self, server_id):
-        """Check if user has access to a specific media server"""
-        return any(access.server_id == server_id and access.is_active for access in self.media_accesses)
-    
-    def get_server_access(self, server_id):
-        """Get UserMediaAccess object for a specific server"""
-        return next((access for access in self.media_accesses if access.server_id == server_id), None)
+# UserAppAccess class removed - replaced by User model with userType='local'
 
 # ServiceAccount model removed - replaced by UserAppAccess + UserMediaAccess architecture
 
@@ -326,7 +484,7 @@ class Invite(db.Model):
     max_uses = db.Column(db.Integer, nullable=True); current_uses = db.Column(db.Integer, default=0, nullable=False) # Added nullable=False
     grant_library_ids = db.Column(MutableList.as_mutable(JSONEncodedDict), default=list)
     allow_downloads = db.Column(db.Boolean, default=False, nullable=False)
-    created_by_owner_id = db.Column(db.Integer, db.ForeignKey('owners.id')); owner_creator = db.relationship('Owner')
+    created_by_owner_id = db.Column(db.Integer, db.ForeignKey('users.id')); owner_creator = db.relationship('User', foreign_keys=[created_by_owner_id])
     created_at = db.Column(db.DateTime, default=utcnow); updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True) # Added nullable=False
     invite_usages = db.relationship('InviteUsage', back_populates='invite', cascade="all, delete-orphan")
@@ -371,7 +529,7 @@ class InviteUsage(db.Model): # ... (as before)
     plex_email = db.Column(db.String(120), nullable=True); plex_thumb = db.Column(db.String(512), nullable=True)
     plex_auth_successful = db.Column(db.Boolean, default=False, nullable=False); discord_user_id = db.Column(db.String(255), nullable=True) # Added nullable=False
     discord_username = db.Column(db.String(255), nullable=True); discord_auth_successful = db.Column(db.Boolean, default=False, nullable=False) # Added nullable=False
-    user_app_access_id = db.Column(db.Integer, db.ForeignKey('user_app_access.id'), nullable=True); user_app_access = db.relationship('UserAppAccess')
+    local_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True); local_user = db.relationship('User', foreign_keys=[local_user_id])
     accepted_invite = db.Column(db.Boolean, default=False, nullable=False); status_message = db.Column(db.String(255), nullable=True) # Added nullable=False
 
 class HistoryLog(db.Model): # ... (as before)
@@ -379,8 +537,8 @@ class HistoryLog(db.Model): # ... (as before)
     timestamp = db.Column(db.DateTime, default=utcnow, index=True)
     event_type = db.Column(db.Enum(EventType), nullable=False, index=True); message = db.Column(db.Text, nullable=False)
     details = db.Column(MutableDict.as_mutable(JSONEncodedDict), nullable=True)
-    owner_id = db.Column(db.Integer, db.ForeignKey('owners.id'), nullable=True); owner = db.relationship('Owner')
-    user_app_access_id = db.Column(db.Integer, db.ForeignKey('user_app_access.id'), nullable=True); affected_user_app_access = db.relationship('UserAppAccess')
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True); owner = db.relationship('User', foreign_keys='HistoryLog.owner_id')
+    local_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True); affected_local_user = db.relationship('User', foreign_keys='HistoryLog.local_user_id')
     invite_id = db.Column(db.Integer, db.ForeignKey('invites.id'), nullable=True); related_invite = db.relationship('Invite')
     def __repr__(self): return f'<HistoryLog {self.timestamp} [{self.event_type.name}]: {self.message[:50]}>'
 
@@ -389,7 +547,7 @@ class HistoryLog(db.Model): # ... (as before)
 class UserPreferences(db.Model):
     __tablename__ = 'user_preferences'
     id = db.Column(db.Integer, primary_key=True)
-    owner_id = db.Column(db.Integer, db.ForeignKey('owners.id'), unique=True, nullable=False)
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
     
     # This field will store the user's choice: 'local' or 'utc'
     timezone_preference = db.Column(db.String(10), default='local', nullable=False)

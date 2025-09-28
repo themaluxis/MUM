@@ -11,9 +11,9 @@
         </div>
         <!-- Show Open Overseerr button if there are overseerr servers -->
         {% set plex_servers_check = [] %}
-        {% for media_access in user.media_accesses %}
-            {% if media_access.server and media_access.server.service_type.value == 'plex' and media_access.is_active %}
-                {% set _ = plex_servers_check.append(media_access.server) %}
+        {% for service_user in user.linked_service_users %}
+            {% if service_user.server and service_user.server.service_type.value == 'plex' and service_user.is_active %}
+                {% set _ = plex_servers_check.append(service_user.server) %}
             {% endif %}
         {% endfor %}
         {% if plex_servers_check %}
@@ -35,9 +35,9 @@
     <!-- Overseerr Integration Status -->
         <div class="">
             {% set plex_servers = [] %}
-            {% for media_access in user.media_accesses %}
-                {% if media_access.server and media_access.server.service_type.value == 'plex' and media_access.is_active %}
-                    {% set _ = plex_servers.append(media_access.server) %}
+            {% for service_user in user.linked_service_users %}
+                {% if service_user.server and service_user.server.service_type.value == 'plex' and service_user.is_active %}
+                    {% set _ = plex_servers.append(service_user.server) %}
                 {% endif %}
             {% endfor %}
             
@@ -56,7 +56,9 @@
                         <div class="space-y-4">
                             <!-- Load user's requests via HTMX -->
                             <div id="overseerr-requests-{{ server.id }}" 
-                                 {% if user._is_service_user is defined and user._is_service_user %}
+                                 {% if is_admin_context is defined and is_admin_context and user._is_service_user is defined and user._is_service_user %}
+                                 hx-get="{{ url_for('admin_user.get_overseerr_requests', server_id=server.id, server_nickname=user._access_record.server.server_nickname, server_username=user.username) }}"
+                                 {% elif user._is_service_user is defined and user._is_service_user %}
                                  hx-get="{{ url_for('user.get_overseerr_requests', server_id=server.id, server_nickname=user._access_record.server.server_nickname, server_username=user.username) }}"
                                  {% else %}
                                  hx-get="{{ url_for('user.get_overseerr_requests', server_id=server.id) }}"
@@ -82,14 +84,18 @@
                         </div>
                         <h3 class="text-lg font-semibold text-base-content mb-2">Overseerr Not Configured</h3>
                         <p class="text-base-content/70 mb-4">
-                            Overseerr integration is not set up for your Plex servers. 
-                            Contact your administrator to enable Overseerr for movie and TV show requests.
+                            {% if is_admin_context is defined and is_admin_context %}
+                                Overseerr integration is not configured for this server. 
+                                Configure Overseerr in the Plugins setting page by editing a Plex server.
+                            {% endif %}
                         </p>
                         <div class="bg-base-200 rounded-lg p-4 max-w-md mx-auto">
                             <h4 class="font-medium text-base-content mb-2">What is Overseerr?</h4>
                             <p class="text-sm text-base-content/70">
-                                Overseerr is a request management and media discovery tool that allows you to 
-                                request movies and TV shows to be added to your Plex library.
+                                {% if is_admin_context is defined and is_admin_context %}
+                                    Overseerr is a request management and media discovery tool that allows users to 
+                                    request movies and TV shows to be added to Plex libraries.
+                                {% endif %}
                             </p>
                         </div>
                     </div>
@@ -102,7 +108,11 @@
                     </div>
                     <h3 class="text-lg font-semibold text-base-content mb-2">No Plex Access</h3>
                     <p class="text-base-content/70">
-                        You don't have access to any Plex servers. Overseerr integration requires Plex access.
+                        {% if is_admin_context is defined and is_admin_context %}
+                            This user doesn't have access to any Plex servers. Overseerr integration requires Plex server access.
+                        {% else %}
+                            You don't have access to any Plex servers. Overseerr integration requires Plex access.
+                        {% endif %}
                     </p>
                 </div>
             {% endif %}

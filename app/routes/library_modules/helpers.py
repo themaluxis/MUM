@@ -1,7 +1,7 @@
 """Helper functions for library management"""
 
 from flask import current_app
-from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory, UserMediaAccess
+from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory
 from app.extensions import db
 from datetime import datetime, timezone, timedelta
 
@@ -16,11 +16,11 @@ def get_library_statistics(library):
         ).count()
         
         # Get unique users who have accessed this library
-        unique_users = db.session.query(MediaStreamHistory.user_media_access_uuid)\
+        unique_users = db.session.query(MediaStreamHistory.user_uuid)\
             .filter(
                 MediaStreamHistory.server_id == library.server_id,
                 MediaStreamHistory.library_name == library.name,
-                MediaStreamHistory.user_media_access_uuid.isnot(None)
+                MediaStreamHistory.user_uuid.isnot(None)
             ).distinct().count()
         
         # Get total watch time (in seconds)
@@ -258,7 +258,6 @@ def generate_library_chart_data(library, days=30):
 
 def get_library_user_stats(library, days=30):
     """Get user statistics for a library"""
-    from app.models_media_services import UserMediaAccess
     
     try:
         # Calculate date range based on days parameter
@@ -279,26 +278,26 @@ def get_library_user_stats(library, days=30):
         
         # Get user statistics for this library
         user_stats_query = db.session.query(
-            MediaStreamHistory.user_media_access_uuid,
-            UserMediaAccess.external_username,
-            UserMediaAccess.external_email,
-            UserMediaAccess.external_avatar_url,
+            MediaStreamHistory.user_uuid,
+            User.external_username,
+            User.external_email,
+            User.external_avatar_url,
             db.func.count(MediaStreamHistory.id).label('play_count'),
             db.func.sum(MediaStreamHistory.duration_seconds).label('total_duration')
         ).join(
-            UserMediaAccess, 
-            MediaStreamHistory.user_media_access_uuid == UserMediaAccess.uuid
+            User, 
+            MediaStreamHistory.user_uuid == User.uuid
         ).filter(
             MediaStreamHistory.server_id == library.server_id,
             MediaStreamHistory.library_name == library.name,
             MediaStreamHistory.started_at >= start_date,
             MediaStreamHistory.started_at <= end_date,
-            MediaStreamHistory.user_media_access_uuid.isnot(None)
+            MediaStreamHistory.user_uuid.isnot(None)
         ).group_by(
-            MediaStreamHistory.user_media_access_uuid,
-            UserMediaAccess.external_username,
-            UserMediaAccess.external_email,
-            UserMediaAccess.external_avatar_url
+            MediaStreamHistory.user_uuid,
+            User.external_username,
+            User.external_email,
+            User.external_avatar_url
         ).order_by(db.func.count(MediaStreamHistory.id).desc()).all()
         
         # Format user stats
@@ -322,9 +321,9 @@ def get_library_user_stats(library, days=30):
             if stat.external_avatar_url:
                 # Use the stored external avatar URL directly
                 avatar_url = stat.external_avatar_url
-            elif stat.user_media_access_uuid:
+            elif stat.user_uuid:
                 # Get the full user record to access raw_data and service_settings
-                user_access = UserMediaAccess.query.filter_by(uuid=stat.user_media_access_uuid).first()
+                user_access = User.query.filter_by(uuid=stat.user_uuid).first()
                 if user_access:
                     if library.server.service_type.value.lower() == 'plex':
                         # For Plex, check multiple possible locations for the thumb URL
@@ -355,7 +354,7 @@ def get_library_user_stats(library, days=30):
                             avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user_access.external_user_id}"
             
             user_stats.append({
-                'uuid': stat.user_media_access_uuid,
+                'uuid': stat.user_uuid,
                 'display_name': display_name,
                 'username': stat.external_username,
                 'email': stat.external_email,

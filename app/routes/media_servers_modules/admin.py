@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from app.models_media_services import MediaServer
 from app.extensions import db
 from app.utils.helpers import log_event, setup_required, permission_required
-from app.models import EventType
+from app.models import User, UserType, EventType
 
 # Create a blueprint for admin routes (prefix will be added in app/__init__.py)
 bp = Blueprint('media_servers_admin', __name__)

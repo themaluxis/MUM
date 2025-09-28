@@ -38,10 +38,10 @@
     </div>
 </div>
 
-{% if user.media_accesses is iterable and user.media_accesses is not string %}
-    {% set user_accesses = user.media_accesses %}
+{% if user.linked_service_users is iterable and user.linked_service_users is not string %}
+    {% set user_accesses = user.linked_service_users %}
 {% else %}
-    {% set user_accesses = user.media_accesses.all() if user.media_accesses else [] %}
+    {% set user_accesses = user.linked_service_users or [] %}
 {% endif %}
 {% set has_service_data = user_accesses|selectattr('user_raw_data')|list|length > 0 %}
 {% if has_service_data %}
@@ -60,7 +60,7 @@
                     <strong>Data Format:</strong> JSON (Raw User Data)
                 </p>
                 <p class="text-base-content/60 mt-1">
-                    This shows raw user data retrieved from media services and stored in UserMediaAccess records. Use this for debugging user sync and service integration problems.
+                    This shows raw user data retrieved from media services and stored in service user records. Use this for debugging user sync and service integration problems.
                 </p>
             </div>
         </div>

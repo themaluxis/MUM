@@ -80,6 +80,7 @@ def sync_all_users():
             'success': False,
             'added': 0,
             'updated': 0,
+            'removed': 0,  # Add missing 'removed' key
             'errors': 1,
             'error_messages': [f"Critical synchronization error: {str(e)}"],
             'servers_synced': 0

@@ -4,8 +4,8 @@
 from flask import render_template, request, current_app, session, make_response
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
-from app.models import UserAppAccess, Owner
-from app.models_media_services import MediaStreamHistory, UserMediaAccess, MediaServer
+from app.models_media_services import MediaStreamHistory, MediaServer
+from app.models import User, UserType
 from app.forms import MassUserEditForm
 from app.extensions import db
 from app.utils.helpers import setup_required, permission_required
@@ -55,27 +55,32 @@ def mass_edit_libraries_form():
         return '<div class="alert alert-warning">Mass edit libraries is only available for service users. No valid service users were selected.</div>'
     
     current_app.logger.debug(f"Querying for service_user_ids: {service_user_ids}")
-    access_records = db.session.query(UserMediaAccess, UserAppAccess, MediaServer).join(
-        UserAppAccess, UserMediaAccess.user_app_access_id == UserAppAccess.id, isouter=True
-    ).join(
-        MediaServer, UserMediaAccess.server_id == MediaServer.id
-    ).filter(UserMediaAccess.id.in_(service_user_ids)).all()
+    # Query for service users and their linked local users with server info
+    access_records = db.session.query(User, MediaServer).join(
+        MediaServer, User.server_id == MediaServer.id
+    ).filter(
+        User.id.in_(service_user_ids),
+        User.userType == UserType.SERVICE
+    ).all()
     current_app.logger.debug(f"Found {len(access_records)} access records")
     
     # Debug each access record
-    for i, (access, user, server) in enumerate(access_records):
-        current_app.logger.debug(f"Record {i}: access={access.id if access else None}, user={user.id if user else None}, server={server.id if server else None}")
-        if access:
-            current_app.logger.debug(f"Record {i} access details: external_username={access.external_username}, server_id={access.server_id}")
+    for i, (service_user, server) in enumerate(access_records):
+        current_app.logger.debug(f"Record {i}: service_user={service_user.id if service_user else None}, server={server.id if server else None}")
+        if service_user:
+            current_app.logger.debug(f"Record {i} service_user details: external_username={service_user.external_username}, server_id={service_user.server_id}")
         if server:
             current_app.logger.debug(f"Record {i} server details: name={server.server_nickname}, service_type={server.service_type}")
-        if user:
-            current_app.logger.debug(f"Record {i} user details: username={user.username}")
+        
+        # Get linked local user if any
+        linked_user = service_user.get_linked_parent() if service_user else None
+        if linked_user:
+            current_app.logger.debug(f"Record {i} linked user details: username={linked_user.localUsername}")
         else:
-            current_app.logger.debug(f"Record {i} user is None (standalone service user)")
+            current_app.logger.debug(f"Record {i} no linked user (standalone service user)")
 
     services_data = {}
-    for access, user, server in access_records:
+    for service_user, server in access_records:
         service_type_key = server.service_type.value
         if service_type_key not in services_data:
             services_data[service_type_key] = {
@@ -99,16 +104,16 @@ def mass_edit_libraries_form():
                 'server_name': server.server_nickname,
                 'users': [],
                 'libraries': libraries,
-                'current_library_ids': set(access.allowed_library_ids or [])
+                'current_library_ids': set(service_user.allowed_library_ids or [])
             }
         
         # Create display name for this user on this server
-        display_name = f"{access.external_username} ({server.server_nickname})"
+        display_name = f"{service_user.external_username} ({server.server_nickname})"
         services_data[service_type_key]['servers'][server.id]['users'].append(display_name)
         
         # Intersect library IDs for users on the same server
         current_ids = services_data[service_type_key]['servers'][server.id]['current_library_ids']
-        current_ids.intersection_update(access.allowed_library_ids or [])
+        current_ids.intersection_update(service_user.allowed_library_ids or [])
 
     current_app.logger.debug(f"Built services_data with {len(services_data)} service types")
     for service_key, service_info in services_data.items():
@@ -245,7 +250,7 @@ def mass_edit_users():
                     toast_category = "success" if error_count == 0 else "warning"
                 elif action == 'merge_into_local_account':
                     # Check if user accounts are enabled
-                    from app.models import Setting
+                    from app.models import User, UserType, Setting
                     allow_user_accounts = Setting.get_bool('ALLOW_USER_ACCOUNTS', False)
                     
                     if not allow_user_accounts:
@@ -275,7 +280,7 @@ def mass_edit_users():
                             toast_category = "error"
                         else:
                             # Check if username already exists
-                            existing_user = UserAppAccess.query.filter_by(username=merge_username).first()
+                            existing_user = User.get_by_local_username(merge_username)
                             if existing_user:
                                 toast_message = f"Username '{merge_username}' already exists. Please choose a different one."
                                 toast_category = "error"
@@ -335,7 +340,7 @@ def mass_edit_users():
     view_mode = request.args.get('view', 'cards')
     items_per_page = session.get('users_list_per_page', int(current_app.config.get('DEFAULT_USERS_PER_PAGE', 12)))
     
-    query = UserAppAccess.query
+    query = User.query.filter_by(userType=UserType.LOCAL)
     
     # Handle separate search fields (same as main route)
     search_username = request.args.get('search_username', '').strip()
@@ -346,13 +351,13 @@ def mass_edit_users():
     # Build search filters
     search_filters = []
     if search_username:
-        search_filters.append(UserAppAccess.username.ilike(f"%{search_username}%"))
+        search_filters.append(User.localUsername.ilike(f"%{search_username}%"))
     if search_email:
-        search_filters.append(UserAppAccess.email.ilike(f"%{search_email}%"))
+        search_filters.append(User.discord_email.ilike(f"%{search_email}%"))
     if search_notes:
-        search_filters.append(UserAppAccess.notes.ilike(f"%{search_notes}%"))
+        search_filters.append(User.notes.ilike(f"%{search_notes}%"))
     if search_term:
-        search_filters.append(or_(UserAppAccess.username.ilike(f"%{search_term}%"), UserAppAccess.email.ilike(f"%{search_term}%")))
+        search_filters.append(or_(User.localUsername.ilike(f"%{search_term}%"), User.discord_email.ilike(f"%{search_term}%")))
     
     # Apply search filters if any exist
     if search_filters:
@@ -363,16 +368,16 @@ def mass_edit_users():
     if server_filter_id != 'all':
         try:
             server_filter_id_int = int(server_filter_id)
-            query = query.join(UserMediaAccess).filter(UserMediaAccess.server_id == server_filter_id_int)
+            query = query.filter(User.server_id == server_filter_id_int)
         except ValueError:
             current_app.logger.warning(f"Invalid server_id received: {server_filter_id}")
     
     filter_type = request.args.get('filter_type', '')
     # Apply filters for users (updated for new architecture)
     if filter_type == 'has_discord': 
-        query = query.filter(UserAppAccess.discord_user_id != None)
+        query = query.filter(User.discord_user_id != None)
     elif filter_type == 'no_discord': 
-        query = query.filter(UserAppAccess.discord_user_id == None)
+        query = query.filter(User.discord_user_id == None)
     
     # Enhanced sorting logic (same as main route)
     sort_by_param = request.args.get('sort_by', 'username_asc')
@@ -383,50 +388,50 @@ def mass_edit_users():
     # Handle sorting that requires joins and aggregation
     if sort_column in ['total_plays', 'total_duration']:
         # Join with MediaStreamHistory for sorting by stream stats
-        query = query.outerjoin(MediaStreamHistory, MediaStreamHistory.user_app_access_uuid == UserAppAccess.uuid).group_by(UserAppAccess.id)
+        query = query.outerjoin(MediaStreamHistory, MediaStreamHistory.user_uuid == User.uuid).group_by(User.id)
         sort_field = func.count(MediaStreamHistory.id) if sort_column == 'total_plays' else func.sum(func.coalesce(MediaStreamHistory.duration_seconds, 0))
         query = query.add_columns(sort_field.label('sort_value'))
         
         if sort_direction == 'desc':
-            query = query.order_by(db.desc('sort_value').nullslast(), UserAppAccess.id.asc())
+            query = query.order_by(db.desc('sort_value').nullslast(), User.id.asc())
         else:
-            query = query.order_by(db.asc('sort_value').nullsfirst(), UserAppAccess.id.asc())
+            query = query.order_by(db.asc('sort_value').nullsfirst(), User.id.asc())
     else:
         sort_map = {
-            'username': UserAppAccess.username,
-            'email': UserAppAccess.email,
-            'last_streamed': UserAppAccess.last_login_at,  # UserAppAccess uses last_login_at
-            'created_at': UserAppAccess.created_at
+            'username': User.localUsername,
+            'email': User.discord_email,
+            'last_streamed': User.last_login_at,  # Uses last_login_at for unified User model
+            'created_at': User.created_at
         }
         
-        sort_field = sort_map.get(sort_column, UserAppAccess.username)
+        sort_field = sort_map.get(sort_column, User.localUsername)
 
         if sort_column in ['username', 'email']:
             if sort_direction == 'desc':
-                query = query.order_by(func.lower(sort_field).desc().nullslast(), UserAppAccess.id.asc())
+                query = query.order_by(func.lower(sort_field).desc().nullslast(), User.id.asc())
             else:
-                query = query.order_by(func.lower(sort_field).asc().nullsfirst(), UserAppAccess.id.asc())
+                query = query.order_by(func.lower(sort_field).asc().nullsfirst(), User.id.asc())
         else:
             if sort_direction == 'desc':
-                query = query.order_by(sort_field.desc().nullslast(), UserAppAccess.id.asc())
+                query = query.order_by(sort_field.desc().nullslast(), User.id.asc())
             else:
-                query = query.order_by(sort_field.asc().nullsfirst(), UserAppAccess.id.asc())
+                query = query.order_by(sort_field.asc().nullsfirst(), User.id.asc())
     
     # Calculate count properly for complex queries
     if sort_column in ['total_plays', 'total_duration']:
-        count_query = UserAppAccess.query
+        count_query = User.query.filter_by(userType=UserType.LOCAL)
         if search_filters:
             count_query = count_query.filter(or_(*search_filters))
         if server_filter_id != 'all':
             try:
                 server_filter_id_int = int(server_filter_id)
-                count_query = count_query.join(UserMediaAccess).filter(UserMediaAccess.server_id == server_filter_id_int)
+                count_query = count_query.filter(User.server_id == server_filter_id_int)
             except ValueError:
                 pass
         if filter_type == 'has_discord': 
-            count_query = count_query.filter(UserAppAccess.discord_user_id != None)
+            count_query = count_query.filter(User.discord_user_id != None)
         elif filter_type == 'no_discord': 
-            count_query = count_query.filter(UserAppAccess.discord_user_id == None)
+            count_query = count_query.filter(User.discord_user_id == None)
         users_count = count_query.count()
     else:
         users_count = query.count()
@@ -443,14 +448,14 @@ def mass_edit_users():
     user_library_access_by_server = {}  # user_id -> server_id -> [lib_ids]
     user_sorted_libraries = {}
     
-    # Get actual user IDs for UserAppAccess users only (for library access lookup)
+    # Get actual user IDs for LOCAL users only (for library access lookup)
     local_user_ids = [user.id for user in users_pagination.items if hasattr(user, 'id')]
     
-    access_records = UserMediaAccess.query.filter(UserMediaAccess.user_app_access_id.in_(local_user_ids)).all()
+    access_records = User.query.filter_by(userType=UserType.SERVICE).filter(User.linkedUserId.in_(local_user_ids)).all()
     for access in access_records:
-        if access.user_app_access_id not in user_library_access_by_server:
-            user_library_access_by_server[access.user_app_access_id] = {}
-        user_library_access_by_server[access.user_app_access_id][access.server_id] = access.allowed_library_ids
+        if access.linkedUserId not in user_library_access_by_server:
+            user_library_access_by_server[access.linkedUserId] = {}
+        user_library_access_by_server[access.linkedUserId][access.server_id] = access.allowed_library_ids
 
     # Get libraries from all active servers, organized by server to prevent ID collisions
     libraries_by_server = {}  # server_id -> {lib_id: lib_name}
@@ -506,7 +511,7 @@ def mass_edit_users():
 
     # Get additional required context data for the template
     # Get Owner with plex_uuid for filtering (AppUsers don't have plex_uuid)
-    owner = Owner.query.filter(Owner.plex_uuid.isnot(None)).first()
+    owner = User.query.filter_by(userType=UserType.OWNER).filter(User.plex_uuid.isnot(None)).first()
     admin_accounts = [owner] if owner else []
     admins_by_uuid = {admin.plex_uuid: admin for admin in admin_accounts if admin.plex_uuid}
     
@@ -527,20 +532,20 @@ def mass_edit_users():
     user_server_names = {}   # Track server names for each user
     
     # Get all user access records to determine service types
-    all_user_access = UserMediaAccess.query.filter(
-        UserMediaAccess.user_app_access_id.in_([user.id for user in users_pagination.items])
+    all_user_access = User.query.filter_by(userType=UserType.SERVICE).filter(
+        User.linkedUserId.in_([user.id for user in users_pagination.items])
     ).all()
     
     for access in all_user_access:
-        if access.user_app_access_id not in user_service_types:
-            user_service_types[access.user_app_access_id] = []
-            user_server_names[access.user_app_access_id] = []
+        if access.linkedUserId not in user_service_types:
+            user_service_types[access.linkedUserId] = []
+            user_server_names[access.linkedUserId] = []
         
-        if access.server.service_type not in user_service_types[access.user_app_access_id]:
-            user_service_types[access.user_app_access_id].append(access.server.service_type)
+        if access.server.service_type not in user_service_types[access.linkedUserId]:
+            user_service_types[access.linkedUserId].append(access.server.service_type)
         
-        if access.server.server_nickname not in user_server_names[access.user_app_access_id]:
-            user_server_names[access.user_app_access_id].append(access.server.server_nickname)
+        if access.server.server_nickname not in user_server_names[access.linkedUserId]:
+            user_server_names[access.linkedUserId].append(access.server.server_nickname)
 
     # Get server dropdown options for template
     server_dropdown_options = [{"id": "all", "name": "All Servers"}]

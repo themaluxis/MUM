@@ -166,9 +166,9 @@
                                 </span>
                                 
                                 {# Show badges for linked service accounts #}
-                                {% if user.media_accesses %}
-                                    {% for media_access in user.media_accesses %}
-                                        {% set service_type = media_access.get_service_type() %}
+                                {% if user.linked_service_users %}
+                                    {% for service_user in user.linked_service_users %}
+                                        {% set service_type = service_user.get_service_type() %}
                                         {% if service_type == 'plex' %}
                                             <a href="{{ url_for('user.view_service_account', server_nickname=media_access.server.server_nickname, server_username=media_access.external_username, back='users', back_view=request.args.get('back_view', 'cards')) }}" class="inline-flex items-center rounded-md bg-plex-50 dark:bg-plex-400/10 px-3 py-1 text-sm font-medium text-plex-700 dark:text-plex-400 ring-1 ring-inset ring-plex-600/20 dark:ring-plex-500/20 gap-2 hover:bg-plex-100 dark:hover:bg-plex-400/20 transition-colors cursor-pointer">
                                                 <svg class="w-4 h-4" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M22 25.5h48L116 94l-46 68.5H22L68.5 94Zm109.8 56L108 46l14-20.5h48zm-.3 23.5c10.979 17.625 25.52 38.875 38.5 49.5-11.149 13.635-34.323 32.278-62.5-14z"/></svg>
@@ -234,7 +234,7 @@
                                     </span>
                                 {% endif %}
                                 
-                                {# Show linked UserAppAccess badge if this service user is linked to a local account #}
+                                {# Show linked local user badge if this service user is linked to a local account #}
                                 {% if linked_user_app_access %}
                                     <a href="{{ url_for('user.view_app_user', username=linked_user_app_access.username, back='users', back_view=request.args.get('back_view', 'cards')) }}" 
                                        class="inline-flex items-center rounded-md bg-primary/10 px-3 py-1 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20 gap-2 hover:bg-primary/20 transition-colors cursor-pointer">
@@ -255,45 +255,86 @@
                     {% if request.args.get('back') %}{% set _ = tab_params.update({'back': request.args.get('back')}) %}{% endif %}
                     {% if request.args.get('back_view') %}{% set _ = tab_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
                     
-                    {# Determine the correct route based on user type #}
+                    {# Determine the correct route based on user type and admin context #}
                     {% if is_local_user is defined and is_local_user %}
                         {# Local User - use username route #}
-                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='profile', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'profile' else '' }}">
-                            <i class="fa-solid fa-user mr-2"></i>Profile
-                        </a>
-                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='history', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'history' else '' }}">
-                            <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
-                        </a>
-                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
-                            <i class="fa-solid fa-cog mr-2"></i>Settings
-                        </a>
-                        <a role="tab" href="{{ url_for('user.view_app_user', username=user.username, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
-                            <i class="fa-solid fa-shield-alt mr-2"></i>Security
-                        </a>
+                        {% if is_admin_context is defined and is_admin_context %}
+                            {# Admin context - use admin routes #}
+                            <a role="tab" href="{{ url_for('admin_user.view_local_user', username=user.localUsername, tab='profile', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'profile' else '' }}">
+                                <i class="fa-solid fa-user mr-2"></i>Profile
+                            </a>
+                            <a role="tab" href="{{ url_for('admin_user.view_local_user', username=user.localUsername, tab='history', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'history' else '' }}">
+                                <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
+                            </a>
+                            <a role="tab" href="{{ url_for('admin_user.view_local_user', username=user.localUsername, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
+                                <i class="fa-solid fa-cog mr-2"></i>Settings
+                            </a>
+                            <a role="tab" href="{{ url_for('admin_user.view_local_user', username=user.localUsername, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
+                                <i class="fa-solid fa-shield-alt mr-2"></i>Security
+                            </a>
+                        {% else %}
+                            {# User context - use regular routes #}
+                            <a role="tab" href="{{ url_for('user.view_app_user', username=user.localUsername, tab='profile', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'profile' else '' }}">
+                                <i class="fa-solid fa-user mr-2"></i>Profile
+                            </a>
+                            <a role="tab" href="{{ url_for('user.view_app_user', username=user.localUsername, tab='history', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'history' else '' }}">
+                                <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
+                            </a>
+                            <a role="tab" href="{{ url_for('user.view_app_user', username=user.localUsername, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
+                                <i class="fa-solid fa-cog mr-2"></i>Settings
+                            </a>
+                            <a role="tab" href="{{ url_for('user.view_app_user', username=user.localUsername, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
+                                <i class="fa-solid fa-shield-alt mr-2"></i>Security
+                            </a>
+                        {% endif %}
                     {% else %}
                         {# Service Account - use server/username route #}
                         {% set user_servers = user_server_names.get(user.uuid, []) %}
                         {% if user_servers %}
                             {% set server_name = user_servers[0] %}
                             {% set username = user.get_display_name() %}
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='profile', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'profile' else '' }}">
-                                <i class="fa-solid fa-user mr-2"></i>Profile
-                            </a>
-                            {% if primary_service and primary_service.value == 'plex' %}
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='overseerr', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'overseerr' else '' }}">
-                                <i class="fa-solid fa-film mr-2"></i>Overseerr
-                            </a>
-                            {% endif %}
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='history', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'history' else '' }}">
-                                <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
-                            </a>
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
-                                <i class="fa-solid fa-cog mr-2"></i>Settings
-                            </a>
-                            {% if user.password_hash and user.used_invite_id %}
-                            <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
-                                <i class="fa-solid fa-shield-alt mr-2"></i>Security
-                            </a>
+                            {% if is_admin_context is defined and is_admin_context %}
+                                {# Admin context - use admin routes #}
+                                <a role="tab" href="{{ url_for('admin_user.view_service_user', server_nickname=server_name, server_username=username, tab='profile', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'profile' else '' }}">
+                                    <i class="fa-solid fa-user mr-2"></i>Profile
+                                </a>
+                                {% if primary_service and primary_service.value == 'plex' %}
+                                <a role="tab" href="{{ url_for('admin_user.view_service_user', server_nickname=server_name, server_username=username, tab='overseerr', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'overseerr' else '' }}">
+                                    <i class="fa-solid fa-film mr-2"></i>Overseerr
+                                </a>
+                                {% endif %}
+                                <a role="tab" href="{{ url_for('admin_user.view_service_user', server_nickname=server_name, server_username=username, tab='history', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'history' else '' }}">
+                                    <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
+                                </a>
+                                <a role="tab" href="{{ url_for('admin_user.view_service_user', server_nickname=server_name, server_username=username, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
+                                    <i class="fa-solid fa-cog mr-2"></i>Settings
+                                </a>
+                                {% if user.password_hash and user.used_invite_id %}
+                                <a role="tab" href="{{ url_for('admin_user.view_service_user', server_nickname=server_name, server_username=username, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
+                                    <i class="fa-solid fa-shield-alt mr-2"></i>Security
+                                </a>
+                                {% endif %}
+                            {% else %}
+                                {# User context - use regular routes #}
+                                <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='profile', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'profile' else '' }}">
+                                    <i class="fa-solid fa-user mr-2"></i>Profile
+                                </a>
+                                {% if primary_service and primary_service.value == 'plex' %}
+                                <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='overseerr', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'overseerr' else '' }}">
+                                    <i class="fa-solid fa-film mr-2"></i>Overseerr
+                                </a>
+                                {% endif %}
+                                <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='history', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'history' else '' }}">
+                                    <i class="fa-solid fa-clock-rotate-left mr-2"></i>History
+                                </a>
+                                <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='settings', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'settings' else '' }}">
+                                    <i class="fa-solid fa-cog mr-2"></i>Settings
+                                </a>
+                                {% if user.password_hash and user.used_invite_id %}
+                                <a role="tab" href="{{ url_for('user.view_service_account', server_nickname=server_name, server_username=username, tab='security', **tab_params) }}" class="tab block h-[unset] pb-4 pt-4 pl-2.5 pr-2.5 {{ 'tab-active' if active_tab == 'security' else '' }}">
+                                    <i class="fa-solid fa-shield-alt mr-2"></i>Security
+                                </a>
+                                {% endif %}
                             {% endif %}
                         {% else %}
                             {# Fallback - no server info available #}
@@ -312,9 +353,12 @@
                 {% elif active_tab == 'history' %}
                     {% if is_service_user and server %}
                         <div id="user-history-container" 
-                             hx-get="{{ url_for('user.view_service_account', server_nickname=server.server_nickname, server_username=user.username, tab='history') }}"
-                             hx-trigger="load"
-                             hx-indicator="#loading-spinner">
+                             {% if is_admin_context is defined and is_admin_context %}
+                             hx-get="{{ url_for('admin_user.view_service_user', server_nickname=server.server_nickname, server_username=user.external_username, tab='history') }}"
+                             {% else %}
+                             hx-get="{{ url_for('user.view_service_account', server_nickname=server.server_nickname, server_username=user.external_username, tab='history') }}"
+                             {% endif %}
+                             hx-trigger="load">
                             <div class="flex justify-center items-center py-8">
                                 <span class="loading loading-spinner loading-md"></span>
                                 <span class="ml-2">Loading history...</span>
