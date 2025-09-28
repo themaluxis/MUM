@@ -27,3 +27,4 @@ from . import linking
 from . import api
 from . import debug
 from . import helpers
+from . import history

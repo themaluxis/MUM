@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ super() }} - General History{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-2">
+    <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">General History</h1>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs tabs-bordered mb-6">
+        <a class="tab" href="{{ url_for('users.list_users') }}">
+            <i class="fa-solid fa-users mr-2"></i> Users
+        </a>
+        <a class="tab tab-active">
+            <i class="fa-solid fa-history mr-2"></i> General History
+        </a>
+    </div>
+
+    <div class="bg-base-200 shadow-lg rounded-lg overflow-x-auto">
+        <table class="table w-full">
+            <!-- head -->
+            <thead>
+                <tr>
+                    <th>Media Title</th>
+                    <th>User</th>
+                    <th>Server</th>
+                    <th>Platform</th>
+                    <th>Watched Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in history_logs.items %}
+                <tr>
+                    <td>
+                        <div class="flex items-center space-x-3">
+                            <div>
+                                <div class="font-bold">{{ log.media_title or 'Unknown Title' }}</div>
+                                {% if log.grandparent_title %}
+                                <div class="text-sm opacity-50">{{ log.grandparent_title }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if log.user_app_access %}
+                            <a href="{{ url_for('user.view_app_user', username=log.user_app_access.username) }}" class="link link-hover">{{ log.user_app_access.get_display_name() }}</a>
+                        {% elif log.user_media_access %}
+                            <a href="{{ url_for('user.view_service_account', server_nickname=log.user_media_access.server.server_nickname, server_username=log.user_media_access.external_username) }}" class="link link-hover">{{ log.user_media_access.get_display_name() }}</a>
+                        {% else %}
+                            Unknown User
+                        {% endif %}
+                    </td>
+                    <td>{{ log.get_server_name() }}</td>
+                    <td>{{ log.platform or 'N/A' }}</td>
+                    <td>
+                        <span title="{{ log.started_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}">
+                            {{ log.started_at | time_ago_utc }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">No history records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="mt-6 flex justify-center">
+        {% if history_logs.has_prev %}
+        <a href="{{ url_for('users.general_history', page=history_logs.prev_num) }}" class="btn btn-outline mr-2">« Previous</a>
+        {% endif %}
+        {% if history_logs.has_next %}
+        <a href="{{ url_for('users.general_history', page=history_logs.next_num) }}" class="btn btn-outline">Next »</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
