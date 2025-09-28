@@ -187,7 +187,22 @@ def create_invite():
                 current_app.logger.error(f"Failed to fetch libraries from database for server {first_server.server_nickname}: {e}")
                 available_libraries = {}
     
-    form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
+    # Set initial form choices, but handle Kavita prefixing early for validation
+    if len(selected_server_ids) == 1:
+        first_server = media_service_manager.get_server_by_id(selected_server_ids[0])
+        if first_server and first_server.service_type.name.upper() == 'KAVITA':
+            # For Kavita, always use prefixed format to avoid ID conflicts
+            unique_choices = []
+            for lib_id, lib_name in available_libraries.items():
+                unique_lib_id = f"[KAVITA]-{first_server.server_nickname}-{lib_id}"
+                unique_choices.append((unique_lib_id, lib_name))
+            form.libraries.choices = unique_choices
+        else:
+            # For other services, use simple format
+            form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
+    else:
+        # Multi-server case - will be handled below
+        form.libraries.choices = [(lib_id, name) for lib_id, name in available_libraries.items()]
     
     # Discord settings
     discord_oauth_enabled = Setting.get_bool('DISCORD_OAUTH_ENABLED', False)
@@ -202,18 +217,8 @@ def create_invite():
         
         # Use different logic for single vs multi-server invites
         if len(selected_server_ids) == 1:
-            # Single server - only use prefixed format for Kavita
-            first_server = media_service_manager.get_server_by_id(selected_server_ids[0])
-            if first_server:
-                service_type = first_server.service_type.name.upper()
-                if service_type == 'KAVITA':
-                    # Convert to prefixed format for Kavita (to avoid ID conflicts)
-                    unique_choices = []
-                    for lib_id, lib_name in available_libraries.items():
-                        unique_lib_id = f"[{service_type}]-{first_server.server_nickname}-{lib_id}"
-                        unique_choices.append((unique_lib_id, lib_name))
-                    form.libraries.choices = unique_choices
-                # For UUID-based services, keep the raw external_id format (no change needed)
+            # Single server - choices already set above before validation
+            pass
         else:
             # Multi-server - use conflict handling logic
             all_valid_choices = []
@@ -373,11 +378,9 @@ def create_invite():
         # Update form choices for multi-server
         form.libraries.choices = all_valid_choices
     elif selected_server_ids and len(selected_server_ids) == 1:
-        # Single server - use simple library choices
-        from app.models_media_services import MediaLibrary
-        server_id = selected_server_ids[0]
-        db_libraries = MediaLibrary.query.filter_by(server_id=server_id).all()
-        form.libraries.choices = [(lib.external_id, lib.name) for lib in db_libraries]
+        # Single server - use appropriate library choices (already set above, don't override)
+        # The choices were already set correctly earlier with Kavita prefixing if needed
+        pass
     else:
         # No servers selected - empty choices
         form.libraries.choices = []

@@ -121,7 +121,7 @@ def process_invite_form(invite_path_or_token):
             if account_form.validate_on_submit():
                 # Store account creation data in session for later use
                 session[f'invite_{invite.id}_user_account_data'] = {
-                    'username': account_form.localUsername.data,
+                    'username': account_form.username.data,
                     'email': account_form.email.data,
                     'password': account_form.password.data
                 }
@@ -139,7 +139,7 @@ def process_invite_form(invite_path_or_token):
                 session[f'invite_{invite.id}_user_account_created'] = True
                 
                 flash("Account information saved! Please continue with the authentication steps.", "success")
-                current_app.logger.info(f"User account data stored in session for invite {invite.id}, username: {account_form.localUsername.data}")
+                current_app.logger.info(f"User account data stored in session for invite {invite.id}, username: {account_form.username.data}")
                 current_app.logger.info(f"Cross-server preferences: same_username={use_same_username}, same_password={use_same_password}")
                     
             else:
@@ -183,7 +183,8 @@ def process_invite_form(invite_path_or_token):
                     try:
                         # Create the local user account now
                         user_app_access = User(
-                            username=user_account_data['username'],
+                            userType=UserType.LOCAL,
+                            localUsername=user_account_data['username'],
                             email=user_account_data['email'],
                             created_at=utcnow(),
                             used_invite_id=invite.id

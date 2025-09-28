@@ -88,7 +88,7 @@ def delete_local_user(user_uuid):
     if not user_obj or user_type != "user_app_access":
         return make_response("Local user not found", 404)
     
-    user = User.query.filter_by(userType=UserType.LOCAL).get(user_obj.id)
+    user = User.query.filter_by(userType=UserType.LOCAL, id=user_obj.id).first()
     if not user:
         return make_response("Local user not found", 404)
     
