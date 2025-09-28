@@ -558,7 +558,7 @@ class MediaServiceManager:
                     # In unified model, get linked user via linkedUserId
                     user = None
                     if access.linkedUserId:
-                        user = User.query.filter_by(userType=UserType.LOCAL).get(access.linkedUserId)
+                        user = User.query.filter_by(userType=UserType.LOCAL, uuid=access.linkedUserId).first()
                     if user:
                         current_app.logger.debug(f"Found existing Plex user via UUID: {user.get_display_name()}")
                     else:

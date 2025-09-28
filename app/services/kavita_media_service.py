@@ -336,7 +336,7 @@ class KavitaMediaService(BaseMediaService):
         """
         from urllib.parse import urlparse, parse_qs
         
-        user_email = email or f"{username}@wizarr.local"
+        user_email = email or f"{username}@mum.local"
         user_password = password or 'changeme123'
         library_ids = kwargs.get('library_ids', [])
 
