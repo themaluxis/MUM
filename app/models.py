@@ -412,6 +412,67 @@ class User(db.Model, UserMixin):
             userType=UserType.SERVICE,
             linkedUserId=local_user_uuid
         ).all()
+    
+    # Overseerr Integration Methods
+    @classmethod
+    def get_overseerr_user_id(cls, server_id, plex_user_id):
+        """Get the Overseerr user ID for a given Plex user"""
+        user = cls.query.filter_by(
+            userType=UserType.SERVICE,
+            server_id=server_id,
+            external_user_id=plex_user_id
+        ).first()
+        
+        return user.overseerr_user_id if user else None
+    
+    @classmethod
+    def link_single_user(cls, server_id, plex_user_id, plex_username, plex_email=None):
+        """Attempt to link a single Plex user to Overseerr on-demand"""
+        from app.services.overseerr_service import OverseerrService
+        from app.models_media_services import MediaServer
+        from app.extensions import db
+        from datetime import datetime
+        
+        try:
+            # Get the server to access Overseerr
+            server = MediaServer.query.get(server_id)
+            if not server or not server.overseerr_enabled or not server.overseerr_url or not server.overseerr_api_key:
+                return False, None, "Overseerr not properly configured for this server"
+            
+            # Find the service user record for this user
+            user = cls.query.filter_by(
+                userType=UserType.SERVICE,
+                server_id=server_id,
+                external_user_id=plex_user_id
+            ).first()
+            
+            if not user:
+                return False, None, "Service user not found"
+            
+            # Check if user is already linked
+            if user.overseerr_user_id:
+                return True, user.overseerr_user_id, "User already linked"
+            
+            # Try to find the user in Overseerr
+            overseerr = OverseerrService(server.overseerr_url, server.overseerr_api_key)
+            success, overseerr_user, message = overseerr.get_user_by_plex_username(plex_username)
+            
+            if not success:
+                return False, None, f"Failed to check Overseerr: {message}"
+            
+            if not overseerr_user:
+                return False, None, "User not found in Overseerr"
+            
+            # User found! Update the link
+            overseerr_user_id = overseerr_user.get('id')
+            user.overseerr_user_id = overseerr_user_id
+            
+            db.session.commit()
+            return True, overseerr_user_id, f"Successfully linked to Overseerr user: {overseerr_user.get('username', overseerr_user.get('email', 'Unknown'))}"
+            
+        except Exception as e:
+            db.session.rollback()
+            return False, None, f"Error linking user: {str(e)}"
 
 # Legacy aliases removed - use unified User model directly
 

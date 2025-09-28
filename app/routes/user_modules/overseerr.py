@@ -3,6 +3,7 @@
 
 from flask import render_template, current_app
 from flask_login import login_required, current_user
+from app.models import User
 from app.models_media_services import MediaServer
 from . import user_bp
 import urllib.parse

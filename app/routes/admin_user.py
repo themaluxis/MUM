@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, current_app, abort, jsoni
 from flask_login import login_required, current_user
 from datetime import datetime, timezone
 from app.models import User, UserType
-from app.models_media_services import MediaStreamHistory, ServiceType
+from app.models_media_services import MediaStreamHistory, ServiceType, MediaServer
 from app.utils.helpers import permission_required
 from app.extensions import db
 from app.services.media_service_factory import MediaServiceFactory
