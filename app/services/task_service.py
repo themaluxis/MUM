@@ -126,7 +126,7 @@ def monitor_media_sessions_task():
                                 # In unified model, get linked user via linkedUserId
                                 mum_user = None
                                 if user_media_access.linkedUserId:
-                                    mum_user = User.query.filter_by(userType=UserType.LOCAL).get(user_media_access.linkedUserId)
+                                    mum_user = User.query.filter_by(userType=UserType.LOCAL, uuid=user_media_access.linkedUserId).first()
                                 current_app.logger.debug(f"LINKED: linked user = {mum_user}")
                                 
                                 if not mum_user:
@@ -176,7 +176,7 @@ def monitor_media_sessions_task():
                                 # In unified model, get linked user via linkedUserId
                                 mum_user = None
                                 if user_media_access.linkedUserId:
-                                    mum_user = User.query.filter_by(userType=UserType.LOCAL).get(user_media_access.linkedUserId)
+                                    mum_user = User.query.filter_by(userType=UserType.LOCAL, uuid=user_media_access.linkedUserId).first()
                                 current_app.logger.debug(f"LINKED: linked user = {mum_user}")
                                 
                                 if not mum_user:

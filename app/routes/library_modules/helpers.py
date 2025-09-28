@@ -2,6 +2,7 @@
 
 from flask import current_app
 from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory
+from app.models import User, UserType
 from app.extensions import db
 from datetime import datetime, timezone, timedelta
 

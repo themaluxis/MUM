@@ -289,7 +289,7 @@
                     {% set prev_params = {'server_nickname': server_name, 'server_username': username, 'tab': 'history', 'page': history_logs.prev_num} %}
                     {% if request.args.get('back') %}{% set _ = prev_params.update({'back': request.args.get('back')}) %}{% endif %}
                     {% if request.args.get('back_view') %}{% set _ = prev_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
-                    {% set prev_url = url_for('user.view_service_account', **prev_params) %}
+                    {% set prev_url = url_for('admin_user.view_service_user', **prev_params) %}
                 {% else %}
                     {% set prev_url = '#' %}
                 {% endif %}
@@ -327,7 +327,7 @@
                             {% set page_params = {'server_nickname': server_name, 'server_username': username, 'tab': 'history', 'page': page_num} %}
                             {% if request.args.get('back') %}{% set _ = page_params.update({'back': request.args.get('back')}) %}{% endif %}
                             {% if request.args.get('back_view') %}{% set _ = page_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
-                            {% set page_url = url_for('user.view_service_account', **page_params) %}
+                            {% set page_url = url_for('admin_user.view_service_user', **page_params) %}
                         {% else %}
                             {% set page_url = '#' %}
                         {% endif %}
@@ -363,7 +363,7 @@
                     {% set next_params = {'server_nickname': server_name, 'server_username': username, 'tab': 'history', 'page': history_logs.next_num} %}
                     {% if request.args.get('back') %}{% set _ = next_params.update({'back': request.args.get('back')}) %}{% endif %}
                     {% if request.args.get('back_view') %}{% set _ = next_params.update({'back_view': request.args.get('back_view')}) %}{% endif %}
-                    {% set next_url = url_for('user.view_service_account', **next_params) %}
+                    {% set next_url = url_for('admin_user.view_service_user', **next_params) %}
                 {% else %}
                     {% set next_url = '#' %}
                 {% endif %}

@@ -851,4 +851,6 @@ def library_detail(server_nickname, library_name):
                          active_tab=tab,
                          selected_days=request.args.get('days', 30) if tab == 'stats' else None,
                          days_filter=request.args.get('days', 30) if tab == 'activity' else None,
-                         current_sort_by=request.args.get('sort_by', 'title_asc') if tab == 'media' else None)
+                         current_sort_by=request.args.get('sort_by', 'title_asc') if tab == 'media' else None,
+                         User=User,
+                         UserType=UserType)
