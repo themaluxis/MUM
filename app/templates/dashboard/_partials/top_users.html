@@ -43,7 +43,7 @@
             
             <!-- Username -->
             {% if user.server_nickname and user.server_username %}
-            <a href="{{ url_for('user.view_service_account', server_nickname=user.server_nickname, server_username=user.server_username) }}" 
+            <a href="{{ url_for('admin_user.view_service_user', server_nickname=user.server_nickname, server_username=user.server_username) }}" 
                class="bg-base-300 font-bold text-white pl-5 pr-5 pt-2.5 pb-2.5 truncate w-full hover:text-primary transition-colors cursor-pointer">
                 {{ user.display_name }}
             </a>
