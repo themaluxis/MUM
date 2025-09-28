@@ -4,7 +4,7 @@
 from flask import render_template, request
 from flask_login import login_required
 from sqlalchemy.orm import joinedload
-from app.models import UserAppAccess
+from app.models import User
 from app.models_media_services import MediaStreamHistory
 from app.utils.helpers import permission_required, setup_required
 from . import users_bp
@@ -21,9 +21,7 @@ def general_history():
     # Query all media stream history, ordered by most recent.
     # Eagerly load related user and server info to prevent N+1 queries in the template.
     history_query = MediaStreamHistory.query.options(
-        joinedload(MediaStreamHistory.user_app_access),
-        joinedload(MediaStreamHistory.user_media_access).joinedload('user_app_access'),
-        joinedload(MediaStreamHistory.user_media_access).joinedload('server'),
+        joinedload(MediaStreamHistory.user),
         joinedload(MediaStreamHistory.server)
     ).order_by(MediaStreamHistory.started_at.desc())
 
