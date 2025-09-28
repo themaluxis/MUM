@@ -393,7 +393,7 @@
                                                         <div>
                                                             <div class="font-medium text-sm">
                                                                 {% if activity.user_server_nickname and activity.user_external_username %}
-                                                                    <a href="{{ url_for('user.view_service_account', server_nickname=activity.user_server_nickname, server_username=activity.user_external_username, back='users', back_view='cards') }}" class="text-primary hover:text-primary-focus" title="View user profile">
+                                                                    <a href="{{ url_for('admin_user.view_service_user', server_nickname=activity.user_server_nickname, server_username=activity.user_external_username, back='users', back_view='cards') }}" class="text-primary hover:text-primary-focus" title="View user profile">
                                                                         {{ activity.user_display_name }}
                                                                     </a>
                                                                 {% else %}

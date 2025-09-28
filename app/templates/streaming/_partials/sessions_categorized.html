@@ -169,7 +169,7 @@
                                                 </div>
                                             </div>
                                         {% endif %}
-                                        <a href="{{ url_for('user.view_service_account', server_nickname=session.server_name, server_username=session.user) }}" class="link link-hover text-info" title="View user profile">
+                                        <a href="{{ url_for('admin_user.view_service_user', server_nickname=session.server_name, server_username=session.user) }}" class="link link-hover text-info" title="View user profile">
                                             {{ session.user }}
                                         </a>
                                     </p>

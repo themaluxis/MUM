@@ -4,6 +4,7 @@ from flask import render_template, flash, redirect, url_for, current_app, reques
 from flask_login import login_required, current_user
 from app.utils.helpers import setup_required, permission_required
 from app.models_media_services import MediaLibrary, MediaServer
+from app.models import UserType
 from app.extensions import db
 from . import libraries_bp
 

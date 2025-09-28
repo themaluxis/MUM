@@ -253,6 +253,7 @@ def any_permission_required(permissions):
                 return redirect(url_for('auth.app_login'))
             
             # Import user types locally to avoid circular imports
+            from app.models import UserType
             
             # Owner always has all permissions
             if current_user.userType == UserType.OWNER:

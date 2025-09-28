@@ -6,6 +6,7 @@ from app.utils.helpers import setup_required, permission_required, encode_url_co
 from app.services.media_service_manager import MediaServiceManager
 from app.services.media_service_factory import MediaServiceFactory
 from app.models_media_services import MediaLibrary, MediaServer, MediaStreamHistory
+from app.models import User, UserType
 from app.extensions import db
 from datetime import datetime, timezone, timedelta
 import urllib.parse
@@ -787,16 +788,16 @@ def library_detail(server_nickname, library_name):
                         thumb_url = None
                         
                         # First try service_settings
-                        if user_access.service_settings and user_access.service_settings.get('thumb'):
-                            thumb_url = user_access.service_settings['thumb']
+                        if user.service_settings and user.service_settings.get('thumb'):
+                            thumb_url = user.service_settings['thumb']
                         # Then try raw_data from the user sync
-                        elif user_access.user_raw_data and user_access.user_raw_data.get('thumb'):
-                            thumb_url = user_access.user_raw_data['thumb']
+                        elif user.user_raw_data and user.user_raw_data.get('thumb'):
+                            thumb_url = user.user_raw_data['thumb']
                         # Also check nested raw data structure
-                        elif (user_access.user_raw_data and 
-                              user_access.user_raw_data.get('plex_user_obj_attrs') and 
-                              user_access.user_raw_data['plex_user_obj_attrs'].get('thumb')):
-                            thumb_url = user_access.user_raw_data['plex_user_obj_attrs']['thumb']
+                        elif (user.user_raw_data and 
+                              user.user_raw_data.get('plex_user_obj_attrs') and 
+                              user.user_raw_data['plex_user_obj_attrs'].get('thumb')):
+                            thumb_url = user.user_raw_data['plex_user_obj_attrs']['thumb']
                         
                         if thumb_url:
                             # Check if it's already a full URL (plex.tv avatars) or needs proxy
@@ -807,14 +808,14 @@ def library_detail(server_nickname, library_name):
                     
                     elif server.service_type.value.lower() == 'jellyfin':
                         # For Jellyfin, use the external_user_id to get avatar
-                        if user_access.external_user_id:
-                            entry.user_avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user_access.external_user_id}"
+                        if user.external_user_id:
+                            entry.user_avatar_url = f"/api/media/jellyfin/users/avatar?user_id={user.external_user_id}"
                 
                 # Check if this service user is linked to a local account for clickable username
                 # Get linked local user if this is a service user
                 entry.linked_local_user = None
-                if user_access.linkedUserId:
-                    entry.linked_local_user = User.query.filter_by(userType=UserType.LOCAL, uuid=user_access.linkedUserId).first()
+                if user and user.linkedUserId:
+                    entry.linked_local_user = User.query.filter_by(userType=UserType.LOCAL, uuid=user.linkedUserId).first()
             else:
                 entry.user_display_name = 'Unknown User'
                 entry.user_type = 'unknown'
