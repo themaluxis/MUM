@@ -4,6 +4,7 @@ instance/*
 .webassets-cache
 env/
 venv/
+
 .env
 
 *.sqlite
